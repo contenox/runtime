@@ -40,3 +40,36 @@ CATE combines several technologies to deliver its features:
 ## ⚙️ WIP - Work In Progress
 
 This project is currently under heavy development. Please check back later for more detailed instructions. Demos, installation, and usage guides will be available within the next day.
+
+Below is a brief "Dev Environment" section you can add to your documentation. It outlines the key steps and commands you need to get started:
+
+## Starting the Development Environment
+
+1. **Prepare the Environment**
+   - Copy and edit `.env-example` into a new `.env` file with the proper configuration.
+   - Install prerequisites: Docker, Docker Compose, Yarn, and Go.
+
+2. **Build and Run the Backend Services**
+   - Run the following to build Docker images and start all services:
+     ```bash
+     make run
+     ```
+   - Use `make logs` to tail the backend logs if needed.
+
+3. **Run the Frontend & UI**
+   - The UI dev server is bundled with the backend (proxied via the BFF).
+   - To start the UI development workflow, run:
+     ```bash
+     make ui-run
+     ```
+   - This will build the UI and wait for the backend to be ready before launching the Vite dev server.
+
+4. **API Tests Setup & Execution**
+   - Initialize the Python virtual environment and install API test dependencies:
+     ```bash
+     make api-init
+     ```
+   - Run your API tests via:
+     ```bash
+     make api-test
+     ```

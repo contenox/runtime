@@ -14,6 +14,6 @@ FROM alpine:3.19
 RUN apk add --no-cache libstdc++ libgcc # ? #https://github.com/ollama/ollama/pull/8106
 WORKDIR /
 
-COPY --from=builder / /app/
+COPY --from=builder /app /
 
 ENTRYPOINT ["/cate"]

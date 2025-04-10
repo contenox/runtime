@@ -3,11 +3,10 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "frontend",
-    "landing"
+    "frontend"
   ],
   "scripts": {
-    "build": "yarn install && yarn lerna run build --stream",
+    "build": "yarn lerna run build",
     "prettier:check": "yarn workspaces foreach --topological-dev --verbose run prettier:check",
     "prettier": "yarn workspaces foreach --topological-dev --verbose run prettier"
   },

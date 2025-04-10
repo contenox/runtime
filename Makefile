@@ -1,4 +1,4 @@
-.PHONY: test benchmarks run build down logs wait-for-server ui-install ui-package ui-build ui-run api-test api-init
+.PHONY: test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init
 
 test:
 	go test -v ./...
@@ -18,16 +18,19 @@ run: down build
 logs: run
 	docker compose logs -f backend
 
-wait-for-server:
-	@echo "Waiting for server to be ready..."
-	@until wget --spider -q http://localhost:8081/; do \
-		echo "Server not yet available, waiting..."; \
-		sleep 2; \
-	done
-	@echo "Server is up!"
+yarn-wipe:
+	echo "Removing Yarn PnP files..."
+	rm -f .pnp.cjs .pnp.loader.mjs
+	echo "Removing Yarn state files and unplugged directory..."
+	rm -rf .yarn/unplugged
+	rm -f .yarn/install-state.gz
+	echo "Removing node_modules directories..."
+	rm -rf node_modules packages/*/node_modules frontend/node_modules
+	echo "Running yarn install..."
+	yarn install
 
 ui-install:
-	yarn workspaces focus @cate/ui
+	yarn workspaces focus @cate/ui frontend
 
 ui-package: ui-install
 	yarn workspace @cate/ui build
@@ -36,8 +39,8 @@ ui-build: ui-package
     yarn prettier:check
 	yarn build
 
-ui-run: ui-build wait-for-server
-	yarn workspace frontend run dev --host
+ui-run: ui-build
+	yarn workspace frontend dev --host
 
 api-init:
 	python3 -m venv apitests/.venv
