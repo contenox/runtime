@@ -39,9 +39,7 @@ CATE combines several technologies to deliver its features:
 
 ## ⚙️ WIP - Work In Progress
 
-This project is currently under heavy development. Please check back later for more detailed instructions. Demos, installation, and usage guides will be available within the next day.
-
-Below is a brief "Dev Environment" section you can add to your documentation. It outlines the key steps and commands you need to get started:
+This project is currently under heavy development.
 
 ## Starting the Development Environment
 
