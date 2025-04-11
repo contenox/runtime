@@ -61,7 +61,8 @@ This project is currently under heavy development.
         make ui-run
         ```
     * Once Vite is running (you'll see its output in the terminal, often mentioning a port like 5173), **access the application in your browser via the main backend URL** (e.g., `http://localhost:8080` or as configured in your `.env` file or docker-compose port mappings).
-    * **Important:** Do *not* use the local URL Vite might display (like `localhost:5173`), as login and other authenticated features will not work correctly through it due to how browser cookies are handled. Always access the UI through the backend's address during development. Registering as `admin@admin.com` system privileges.
+    * **Important:** Do *not* use the local URL Vite might display (like `localhost:5173`), as login and other authenticated features will not work correctly through it due to how browser cookies are handled. Always access the UI through the backend's address during development. NOTE: Register
+    as `admin@admin.com` for system privileges.
 
 4.  **API Tests Setup & Execution**
     * Initialize the Python virtual environment and install API test dependencies:
