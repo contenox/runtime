@@ -3,8 +3,10 @@ package libollama
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/ollama/ollama/api"
@@ -12,7 +14,24 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+func quiet() func() {
+	null, _ := os.Open(os.DevNull)
+	sout := os.Stdout
+	serr := os.Stderr
+	os.Stdout = null
+	os.Stderr = null
+	log.SetOutput(null)
+	return func() {
+		defer null.Close()
+		os.Stdout = sout
+		os.Stderr = serr
+		log.SetOutput(os.Stderr)
+	}
+}
+
 func SetupLocalInstance(ctx context.Context) (string, testcontainers.Container, func(), error) {
+	defer quiet()()
+
 	cleanup := func() {}
 	exposedPort := "11434/tcp"
 
