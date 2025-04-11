@@ -14,6 +14,8 @@ import (
 )
 
 func TestTokenize(t *testing.T) {
+	defer quiet()
+
 	// Set up a tokenizer with fast timeout (optional)
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
@@ -70,6 +72,8 @@ func TestTokenize(t *testing.T) {
 }
 
 func TestCountTokens(t *testing.T) {
+	defer quiet()
+
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	tokenizer, err := libollama.NewTokenizer(
@@ -128,6 +132,7 @@ func TestCountTokens(t *testing.T) {
 }
 
 func TestAvailableModels(t *testing.T) {
+	defer quiet()
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	tokenizer, err := libollama.NewTokenizer(
@@ -152,6 +157,7 @@ func TestAvailableModels(t *testing.T) {
 }
 
 func TestOptimalTokenizerModel(t *testing.T) {
+	defer quiet()
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	tokenizer, err := libollama.NewTokenizer(
@@ -198,6 +204,7 @@ func TestOptimalTokenizerModel(t *testing.T) {
 }
 
 func TestPreloadOption(t *testing.T) {
+	defer quiet()
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	// Test with a small model (e.g., "tiny") preloaded
@@ -233,6 +240,8 @@ func TestPreloadOption(t *testing.T) {
 }
 
 func TestConcurrentTokenization(t *testing.T) {
+	defer quiet()
+
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 
 	// Preload models to avoid network delays during concurrent testing
