@@ -134,7 +134,7 @@ func (s *State) RunDownloadCycle(ctx context.Context) error {
 
 	log.Printf("Processing download job: %+v", item)
 	err = s.dwQueue.downloadModel(ctx, *item, func(status store.Status) error {
-		log.Printf("Download progress for model %s: %+v", item.Model, status)
+		// log.Printf("Download progress for model %s: %+v", item.Model, status)
 		message, _ := json.Marshal(status)
 		return s.psInstance.Publish(ctx, "model_download", message)
 	})
