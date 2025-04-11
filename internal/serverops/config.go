@@ -9,24 +9,24 @@ import (
 )
 
 type Config struct {
-	DatabaseURL     string `json:"database_url"`
-	Port            string `json:"port"`
-	Addr            string `json:"addr"`
-	AllowedOrigins  string `json:"allowed_origins"`
-	AllowedMethods  string `json:"allowed_methods"`
-	AllowedHeaders  string `json:"allowed_headers"`
-	SigningKey      string `json:"signing_key"`
-	EncryptionKey   string `json:"encryption_key"`
-	JWTSecret       string `json:"jwt_secret"`
-	JWTExpiry       string `json:"jwt_expiry"`
-	TiKVPDEndpoint  string `json:"tikv_pd_endpoint"`
-	NATSURL         string `json:"nats_url"`
-	NATSUser        string `json:"nats_user"`
-	NATSPassword    string `json:"nats_password"`
-	SecurityEnabled string `json:"security_enabled"`
-	OpensearchURL   string `json:"opensearch_url"`
-	ProxyOrigin     string `json:"proxy_origin"`
-	UIBaseURL       string `json:"ui_base_url"`
+	DatabaseURL       string `json:"database_url"`
+	Port              string `json:"port"`
+	Addr              string `json:"addr"`
+	AllowedAPIOrigins string `json:"allowed_api_origins"`
+	AllowedMethods    string `json:"allowed_methods"`
+	AllowedHeaders    string `json:"allowed_headers"`
+	SigningKey        string `json:"signing_key"`
+	EncryptionKey     string `json:"encryption_key"`
+	JWTSecret         string `json:"jwt_secret"`
+	JWTExpiry         string `json:"jwt_expiry"`
+	TiKVPDEndpoint    string `json:"tikv_pd_endpoint"`
+	NATSURL           string `json:"nats_url"`
+	NATSUser          string `json:"nats_user"`
+	NATSPassword      string `json:"nats_password"`
+	SecurityEnabled   string `json:"security_enabled"`
+	OpensearchURL     string `json:"opensearch_url"`
+	ProxyOrigin       string `json:"proxy_origin"`
+	UIBaseURL         string `json:"ui_base_url"`
 }
 
 func LoadConfig(cfg *Config) error {
@@ -72,9 +72,9 @@ func ValidateConfig(cfg *Config) error {
 		cfg.AllowedHeaders = "Content-Type, Authorization"
 		log.Println("allowed_headers not set, using default:", cfg.AllowedHeaders)
 	}
-	if len(cfg.AllowedOrigins) == 0 {
-		cfg.AllowedOrigins = "*" // Default to allow all origins
-		log.Println("allowed_origins not set, using default:", cfg.AllowedOrigins)
+	if len(cfg.AllowedAPIOrigins) == 0 {
+		cfg.AllowedAPIOrigins = "*" // Default to allow all origins
+		log.Println("allowed_origins not set, using default:", cfg.AllowedAPIOrigins)
 	}
 	// Validate SigningKey: require at least 16 characters.
 	if len(cfg.SigningKey) < 16 {

@@ -124,7 +124,7 @@ func enableCORS(cfg *serverops.Config, next http.Handler) http.Handler {
 			w.Header().Add("Vary", "Origin")
 		}
 		// If the config explicitly allows all origins.
-		declaredOrigins := strings.Split(cfg.AllowedOrigins, ",")
+		declaredOrigins := strings.Split(cfg.AllowedAPIOrigins, ",")
 		for _, o := range declaredOrigins {
 			if strings.TrimSpace(o) == "*" {
 				allowedOrigin = "*"
