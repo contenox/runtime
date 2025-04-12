@@ -263,7 +263,7 @@ func TestConcurrentTokenization(t *testing.T) {
 			defer wg.Done()
 			model := "granite-embedding-30m"
 			if id%2 == 0 {
-				model = "llama-3.1"
+				model = "tiny"
 			}
 			prompt := fmt.Sprintf("Goroutine %d: 🚀 Concurrent test! %s", id, strings.Repeat("na ", id%5))
 
