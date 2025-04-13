@@ -56,3 +56,7 @@ wait-for-server:
 
 api-test: run wait-for-server
 	. apitests/.venv/bin/activate && pytest apitests/
+
+
+proto:
+	protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/serverapi/tokenizerapi/proto/tokenizerapi.proto

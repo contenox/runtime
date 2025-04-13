@@ -1,6 +1,7 @@
 package tokenizerservice
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -8,7 +9,14 @@ import (
 	"github.com/js402/CATE/libs/libollama"
 )
 
-type Service struct {
+type Tokenizer interface {
+	Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error)
+	CountTokens(ctx context.Context, modelName string, prompt string) (int, error)
+	AvailableModels(ctx context.Context) ([]string, error)
+	OptimalModel(ctx context.Context, baseModel string) (string, error)
+}
+
+type localService struct {
 	mu         sync.RWMutex
 	tokenizer  libollama.Tokenizer
 	config     Config
@@ -23,8 +31,8 @@ type Config struct {
 	UseDefaultURLs bool
 }
 
-func New(initial Config) (*Service, error) {
-	svc := &Service{
+func New(initial Config) (Tokenizer, error) {
+	svc := &localService{
 		config: Config{
 			Models:         make(map[string]string),
 			UseDefaultURLs: true,
@@ -54,7 +62,7 @@ func New(initial Config) (*Service, error) {
 }
 
 // Core configuration management
-func (s *Service) applyConfig() error {
+func (s *localService) applyConfig() error {
 	opts := []libollama.TokenizerOption{}
 
 	// Model configuration
@@ -95,21 +103,21 @@ func (s *Service) applyConfig() error {
 }
 
 // Model management
-func (s *Service) AddModel(name, modelURL string) error {
+func (s *localService) AddModel(ctx context.Context, name, modelURL string) error {
 	s.mu.Lock()
 	s.config.Models[name] = modelURL
 	s.mu.Unlock()
 	return s.applyConfig()
 }
 
-func (s *Service) RemoveModel(name string) error {
+func (s *localService) RemoveModel(name string) error {
 	s.mu.Lock()
 	delete(s.config.Models, name)
 	s.mu.Unlock()
 	return s.applyConfig()
 }
 
-func (s *Service) ReplaceAllModels(models map[string]string) error {
+func (s *localService) ReplaceAllModels(ctx context.Context, models map[string]string) error {
 	s.mu.Lock()
 	s.config.Models = models
 	s.config.UseDefaultURLs = false
@@ -118,7 +126,7 @@ func (s *Service) ReplaceAllModels(models map[string]string) error {
 }
 
 // Security configuration
-func (s *Service) SetAuthToken(token string) error {
+func (s *localService) SetAuthToken(token string) error {
 	s.mu.Lock()
 	s.config.AuthToken = token
 	s.mu.Unlock()
@@ -126,7 +134,7 @@ func (s *Service) SetAuthToken(token string) error {
 }
 
 // Network configuration
-func (s *Service) SetHTTPClient(client *http.Client) error {
+func (s *localService) SetHTTPClient(client *http.Client) error {
 	s.mu.Lock()
 	s.httpClient = client
 	s.mu.Unlock()
@@ -134,7 +142,7 @@ func (s *Service) SetHTTPClient(client *http.Client) error {
 }
 
 // Fallback model management
-func (s *Service) SetFallbackModel(name string) error {
+func (s *localService) SetFallbackModel(name string) error {
 	s.mu.Lock()
 	s.config.FallbackModel = name
 	s.mu.Unlock()
@@ -142,7 +150,7 @@ func (s *Service) SetFallbackModel(name string) error {
 }
 
 // Preloading configuration
-func (s *Service) SetPreloadModels(models []string) error {
+func (s *localService) SetPreloadModels(models []string) error {
 	s.mu.Lock()
 	s.config.PreloadModels = models
 	s.mu.Unlock()
@@ -150,29 +158,29 @@ func (s *Service) SetPreloadModels(models []string) error {
 }
 
 // Existing service methods with thread safety
-func (s *Service) Tokenize(modelName string, prompt string) ([]int, error) {
+func (s *localService) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.tokenizer.Tokenize(modelName, prompt)
 }
 
-func (s *Service) CountTokens(modelName string, prompt string) (int, error) {
+func (s *localService) CountTokens(ctx context.Context, modelName string, prompt string) (int, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.tokenizer.CountTokens(modelName, prompt)
 }
 
-func (s *Service) AvailableModels() []string {
+func (s *localService) AvailableModels(ctx context.Context) ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.tokenizer.AvailableModels()
+	return s.tokenizer.AvailableModels(), nil
 }
 
-func (s *Service) OptimalModel(baseModel string) (string, error) {
+func (s *localService) OptimalModel(ctx context.Context, baseModel string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.tokenizer.OptimalTokenizerModel(baseModel)
 }
 
-func (s *Service) GetServiceName() string  { return "tokenizerservice" }
-func (s *Service) GetServiceGroup() string { return serverops.DefaultDefaultServiceGroup }
+func (s *localService) GetServiceName() string  { return "tokenizerservice" }
+func (s *localService) GetServiceGroup() string { return serverops.DefaultDefaultServiceGroup }

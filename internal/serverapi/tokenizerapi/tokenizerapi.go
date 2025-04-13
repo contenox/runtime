@@ -14,10 +14,10 @@ import (
 
 type server struct {
 	tokenizerservicepb.UnimplementedTokenizerServiceServer
-	coreService *tokenizerservice.Service
+	coreService tokenizerservice.Tokenizer
 }
 
-func RegisterTokenizerServiceServer(grpcSrv *grpc.Server, coreSvc *tokenizerservice.Service) {
+func RegisterTokenizerServiceServer(grpcSrv *grpc.Server, coreSvc tokenizerservice.Tokenizer) {
 	if grpcSrv == nil {
 		// TODO: handle this error more gracefully depending on your setup
 		panic("grpc.Server instance is nil")
