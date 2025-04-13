@@ -57,7 +57,7 @@ func (s *server) CountTokens(ctx context.Context, req *tokenizerservicepb.CountT
 	if req.ModelName == "" {
 		return nil, status.Error(codes.InvalidArgument, "model_name is required")
 	}
-	count, err := s.coreService.CountTokens(req.ModelName, req.Prompt)
+	count, err := s.coreService.CountTokens(ctx, req.ModelName, req.Prompt)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "core service failed to count tokens: %v", err)
 	}
@@ -66,7 +66,10 @@ func (s *server) CountTokens(ctx context.Context, req *tokenizerservicepb.CountT
 }
 
 func (s *server) AvailableModels(ctx context.Context, req *emptypb.Empty) (*tokenizerservicepb.AvailableModelsResponse, error) {
-	models := s.coreService.AvailableModels()
+	models, err := s.coreService.AvailableModels(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "core service failed to get available models: %v", err)
+	}
 	if models == nil {
 		models = []string{}
 	}
@@ -77,7 +80,7 @@ func (s *server) OptimalModel(ctx context.Context, req *tokenizerservicepb.Optim
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
-	optimalModel, err := s.coreService.OptimalModel(req.BaseModel)
+	optimalModel, err := s.coreService.OptimalModel(ctx, req.BaseModel)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "core service failed to find optimal model: %v", err)
 	}
