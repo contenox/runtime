@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v3.21.12
-// source: internal/serverapi/tokenizerapi/proto/tokenizerapi.proto
+// source: serverapi/tokenizerapi/proto/tokenizerapi.proto
 
 package tokenizerservicepb
 
@@ -244,5 +244,5 @@ var TokenizerService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "internal/serverapi/tokenizerapi/proto/tokenizerapi.proto",
+	Metadata: "serverapi/tokenizerapi/proto/tokenizerapi.proto",
 }

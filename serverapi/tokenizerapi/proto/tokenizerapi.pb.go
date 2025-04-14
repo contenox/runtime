@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v3.21.12
-// source: internal/serverapi/tokenizerapi/proto/tokenizerapi.proto
+// source: serverapi/tokenizerapi/proto/tokenizerapi.proto
 
 package tokenizerservicepb
 
@@ -33,7 +33,7 @@ type TokenizeRequest struct {
 
 func (x *TokenizeRequest) Reset() {
 	*x = TokenizeRequest{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[0]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *TokenizeRequest) String() string {
 func (*TokenizeRequest) ProtoMessage() {}
 
 func (x *TokenizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[0]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *TokenizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenizeRequest.ProtoReflect.Descriptor instead.
 func (*TokenizeRequest) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{0}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *TokenizeRequest) GetModelName() string {
@@ -85,7 +85,7 @@ type TokenizeResponse struct {
 
 func (x *TokenizeResponse) Reset() {
 	*x = TokenizeResponse{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[1]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -97,7 +97,7 @@ func (x *TokenizeResponse) String() string {
 func (*TokenizeResponse) ProtoMessage() {}
 
 func (x *TokenizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[1]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -110,7 +110,7 @@ func (x *TokenizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenizeResponse.ProtoReflect.Descriptor instead.
 func (*TokenizeResponse) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{1}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *TokenizeResponse) GetTokens() []int32 {
@@ -131,7 +131,7 @@ type CountTokensRequest struct {
 
 func (x *CountTokensRequest) Reset() {
 	*x = CountTokensRequest{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[2]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -143,7 +143,7 @@ func (x *CountTokensRequest) String() string {
 func (*CountTokensRequest) ProtoMessage() {}
 
 func (x *CountTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[2]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -156,7 +156,7 @@ func (x *CountTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountTokensRequest.ProtoReflect.Descriptor instead.
 func (*CountTokensRequest) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{2}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CountTokensRequest) GetModelName() string {
@@ -183,7 +183,7 @@ type CountTokensResponse struct {
 
 func (x *CountTokensResponse) Reset() {
 	*x = CountTokensResponse{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[3]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +195,7 @@ func (x *CountTokensResponse) String() string {
 func (*CountTokensResponse) ProtoMessage() {}
 
 func (x *CountTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[3]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +208,7 @@ func (x *CountTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountTokensResponse.ProtoReflect.Descriptor instead.
 func (*CountTokensResponse) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{3}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CountTokensResponse) GetCount() int32 {
@@ -228,7 +228,7 @@ type AvailableModelsResponse struct {
 
 func (x *AvailableModelsResponse) Reset() {
 	*x = AvailableModelsResponse{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[4]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -240,7 +240,7 @@ func (x *AvailableModelsResponse) String() string {
 func (*AvailableModelsResponse) ProtoMessage() {}
 
 func (x *AvailableModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[4]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -253,7 +253,7 @@ func (x *AvailableModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AvailableModelsResponse.ProtoReflect.Descriptor instead.
 func (*AvailableModelsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{4}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AvailableModelsResponse) GetModelNames() []string {
@@ -273,7 +273,7 @@ type OptimalModelRequest struct {
 
 func (x *OptimalModelRequest) Reset() {
 	*x = OptimalModelRequest{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[5]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -285,7 +285,7 @@ func (x *OptimalModelRequest) String() string {
 func (*OptimalModelRequest) ProtoMessage() {}
 
 func (x *OptimalModelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[5]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -298,7 +298,7 @@ func (x *OptimalModelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimalModelRequest.ProtoReflect.Descriptor instead.
 func (*OptimalModelRequest) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{5}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *OptimalModelRequest) GetBaseModel() string {
@@ -318,7 +318,7 @@ type OptimalModelResponse struct {
 
 func (x *OptimalModelResponse) Reset() {
 	*x = OptimalModelResponse{}
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[6]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +330,7 @@ func (x *OptimalModelResponse) String() string {
 func (*OptimalModelResponse) ProtoMessage() {}
 
 func (x *OptimalModelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[6]
+	mi := &file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +343,7 @@ func (x *OptimalModelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptimalModelResponse.ProtoReflect.Descriptor instead.
 func (*OptimalModelResponse) Descriptor() ([]byte, []int) {
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{6}
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *OptimalModelResponse) GetOptimalModelName() string {
@@ -353,11 +353,11 @@ func (x *OptimalModelResponse) GetOptimalModelName() string {
 	return ""
 }
 
-var File_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto protoreflect.FileDescriptor
+var File_serverapi_tokenizerapi_proto_tokenizerapi_proto protoreflect.FileDescriptor
 
-const file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc = "" +
+const file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc = "" +
 	"\n" +
-	"8internal/serverapi/tokenizerapi/proto/tokenizerapi.proto\x12\x12tokenizerservicepb\x1a\x1bgoogle/protobuf/empty.proto\"H\n" +
+	"/serverapi/tokenizerapi/proto/tokenizerapi.proto\x12\x12tokenizerservicepb\x1a\x1bgoogle/protobuf/empty.proto\"H\n" +
 	"\x0fTokenizeRequest\x12\x1d\n" +
 	"\n" +
 	"model_name\x18\x01 \x01(\tR\tmodelName\x12\x16\n" +
@@ -382,22 +382,22 @@ const file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc = ""
 	"\bTokenize\x12#.tokenizerservicepb.TokenizeRequest\x1a$.tokenizerservicepb.TokenizeResponse\x12^\n" +
 	"\vCountTokens\x12&.tokenizerservicepb.CountTokensRequest\x1a'.tokenizerservicepb.CountTokensResponse\x12V\n" +
 	"\x0fAvailableModels\x12\x16.google.protobuf.Empty\x1a+.tokenizerservicepb.AvailableModelsResponse\x12a\n" +
-	"\fOptimalModel\x12'.tokenizerservicepb.OptimalModelRequest\x1a(.tokenizerservicepb.OptimalModelResponseBIZGgithub.com/js402/cate/services/tokenizerapi/tokenizerservicepbb\x06proto3"
+	"\fOptimalModel\x12'.tokenizerservicepb.OptimalModelRequest\x1a(.tokenizerservicepb.OptimalModelResponseB@Z>github.com/js402/cate/services/tokenizerapi/tokenizerservicepbb\x06proto3"
 
 var (
-	file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescOnce sync.Once
-	file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData []byte
+	file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescOnce sync.Once
+	file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData []byte
 )
 
-func file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP() []byte {
-	file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescOnce.Do(func() {
-		file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc), len(file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc)))
+func file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescGZIP() []byte {
+	file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescOnce.Do(func() {
+		file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc), len(file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc)))
 	})
-	return file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData
+	return file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescData
 }
 
-var file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes = []any{
+var file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes = []any{
 	(*TokenizeRequest)(nil),         // 0: tokenizerservicepb.TokenizeRequest
 	(*TokenizeResponse)(nil),        // 1: tokenizerservicepb.TokenizeResponse
 	(*CountTokensRequest)(nil),      // 2: tokenizerservicepb.CountTokensRequest
@@ -407,7 +407,7 @@ var file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes = []an
 	(*OptimalModelResponse)(nil),    // 6: tokenizerservicepb.OptimalModelResponse
 	(*emptypb.Empty)(nil),           // 7: google.protobuf.Empty
 }
-var file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs = []int32{
+var file_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs = []int32{
 	0, // 0: tokenizerservicepb.TokenizerService.Tokenize:input_type -> tokenizerservicepb.TokenizeRequest
 	2, // 1: tokenizerservicepb.TokenizerService.CountTokens:input_type -> tokenizerservicepb.CountTokensRequest
 	7, // 2: tokenizerservicepb.TokenizerService.AvailableModels:input_type -> google.protobuf.Empty
@@ -423,26 +423,26 @@ var file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs = []in
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_init() }
-func file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_init() {
-	if File_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto != nil {
+func init() { file_serverapi_tokenizerapi_proto_tokenizerapi_proto_init() }
+func file_serverapi_tokenizerapi_proto_tokenizerapi_proto_init() {
+	if File_serverapi_tokenizerapi_proto_tokenizerapi_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc), len(file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc), len(file_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes,
-		DependencyIndexes: file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs,
-		MessageInfos:      file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes,
+		GoTypes:           file_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes,
+		DependencyIndexes: file_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs,
+		MessageInfos:      file_serverapi_tokenizerapi_proto_tokenizerapi_proto_msgTypes,
 	}.Build()
-	File_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto = out.File
-	file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes = nil
-	file_internal_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs = nil
+	File_serverapi_tokenizerapi_proto_tokenizerapi_proto = out.File
+	file_serverapi_tokenizerapi_proto_tokenizerapi_proto_goTypes = nil
+	file_serverapi_tokenizerapi_proto_tokenizerapi_proto_depIdxs = nil
 }
