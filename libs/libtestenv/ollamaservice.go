@@ -1,4 +1,4 @@
-package libollama
+package libtestenv
 
 import (
 	"context"
