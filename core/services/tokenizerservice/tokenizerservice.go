@@ -2,10 +2,12 @@ package tokenizerservice
 
 import (
 	"context"
-	"net/http"
-	"sync"
+	"fmt"
 
-	"github.com/js402/cate/core/serverops"
+	tokenizerservicepb "github.com/js402/cate/core/serverapi/tokenizerapi/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Tokenizer interface {
@@ -15,173 +17,115 @@ type Tokenizer interface {
 	OptimalModel(ctx context.Context, baseModel string) (string, error)
 }
 
-type localService struct {
-	mu         sync.RWMutex
-	tokenizer  Tokenizer
-	config     Config
-	httpClient *http.Client
+type grpcClient struct {
+	client tokenizerservicepb.TokenizerServiceClient
+	conn   *grpc.ClientConn
 }
 
-type Config struct {
-	Models         map[string]string
-	FallbackModel  string
-	AuthToken      string
-	PreloadModels  []string
-	UseDefaultURLs bool
+var _ Tokenizer = (*grpcClient)(nil)
+
+type ConfigGRPC struct {
+	ServerAddress string
+	DialOptions   []grpc.DialOption
 }
 
-func New(initial Config, t Tokenizer) (Tokenizer, error) {
-	svc := &localService{
-		config: Config{
-			Models:         make(map[string]string),
-			UseDefaultURLs: true,
-		},
-		httpClient: http.DefaultClient,
-		mu:         sync.RWMutex{},
-		tokenizer:  t,
+func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() error, error) {
+	opts := cfg.DialOptions
+	if len(opts) == 0 {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	// Apply initial configuration
-	if initial.Models != nil {
-		svc.config.Models = initial.Models
+	conn, err := grpc.NewClient(cfg.ServerAddress, opts...)
+	if err != nil {
+		err = fmt.Errorf("failed to dial gRPC server at %s: %w", cfg.ServerAddress, err)
+		return nil, nil, err
 	}
-	if initial.FallbackModel != "" {
-		svc.config.FallbackModel = initial.FallbackModel
+
+	closeFunc := func() error {
+		fmt.Println("Closing gRPC connection via returned closer...")
+		if conn != nil {
+			return conn.Close()
+		}
+		return nil
 	}
-	if initial.AuthToken != "" {
-		svc.config.AuthToken = initial.AuthToken
+
+	defer func() {
+		if err != nil && conn != nil {
+			closeFunc()
+		}
+	}()
+
+	stub := tokenizerservicepb.NewTokenizerServiceClient(conn)
+	client := &grpcClient{
+		client: stub,
+		conn:   conn,
 	}
-	if initial.PreloadModels != nil {
-		svc.config.PreloadModels = initial.PreloadModels
-	}
-	svc.config.UseDefaultURLs = initial.UseDefaultURLs
-	// err := svc.applyConfig()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	return svc, nil
+
+	return client, closeFunc, nil
 }
 
-// // Core configuration management
-// func (s *localService) applyConfig() error {
-// 	opts := []libollama.TokenizerOption{}
+func (c *grpcClient) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
+	req := &tokenizerservicepb.TokenizeRequest{
+		ModelName: modelName,
+		Prompt:    prompt,
+	}
 
-// 	// Model configuration
-// 	if s.config.UseDefaultURLs {
-// 		opts = append(opts, libollama.TokenizerWithCustomModels(s.config.Models))
-// 	} else {
-// 		opts = append(opts, libollama.TokenizerWithModelMap(s.config.Models))
-// 	}
+	resp, err := c.client.Tokenize(ctx, req)
+	if err != nil {
+		// Consider logging the error or wrapping it for more context
+		return nil, fmt.Errorf("gRPC Tokenize call failed: %w", err)
+	}
 
-// 	// Authentication
-// 	if s.config.AuthToken != "" {
-// 		opts = append(opts, libollama.TokenizerWithToken(s.config.AuthToken))
-// 	}
+	// Convert []int32 from protobuf to []int for the interface contract
+	tokens := make([]int, len(resp.Tokens))
+	for i, t := range resp.Tokens {
+		tokens[i] = int(t) // TODO: Potential data loss if int32 > max int on platform, usually ok.
+	}
 
-// 	// Network configuration
-// 	opts = append(opts, libollama.TokenizerWithHTTPClient(s.httpClient))
-
-// 	// Model defaults
-// 	if s.config.FallbackModel != "" {
-// 		opts = append(opts, libollama.TokenizerWithFallbackModel(s.config.FallbackModel))
-// 	}
-
-// 	// Preloading
-// 	if len(s.config.PreloadModels) > 0 {
-// 		opts = append(opts, libollama.TokenizerWithPreloadedModels(s.config.PreloadModels...))
-// 	}
-
-// 	// Create new tokenizer instance
-// 	newTokenizer, err := libollama.NewTokenizer(opts...)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-// 	s.tokenizer = newTokenizer
-// 	return nil
-// }
-
-// Model management
-// func (s *localService) AddModel(ctx context.Context, name, modelURL string) error {
-// 	s.mu.Lock()
-// 	s.config.Models[name] = modelURL
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// func (s *localService) RemoveModel(name string) error {
-// 	s.mu.Lock()
-// 	delete(s.config.Models, name)
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// func (s *localService) ReplaceAllModels(ctx context.Context, models map[string]string) error {
-// 	s.mu.Lock()
-// 	s.config.Models = models
-// 	s.config.UseDefaultURLs = false
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// // Security configuration
-// func (s *localService) SetAuthToken(token string) error {
-// 	s.mu.Lock()
-// 	s.config.AuthToken = token
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// // Network configuration
-// func (s *localService) SetHTTPClient(client *http.Client) error {
-// 	s.mu.Lock()
-// 	s.httpClient = client
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// // Fallback model management
-// func (s *localService) SetFallbackModel(name string) error {
-// 	s.mu.Lock()
-// 	s.config.FallbackModel = name
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// // Preloading configuration
-// func (s *localService) SetPreloadModels(models []string) error {
-// 	s.mu.Lock()
-// 	s.config.PreloadModels = models
-// 	s.mu.Unlock()
-// 	return s.applyConfig()
-// }
-
-// Existing service methods with thread safety
-func (s *localService) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.tokenizer.Tokenize(ctx, modelName, prompt)
+	return tokens, nil
 }
 
-func (s *localService) CountTokens(ctx context.Context, modelName string, prompt string) (int, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.tokenizer.CountTokens(ctx, modelName, prompt)
+// CountTokens implements the Tokenizer interface.
+func (c *grpcClient) CountTokens(ctx context.Context, modelName string, prompt string) (int, error) {
+	req := &tokenizerservicepb.CountTokensRequest{
+		ModelName: modelName,
+		Prompt:    prompt,
+	}
+
+	resp, err := c.client.CountTokens(ctx, req)
+	if err != nil {
+		return 0, fmt.Errorf("gRPC CountTokens call failed: %w", err)
+	}
+
+	return int(resp.Count), nil
 }
 
-// func (s *localService) AvailableModels(ctx context.Context) ([]string, error) {
-// 	s.mu.RLock()
-// 	defer s.mu.RUnlock()
-// 	return s.tokenizer.AvailableModels(), nil
-// }
+func (c *grpcClient) AvailableModels(ctx context.Context) ([]string, error) {
+	req := &emptypb.Empty{}
 
-func (s *localService) OptimalModel(ctx context.Context, baseModel string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.tokenizer.OptimalModel(ctx, baseModel)
+	resp, err := c.client.AvailableModels(ctx, req)
+	if err != nil {
+		return []string{}, fmt.Errorf("gRPC AvailableModels call failed: %w.", err)
+	}
+	if resp == nil {
+		return []string{}, fmt.Errorf("gRPC AvailableModels returned nil response.")
+
+	}
+	return resp.ModelNames, nil
 }
 
-func (s *localService) GetServiceName() string  { return "tokenizerservice" }
-func (s *localService) GetServiceGroup() string { return serverops.DefaultDefaultServiceGroup }
+func (c *grpcClient) OptimalModel(ctx context.Context, baseModel string) (string, error) {
+	req := &tokenizerservicepb.OptimalModelRequest{
+		BaseModel: baseModel,
+	}
+
+	resp, err := c.client.OptimalModel(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("gRPC OptimalModel call failed: %w", err)
+	}
+	if resp == nil {
+		return "", fmt.Errorf("gRPC OptimalModel returned nil response")
+	}
+
+	return resp.OptimalModelName, nil
+}

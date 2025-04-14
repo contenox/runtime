@@ -1,4 +1,4 @@
-module github.com/cate/libs/libollama
+module github.com/js402/cate/libs/libollama
 
 go 1.24.1
 
@@ -6,7 +6,6 @@ go 1.24.1
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/js402/cate v0.0.0-20250414172403-2ab6009c46c0
 	github.com/ollama/ollama v0.6.5
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0

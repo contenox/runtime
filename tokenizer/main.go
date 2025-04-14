@@ -7,7 +7,7 @@ import (
 
 	"github.com/js402/cate/core/serverapi/tokenizerapi"
 	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/tokenizerservice"
+	"github.com/js402/cate/services/tokenizerservice"
 
 	"google.golang.org/grpc"
 )
