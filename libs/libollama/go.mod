@@ -1,12 +1,15 @@
-module github.com/js402/cate/tokenizer
+module github.com/cate/libs/libollama
 
 go 1.24.1
 
-replace github.com/js402/cate/core => ../core
+// go why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/js402/cate/core v0.0.0-00010101000000-000000000000
-	google.golang.org/grpc v1.71.1
+	github.com/js402/cate v0.0.0-20250414172403-2ab6009c46c0
+	github.com/ollama/ollama v0.6.5
+	github.com/stretchr/testify v1.10.0
+	github.com/testcontainers/testcontainers-go v0.36.0
 )
 
 require (
@@ -47,16 +50,13 @@ require (
 	github.com/go-playground/validator/v10 v10.20.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/js402/cate v0.0.0-20250414172403-2ab6009c46c0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/lufia/plan9stats v0.0.0-20250317134145-8bc96cf8fc35 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -70,10 +70,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nlpodyssey/gopickle v0.3.0 // indirect
-	github.com/ollama/ollama v0.6.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/opensearch-project/opensearch-go/v4 v4.4.0 // indirect
 	github.com/pdevine/tensor v0.0.0-20240510204454-f88f4562727c // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -81,10 +79,6 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
-	github.com/testcontainers/testcontainers-go v0.36.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/opensearch v0.36.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -95,8 +89,10 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel v1.35.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
@@ -108,12 +104,8 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorgonia.org/vecf32 v0.9.0 // indirect
 	gorgonia.org/vecf64 v0.9.0 // indirect
 )
-
-// go why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb

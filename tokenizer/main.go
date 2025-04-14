@@ -5,9 +5,9 @@ import (
 	"net"
 	"strings"
 
-	"github.com/js402/cate/serverapi/tokenizerapi"
-	"github.com/js402/cate/serverops"
-	"github.com/js402/cate/services/tokenizerservice"
+	"github.com/js402/cate/core/serverapi/tokenizerapi"
+	"github.com/js402/cate/core/serverops"
+	"github.com/js402/cate/core/services/tokenizerservice"
 
 	"google.golang.org/grpc"
 )
