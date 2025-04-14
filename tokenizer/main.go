@@ -2,33 +2,44 @@ package main
 
 import (
 	"log"
+	"net"
+	"strings"
 
-	"github.com/js402/CATE/internal/serverops"
+	"github.com/js402/CATE/serverapi/tokenizerapi"
+	"github.com/js402/CATE/serverops"
+	"github.com/js402/CATE/services/tokenizerservice"
+
+	"google.golang.org/grpc"
 )
 
 func main() {
-	config := &serverops.Config{}
+	config := &serverops.ConfigTokenizerService{}
 	if err := serverops.LoadConfig(config); err != nil {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
-	if err := serverops.ValidateConfig(config); err != nil {
-		log.Fatalf("configuration did not pass validation: %v", err)
+	models := strings.Split(config.PreloadModels, ",")
+	coreSvc, err := tokenizerservice.New(
+		tokenizerservice.Config{
+			FallbackModel:  config.FallbackModel,
+			AuthToken:      config.ModelSourceAuthToken,
+			UseDefaultURLs: config.UseDefaultURLs,
+			PreloadModels:  models,
+		},
+	)
+	grpcServer := grpc.NewServer()
+
+	if err := tokenizerapi.RegisterTokenizerService(grpcServer, coreSvc); err != nil {
+		log.Fatalf("failed to register tokenizer service: %v", err)
 	}
-	// ctx := context.TODO()
 
-	// // fmt.Print("initialize the database")
+	listenAddr := config.Addr
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		log.Fatalf("failed to listen on %s: %v", listenAddr, err)
+	}
 
-	// // apiHandler, err := serverapi.New(ctx, config, store, ps, bus)
-	// // if err != nil {
-	// // 	log.Fatalf("initializing API handler failed: %v", err)
-	// // }
-
-	// // mux := http.NewServeMux()
-	// // mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
-
-	// // port := config.Port
-	// // log.Printf("starting server on :%s", port)
-	// // if err := http.ListenAndServe(config.Addr+":"+port, mux); err != nil {
-	// // 	log.Fatalf("server failed: %v", err)
-	// // }
+	log.Printf("Tokenizer gRPC server listening on %s", listenAddr)
+	if err := grpcServer.Serve(listener); err != nil {
+		log.Fatalf("gRPC server failed: %v", err)
+	}
 }

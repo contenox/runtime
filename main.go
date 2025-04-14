@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/js402/CATE/internal/serverapi"
-	"github.com/js402/CATE/internal/serverops"
-	"github.com/js402/CATE/internal/serverops/messagerepo"
-	"github.com/js402/CATE/internal/serverops/store"
+	"github.com/js402/CATE/serverapi"
+	"github.com/js402/CATE/serverops"
+	"github.com/js402/CATE/serverops/messagerepo"
+	"github.com/js402/CATE/serverops/store"
 	"github.com/js402/CATE/libs/libbus"
 	"github.com/js402/CATE/libs/libdb"
 	"github.com/js402/CATE/libs/libroutine"
@@ -82,7 +82,8 @@ func main() {
 		log.Fatalf("initializing OpenSearch failed: %v", err)
 	}
 
-	apiHandler, err := serverapi.New(ctx, config, store, ps, bus)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, store, ps, bus)
+	defer cleanup()
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
 	}

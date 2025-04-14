@@ -21,6 +21,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  tokenizer:
+    build:
+      context: ./
+      dockerfile: Dockerfile.tokenizer
+    ports:
+      - "50051:50051"
+    healthcheck:
+      test: ["CMD-SHELL", "grpc_health_probe -addr=localhost:50051"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      - FALLBACK_MODEL=phi3
+      - USE_DEFAULT_URLS=true
+      - PRELOAD_MODELS=tiny,phi3
+      - ADDR=0.0.0.0:50051
 
   postgres:
     image: postgres:17-bookworm
