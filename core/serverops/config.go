@@ -27,7 +27,7 @@ type Config struct {
 	OpensearchURL       string `json:"opensearch_url"`
 	ProxyOrigin         string `json:"proxy_origin"`
 	UIBaseURL           string `json:"ui_base_url"`
-	TokenizerServiceURL string `env:"TOKENIZER_SERVICE_URL" envDefault:"tokenizer:50051"`
+	TokenizerServiceURL string `json:"tokenizer_service_url"`
 }
 
 type ConfigTokenizerService struct {
