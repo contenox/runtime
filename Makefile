@@ -1,10 +1,18 @@
-.PHONY: core-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+.PHONY: core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
 
 core-test:
 	go test -C ./core/ ./...
 
-benchmarks:
-	go test -bench=./... -run=^$ -benchmem
+libs-test:
+	for d in libs/*; do \
+	  if [ -f "$$d/go.mod" ]; then \
+	    echo "=== Running tests in $$d ==="; \
+	    (cd "$$d" && go test ./...); \
+	  fi; \
+	done
+
+core-benchmark:
+	go test -C ./core -bench=. -run=^$ -benchmem ./...
 
 build:
 	docker compose build
