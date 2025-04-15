@@ -7,7 +7,7 @@ import (
 
 	"github.com/js402/cate/core/serverapi/tokenizerapi"
 	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/services/tokenizerservice"
+	"github.com/js402/cate/tokenizer/service"
 
 	"google.golang.org/grpc"
 )
@@ -18,8 +18,8 @@ func main() {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
 	models := strings.Split(config.PreloadModels, ",")
-	coreSvc, err := tokenizerservice.New(
-		tokenizerservice.Config{
+	coreSvc, err := service.New(
+		service.Config{
 			FallbackModel:  config.FallbackModel,
 			AuthToken:      config.ModelSourceAuthToken,
 			UseDefaultURLs: config.UseDefaultURLs,

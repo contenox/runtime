@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tokenizerservicepb "github.com/js402/cate/core/serverapi/tokenizerapi/proto"
+	"github.com/js402/cate/core/serverapi/tokenizerapi/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -17,7 +17,7 @@ type Tokenizer interface {
 }
 
 type grpcClient struct {
-	client tokenizerservicepb.TokenizerServiceClient
+	client proto.TokenizerServiceClient
 	conn   *grpc.ClientConn
 }
 
@@ -54,7 +54,7 @@ func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() er
 		}
 	}()
 
-	stub := tokenizerservicepb.NewTokenizerServiceClient(conn)
+	stub := proto.NewTokenizerServiceClient(conn)
 	client := &grpcClient{
 		client: stub,
 		conn:   conn,
@@ -64,7 +64,7 @@ func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() er
 }
 
 func (c *grpcClient) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
-	req := &tokenizerservicepb.TokenizeRequest{
+	req := &proto.TokenizeRequest{
 		ModelName: modelName,
 		Prompt:    prompt,
 	}
@@ -86,7 +86,7 @@ func (c *grpcClient) Tokenize(ctx context.Context, modelName string, prompt stri
 
 // CountTokens implements the Tokenizer interface.
 func (c *grpcClient) CountTokens(ctx context.Context, modelName string, prompt string) (int, error) {
-	req := &tokenizerservicepb.CountTokensRequest{
+	req := &proto.CountTokensRequest{
 		ModelName: modelName,
 		Prompt:    prompt,
 	}
@@ -114,7 +114,7 @@ func (c *grpcClient) AvailableModels(ctx context.Context) ([]string, error) {
 }
 
 func (c *grpcClient) OptimalModel(ctx context.Context, baseModel string) (string, error) {
-	req := &tokenizerservicepb.OptimalModelRequest{
+	req := &proto.OptimalModelRequest{
 		BaseModel: baseModel,
 	}
 

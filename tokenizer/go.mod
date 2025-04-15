@@ -4,9 +4,17 @@ go 1.24.1
 
 replace github.com/js402/cate/core => ../core
 
+replace (
+	github.com/js402/cate/libs/libauth => ../libs/libauth
+	github.com/js402/cate/libs/libdb => ../libs/libdb
+)
+
+// go why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
+
 require (
-	github.com/js402/cate v0.0.0-20250414172403-2ab6009c46c0
 	github.com/js402/cate/core v0.0.0-00010101000000-000000000000
+	github.com/js402/cate/libs/libollama v0.0.0-20250415134247-d9ea7c0520f3
 	google.golang.org/grpc v1.71.1
 )
 
@@ -52,6 +60,8 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/js402/cate/libs/libauth v0.0.0-00010101000000-000000000000 // indirect
+	github.com/js402/cate/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
@@ -108,12 +118,9 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorgonia.org/vecf32 v0.9.0 // indirect
 	gorgonia.org/vecf64 v0.9.0 // indirect
 )
-
-// go why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
-replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb

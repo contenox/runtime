@@ -4,7 +4,7 @@
 // - protoc             v3.21.12
 // source: core/serverapi/tokenizerapi/proto/tokenizerapi.proto
 
-package tokenizerservicepb
+package proto
 
 import (
 	context "context"

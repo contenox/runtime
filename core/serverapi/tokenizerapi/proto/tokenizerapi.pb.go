@@ -4,7 +4,7 @@
 // 	protoc        v3.21.12
 // source: core/serverapi/tokenizerapi/proto/tokenizerapi.proto
 
-package tokenizerservicepb
+package proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -382,7 +382,7 @@ const file_core_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDesc = "" +
 	"\bTokenize\x12#.tokenizerservicepb.TokenizeRequest\x1a$.tokenizerservicepb.TokenizeResponse\x12^\n" +
 	"\vCountTokens\x12&.tokenizerservicepb.CountTokensRequest\x1a'.tokenizerservicepb.CountTokensResponse\x12V\n" +
 	"\x0fAvailableModels\x12\x16.google.protobuf.Empty\x1a+.tokenizerservicepb.AvailableModelsResponse\x12a\n" +
-	"\fOptimalModel\x12'.tokenizerservicepb.OptimalModelRequest\x1a(.tokenizerservicepb.OptimalModelResponseBEZCgithub.com/js402/cate/services/core/tokenizerapi/tokenizerservicepbb\x06proto3"
+	"\fOptimalModel\x12'.tokenizerservicepb.OptimalModelRequest\x1a(.tokenizerservicepb.OptimalModelResponseB9Z7github.com/js402/cate/core/serverapi/tokenizerapi/protob\x06proto3"
 
 var (
 	file_core_serverapi_tokenizerapi_proto_tokenizerapi_proto_rawDescOnce sync.Once

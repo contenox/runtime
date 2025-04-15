@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tokenizerservicepb "github.com/js402/cate/core/serverapi/tokenizerapi/proto"
+	"github.com/js402/cate/core/serverapi/tokenizerapi/proto"
 	"github.com/js402/cate/core/services/tokenizerservice"
 
 	"google.golang.org/grpc"
@@ -13,7 +13,7 @@ import (
 )
 
 type service struct {
-	tokenizerservicepb.UnimplementedTokenizerServiceServer
+	proto.UnimplementedTokenizerServiceServer
 	coreService tokenizerservice.Tokenizer
 }
 
@@ -27,11 +27,11 @@ func RegisterTokenizerService(grpcSrv *grpc.Server, coreSvc tokenizerservice.Tok
 	adapter := &service{
 		coreService: coreSvc,
 	}
-	tokenizerservicepb.RegisterTokenizerServiceServer(grpcSrv, adapter)
+	proto.RegisterTokenizerServiceServer(grpcSrv, adapter)
 	return nil
 }
 
-func (s *service) Tokenize(ctx context.Context, req *tokenizerservicepb.TokenizeRequest) (*tokenizerservicepb.TokenizeResponse, error) {
+func (s *service) Tokenize(ctx context.Context, req *proto.TokenizeRequest) (*proto.TokenizeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
@@ -47,10 +47,10 @@ func (s *service) Tokenize(ctx context.Context, req *tokenizerservicepb.Tokenize
 		responseTokens[i] = int32(t)
 	}
 
-	return &tokenizerservicepb.TokenizeResponse{Tokens: responseTokens}, nil
+	return &proto.TokenizeResponse{Tokens: responseTokens}, nil
 }
 
-func (s *service) CountTokens(ctx context.Context, req *tokenizerservicepb.CountTokensRequest) (*tokenizerservicepb.CountTokensResponse, error) {
+func (s *service) CountTokens(ctx context.Context, req *proto.CountTokensRequest) (*proto.CountTokensResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
@@ -62,7 +62,7 @@ func (s *service) CountTokens(ctx context.Context, req *tokenizerservicepb.Count
 		return nil, status.Errorf(codes.Internal, "core service failed to count tokens: %v", err)
 	}
 
-	return &tokenizerservicepb.CountTokensResponse{Count: int32(count)}, nil
+	return &proto.CountTokensResponse{Count: int32(count)}, nil
 }
 
 // func (s *service) AvailableModels(ctx context.Context, req *emptypb.Empty) (*tokenizerservicepb.AvailableModelsResponse, error) {
@@ -76,7 +76,7 @@ func (s *service) CountTokens(ctx context.Context, req *tokenizerservicepb.Count
 // 	return &tokenizerservicepb.AvailableModelsResponse{ModelNames: models}, nil
 // }
 
-func (s *service) OptimalModel(ctx context.Context, req *tokenizerservicepb.OptimalModelRequest) (*tokenizerservicepb.OptimalModelResponse, error) {
+func (s *service) OptimalModel(ctx context.Context, req *proto.OptimalModelRequest) (*proto.OptimalModelResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
@@ -85,5 +85,5 @@ func (s *service) OptimalModel(ctx context.Context, req *tokenizerservicepb.Opti
 		return nil, status.Errorf(codes.Internal, "core service failed to find optimal model: %v", err)
 	}
 
-	return &tokenizerservicepb.OptimalModelResponse{OptimalModelName: optimalModel}, nil
+	return &proto.OptimalModelResponse{OptimalModelName: optimalModel}, nil
 }
