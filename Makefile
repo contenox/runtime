@@ -1,7 +1,7 @@
-.PHONY: test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+.PHONY: core-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
 
-test:
-	go test -v ./...
+core-test:
+	go test -C ./core/ ./...
 
 benchmarks:
 	go test -bench=./... -run=^$ -benchmem
