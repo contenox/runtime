@@ -25,6 +25,7 @@
 
 **Language**: `Go`
 
+```bash
 ├── core
 │   ├── go.mod
 │   ├── go.sum
@@ -36,7 +37,7 @@
 │   │   ├── fromruntimestate.go
 │   │   ├── fromruntimestate_test.go
 │   │   ├── mockmodelprovider.go
-
+```
 
 ### API Layer (`serverapi`)
 Defines the HTTP API endpoints. Not all api-routes are/have to be exposed by the core.
