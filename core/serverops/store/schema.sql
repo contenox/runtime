@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
     payload JSONB NOT NULL,
     added_at TIMESTAMP NOT NULL,
-)
+);
 
 CREATE INDEX IF NOT EXISTS idx_job_queue_v2_task_type ON job_queue_v2 USING hash(task_type);
 CREATE INDEX IF NOT EXISTS idx_accesslists_identity ON accesslists USING hash(identity);
