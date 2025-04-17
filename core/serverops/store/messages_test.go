@@ -12,6 +12,15 @@ import (
 
 func TestMessages(t *testing.T) {
 	ctx, s := store.SetupStore(t)
+	err := s.CreateUser(ctx, &store.User{
+		ID:           uuid.NewString(),
+		FriendlyName: "John Doe",
+		Email:        "admin@admin.com",
+		Subject:      "my-users-id",
+	})
+	require.NoError(t, err)
+	idxID := uuid.NewString()
+	err = s.CreateMessageIndex(ctx, idxID, "my-users-id")
 	t.Run("list Empty", func(t *testing.T) {
 		messages, err := s.ListMessages(context.Background(), "invalid-stream")
 		require.NoError(t, err)
@@ -21,18 +30,18 @@ func TestMessages(t *testing.T) {
 		id := uuid.NewString()
 		err := s.AppendMessage(ctx, &store.Message{
 			ID:      id,
-			Stream:  "my-stream",
+			IDX:     idxID,
 			Payload: []byte("{}"),
 		})
 		require.NoError(t, err)
-		messages, err := s.ListMessages(context.Background(), "my-stream")
+		messages, err := s.ListMessages(context.Background(), idxID)
 		require.NoError(t, err)
 		require.Len(t, messages, 1)
 		require.Equal(t, id, messages[0].ID)
 		require.WithinDuration(t, time.Now(), messages[0].AddedAt, time.Second)
-		err = s.DeleteMessages(context.Background(), "my-stream")
+		err = s.DeleteMessages(context.Background(), idxID)
 		require.NoError(t, err)
-		messages, err = s.ListMessages(context.Background(), "my-stream")
+		messages, err = s.ListMessages(context.Background(), idxID)
 		require.NoError(t, err)
 		require.Empty(t, messages)
 	})

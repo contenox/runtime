@@ -12,10 +12,10 @@ func (s *store) AppendMessage(ctx context.Context, message *Message) error {
 
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO messages
-		(id, stream, payload, added_at)
+		(id, idx_id, payload, added_at)
 		VALUES ($1, $2, $3, $4)`,
 		message.ID,
-		message.Stream,
+		message.IDX,
 		message.Payload,
 		message.AddedAt,
 	)
@@ -25,7 +25,7 @@ func (s *store) AppendMessage(ctx context.Context, message *Message) error {
 func (s *store) DeleteMessages(ctx context.Context, stream string) error {
 	result, err := s.Exec.ExecContext(ctx, `
 		DELETE FROM messages
-		WHERE stream = $1`,
+		WHERE idx_id = $1`,
 		stream,
 	)
 
@@ -38,10 +38,10 @@ func (s *store) DeleteMessages(ctx context.Context, stream string) error {
 
 func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, stream, payload, added_at
+		SELECT id, idx_id, payload, added_at
 		FROM messages
-		WHERE stream = $1
-		ORDER BY added_at DESC`,
+		WHERE idx_id = $1
+		ORDER BY added_at ASC`,
 		stream,
 	)
 	if err != nil {
@@ -54,7 +54,7 @@ func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, er
 		var model Message
 		if err := rows.Scan(
 			&model.ID,
-			&model.Stream,
+			&model.IDX,
 			&model.Payload,
 			&model.AddedAt,
 		); err != nil {

@@ -10,8 +10,8 @@ services:
         condition: service_healthy
       nats:
         condition: service_started
-      opensearch:
-        condition: service_healthy
+      # opensearch:
+      #   condition: service_healthy
       # tokenizer:
       #   condition: service_healthy
     ports:
@@ -63,33 +63,33 @@ services:
       - NATS_USER=natsuser
       - NATS_PASSWORD=natspassword
 
-  opensearch:
-    image: opensearchproject/opensearch:latest
-    environment:
-      - cluster.name=opensearch-cluster
-      - node.name=opensearch-node1
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms750m -Xmx750m"
-      - "DISABLE_SECURITY_PLUGIN=true"
-      - "DISABLE_INSTALL_DEMO_CONFIG=true"
-      - "OPENSEARCH_JAVA_OPTS=-Dopensearch.experimental.feature.telemetry.enabled=true"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    ports:
-      - "${HOST_OPENSEARCH_PORT:-9200}:9200"
-      - "${HOST_OPENSEARCH_PORT2:-9300}:9300"
-    command: ["opensearch", "-Elogger.level=${OPENSEARCH_LOG_LEVEL:-INFO}"]
-    healthcheck:
-      test:
-        ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-    # volumes:
-    #   - opensearch-data:/usr/share/opensearch/data
+  # opensearch:
+  #   image: opensearchproject/opensearch:latest
+  #   environment:
+  #     - cluster.name=opensearch-cluster
+  #     - node.name=opensearch-node1
+  #     - discovery.type=single-node
+  #     - bootstrap.memory_lock=true
+  #     - "ES_JAVA_OPTS=-Xms750m -Xmx750m"
+  #     - "DISABLE_SECURITY_PLUGIN=true"
+  #     - "DISABLE_INSTALL_DEMO_CONFIG=true"
+  #     - "OPENSEARCH_JAVA_OPTS=-Dopensearch.experimental.feature.telemetry.enabled=true"
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #   ports:
+  #     - "${HOST_OPENSEARCH_PORT:-9200}:9200"
+  #     - "${HOST_OPENSEARCH_PORT2:-9300}:9300"
+  #   command: ["opensearch", "-Elogger.level=${OPENSEARCH_LOG_LEVEL:-INFO}"]
+  #   healthcheck:
+  #     test:
+  #       ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+  #     interval: 10s
+  #     timeout: 10s
+  #     retries: 5
+  # volumes:
+  #   - opensearch-data:/usr/share/opensearch/data
 
   # ollama:
   #   image: ollama/ollama:latest

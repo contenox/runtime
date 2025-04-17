@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,23 +11,26 @@ import (
 	"github.com/js402/cate/core/modelprovider"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/messagerepo"
 	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/core/services/tokenizerservice"
+	"github.com/js402/cate/libs/libdb"
 	"github.com/ollama/ollama/api"
 )
 
 type Service struct {
-	state     *runtimestate.State
-	msgRepo   messagerepo.Store
-	tokenizer tokenizerservice.Tokenizer
+	state      *runtimestate.State
+	dbInstance libdb.DBManager
+	tokenizer  tokenizerservice.Tokenizer
 }
 
-func New(state *runtimestate.State, msgStore messagerepo.Store, tokenizer tokenizerservice.Tokenizer) *Service {
+func New(
+	state *runtimestate.State,
+	dbInstance libdb.DBManager,
+	tokenizer tokenizerservice.Tokenizer) *Service {
 	return &Service{
-		state:     state,
-		msgRepo:   msgStore,
-		tokenizer: tokenizer,
+		state:      state,
+		dbInstance: dbInstance,
+		tokenizer:  tokenizer,
 	}
 }
 
@@ -46,88 +48,89 @@ type ChatSession struct {
 }
 
 // NewInstance creates a new chat instance after verifying that the user is authorized to start a chat for the given model.
-func (s *Service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (uuid.UUID, error) {
+func (s *Service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return uuid.Nil, err
+		return "", err
 	}
-
-	// TODO: check if at least one of preferred models are ready for usage.
-	// OR we find best candidates instead
-
-	chatSubjectID := uuid.New()
-	now := time.Now().UTC()
-
-	err := s.msgRepo.Save(ctx, messagerepo.Message{
-		ID:          uuid.New().String(),
-		MessageID:   "0",
-		Data:        `{"role": "system", "content": "{}"}`,
-		Source:      "chatservice",
-		SpecVersion: "v1",
-		Type:        "chat_message",
-		Subject:     chatSubjectID.String(),
-		Time:        now,
-	})
+	identity, err := serverops.GetIdentity(ctx)
 	if err != nil {
-		return uuid.Nil, err
+		return "", err
 	}
-	return chatSubjectID, nil
+
+	idxID := uuid.New().String()
+	err = store.New(s.dbInstance.WithoutTransaction()).CreateMessageIndex(ctx, idxID, identity)
+	if err != nil {
+		return "", err
+	}
+
+	return idxID, nil
 }
 
 // AddInstruction adds a system instruction to an existing chat instance.
 // This method requires admin panel permissions.
-func (s *Service) AddInstruction(ctx context.Context, id uuid.UUID, message string) error {
+func (s *Service) AddInstruction(ctx context.Context, id string, message string) error {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
 		return err
 	}
-	err := s.msgRepo.Save(ctx, messagerepo.Message{
-		ID:          uuid.New().String(),
-		MessageID:   "0",
-		Data:        fmt.Sprintf(`{"role": "system", "content": "%s"}`, message),
-		Source:      "chatservice",
-		SpecVersion: "v1",
-		Type:        "chat_message",
-		Subject:     id.String(),
-		Time:        time.Now().UTC(),
-	})
-	return err
-}
-
-func (s *Service) AddMessage(ctx context.Context, id uuid.UUID, message string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	// TODO: check authorization for the chat instance.
+	msg := serverops.Message{
+		Role:    "system",
+		Content: message,
+	}
+	payload, err := json.Marshal(&msg)
+	if err != nil {
 		return err
 	}
-	err := s.msgRepo.Save(ctx, messagerepo.Message{
-		ID:          uuid.New().String(),
-		MessageID:   "0",
-		Data:        fmt.Sprintf(`{"role": "user", "content": "%s"}`, message),
-		Source:      "chatservice",
-		SpecVersion: "v1",
-		Type:        "chat_message",
-		Subject:     id.String(),
-		Time:        time.Now().UTC(),
+	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
+		ID:      uuid.NewString(),
+		IDX:     id,
+		Payload: payload,
 	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) addMessage(ctx context.Context, id string, message string) error {
+	msg := serverops.Message{
+		Role:    "user",
+		Content: message,
+	}
+	payload, err := json.Marshal(&msg)
+	if err != nil {
+		return err
+	}
+	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
+		ID:      uuid.NewString(),
+		IDX:     id,
+		Payload: payload,
+	})
+
 	return err
 }
 
-func (s *Service) Chat(ctx context.Context, subjectID uuid.UUID, message string, preferredModelNames ...string) (string, error) {
-	// Save the user's message.
-	if err := s.AddMessage(ctx, subjectID, message); err != nil {
+func (s *Service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
+	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
 		return "", err
 	}
+	// TODO: check authorization for the chat instance.
 
-	// Retrieve all messages for this chat from the persistent store.
-	msgs, _, _, err := s.msgRepo.Search(ctx, subjectID.String(), nil, nil, "", "", 0, 10000, "", "")
+	// Save the user's message.
+	if err := s.addMessage(ctx, subjectID, message); err != nil {
+		return "", err
+	}
+	conversation, err := store.New(s.dbInstance.WithoutTransaction()).ListMessages(ctx, subjectID)
 	if err != nil {
 		return "", err
 	}
 
 	// Convert stored messages into the api.Message slice.
 	var messages []serverops.Message
-	for _, msg := range msgs {
+	for _, msg := range conversation {
 		var parsedMsg serverops.Message
-		if err := json.Unmarshal([]byte(msg.Data), &parsedMsg); err != nil {
-			fmt.Printf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %v", err)
-			continue
+		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
+			return "", fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
 		}
 		messages = append(messages, parsedMsg)
 	}
@@ -154,10 +157,7 @@ func (s *Service) Chat(ctx context.Context, subjectID uuid.UUID, message string,
 	if err != nil {
 		return "", fmt.Errorf("failed to chat %w", err)
 	}
-	assistantMsgData := struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}{
+	assistantMsgData := serverops.Message{
 		Role:    responseMessage.Role,
 		Content: responseMessage.Content,
 	}
@@ -165,16 +165,10 @@ func (s *Service) Chat(ctx context.Context, subjectID uuid.UUID, message string,
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
-
-	err = s.msgRepo.Save(ctx, messagerepo.Message{
-		ID:          uuid.New().String(),
-		MessageID:   "0",
-		Data:        string(jsonData), // Save the marshaled JSON string
-		Source:      "chatservice",
-		SpecVersion: "v1",
-		Type:        "chat_message",
-		Subject:     subjectID.String(),
-		Time:        time.Now().UTC(),
+	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
+		ID:      uuid.New().String(),
+		IDX:     subjectID,
+		Payload: jsonData,
 	})
 	if err != nil {
 		return "", err
@@ -194,27 +188,32 @@ type ChatMessage struct {
 
 // GetChatHistory retrieves the chat history for a specific chat instance.
 // It checks that the caller is authorized to view the chat instance.
-func (s *Service) GetChatHistory(ctx context.Context, id uuid.UUID) ([]ChatMessage, error) {
+func (s *Service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
 		return nil, err
 	}
-
-	msgs, _, _, err := s.msgRepo.Search(ctx, id.String(), nil, nil, "", "", 0, 10000, "", "")
+	conversation, err := store.New(s.dbInstance.WithoutTransaction()).ListMessages(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	var history []ChatMessage
-	for _, msg := range msgs {
-		var parsedMsg api.Message
-		if err := json.Unmarshal([]byte(msg.Data), &parsedMsg); err != nil {
-			continue // Skip messages that cannot be parsed.
+	// Convert stored messages into the api.Message slice.
+	var messages []serverops.Message
+	for _, msg := range conversation {
+		var parsedMsg serverops.Message
+		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
+			return nil, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
 		}
+		messages = append(messages, parsedMsg)
+	}
+
+	var history []ChatMessage
+	for i, msg := range messages {
 		history = append(history, ChatMessage{
-			Role:    parsedMsg.Role,
-			Content: parsedMsg.Content,
-			SentAt:  msg.Time,
-			IsUser:  parsedMsg.Role == "user",
+			Role:    msg.Role,
+			Content: msg.Content,
+			SentAt:  conversation[i].AddedAt,
+			IsUser:  msg.Role == "user",
 		})
 	}
 	if len(history) > 0 {
@@ -229,45 +228,19 @@ func (s *Service) ListChats(ctx context.Context) ([]ChatSession, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
 		return nil, err
 	}
-
-	// Retrieve messages related to chat sessions.
-	msgs, _, _, err := s.msgRepo.Search(ctx, "", nil, nil, "chatservice", "chat_message", 0, 10000, "", "")
+	userID, err := serverops.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// Group messages by their Subject (chat session id).
-	sessionsMap := make(map[string][]messagerepo.Message)
-	for _, msg := range msgs {
-		sessionsMap[msg.Subject] = append(sessionsMap[msg.Subject], msg)
+	subjects, err := store.New(s.dbInstance.WithoutTransaction()).ListMessageIndices(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
-
+	// TODO implement missing logic here
 	var sessions []ChatSession
-	for subject, messages := range sessionsMap {
-		// Sort messages by time.
-		sort.Slice(messages, func(i, j int) bool {
-			return messages[i].Time.Before(messages[j].Time)
-		})
-		// TODO Retrieve a model value.
-		var lastMsg *ChatMessage
-		if len(messages) > 0 {
-			last := messages[len(messages)-1]
-			var parsedMsg api.Message
-			if err := json.Unmarshal([]byte(last.Data), &parsedMsg); err == nil {
-				lastMsg = &ChatMessage{
-					Role:     parsedMsg.Role,
-					Content:  parsedMsg.Content,
-					SentAt:   last.Time,
-					IsUser:   parsedMsg.Role == "user",
-					IsLatest: true,
-				}
-			}
-		}
-
+	for _, sub := range subjects {
 		sessions = append(sessions, ChatSession{
-			ChatID:      subject,
-			StartedAt:   messages[0].Time,
-			LastMessage: lastMsg,
+			ChatID: sub,
 		})
 	}
 

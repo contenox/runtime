@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/js402/cate/core/serverops/messagerepo"
 	"github.com/js402/cate/libs/libauth"
 	"github.com/js402/cate/libs/libdb"
 )
@@ -119,26 +118,26 @@ func mapErrorToStatus(op Operation, err error) int {
 		return http.StatusBadRequest // 400
 	}
 
-	if errors.Is(err, messagerepo.ErrMessageNotFound) {
-		return http.StatusNotFound // 404
-	}
-	if errors.Is(err, messagerepo.ErrSerializeMessage) ||
-		errors.Is(err, messagerepo.ErrDeserializeResponse) {
-		return http.StatusBadRequest // 400 (Assuming relates to bad input format)
-	}
-	if errors.Is(err, messagerepo.ErrIndexCreationFailed) ||
-		errors.Is(err, messagerepo.ErrIndexCheckFailed) {
-		return http.StatusInternalServerError // 500 (Internal index issue)
-	}
-	if errors.Is(err, messagerepo.ErrSearchFailed) {
-		// Could be bad query (400) or internal issue (500)
-		return http.StatusBadRequest // 400 (Assume bad search terms first)
-	}
-	if errors.Is(err, messagerepo.ErrUpdateFailed) ||
-		errors.Is(err, messagerepo.ErrDeleteFailed) {
-		// Failed operation on existing resource, 422 or 400?
-		return http.StatusUnprocessableEntity // 422 (The request was understood, but couldn't process instructions)
-	}
+	// if errors.Is(err, messagerepo.ErrMessageNotFound) {
+	// 	return http.StatusNotFound // 404
+	// }
+	// if errors.Is(err, messagerepo.ErrSerializeMessage) ||
+	// 	errors.Is(err, messagerepo.ErrDeserializeResponse) {
+	// 	return http.StatusBadRequest // 400 (Assuming relates to bad input format)
+	// }
+	// if errors.Is(err, messagerepo.ErrIndexCreationFailed) ||
+	// 	errors.Is(err, messagerepo.ErrIndexCheckFailed) {
+	// 	return http.StatusInternalServerError // 500 (Internal index issue)
+	// }
+	// if errors.Is(err, messagerepo.ErrSearchFailed) {
+	// 	// Could be bad query (400) or internal issue (500)
+	// 	return http.StatusBadRequest // 400 (Assume bad search terms first)
+	// }
+	// if errors.Is(err, messagerepo.ErrUpdateFailed) ||
+	// 	errors.Is(err, messagerepo.ErrDeleteFailed) {
+	// 	// Failed operation on existing resource, 422 or 400?
+	// 	return http.StatusUnprocessableEntity // 422 (The request was understood, but couldn't process instructions)
+	// }
 
 	// fallbacks if no specific error matched above.
 	switch op {

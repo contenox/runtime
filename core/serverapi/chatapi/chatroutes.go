@@ -45,7 +45,7 @@ func (h *chatManagerHandler) createChat(w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := map[string]string{
-		"id": chatID.String(),
+		"id": chatID,
 	}
 	_ = serverops.Encode(w, r, http.StatusCreated, resp)
 }
@@ -69,7 +69,7 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = h.manager.AddInstruction(ctx, chatID, req.Instruction)
+	err = h.manager.AddInstruction(ctx, chatID.String(), req.Instruction)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -99,7 +99,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, err := h.manager.Chat(ctx, chatID, req.Message)
+	reply, err := h.manager.Chat(ctx, chatID.String(), req.Message)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.ServerOperation)
 		return
@@ -120,7 +120,7 @@ func (h *chatManagerHandler) history(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	history, err := h.manager.GetChatHistory(ctx, chatID)
+	history, err := h.manager.GetChatHistory(ctx, chatID.String())
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.GetOperation)
 		return

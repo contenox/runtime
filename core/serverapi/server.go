@@ -13,7 +13,6 @@ import (
 	"github.com/js402/cate/core/serverapi/systemapi"
 	"github.com/js402/cate/core/serverapi/usersapi"
 	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/messagerepo"
 	"github.com/js402/cate/core/services/accessservice"
 	"github.com/js402/cate/core/services/backendservice"
 	"github.com/js402/cate/core/services/chatservice"
@@ -34,7 +33,6 @@ func New(
 	config *serverops.Config,
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
-	bus messagerepo.Store,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -90,7 +88,7 @@ func New(
 	if err != nil {
 		return nil, cleanup, err
 	}
-	chatService := chatservice.New(state, bus, tokenizerSvc)
+	chatService := chatservice.New(state, dbInstance, tokenizerSvc)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
 	usersapi.AddUserRoutes(mux, config, userService)

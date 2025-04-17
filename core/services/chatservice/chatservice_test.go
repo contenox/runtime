@@ -6,34 +6,36 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/serverops/messagerepo"
+	"github.com/js402/cate/core/serverops"
+	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/core/services/chatservice"
 	"github.com/js402/cate/core/services/tokenizerservice"
 	"github.com/stretchr/testify/require"
 )
 
 func TestChat(t *testing.T) {
-	ctx, backendState, cleanup := chatservice.SetupTestEnvironment(t)
+	ctx, backendState, dbInstance, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
-	repo, cleanup2, err := messagerepo.NewTestStore(t)
-	require.NoError(t, err, "failed to initialize test repository")
-	defer cleanup2()
+	userSubjectID := serverops.DefaultAdminUser
+	err := store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+		ID:           uuid.NewString(),
+		FriendlyName: "John Doe",
+		Email:        "string@strings.com",
+		Subject:      userSubjectID,
+	})
+	require.NoError(t, err)
 	tokenizer := tokenizerservice.MockTokenizer{}
 	t.Run("creating new chat instance", func(t *testing.T) {
-		manager := chatservice.New(backendState, repo, tokenizer)
+		manager := chatservice.New(backendState, dbInstance, tokenizer)
 
 		// Test valid model
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
 		require.NoError(t, err)
 		require.NotEqual(t, uuid.Nil, id)
-
-		// // Test invalid model
-		// _, err = manager.NewInstance(ctx, "user1", "invalid-model")
-		// require.ErrorContains(t, err, "not ready for usage")
 	})
 
 	t.Run("simple chat interaction tests", func(t *testing.T) {
-		manager := chatservice.New(backendState, repo, tokenizer)
+		manager := chatservice.New(backendState, dbInstance, tokenizer)
 
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
 		require.NoError(t, err)
@@ -45,7 +47,7 @@ func TestChat(t *testing.T) {
 	})
 
 	t.Run("test chat history via interactions", func(t *testing.T) {
-		manager := chatservice.New(backendState, repo, tokenizer)
+		manager := chatservice.New(backendState, dbInstance, tokenizer)
 
 		// Create new chat instance
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
@@ -54,7 +56,7 @@ func TestChat(t *testing.T) {
 		// Verify initial empty history
 		history, err := manager.GetChatHistory(ctx, id)
 		require.NoError(t, err)
-		require.Len(t, history, 1, "new instance should have empty history")
+		require.Len(t, history, 0, "new instance should have empty history")
 
 		// First interaction
 		userMessage1 := "What's the capital of France?"
@@ -64,10 +66,10 @@ func TestChat(t *testing.T) {
 		// Verify first pair of messages
 		history, err = manager.GetChatHistory(ctx, id)
 		require.NoError(t, err)
-		require.Len(t, history, 3, "should have user + assistant messages")
+		require.Len(t, history, 2, "should have user + assistant messages")
 
 		// Check user message details
-		userMsg := history[1]
+		userMsg := history[0]
 		require.Equal(t, "user", userMsg.Role)
 		require.Equal(t, userMessage1, userMsg.Content)
 		require.True(t, userMsg.IsUser)
@@ -75,7 +77,7 @@ func TestChat(t *testing.T) {
 		require.False(t, userMsg.SentAt.IsZero())
 
 		// Check assistant message details
-		assistantMsg := history[2]
+		assistantMsg := history[1]
 		require.Equal(t, "assistant", assistantMsg.Role)
 		require.NotEmpty(t, assistantMsg.Content)
 		require.False(t, assistantMsg.IsUser)
@@ -90,25 +92,28 @@ func TestChat(t *testing.T) {
 		// Verify updated history
 		history, err = manager.GetChatHistory(ctx, id)
 		require.NoError(t, err)
-		require.Len(t, history, 5, "should accumulate messages")
+		require.Len(t, history, 4, "should accumulate messages")
 
 		// Verify message order and flags
-		secondUserMsg := history[3]
+		secondUserMsg := history[2]
 		require.Equal(t, userMessage2, secondUserMsg.Content)
 		require.True(t, secondUserMsg.SentAt.After(assistantMsg.SentAt))
 
-		finalAssistantMsg := history[4]
+		finalAssistantMsg := history[3]
 		require.True(t, finalAssistantMsg.IsLatest)
 		require.Contains(t, strings.ToLower(finalAssistantMsg.Content), "germany", "should maintain context")
 
 		// Verify all timestamps are sequential
-		for i := 1; i < len(history); i++ {
-			require.True(t, history[i].SentAt.After(history[i-1].SentAt),
-				"message %d should be after message %d", i, i-1)
+		for i := range history {
+			if i == len(history)-1 {
+				break
+			}
+			require.True(t, history[i+1].SentAt.After(history[i].SentAt),
+				"message %d should be after message %d", i, i)
 		}
 
 		// Test invalid ID case
-		hist, err := manager.GetChatHistory(ctx, uuid.New())
+		hist, err := manager.GetChatHistory(ctx, uuid.New().String())
 		require.NoError(t, err)
 		require.Len(t, hist, 0)
 	})
@@ -116,22 +121,29 @@ func TestChat(t *testing.T) {
 
 // TestLongConversation simulates a more extended interaction with the chat service.
 func TestLongConversation(t *testing.T) {
-	ctx, backendState, cleanup := chatservice.SetupTestEnvironment(t)
+	ctx, backendState, dbInstance, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 
-	repo, cleanup2, err := messagerepo.NewTestStore(t)
-	require.NoError(t, err, "failed to initialize test repository")
-	defer cleanup2()
+	// repo, cleanup2, err := messagerepo.NewTestStore(t)
+	// require.NoError(t, err, "failed to initialize test repository")
+	// defer cleanup2()
 
 	tokenizer := tokenizerservice.MockTokenizer{}
-
+	userSubjectID := serverops.DefaultAdminUser
+	err := store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+		ID:           uuid.NewString(),
+		FriendlyName: "John Doe",
+		Email:        "string@strings.com",
+		Subject:      userSubjectID,
+	})
+	require.NoError(t, err)
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
-		manager := chatservice.New(backendState, repo, tokenizer)
+		manager := chatservice.New(backendState, dbInstance, tokenizer)
 
 		model := "smollm2:135m"
-		userID := "user-long-convo"
+		subject := "user-long-convo"
 
-		instanceID, err := manager.NewInstance(ctx, userID, model)
+		instanceID, err := manager.NewInstance(ctx, subject, model)
 		require.NoError(t, err, "Failed to create new chat instance")
 		require.NotEqual(t, uuid.Nil, instanceID, "Instance ID should not be nil")
 
@@ -166,7 +178,7 @@ func TestLongConversation(t *testing.T) {
 		history, err := manager.GetChatHistory(ctx, instanceID)
 		require.NoError(t, err, "Failed to get chat history")
 
-		expectedMessageCount := 1 + (len(userMessages) * 2)
+		expectedMessageCount := len(userMessages) * 2
 		was := ""
 		for _, message := range history {
 			trimIndex := min(len(message.Content), 12)

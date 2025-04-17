@@ -99,9 +99,14 @@ CREATE TABLE IF NOT EXISTS blobs (
     updated_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS message_indices (
+    id VARCHAR(36) PRIMARY KEY,
+    identity VARCHAR(255) NOT NULL REFERENCES users(subject) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id VARCHAR(36) PRIMARY KEY,
-    stream VARCHAR(36) NOT NULL,
+    idx_id VARCHAR(36) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
 
     payload JSONB NOT NULL,
     added_at TIMESTAMP NOT NULL
@@ -112,7 +117,6 @@ CREATE INDEX IF NOT EXISTS idx_accesslists_identity ON accesslists USING hash(id
 CREATE INDEX IF NOT EXISTS idx_users_email ON users USING hash(email);
 CREATE INDEX IF NOT EXISTS idx_users_subject ON users USING hash(subject);
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS salt TEXT;
-CREATE INDEX IF NOT EXISTS idx_messages_stream ON messages USING hash(stream);
 
 -- For pagination --
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at);

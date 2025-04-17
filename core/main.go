@@ -11,7 +11,6 @@ import (
 
 	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/messagerepo"
 	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/libs/libbus"
 	"github.com/js402/cate/libs/libdb"
@@ -73,16 +72,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing PubSub failed: %v", err)
 	}
-	var bus messagerepo.Store
-	libroutine.NewRoutine(10, time.Second*10).ExecuteWithRetry(ctx, time.Second*3, 10, func(ctx context.Context) error {
-		bus, err = openSearch(ctx, config)
-		return err
-	})
 	if err != nil {
 		log.Fatalf("initializing OpenSearch failed: %v", err)
 	}
 
-	apiHandler, cleanup, err := serverapi.New(ctx, config, store, ps, bus)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, store, ps)
 	defer cleanup()
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
@@ -106,8 +100,4 @@ func main() {
 	if err := http.ListenAndServe(config.Addr+":"+port, mux); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
-}
-
-func openSearch(ctx context.Context, config *serverops.Config) (messagerepo.Store, error) {
-	return messagerepo.New(ctx, config.OpensearchURL, "messages", time.Second*10)
 }

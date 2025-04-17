@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func SetupTestEnvironment(t *testing.T) (context.Context, *runtimestate.State, func()) {
+func SetupTestEnvironment(t *testing.T) (context.Context, *runtimestate.State, libdb.DBManager, func()) {
 	ctx := context.TODO()
 	err := serverops.NewServiceManager(&serverops.Config{
 		JWTExpiry: "1h",
@@ -126,5 +126,5 @@ func SetupTestEnvironment(t *testing.T) (context.Context, *runtimestate.State, f
 			fn()
 		}
 	}
-	return ctx, backendState, cleanupAll
+	return ctx, backendState, dbInstance, cleanupAll
 }

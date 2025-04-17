@@ -12,7 +12,7 @@ import (
 )
 
 func TestOllamaChatClient_HappyPath(t *testing.T) {
-	ctx, backendState, cleanup := chatservice.SetupTestEnvironment(t)
+	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 	runtime := backendState.Get(ctx)
 	url := ""
@@ -47,7 +47,7 @@ func TestOllamaChatClient_HappyPath(t *testing.T) {
 }
 
 func TestOllamaChatClient_LongerHappyPath(t *testing.T) {
-	ctx, backendState, cleanup := chatservice.SetupTestEnvironment(t)
+	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 	runtime := backendState.Get(ctx)
 	url := ""
@@ -104,7 +104,7 @@ func TestOllamaProvider_GetChatConnection_ChatDisabled(t *testing.T) {
 }
 
 func TestOllamaChatClient_ChatWithNonExistentModel(t *testing.T) {
-	ctx, backendState, cleanup := chatservice.SetupTestEnvironment(t)
+	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 	runtime := backendState.Get(ctx)
 	url := ""

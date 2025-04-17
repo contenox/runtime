@@ -41,7 +41,7 @@ type Backend struct {
 
 type Message struct {
 	ID      string    `json:"id"`
-	Stream  string    `json:"stream"`
+	IDX     string    `json:"stream"`
 	Payload []byte    `json:"payload"`
 	AddedAt time.Time `json:"addedAt"`
 }
@@ -241,6 +241,10 @@ type Store interface {
 	AppendMessage(ctx context.Context, message *Message) error
 	DeleteMessages(ctx context.Context, stream string) error
 	ListMessages(ctx context.Context, stream string) ([]*Message, error)
+
+	CreateMessageIndex(ctx context.Context, id string, identity string) error
+	DeleteMessageIndex(ctx context.Context, id string, identity string) error
+	ListMessageIndices(ctx context.Context, identity string) ([]string, error)
 }
 
 //go:embed schema.sql
