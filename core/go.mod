@@ -28,10 +28,7 @@ require (
 	github.com/js402/cate/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/lib/pq v1.10.9
 	github.com/ollama/ollama v0.6.5
-	github.com/opensearch-project/opensearch-go/v4 v4.4.0
 	github.com/stretchr/testify v1.10.0
-	github.com/testcontainers/testcontainers-go v0.36.0
-	github.com/testcontainers/testcontainers-go/modules/opensearch v0.36.0
 	google.golang.org/grpc v1.71.1
 	google.golang.org/protobuf v1.36.5
 )
@@ -75,6 +72,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/shirou/gopsutil/v4 v4.25.3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/testcontainers/testcontainers-go v0.36.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/nats v0.36.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
