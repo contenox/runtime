@@ -149,7 +149,7 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 	chatClient, err := llmresolver.ResolveChat(ctx, llmresolver.ResolveRequest{
 		ContextLength: contextLength,
 		ModelNames:    preferredModelNames,
-	}, modelprovider.ModelProviderAdapter(ctx, s.state.Get(ctx)))
+	}, modelprovider.ModelProviderAdapter(ctx, s.state.Get(ctx)), llmresolver.ResolveRandomly)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve backend %w", err)
 	}

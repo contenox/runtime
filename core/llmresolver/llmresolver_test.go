@@ -76,7 +76,7 @@ func TestResolveCommon(t *testing.T) {
 				return tt.providers, nil
 			}
 
-			_, err := llmresolver.ResolveChat(context.Background(), tt.req, getModels)
+			_, err := llmresolver.ResolveChat(context.Background(), tt.req, getModels, llmresolver.ResolveRandomly)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got error %v, want %v", err, tt.wantErr)
 			}

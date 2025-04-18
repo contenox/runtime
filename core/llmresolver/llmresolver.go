@@ -24,12 +24,12 @@ type ResolveRequest struct {
 	ContextLength int      // Minimum required context length; 0 means no requirement
 }
 
-func resolveCommon(
+func filterCandidates(
 	ctx context.Context,
 	req ResolveRequest,
 	getModels modelprovider.RuntimeState,
 	capCheck func(modelprovider.Provider) bool,
-) (modelprovider.Provider, string, error) {
+) ([]modelprovider.Provider, error) {
 	providerType := req.Provider
 	if providerType == "" {
 		providerType = "Ollama" // Default provider
@@ -37,10 +37,10 @@ func resolveCommon(
 
 	providers, err := getModels(ctx, providerType)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if len(providers) == 0 {
-		return nil, "", ErrNoAvailableModels
+		return nil, ErrNoAvailableModels
 	}
 
 	// Use a map to track seen providers by ID to prevent duplicates
@@ -82,20 +82,76 @@ func resolveCommon(
 	}
 
 	if len(candidates) == 0 {
+		return nil, ErrNoSatisfactoryModel
+	}
+
+	return candidates, nil
+}
+
+type Resolver func(candidates []modelprovider.Provider) (modelprovider.Provider, string, error)
+
+func ResolveRandomly(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+	provider, err := selectRandomProvider(candidates)
+	if err != nil {
+		return nil, "", err
+	}
+
+	backend, err := selectRandomBackend(provider)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return provider, backend, nil
+}
+
+func selectRandomProvider(candidates []modelprovider.Provider) (modelprovider.Provider, error) {
+	if len(candidates) == 0 {
+		return nil, ErrNoSatisfactoryModel
+	}
+
+	return candidates[rand.Intn(len(candidates))], nil
+}
+
+func selectRandomBackend(provider modelprovider.Provider) (string, error) {
+	if provider == nil {
+		return "", ErrNoSatisfactoryModel
+	}
+
+	backendIDs := provider.GetBackendIDs()
+	if len(backendIDs) == 0 {
+		return "", ErrNoSatisfactoryModel
+	}
+
+	return backendIDs[rand.Intn(len(backendIDs))], nil
+}
+
+func ResolveHighestContext(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+	if len(candidates) == 0 {
 		return nil, "", ErrNoSatisfactoryModel
 	}
 
-	// Select random provider from candidates
-	selected := candidates[rand.Intn(len(candidates))]
+	var bestProvider modelprovider.Provider = nil
+	maxContextLength := -1
 
-	// Select backend with basic load balancing
-	backendIDs := selected.GetBackendIDs()
-	if len(backendIDs) == 0 {
-		return nil, "", ErrNoAvailableModels
+	for _, p := range candidates {
+		currentContextLength := p.GetContextLength()
+		if currentContextLength > maxContextLength {
+			maxContextLength = currentContextLength
+			bestProvider = p
+		}
 	}
-	backendID := backendIDs[rand.Intn(len(backendIDs))]
 
-	return selected, backendID, nil
+	if bestProvider == nil {
+		return nil, "", errors.New("failed to select a provider based on context length") // Should never happen
+	}
+
+	// Once the best provider is selected, choose a backend randomly for it
+	backend, err := selectRandomBackend(bestProvider)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return bestProvider, backend, nil
 }
 
 // validateProvider checks if a provider meets requirements
@@ -118,8 +174,13 @@ func ResolveChat(
 	ctx context.Context,
 	req ResolveRequest,
 	getModels modelprovider.RuntimeState,
+	resolver Resolver,
 ) (serverops.LLMChatClient, error) {
-	provider, backend, err := resolveCommon(ctx, req, getModels, modelprovider.Provider.CanChat)
+	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
+	if err != nil {
+		return nil, err
+	}
+	provider, backend, err := resolver(candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +192,13 @@ func ResolveEmbed(
 	ctx context.Context,
 	req ResolveRequest,
 	getModels modelprovider.RuntimeState,
+	resolver Resolver,
 ) (serverops.LLMEmbedClient, error) {
-	provider, backend, err := resolveCommon(ctx, req, getModels, modelprovider.Provider.CanEmbed)
+	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanEmbed)
+	if err != nil {
+		return nil, err
+	}
+	provider, backend, err := resolver(candidates)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +210,13 @@ func ResolveStream(
 	ctx context.Context,
 	req ResolveRequest,
 	getModels modelprovider.RuntimeState,
+	resolver Resolver,
 ) (serverops.LLMStreamClient, error) {
-	provider, backend, err := resolveCommon(ctx, req, getModels, modelprovider.Provider.CanStream)
+	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanStream)
+	if err != nil {
+		return nil, err
+	}
+	provider, backend, err := resolver(candidates)
 	if err != nil {
 		return nil, err
 	}
