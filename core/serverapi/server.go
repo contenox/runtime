@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi/backendapi"
 	"github.com/js402/cate/core/serverapi/chatapi"
+	"github.com/js402/cate/core/serverapi/indexapi"
 	"github.com/js402/cate/core/serverapi/poolapi"
 	"github.com/js402/cate/core/serverapi/systemapi"
 	"github.com/js402/cate/core/serverapi/usersapi"
@@ -18,6 +20,7 @@ import (
 	"github.com/js402/cate/core/services/chatservice"
 	"github.com/js402/cate/core/services/downloadservice"
 	"github.com/js402/cate/core/services/fileservice"
+	"github.com/js402/cate/core/services/indexservice"
 	"github.com/js402/cate/core/services/modelservice"
 	"github.com/js402/cate/core/services/poolservice"
 	"github.com/js402/cate/core/services/tokenizerservice"
@@ -33,6 +36,7 @@ func New(
 	config *serverops.Config,
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
+	embedder llmembed.Embedder,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -95,7 +99,8 @@ func New(
 
 	accessService := accessservice.New(dbInstance)
 	usersapi.AddAccessRoutes(mux, config, accessService)
-
+	indexService := indexservice.New(ctx, embedder)
+	indexapi.AddIndexRoutes(mux, config, indexService)
 	usersapi.AddAuthRoutes(mux, userService)
 
 	handler = enableCORS(config, handler)
@@ -110,6 +115,7 @@ func New(
 		userService,
 		downloadService,
 		fileService,
+		indexService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

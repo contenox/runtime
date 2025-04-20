@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -62,11 +63,11 @@ func main() {
 	ctx := context.TODO()
 
 	fmt.Print("initialize the database")
-	store, err := initDatabase(ctx, config)
+	dbInstance, err := initDatabase(ctx, config)
 	if err != nil {
 		log.Fatalf("initializing database failed: %v", err)
 	}
-	defer store.Close()
+	defer dbInstance.Close()
 
 	ps, err := initPubSub(ctx, config)
 	if err != nil {
@@ -75,8 +76,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing OpenSearch failed: %v", err)
 	}
-
-	apiHandler, cleanup, err := serverapi.New(ctx, config, store, ps)
+	embedder, err := llmembed.New(ctx, config, dbInstance)
+	if err != nil {
+		log.Fatalf("initializing embedding pool failed: %v", err)
+	}
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder)
 	defer cleanup()
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

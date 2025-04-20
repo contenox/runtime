@@ -178,6 +178,7 @@ type Store interface {
 	GetBackendByName(ctx context.Context, name string) (*Backend, error)
 
 	AppendModel(ctx context.Context, model *Model) error
+	GetModel(ctx context.Context, id string) (*Model, error)
 	DeleteModel(ctx context.Context, modelName string) error
 	ListModels(ctx context.Context) ([]*Model, error)
 

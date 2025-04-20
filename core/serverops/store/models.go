@@ -2,8 +2,12 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/js402/cate/libs/libdb"
 )
 
 func (s *store) AppendModel(ctx context.Context, model *Model) error {
@@ -21,6 +25,26 @@ func (s *store) AppendModel(ctx context.Context, model *Model) error {
 		model.UpdatedAt,
 	)
 	return err
+}
+
+func (s *store) GetModel(ctx context.Context, id string) (*Model, error) {
+	var model Model
+	err := s.Exec.QueryRowContext(ctx, `
+        SELECT id, model, created_at, updated_at
+        FROM ollama_models
+        WHERE id = $1`,
+		id,
+	).Scan(
+		&model.ID,
+		&model.Model,
+		&model.CreatedAt,
+		&model.UpdatedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, libdb.ErrNotFound
+	}
+	return &model, err
 }
 
 func (s *store) DeleteModel(ctx context.Context, modelName string) error {

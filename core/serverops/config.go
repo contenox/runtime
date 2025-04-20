@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const EmbedPoolID = "internal_embed_pool"
+const EmbedPoolName = "Embedder"
+const TenantID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+
 type Config struct {
 	DatabaseURL         string `json:"database_url"`
 	Port                string `json:"port"`
@@ -28,6 +32,7 @@ type Config struct {
 	ProxyOrigin         string `json:"proxy_origin"`
 	UIBaseURL           string `json:"ui_base_url"`
 	TokenizerServiceURL string `json:"tokenizer_service_url"`
+	EmbedModel          string `json:"embed_model"`
 }
 
 type ConfigTokenizerService struct {

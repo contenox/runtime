@@ -213,6 +213,9 @@ func TestAssignAndListModelsForPool(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, models, 1)
 	require.Equal(t, model.ID, models[0].ID)
+	// test for error when assigning model to pool twice
+	err = s.AssignModelToPool(ctx, pool.ID, model.ID)
+	require.Error(t, err, libdb.ErrConstraintViolation)
 }
 
 func TestRemoveModelFromPool(t *testing.T) {
