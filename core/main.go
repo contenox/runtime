@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -61,7 +62,15 @@ func main() {
 		log.Fatalf("configuration did not pass validation: %v", err)
 	}
 	ctx := context.TODO()
-
+	cleanups := []func() error{func() error { return nil }}
+	defer func() {
+		for _, cleanup := range cleanups {
+			err := cleanup()
+			if err != nil {
+				log.Printf("cleanup failed: %v", err)
+			}
+		}
+	}()
 	fmt.Print("initialize the database")
 	dbInstance, err := initDatabase(ctx, config)
 	if err != nil {
@@ -76,12 +85,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing OpenSearch failed: %v", err)
 	}
-	embedder, err := llmembed.New(ctx, config, dbInstance)
+	state, err := runtimestate.New(ctx, dbInstance, ps, runtimestate.WithPools())
+	if err != nil {
+		log.Fatalf("initializing runtime state failed: %v", err)
+	}
+	embedder, err := llmembed.New(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder)
-	defer cleanup()
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, state)
+	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
 	}

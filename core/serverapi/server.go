@@ -37,6 +37,7 @@ func New(
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
 	embedder llmembed.Embedder,
+	state *runtimestate.State,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -48,10 +49,6 @@ func New(
 		// OK
 	})
 	err := serverops.NewServiceManager(config)
-	if err != nil {
-		return nil, cleanup, err
-	}
-	state, err := runtimestate.New(ctx, dbInstance, pubsub, runtimestate.WithPools())
 	if err != nil {
 		return nil, cleanup, err
 	}
