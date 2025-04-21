@@ -2,17 +2,15 @@ package indexservice
 
 import (
 	"context"
+	"errors"
 
 	"github.com/js402/cate/core/llmembed"
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/runtimestate"
+	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/serverops"
 )
 
 type Service struct {
-	embedder      llmembed.Embedder
-	runtime       *runtimestate.State
-	modelProvider modelprovider.Provider
+	embedder llmembed.Embedder
 }
 
 func New(ctx context.Context, embedder llmembed.Embedder) *Service {
@@ -29,7 +27,25 @@ type IndexResponse struct {
 	// Define fields for the index response
 }
 
-func (s *Service) Index(request *IndexRequest) (*IndexResponse, error) {
+func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
+	provider, err := s.embedder.GetProvider(ctx)
+	if err != nil {
+		return nil, err
+	}
+	embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+		ModelName: provider.ModelName(),
+	}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	if err != nil {
+		return nil, err
+	}
+	if embedClient == nil {
+		return nil, errors.New("embed client is nil")
+	}
+	_, err = embedClient.Embed(ctx, request.text)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: wire up the index logic here
 	return &IndexResponse{}, nil
 }
 

@@ -62,7 +62,10 @@ func main() {
 		log.Fatalf("configuration did not pass validation: %v", err)
 	}
 	ctx := context.TODO()
-	cleanups := []func() error{func() error { return nil }}
+	cleanups := []func() error{func() error {
+		fmt.Println("cleaning up")
+		return nil
+	}}
 	defer func() {
 		for _, cleanup := range cleanups {
 			err := cleanup()

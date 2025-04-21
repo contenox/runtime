@@ -15,6 +15,7 @@ import (
 
 type Embedder interface {
 	GetProvider(ctx context.Context) (modelprovider.Provider, error)
+	GetRuntime(ctx context.Context) modelprovider.RuntimeState
 }
 
 func New(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (Embedder, error) {
@@ -43,6 +44,11 @@ type embedder struct {
 	model      *store.Model
 	dbInstance libdb.DBManager
 	runtime    *runtimestate.State
+}
+
+// GetRuntime implements Embedder.
+func (e *embedder) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
+	return modelprovider.ModelProviderAdapter(ctx, e.runtime.Get(ctx))
 }
 
 func (e *embedder) GetProvider(ctx context.Context) (modelprovider.Provider, error) {
