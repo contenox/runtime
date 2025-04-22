@@ -7,24 +7,28 @@ import (
 	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/serverops"
+	"github.com/js402/cate/core/serverops/vectors"
 )
 
 type Service struct {
 	embedder llmembed.Embedder
+	vectors  vectors.Store
 }
 
-func New(ctx context.Context, embedder llmembed.Embedder) *Service {
+func New(ctx context.Context, embedder llmembed.Embedder, vectors vectors.Store) *Service {
 	return &Service{
 		embedder: embedder,
+		vectors:  vectors,
 	}
 }
 
 type IndexRequest struct {
-	text string
+	Text string `json:"text"`
+	ID   string `json:"id"`
 }
 
 type IndexResponse struct {
-	// Define fields for the index response
+	ID string `json:"id"`
 }
 
 func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
@@ -41,12 +45,21 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	if embedClient == nil {
 		return nil, errors.New("embed client is nil")
 	}
-	_, err = embedClient.Embed(ctx, request.text)
+	vectorData, err := embedClient.Embed(ctx, request.Text)
 	if err != nil {
 		return nil, err
 	}
-	// TODO: wire up the index logic here
-	return &IndexResponse{}, nil
+
+	err = s.vectors.Insert(ctx, vectors.Vector{
+		ID:   request.ID,
+		Data: vectorData,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &IndexResponse{
+		ID: request.ID,
+	}, nil
 }
 
 func (s *Service) GetServiceName() string {
