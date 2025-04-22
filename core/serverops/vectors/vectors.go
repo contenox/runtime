@@ -16,11 +16,11 @@ type valdStore struct {
 }
 
 type Store interface {
-	Insert(ctx context.Context, v Vector) error
-	Upsert(ctx context.Context, v Vector) error
-	BatchInsert(ctx context.Context, vs []Vector) error
+	Insert(ctx context.Context, vector Vector) error
+	Upsert(ctx context.Context, vector Vector) error
+	BatchInsert(ctx context.Context, vectors []Vector) error
 	Get(ctx context.Context, id string) (*Vector, error)
-	Search(ctx context.Context, q []float32, k int) ([]VectorSearchResult, error)
+	Search(ctx context.Context, query []float32, k int) ([]VectorSearchResult, error)
 	Delete(ctx context.Context, id string) error
 }
 
