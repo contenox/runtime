@@ -8,6 +8,7 @@ import (
 	"github.com/vdaas/vald-client-go/v1/payload"
 	"github.com/vdaas/vald-client-go/v1/vald"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type valdStore struct {
@@ -29,7 +30,7 @@ func New(ctx context.Context, addr string) (Store, func() error, error) {
 	close := func() error {
 		return nil
 	}
-	conn, err := grpc.NewClient(addr)
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, close, err
 	}

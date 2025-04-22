@@ -39,7 +39,12 @@ services:
       - USE_DEFAULT_URLS=true
       - PRELOAD_MODELS=tiny,phi-3
       - ADDR=0.0.0.0:50051
-
+  vald:
+    build:
+      context: ./
+      dockerfile: Dockerfile.vald
+    ports:
+      - "8082:8081"
   postgres:
     image: postgres:17-bookworm
     env_file:

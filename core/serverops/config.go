@@ -33,6 +33,7 @@ type Config struct {
 	UIBaseURL           string `json:"ui_base_url"`
 	TokenizerServiceURL string `json:"tokenizer_service_url"`
 	EmbedModel          string `json:"embed_model"`
+	VectorStoreURL      string `json:"vector_service_url"`
 }
 
 type ConfigTokenizerService struct {

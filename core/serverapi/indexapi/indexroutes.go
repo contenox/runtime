@@ -7,19 +7,28 @@ import (
 	"github.com/js402/cate/core/services/indexservice"
 )
 
-func AddIndexRoutes(mux *http.ServeMux, config *serverops.Config, indexService *indexservice.Service) {
+func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService *indexservice.Service) {
 	f := &indexManager{
 		service: indexService,
 	}
-	_ = f
-	// mux.HandleFunc("POST /files", f.create)
-	// mux.HandleFunc("GET /files/{id}", f.getMetadata)
-	// mux.HandleFunc("PUT /files/{id}", f.update)
-	// mux.HandleFunc("DELETE /files/{id}", f.delete)
-	// mux.HandleFunc("GET /files/{id}/download", f.download)
-	// mux.HandleFunc("GET /files/paths", f.listPaths)
+	mux.HandleFunc("POST /index", f.index)
 }
 
 type indexManager struct {
 	service *indexservice.Service
+}
+
+func (im *indexManager) index(w http.ResponseWriter, r *http.Request) {
+	req, err := serverops.Decode[indexservice.IndexRequest](r)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		return
+	}
+
+	resp, err := im.service.Index(r.Context(), &req)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		return
+	}
+	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }

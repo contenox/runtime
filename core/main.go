@@ -14,6 +14,7 @@ import (
 	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
+	"github.com/js402/cate/core/serverops/vectors"
 	"github.com/js402/cate/libs/libbus"
 	"github.com/js402/cate/libs/libdb"
 	"github.com/js402/cate/libs/libroutine"
@@ -96,7 +97,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, state)
+	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL)
+	if err != nil {
+		log.Fatalf("initializing vector store failed: %v", err)
+	}
+	cleanups = append(cleanups, cleanup)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, state, vectorStore)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

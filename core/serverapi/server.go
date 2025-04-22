@@ -15,6 +15,7 @@ import (
 	"github.com/js402/cate/core/serverapi/systemapi"
 	"github.com/js402/cate/core/serverapi/usersapi"
 	"github.com/js402/cate/core/serverops"
+	"github.com/js402/cate/core/serverops/vectors"
 	"github.com/js402/cate/core/services/accessservice"
 	"github.com/js402/cate/core/services/backendservice"
 	"github.com/js402/cate/core/services/chatservice"
@@ -38,6 +39,7 @@ func New(
 	pubsub libbus.Messenger,
 	embedder llmembed.Embedder,
 	state *runtimestate.State,
+	vectorStore vectors.Store,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -96,7 +98,7 @@ func New(
 
 	accessService := accessservice.New(dbInstance)
 	usersapi.AddAccessRoutes(mux, config, accessService)
-	indexService := indexservice.New(ctx, embedder)
+	indexService := indexservice.New(ctx, embedder, vectorStore)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 	usersapi.AddAuthRoutes(mux, userService)
 

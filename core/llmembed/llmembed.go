@@ -21,15 +21,15 @@ type Embedder interface {
 func New(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (Embedder, error) {
 	pool, err := initPool(ctx, config, dbInstance, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init pool: %w", err)
 	}
 	model, err := initModel(ctx, config, dbInstance, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init model: %w", err)
 	}
 	err = assignModelToPool(ctx, config, dbInstance, model, pool)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("assign model to pool: %w", err)
 	}
 	return &embedder{
 		pool:       pool,
@@ -110,8 +110,8 @@ func initModel(ctx context.Context, config *serverops.Config, dbInstance libdb.D
 	}
 	modelID := uuid.NewSHA1(tenantID, []byte(config.EmbedModel))
 	model, err := store.New(dbInstance.WithoutTransaction()).GetModel(ctx, modelID.String())
-	if err != nil {
-		return nil, err
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("get model: %w", err)
 	}
 	if !created && errors.Is(err, libdb.ErrNotFound) {
 		err = store.New(dbInstance.WithoutTransaction()).AppendModel(ctx, &store.Model{
@@ -136,7 +136,7 @@ func assignModelToPool(ctx context.Context, _ *serverops.Config, dbInstance libd
 			return nil
 		}
 	}
-	if err := store.New(dbInstance.WithoutTransaction()).AssignModelToPool(ctx, model.ID, pool.ID); err != nil {
+	if err := store.New(dbInstance.WithoutTransaction()).AssignModelToPool(ctx, pool.ID, model.ID); err != nil {
 		return err
 	}
 	return nil
