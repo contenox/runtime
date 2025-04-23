@@ -1,20 +1,23 @@
 FROM golang:1.24-alpine AS builder
-RUN apk add --no-cache gcc g++ musl-dev #https://github.com/ollama/ollama/pull/8106
-
+RUN apk add --no-cache gcc g++ musl-dev
 WORKDIR /app
-COPY . .
-
+COPY tokenizer/go.mod tokenizer/go.sum ./tokenizer/
+COPY core/go.mod core/go.sum ./core/
+COPY libs/libauth/go.mod libs/libauth/go.sum ./libs/libauth/
+COPY libs/libdb/go.mod libs/libdb/go.sum ./libs/libdb/
+COPY libs/libollama/go.mod libs/libollama/go.sum ./libs/libollama/
+COPY core/ ./core/
+COPY libs/ ./libs/
+COPY tokenizer/ ./tokenizer/
 WORKDIR /app/tokenizer
+RUN go mod tidy && go mod download
+WORKDIR /app
+WORKDIR /app/tokenizer
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o /app/tokenizer-service .
 
-COPY tokenizer/ ./
-
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/tokenizer-service .
 
 FROM alpine:3.19
-RUN apk add --no-cache libstdc++ libgcc # ? #https://github.com/ollama/ollama/pull/8106
-
+RUN apk add --no-cache libstdc++ libgcc
 WORKDIR /app
-
 COPY --from=builder /app/tokenizer-service /app/tokenizer-service
-
 ENTRYPOINT ["/app/tokenizer-service"]
