@@ -3,7 +3,7 @@ from helpers import assert_status_code
 
 def test_server_ok(base_url):
     """Test that the server root endpoint is accessible."""
-    response = requests.get(f"{base_url}/")
+    response = requests.get(f"{base_url}/health")
     assert_status_code(response, 200)
 
 def test_register(base_url, generate_email):
