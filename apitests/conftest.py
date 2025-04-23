@@ -1,3 +1,4 @@
+from collections import UserDict
 import pytest
 import uuid
 import requests
@@ -59,8 +60,9 @@ def register_user(base_url):
             pytest.fail(f"Registration failed: {e}")
         assert response.status_code == 201, f"Registration failed: {response.text}"
         token = response.json().get("token", "")
+        user_id = response.json().get("user", {}).get("id", None)
         logger.info("User registered successfully, token obtained.")
-        return token
+        return {token: token, "user_id": user_id}
     return _register
 
 @pytest.fixture

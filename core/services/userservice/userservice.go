@@ -165,9 +165,10 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*store
 }
 
 func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserRequest) (*store.User, error) {
+	id := uuid.NewString()
 	user := &store.User{
-		ID:           uuid.NewString(),
-		Subject:      uuid.NewString(),
+		ID:           id,
+		Subject:      id,
 		Email:        req.Email,
 		FriendlyName: req.FriendlyName,
 	}
