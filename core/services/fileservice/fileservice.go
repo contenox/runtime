@@ -163,10 +163,7 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 }
 
 func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-	if err := serverops.CheckResourceAuthorization(ctx, id, store.PermissionView); err != nil {
+	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
 		return nil, err
 	}
 	// Start a transaction.
@@ -178,6 +175,9 @@ func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	}()
 	if err != nil {
 		return nil, err
+	}
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), id, store.PermissionView); err != nil {
+		return nil, fmt.Errorf("failed to authorize resource: %w", err)
 	}
 	resFile, err := s.getFileByID(ctx, tx, id)
 	if err != nil {
@@ -280,7 +280,7 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := serverops.CheckResourceAuthorization(ctx, existing.ID, store.PermissionEdit); err != nil {
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), existing.ID, store.PermissionEdit); err != nil {
 		return nil, err
 	}
 	blobID := existing.BlobsID
@@ -347,7 +347,7 @@ func (s *Service) DeleteFile(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get file: %w", err)
 	}
-	if err := serverops.CheckResourceAuthorization(ctx, file.ID, store.PermissionManage); err != nil {
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), file.ID, store.PermissionManage); err != nil {
 		return err
 	}
 	// Delete associated blob.
@@ -462,21 +462,17 @@ func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error
 }
 
 func (s *Service) RenameFile(ctx context.Context, fileID, newPath string) (*File, error) {
-	// Check resource-level edit permission
-	if err := serverops.CheckResourceAuthorization(ctx, fileID, store.PermissionEdit); err != nil {
-		return nil, err
-	}
-
-	// Start transaction
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
 	if err != nil {
 		return nil, err
 	}
-	storeService := store.New(tx)
+	storeInstance := store.New(tx)
 
-	// Get the file
-	fileRecord, err := storeService.GetFileByID(ctx, fileID)
+	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, fileID, store.PermissionEdit); err != nil {
+		return nil, err
+	}
+	fileRecord, err := storeInstance.GetFileByID(ctx, fileID)
 	if err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
@@ -484,32 +480,25 @@ func (s *Service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 		return nil, fmt.Errorf("target is a folder, use RenameFolder instead")
 	}
 
-	// Sanitize and validate new path
 	cleanedPath, err := sanitizePath(newPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
-
-	// Check for existing file/folder at new path
-	existing, err := storeService.ListFilesByPath(ctx, cleanedPath)
+	existing, err := storeInstance.ListFilesByPath(ctx, cleanedPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check path availability: %w", err)
 	}
 	if len(existing) > 0 {
 		return nil, fmt.Errorf("path '%s' already exists", cleanedPath)
 	}
-
-	// Update file path
-	if err := storeService.UpdateFilePath(ctx, fileID, cleanedPath); err != nil {
+	if err := storeInstance.UpdateFilePath(ctx, fileID, cleanedPath); err != nil {
 		return nil, fmt.Errorf("failed to rename file: %w", err)
 	}
 
-	// Commit transaction
 	if err := commit(ctx); err != nil {
 		return nil, err
 	}
 
-	// Return updated file
 	return s.GetFileByID(ctx, fileID)
 }
 

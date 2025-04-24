@@ -13,18 +13,34 @@ const DefaultServerGroup = "server"
 const DefaultDefaultServiceGroup = "admin_panel"
 const DefaultAdminUser = "admin@admin.com"
 
+func dynamicAccessList(ctx context.Context, storeInstance store.Store, identity string) (store.AccessList, error) {
+	var al store.AccessList
+	al, err := storeInstance.GetAccessEntriesByIdentity(ctx, identity)
+	if err != nil {
+		return al, err
+	}
+	return al, nil
+}
+
 // CheckResourceAuthorization checks if the user has the required permission for a given resource.
-func CheckResourceAuthorization(ctx context.Context, resource string, requiredPermission store.Permission) error {
+func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, resource string, requiredPermission store.Permission) error {
 	if instance := GetManagerInstance(); instance == nil {
 		return fmt.Errorf("BUG: Service Manager was not initialized")
 	}
 	if instance := GetManagerInstance(); instance != nil && instance.IsSecurityEnabled(DefaultServerGroup) {
 		// Get the access entries for the user from the token
-		accessList, err := libauth.GetClaims[store.AccessList](ctx, instance.GetSecret())
+		// accessList, err := libauth.GetClaims[store.AccessList](ctx, instance.GetSecret())
+		// if err != nil {
+		// 	return fmt.Errorf("failed to get user claims: %w", err)
+		// }
+		identity, err := GetIdentity(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get user claims: %w", err)
+			return fmt.Errorf("failed to get user identity: %w", err)
 		}
-
+		accessList, err := dynamicAccessList(ctx, storeInstance, identity)
+		if err != nil {
+			return fmt.Errorf("failed to get access list: %w", err)
+		}
 		// Check if any of the user's access entries allow the required permission on the resource
 		authorized, err := accessList.RequireAuthorisation(resource, int(requiredPermission))
 		if err != nil {
