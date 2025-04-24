@@ -1,4 +1,3 @@
-from collections import UserDict
 import pytest
 import uuid
 import requests
