@@ -14,9 +14,9 @@ const DefaultServerGroup = "server"
 const DefaultDefaultServiceGroup = "admin_panel"
 const DefaultAdminUser = "admin@admin.com"
 
-func accessListFromStore(ctx context.Context, storeInstance store.Store, identity string) (store.AccessList, error) {
+func accessListFromStore(ctx context.Context, storeInstance store.Store, identity string, resource string) (store.AccessList, error) {
 	var al store.AccessList
-	al, err := storeInstance.GetAccessEntriesByIdentity(ctx, identity)
+	al, err := storeInstance.GetAccessEntriesByIdentityAndResource(ctx, identity, resource)
 	if err != nil {
 		return al, err
 	}
@@ -55,7 +55,7 @@ func checkAuth(ctx context.Context, identity, resource string, requiredPermissio
 		return authorized, err
 	}
 	if errors.Is(err, store.ErrAccessEntryNotFound) {
-		accessList, err = accessListFromStore(ctx, storeInstance, identity)
+		accessList, err = accessListFromStore(ctx, storeInstance, identity, resource)
 		if err != nil {
 			return authorized, fmt.Errorf("failed to get access list: %w", err)
 		}

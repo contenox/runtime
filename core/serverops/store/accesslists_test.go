@@ -42,6 +42,17 @@ func TestCreateAndGetAccessEntry(t *testing.T) {
 	require.Equal(t, store.PermissionManage, fetched.Permission)
 	require.WithinDuration(t, entry.CreatedAt, fetched.CreatedAt, time.Second)
 	require.WithinDuration(t, entry.UpdatedAt, fetched.UpdatedAt, time.Second)
+
+	// Retrieve by identity and resource
+	fetchedEntries, err := s.GetAccessEntriesByIdentityAndResource(ctx, "user|123", "project:456")
+	require.NoError(t, err)
+	require.Len(t, fetchedEntries, 1)
+	require.Equal(t, entry.ID, fetchedEntries[0].ID)
+	require.Equal(t, "user|123", fetchedEntries[0].Identity)
+	require.Equal(t, "project:456", fetchedEntries[0].Resource)
+	require.Equal(t, store.PermissionManage, fetchedEntries[0].Permission)
+	require.WithinDuration(t, entry.CreatedAt, fetchedEntries[0].CreatedAt, time.Second)
+	require.WithinDuration(t, entry.UpdatedAt, fetchedEntries[0].UpdatedAt, time.Second)
 }
 
 func TestUpdateAccessEntry(t *testing.T) {

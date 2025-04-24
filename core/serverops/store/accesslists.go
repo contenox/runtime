@@ -193,3 +193,40 @@ func (s *store) GetAccessEntriesByIdentity(ctx context.Context, identity string)
 
 	return entries, nil
 }
+
+func (s *store) GetAccessEntriesByIdentityAndResource(ctx context.Context, identity string, resource string) ([]*AccessEntry, error) {
+	rows, err := s.Exec.QueryContext(ctx, `
+		SELECT id, identity, resource, permission, created_at, updated_at
+		FROM accesslists
+		WHERE identity = $1 AND resource = $2
+		ORDER BY created_at DESC LIMIT 10000`,
+		identity,
+		resource,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query access entries by identity and resource: %w", err)
+	}
+	defer rows.Close()
+
+	entries := []*AccessEntry{}
+	for rows.Next() {
+		var entry AccessEntry
+		if err := rows.Scan(
+			&entry.ID,
+			&entry.Identity,
+			&entry.Resource,
+			&entry.Permission,
+			&entry.CreatedAt,
+			&entry.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan access entry: %w", err)
+		}
+		entries = append(entries, &entry)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return entries, nil
+}

@@ -223,6 +223,7 @@ type Store interface {
 	DeleteAccessEntriesByResource(ctx context.Context, resource string) error
 	ListAccessEntries(ctx context.Context, createdAtCursor time.Time) ([]*AccessEntry, error)
 	GetAccessEntriesByIdentity(ctx context.Context, identity string) ([]*AccessEntry, error)
+	GetAccessEntriesByIdentityAndResource(ctx context.Context, identity string, resource string) ([]*AccessEntry, error)
 
 	CreateUser(ctx context.Context, user *User) error
 	GetUserByID(ctx context.Context, id string) (*User, error)
