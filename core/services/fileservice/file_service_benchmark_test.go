@@ -182,9 +182,6 @@ func BenchmarkGetFilesByPath(b *testing.B) {
 	createFileForBenchmark(ctx, b, fileService, filepath.Join(basePath, "file1.txt"), fileData, "text/plain")
 	createFileForBenchmark(ctx, b, fileService, filepath.Join(basePath, "file2.txt"), fileData, "application/json")
 
-	// We are listing metadata, not necessarily reading all the data in each iteration
-	// Setting bytes here might be misleading.
-
 	for b.Loop() {
 		files, err := fileService.GetFilesByPath(ctx, basePath)
 		if err != nil {
