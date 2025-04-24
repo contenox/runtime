@@ -153,7 +153,7 @@ type CreateUserRequestAllowedResources struct {
 
 func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	user, err := s.createUser(ctx, tx, req)
@@ -208,15 +208,15 @@ func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserR
 }
 
 func (s *Service) GetUserByID(ctx context.Context, id string) (*store.User, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 
-	return s.getUserByID(ctx, id)
+	return s.getUserByID(ctx, tx, id)
 }
 
-func (s *Service) getUserByID(ctx context.Context, id string) (*store.User, error) {
-	tx := s.dbInstance.WithoutTransaction()
+func (s *Service) getUserByID(ctx context.Context, tx libdb.Exec, id string) (*store.User, error) {
 	user, err := store.New(tx).GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -233,7 +233,8 @@ func (s *Service) getUserByEmail(ctx context.Context, tx libdb.Exec, email strin
 }
 
 func (s *Service) GetUserBySubject(ctx context.Context, subject string) (*store.User, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	return s.getUserBySubject(ctx, subject)
@@ -256,10 +257,6 @@ type UpdateUserRequest struct {
 
 // UpdateUserFields fetches the user, applies allowed updates, and persists the changes.
 func (s *Service) UpdateUserFields(ctx context.Context, id string, req UpdateUserRequest) (*store.User, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-
 	tx, commit, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -267,6 +264,9 @@ func (s *Service) UpdateUserFields(ctx context.Context, id string, req UpdateUse
 		}
 	}()
 	if err != nil {
+		return nil, err
+	}
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	// Retrieve the existing user
@@ -325,9 +325,6 @@ func (s *Service) updateUser(ctx context.Context, tx libdb.Exec, user *store.Use
 }
 
 func (s *Service) DeleteUser(ctx context.Context, id string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return err
-	}
 	tx, commit, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -335,6 +332,9 @@ func (s *Service) DeleteUser(ctx context.Context, id string) error {
 		}
 	}()
 	if err != nil {
+		return err
+	}
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
 	err = store.New(tx).DeleteUser(ctx, id)
@@ -349,10 +349,10 @@ func (s *Service) DeleteUser(ctx context.Context, id string) error {
 }
 
 func (s *Service) ListUsers(ctx context.Context, cursorCreatedAt time.Time) ([]*store.User, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	return store.New(tx).ListUsers(ctx, cursorCreatedAt)
 }
 

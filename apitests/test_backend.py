@@ -25,7 +25,7 @@ def test_list_backends_unauthorized(base_url, generate_email, register_user):
     """Test that a random user gets a 401 when listing backends."""
     email = generate_email("unauthorized")
     password = "unauthorizedpassword"
-    token = register_user(email, "Unauthorized User", password)
-    headers = {"Authorization": f"Bearer {token}"}
+    user_data = register_user(email, "Unauthorized User", password)
+    headers = {"Authorization": f"Bearer {user_data['token']}"}
     response = requests.get(f"{base_url}/backends", headers=headers)
     assert_status_code(response, 401)

@@ -25,49 +25,48 @@ func New(db libdb.DBManager) *Service {
 }
 
 func (s *Service) Create(ctx context.Context, backend *store.Backend) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
-	// Validate backend before storing
 	if err := validate(backend); err != nil {
 		return err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	return store.New(tx).CreateBackend(ctx, backend)
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*store.Backend, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	return store.New(tx).GetBackend(ctx, id)
 }
 
 func (s *Service) Update(ctx context.Context, backend *store.Backend) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return err
-	}
 	if err := validate(backend); err != nil {
 		return err
 	}
 	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+		return err
+	}
 	return store.New(tx).UpdateBackend(ctx, backend)
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	return store.New(tx).DeleteBackend(ctx, id)
 }
 
 func (s *Service) List(ctx context.Context) ([]*store.Backend, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	return store.New(tx).ListBackends(ctx)
 }
 

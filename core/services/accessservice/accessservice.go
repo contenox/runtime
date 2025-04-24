@@ -41,14 +41,14 @@ type UserMetadata struct {
 }
 
 func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	perm, err := store.PermissionFromString(entry.Permission)
 	if err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	id := uuid.NewString()
 	err = store.New(tx).CreateAccessEntry(ctx, &store.AccessEntry{
 		ID:         id,
@@ -67,10 +67,10 @@ func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*Acces
 }
 
 func (s *Service) GetByID(ctx context.Context, entry AccessEntryRequest) (*AccessEntryRequest, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	withDetails := false
 	if entry.WithUserDetails != nil && *entry.WithUserDetails {
 		withDetails = true
@@ -106,14 +106,14 @@ func (s *Service) getByID(ctx context.Context, tx libdb.Exec, id string, withUse
 }
 
 func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	perm, err := store.PermissionFromString(entry.Permission)
 	if err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	err = store.New(tx).UpdateAccessEntry(ctx, &store.AccessEntry{
 		ID:         entry.ID,
 		Identity:   entry.Identity,
@@ -128,19 +128,19 @@ func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	err := store.New(tx).DeleteAccessEntry(ctx, id)
 	return err
 }
 
 func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails bool) ([]AccessEntryRequest, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	entries, err := store.New(tx).ListAccessEntries(ctx, starting)
 	if err != nil {
 		return nil, err
@@ -174,10 +174,10 @@ func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails b
 }
 
 func (s *Service) ListByIdentity(ctx context.Context, identity string, withDetails bool) ([]AccessEntryRequest, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	entries, err := store.New(tx).GetAccessEntriesByIdentity(ctx, identity)
 	if err != nil {
 		return nil, err

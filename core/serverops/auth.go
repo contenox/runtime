@@ -2,6 +2,7 @@ package serverops
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,7 +14,7 @@ const DefaultServerGroup = "server"
 const DefaultDefaultServiceGroup = "admin_panel"
 const DefaultAdminUser = "admin@admin.com"
 
-func dynamicAccessList(ctx context.Context, storeInstance store.Store, identity string) (store.AccessList, error) {
+func accessListFromStore(ctx context.Context, storeInstance store.Store, identity string) (store.AccessList, error) {
 	var al store.AccessList
 	al, err := storeInstance.GetAccessEntriesByIdentity(ctx, identity)
 	if err != nil {
@@ -28,25 +29,14 @@ func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, 
 		return fmt.Errorf("BUG: Service Manager was not initialized")
 	}
 	if instance := GetManagerInstance(); instance != nil && instance.IsSecurityEnabled(DefaultServerGroup) {
-		// Get the access entries for the user from the token
-		// accessList, err := libauth.GetClaims[store.AccessList](ctx, instance.GetSecret())
-		// if err != nil {
-		// 	return fmt.Errorf("failed to get user claims: %w", err)
-		// }
 		identity, err := GetIdentity(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get user identity: %w", err)
+			return fmt.Errorf("unauthorized: failed to get user identity: %w", err)
 		}
-		accessList, err := dynamicAccessList(ctx, storeInstance, identity)
+		authorized, err := checkAuth(ctx, identity, resource, requiredPermission, instance.GetSecret(), storeInstance)
 		if err != nil {
-			return fmt.Errorf("failed to get access list: %w", err)
+			return err
 		}
-		// Check if any of the user's access entries allow the required permission on the resource
-		authorized, err := accessList.RequireAuthorisation(resource, int(requiredPermission))
-		if err != nil {
-			return fmt.Errorf("error during authorization check: %w", err)
-		}
-
 		if !authorized {
 			return fmt.Errorf("unauthorized: user lacks permission %v for resource %s", requiredPermission, resource)
 		}
@@ -55,7 +45,29 @@ func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, 
 
 }
 
-func CheckServiceAuthorization[T ServiceMeta](ctx context.Context, s T, permission store.Permission) error {
+func checkAuth(ctx context.Context, identity, resource string, requiredPermission store.Permission, secret string, storeInstance store.Store) (bool, error) {
+	accessList, err := libauth.GetClaims[store.AccessList](ctx, secret)
+	if err != nil {
+		return false, fmt.Errorf("failed to get access list: %w", err)
+	}
+	authorized, err := accessList.RequireAuthorisation(resource, int(requiredPermission))
+	if err != nil && !errors.Is(err, store.ErrAccessEntryNotFound) {
+		return authorized, err
+	}
+	if errors.Is(err, store.ErrAccessEntryNotFound) {
+		accessList, err = accessListFromStore(ctx, storeInstance, identity)
+		if err != nil {
+			return authorized, fmt.Errorf("failed to get access list: %w", err)
+		}
+		authorized, err = accessList.RequireAuthorisation(resource, int(requiredPermission))
+		if errors.Is(err, store.ErrAccessEntryNotFound) {
+			return authorized, fmt.Errorf("error during authorization check: %w", err)
+		}
+	}
+	return authorized, nil
+}
+
+func CheckServiceAuthorization[T ServiceMeta](ctx context.Context, storeInstance store.Store, s T, permission store.Permission) error {
 	instance := GetManagerInstance()
 	if instance == nil {
 		return fmt.Errorf("BUG: Service Manager was not initialized")
@@ -63,17 +75,19 @@ func CheckServiceAuthorization[T ServiceMeta](ctx context.Context, s T, permissi
 	if !instance.IsSecurityEnabled(DefaultServerGroup) {
 		return nil
 	}
-
+	identity, err := GetIdentity(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get user identity: %w", err)
+	}
 	tryAuth := []string{
 		s.GetServiceName(),
 		s.GetServiceGroup(),
 		DefaultServerGroup,
 	}
 	var authorized bool
-	var err error
 	for _, resource := range tryAuth {
-		authorized, err = libauth.CheckAuthorisation[store.AccessList](ctx, instance.GetSecret(), resource, int(permission))
-		if err != nil {
+		authorized, err = checkAuth(ctx, identity, resource, permission, instance.GetSecret(), storeInstance)
+		if err != nil && !errors.Is(err, store.ErrAccessEntryNotFound) {
 			return err
 		}
 		if authorized {

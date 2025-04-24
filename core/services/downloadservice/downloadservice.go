@@ -38,10 +38,10 @@ type QueueJobs struct {
 }
 
 func (s *Service) CurrentQueueState(ctx context.Context) ([]QueueJobs, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	tx := s.dbInstance.WithoutTransaction()
 	queue, err := store.New(tx).GetJobsForType(ctx, "model_download")
 	if err != nil {
 		return nil, err
@@ -79,9 +79,6 @@ func (s *Service) CancelDownloads(ctx context.Context, url string) error {
 }
 
 func (s *Service) RemoveFromQueue(ctx context.Context, modelName string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
-		return err
-	}
 	tx, comm, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -89,6 +86,9 @@ func (s *Service) RemoveFromQueue(ctx context.Context, modelName string) error {
 		}
 	}()
 	if err != nil {
+		return err
+	}
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return err
 	}
 	jobs, err := store.New(tx).PopJobsForType(ctx, "model_download")
@@ -123,7 +123,8 @@ func (s *Service) RemoveFromQueue(ctx context.Context, modelName string) error {
 }
 
 func (s *Service) InProgress(ctx context.Context, statusCh chan<- *store.Status) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(s.dbInstance.WithoutTransaction()), s, store.PermissionView); err != nil {
 		return err
 	}
 	ch := make(chan []byte, 16)

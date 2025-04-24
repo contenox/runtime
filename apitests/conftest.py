@@ -61,7 +61,7 @@ def register_user(base_url):
         token = response.json().get("token", "")
         user_id = response.json().get("user", {}).get("id", None)
         logger.info("User registered successfully, token obtained.")
-        return {token: token, "user_id": user_id}
+        return {"token": token, "user_id": user_id}
     return _register
 
 @pytest.fixture

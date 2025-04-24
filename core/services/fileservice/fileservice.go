@@ -57,9 +57,6 @@ type Metadata struct {
 }
 
 func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
 	_, err := validateContentType(file.ContentType)
 	if err != nil {
 		return nil, err
@@ -110,15 +107,18 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	storeService := store.New(tx)
-	err = storeService.EnforceMaxFileCount(ctx, MaxFilesRowCount)
+	storeInstance := store.New(tx)
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
+	err = storeInstance.EnforceMaxFileCount(ctx, MaxFilesRowCount)
 	if err != nil {
 		err := fmt.Errorf("too many files in the system: %w", err)
 		fmt.Printf("SERVER ERROR: file creation blocked: limit reached (%d max) %v", err, MaxFilesRowCount)
 		return nil, err
 	}
 
-	if err = storeService.CreateBlob(ctx, blob); err != nil {
+	if err = storeInstance.CreateBlob(ctx, blob); err != nil {
 		return nil, fmt.Errorf("failed to create blob: %w", err)
 	}
 
@@ -130,7 +130,7 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 		Meta:    bMeta,
 		BlobsID: blobID,
 	}
-	if err = storeService.CreateFile(ctx, fileRecord); err != nil {
+	if err = storeInstance.CreateFile(ctx, fileRecord); err != nil {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 	creatorID, err := serverops.GetIdentity(ctx)
@@ -147,7 +147,7 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 		Resource:   fileID,
 		Permission: store.PermissionManage,
 	}
-	if err := storeService.CreateAccessEntry(ctx, accessEntry); err != nil {
+	if err := storeInstance.CreateAccessEntry(ctx, accessEntry); err != nil {
 		return nil, fmt.Errorf("failed to create access entry: %w", err)
 	}
 	resFiles, err := s.getFileByID(ctx, tx, fileID)
@@ -163,9 +163,6 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 }
 
 func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
-		return nil, err
-	}
 	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -174,6 +171,9 @@ func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
 		}
 	}()
 	if err != nil {
+		return nil, err
+	}
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
 	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), id, store.PermissionView); err != nil {
@@ -214,9 +214,6 @@ func (s *Service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*F
 }
 
 func (s *Service) GetFilesByPath(ctx context.Context, path string) ([]File, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
 	// Start a transaction to fetch files and their blobs.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -227,7 +224,9 @@ func (s *Service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 	if err != nil {
 		return nil, err
 	}
-
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 	fileRecords, err := store.New(tx).ListFilesByPath(ctx, path)
 	if err != nil {
 		return nil, err
@@ -255,10 +254,6 @@ func (s *Service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 }
 
 func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-
 	_, err := validateContentType(file.ContentType)
 	if err != nil {
 		return nil, err
@@ -275,7 +270,9 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 	existing, err := store.New(tx).GetFileByID(ctx, file.ID)
 	if err != nil {
 		return nil, err
@@ -328,9 +325,6 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 }
 
 func (s *Service) DeleteFile(ctx context.Context, id string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return err
-	}
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -340,10 +334,13 @@ func (s *Service) DeleteFile(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	storeService := store.New(tx)
+	storeInstance := store.New(tx)
 
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return err
+	}
 	// Get file details.
-	file, err := storeService.GetFileByID(ctx, id)
+	file, err := storeInstance.GetFileByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get file: %w", err)
 	}
@@ -351,17 +348,17 @@ func (s *Service) DeleteFile(ctx context.Context, id string) error {
 		return err
 	}
 	// Delete associated blob.
-	if err := storeService.DeleteBlob(ctx, file.BlobsID); err != nil {
+	if err := storeInstance.DeleteBlob(ctx, file.BlobsID); err != nil {
 		return fmt.Errorf("failed to delete blob: %w", err)
 	}
 
 	// Delete file record.
-	if err := storeService.DeleteFile(ctx, id); err != nil {
+	if err := storeInstance.DeleteFile(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
 	// Remove related access entries.
-	if err := storeService.DeleteAccessEntriesByResource(ctx, id); err != nil {
+	if err := storeInstance.DeleteAccessEntriesByResource(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete access entries: %w", err)
 	}
 
@@ -369,9 +366,6 @@ func (s *Service) DeleteFile(ctx context.Context, id string) error {
 }
 
 func (s *Service) ListAllPaths(ctx context.Context) ([]string, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
 	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -382,7 +376,9 @@ func (s *Service) ListAllPaths(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 	// Retrieve the distinct paths using the store method.
 	paths, err := store.New(tx).ListFiles(ctx)
 	if err != nil {
@@ -397,10 +393,6 @@ func (s *Service) ListAllPaths(ctx context.Context) ([]string, error) {
 }
 
 func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-
 	cleanedPath, err := sanitizePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
@@ -432,10 +424,13 @@ func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error
 		return nil, err
 	}
 
-	storeService := store.New(tx)
+	storeInstance := store.New(tx)
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 
 	// Enforce max file count (includes folders)
-	if err := storeService.EnforceMaxFileCount(ctx, MaxFilesRowCount); err != nil {
+	if err := storeInstance.EnforceMaxFileCount(ctx, MaxFilesRowCount); err != nil {
 		return nil, fmt.Errorf("too many files in the system: %w", err)
 	}
 
@@ -447,7 +442,7 @@ func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error
 		IsFolder: true,
 	}
 
-	if err := storeService.CreateFile(ctx, folderRecord); err != nil {
+	if err := storeInstance.CreateFile(ctx, folderRecord); err != nil {
 		return nil, fmt.Errorf("failed to create folder: %w", err)
 	}
 
@@ -503,21 +498,20 @@ func (s *Service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 }
 
 func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error) {
-	// Check service-level manage permission
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-
 	// Start transaction
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
 	if err != nil {
 		return nil, err
 	}
-	storeService := store.New(tx)
+	storeInstance := store.New(tx)
+	// Check service-level manage permission
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 
 	// Get the folder
-	folderRecord, err := storeService.GetFileByID(ctx, folderID)
+	folderRecord, err := storeInstance.GetFileByID(ctx, folderID)
 	if err != nil {
 		return nil, fmt.Errorf("folder not found: %w", err)
 	}
@@ -533,7 +527,7 @@ func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 	}
 
 	// Check for existing file/folder at new path
-	existing, err := storeService.ListFilesByPath(ctx, cleanedPath)
+	existing, err := storeInstance.ListFilesByPath(ctx, cleanedPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check path availability: %w", err)
 	}
@@ -542,12 +536,12 @@ func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 	}
 
 	// Update folder's own path
-	if err := storeService.UpdateFilePath(ctx, folderID, cleanedPath); err != nil {
+	if err := storeInstance.UpdateFilePath(ctx, folderID, cleanedPath); err != nil {
 		return nil, fmt.Errorf("failed to rename folder: %w", err)
 	}
 
 	// List all files under the old folder path (prefix match)
-	descendants, err := storeService.ListFilesByPath(ctx, oldPath+"/%")
+	descendants, err := storeInstance.ListFilesByPath(ctx, oldPath+"/%")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list folder contents: %w", err)
 	}
@@ -560,7 +554,7 @@ func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 	}
 
 	// Apply bulk updates
-	if err := storeService.BulkUpdateFilePaths(ctx, updates); err != nil {
+	if err := storeInstance.BulkUpdateFilePaths(ctx, updates); err != nil {
 		return nil, fmt.Errorf("failed to update descendant paths: %w", err)
 	}
 

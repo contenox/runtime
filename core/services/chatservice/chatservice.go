@@ -49,7 +49,8 @@ type ChatSession struct {
 
 // NewInstance creates a new chat instance after verifying that the user is authorized to start a chat for the given model.
 func (s *Service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
 	}
 	identity, err := serverops.GetIdentity(ctx)
@@ -58,7 +59,7 @@ func (s *Service) NewInstance(ctx context.Context, subject string, preferredMode
 	}
 
 	idxID := uuid.New().String()
-	err = store.New(s.dbInstance.WithoutTransaction()).CreateMessageIndex(ctx, idxID, identity)
+	err = store.New(tx).CreateMessageIndex(ctx, idxID, identity)
 	if err != nil {
 		return "", err
 	}
@@ -69,7 +70,8 @@ func (s *Service) NewInstance(ctx context.Context, subject string, preferredMode
 // AddInstruction adds a system instruction to an existing chat instance.
 // This method requires admin panel permissions.
 func (s *Service) AddInstruction(ctx context.Context, id string, message string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
 	// TODO: check authorization for the chat instance.
@@ -81,7 +83,7 @@ func (s *Service) AddInstruction(ctx context.Context, id string, message string)
 	if err != nil {
 		return err
 	}
-	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
+	err = store.New(tx).AppendMessage(ctx, &store.Message{
 		ID:      uuid.NewString(),
 		IDX:     id,
 		Payload: payload,
@@ -111,7 +113,9 @@ func (s *Service) addMessage(ctx context.Context, id string, message string) err
 }
 
 func (s *Service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
+
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
 	}
 	// TODO: check authorization for the chat instance.
@@ -120,7 +124,7 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 	if err := s.addMessage(ctx, subjectID, message); err != nil {
 		return "", err
 	}
-	conversation, err := store.New(s.dbInstance.WithoutTransaction()).ListMessages(ctx, subjectID)
+	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
 		return "", err
 	}
@@ -189,10 +193,11 @@ type ChatMessage struct {
 // GetChatHistory retrieves the chat history for a specific chat instance.
 // It checks that the caller is authorized to view the chat instance.
 func (s *Service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	conversation, err := store.New(s.dbInstance.WithoutTransaction()).ListMessages(ctx, id)
+	conversation, err := store.New(tx).ListMessages(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -225,14 +230,15 @@ func (s *Service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage,
 // ListChats returns all chat sessions.
 // This operation requires admin panel view permission.
 func (s *Service) ListChats(ctx context.Context) ([]ChatSession, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionView); err != nil {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
 	userID, err := serverops.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
-	subjects, err := store.New(s.dbInstance.WithoutTransaction()).ListMessageIndices(ctx, userID)
+	subjects, err := store.New(tx).ListMessageIndices(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -158,13 +158,22 @@ type AccessEntry struct {
 
 type AccessList []*AccessEntry
 
+var ErrAccessEntryNotFound = errors.New("access denied")
+
 var _ libauth.Authz = AccessList{}
 
 func (al AccessList) RequireAuthorisation(forResource string, permission int) (bool, error) {
+	found := false
 	for _, entry := range al {
 		if entry.Resource == forResource && entry.Permission >= Permission(permission) {
 			return true, nil
 		}
+		if entry.Resource == forResource {
+			found = true
+		}
+	}
+	if !found {
+		return false, ErrAccessEntryNotFound
 	}
 	return false, nil
 }
