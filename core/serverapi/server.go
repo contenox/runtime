@@ -10,6 +10,7 @@ import (
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi/backendapi"
 	"github.com/js402/cate/core/serverapi/chatapi"
+	"github.com/js402/cate/core/serverapi/filesapi"
 	"github.com/js402/cate/core/serverapi/indexapi"
 	"github.com/js402/cate/core/serverapi/poolapi"
 	"github.com/js402/cate/core/serverapi/systemapi"
@@ -80,7 +81,7 @@ func New(
 		state.RunDownloadCycle, // operation
 	)
 	fileService := fileservice.New(dbInstance, config)
-	// fileservice.
+	filesapi.AddFileRoutes(mux, config, fileService)
 	downloadService := downloadservice.New(dbInstance, pubsub)
 	backendapi.AddQueueRoutes(mux, config, downloadService)
 	modelService := modelservice.New(dbInstance)

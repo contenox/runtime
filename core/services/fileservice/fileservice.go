@@ -60,24 +60,14 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
 		return nil, err
 	}
-	if err := validateContentType(file.ContentType); err != nil {
-		return nil, fmt.Errorf("invalid content type: %w", err)
+	_, err := validateContentType(file.ContentType)
+	if err != nil {
+		return nil, err
 	}
+
 	cleanedPath, err := sanitizePath(file.Path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
-	}
-	mediaType, _, parseMediaErr := mime.ParseMediaType(file.ContentType)
-	if parseMediaErr != nil {
-		err = fmt.Errorf("invalid detected content type '%s': %v", file.ContentType, parseMediaErr)
-		return nil, err
-	}
-	if mediaType != file.ContentType {
-		return nil, fmt.Errorf("invalid detected content type. Claimed as '%s' yet is %v", file.ContentType, mediaType)
-	}
-	if !allowedMimeTypes[mediaType] {
-		err = fmt.Errorf("MIME type '%s' (detected: %s) is not allowed for file '%s'", mediaType, file.ContentType, file.Path)
-		return nil, err
 	}
 	file.Path = cleanedPath
 
@@ -176,6 +166,9 @@ func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
 		return nil, err
 	}
+	if err := serverops.CheckResourceAuthorization(ctx, id, store.PermissionView); err != nil {
+		return nil, err
+	}
 	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -200,9 +193,6 @@ func (s *Service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*F
 	// Get file record.
 	fileRecord, err := store.New(tx).GetFileByID(ctx, id)
 	if err != nil {
-		return nil, err
-	}
-	if err := serverops.CheckResourceAuthorization(ctx, fileRecord.ID, store.PermissionView); err != nil {
 		return nil, err
 	}
 	// Get associated blob.
@@ -268,39 +258,24 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, s, store.PermissionManage); err != nil {
 		return nil, err
 	}
-	if err := validateContentType(file.ContentType); err != nil {
-		return nil, fmt.Errorf("invalid content type: %w", err)
+
+	_, err := validateContentType(file.ContentType)
+	if err != nil {
+		return nil, err
 	}
+
 	cleanedPath, err := sanitizePath(file.Path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 	file.Path = cleanedPath
 
-	mediaType, _, parseMediaErr := mime.ParseMediaType(file.ContentType)
-	if parseMediaErr != nil {
-		err = fmt.Errorf("invalid detected content type '%s': %v", file.ContentType, parseMediaErr)
-		return nil, err
-	}
-	if mediaType != file.ContentType {
-		return nil, fmt.Errorf("invalid detected content type. Claimed as '%s' yet is %v", file.ContentType, mediaType)
-	}
-	if !allowedMimeTypes[mediaType] {
-		err = fmt.Errorf("MIME type '%s' (detected: %s) is not allowed for file '%s'", mediaType, file.ContentType, file.Path)
-		return nil, err
-	}
-	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
-	defer func() {
-		if err := rTx(); err != nil {
-			log.Println("failed to rollback transaction", err)
-		}
-	}()
+	defer rTx()
 	if err != nil {
 		return nil, err
 	}
 
-	// Retrieve the existing file record to get the blob ID.
 	existing, err := store.New(tx).GetFileByID(ctx, file.ID)
 	if err != nil {
 		return nil, err
@@ -310,12 +285,11 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	}
 	blobID := existing.BlobsID
 
-	// Compute new hash and metadata.
 	hashBytes := sha256.Sum256(file.Data)
 	hashString := hex.EncodeToString(hashBytes[:])
 	meta := Metadata{
 		SpecVersion: "1.0",
-		Path:        existing.Path,
+		Path:        file.Path,
 		Hash:        hashString,
 		Size:        int64(len(file.Data)),
 		FileID:      file.ID,
@@ -325,40 +299,32 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 		return nil, err
 	}
 
-	// Update blob record.
-	blob := &store.Blob{
-		ID:   blobID,
-		Data: file.Data,
-		Meta: bMeta,
-	}
 	if err := store.New(tx).DeleteBlob(ctx, blobID); err != nil {
-		return nil, fmt.Errorf("failed to delete blob: %w", err)
+		return nil, fmt.Errorf("failed to delete old blob: %w", err)
 	}
-	if err := store.New(tx).CreateBlob(ctx, blob); err != nil {
-		return nil, fmt.Errorf("failed to update blob: %w", err)
+	if err := store.New(tx).CreateBlob(ctx, &store.Blob{ID: blobID, Data: file.Data, Meta: bMeta}); err != nil {
+		return nil, fmt.Errorf("failed to create new blob: %w", err)
 	}
 
-	// Update file record.
-	updatedFile := &store.File{
+	updated := &store.File{
 		ID:      file.ID,
 		Path:    file.Path,
 		Type:    file.ContentType,
 		Meta:    bMeta,
 		BlobsID: blobID,
 	}
-	if err := store.New(tx).UpdateFile(ctx, updatedFile); err != nil {
-		return nil, fmt.Errorf("failed to update file: %w", err)
+	if err := store.New(tx).UpdateFile(ctx, updated); err != nil {
+		return nil, fmt.Errorf("failed to update file record: %w", err)
 	}
 
-	resFile, err := s.getFileByID(ctx, tx, file.ID)
+	res, err := s.getFileByID(ctx, tx, file.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get file: %w", err)
+		return nil, fmt.Errorf("failed to reload file: %w", err)
 	}
-	err = commit(ctx)
-	if err != nil {
+	if err := commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	return resFile, nil
+	return res, nil
 }
 
 func (s *Service) DeleteFile(ctx context.Context, id string) error {
@@ -668,15 +634,15 @@ var allowedMimeTypes = map[string]bool{
 	"application/pdf":  true,
 }
 
-func validateContentType(contentType string) error {
-	mediaType, _, err := mime.ParseMediaType(contentType)
+func validateContentType(contentType string) (mediaType string, err error) {
+	mediaType, _, err = mime.ParseMediaType(contentType)
 	if err != nil {
-		return fmt.Errorf("invalid content type: %v", err)
+		return "", fmt.Errorf("invalid content-type header %q: %w", contentType, err)
 	}
 	if !allowedMimeTypes[mediaType] {
-		return fmt.Errorf("content type %s is not allowed", mediaType)
+		return "", fmt.Errorf("content type %q is not allowed", mediaType)
 	}
-	return nil
+	return mediaType, nil
 }
 
 func sanitizePath(path string) (string, error) {

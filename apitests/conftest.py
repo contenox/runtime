@@ -97,3 +97,29 @@ def admin_session(base_url, admin_email, admin_password):
     token = response.json().get("token", "")
     logger.info("Admin registered successfully, token obtained.")
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def create_test_file(base_url, admin_session, tmp_path):
+    """Fixture to create a test file and return its metadata."""
+    def _create_test_file(content="Test content", path=None):
+        if path is None:
+            path = f"test/{uuid.uuid4().hex}.txt"
+
+        file_path = tmp_path / "tempfile.txt"
+        file_path.write_text(content)
+
+        with open(file_path, 'rb') as f:
+            files = {'file': f}
+            data = {'path': path}
+            response = requests.post(
+                f"{base_url}/files",
+                files=files,
+                data=data,
+                headers=admin_session
+            )
+            response.raise_for_status()
+            file_data = response.json()
+            file_data['content'] = content
+            return file_data
+    return _create_test_file
