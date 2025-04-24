@@ -18,7 +18,7 @@ const benchmarkFileSize = 1024 * 1024 // 1MB for data-intensive benchmarks
 
 // setupFileServiceBenchmark sets up the database, service manager, and fileService.
 // It returns the fileService and a cleanup function.
-func setupFileServiceBenchmark(ctx context.Context, t testing.TB) (*fileservice.Service, func()) {
+func setupFileServiceBenchmark(ctx context.Context, t testing.TB) (fileservice.Service, func()) {
 	t.Helper()
 	var cleanups []func()
 	addCleanup := func(fn func()) {
@@ -80,7 +80,7 @@ func setupFileServiceBenchmark(ctx context.Context, t testing.TB) (*fileservice.
 	}
 }
 
-func createFileForBenchmark(ctx context.Context, b *testing.B, fs *fileservice.Service, path string, data []byte, contentType string) *fileservice.File {
+func createFileForBenchmark(ctx context.Context, b *testing.B, fs fileservice.Service, path string, data []byte, contentType string) *fileservice.File {
 	b.Helper()
 	file := &fileservice.File{
 		Path:        path,
@@ -103,7 +103,7 @@ func showOpsPerSecond(b *testing.B, ops int64) {
 	}
 }
 
-func createFolderForBenchmark(ctx context.Context, b *testing.B, fs *fileservice.Service, path string) *fileservice.Folder {
+func createFolderForBenchmark(ctx context.Context, b *testing.B, fs fileservice.Service, path string) *fileservice.Folder {
 	b.Helper()
 	folder, err := fs.CreateFolder(ctx, path)
 	if err != nil {
@@ -256,7 +256,7 @@ func BenchmarkCreateFolder(b *testing.B) {
 	showOpsPerSecond(b, int64(b.N))
 }
 
-func populateFolderTree(ctx context.Context, b *testing.B, fs *fileservice.Service, basePath string, depth, breadth int, fileData []byte) {
+func populateFolderTree(ctx context.Context, b *testing.B, fs fileservice.Service, basePath string, depth, breadth int, fileData []byte) {
 	b.Helper()
 	// Base case: if no more depth, just create a file and return.
 	if depth <= 0 {

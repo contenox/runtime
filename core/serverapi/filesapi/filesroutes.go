@@ -20,7 +20,7 @@ const (
 	formFieldPath       = "path"
 )
 
-func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService *fileservice.Service) {
+func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fileservice.Service) {
 	f := &fileManager{
 		service: fileService,
 	}
@@ -34,7 +34,7 @@ func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService *fi
 }
 
 type fileManager struct {
-	service *fileservice.Service
+	service fileservice.Service
 }
 
 type fileResponse struct {

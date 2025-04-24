@@ -23,12 +23,27 @@ import (
 const MaxUploadSize = 1 * 1024 * 1024
 const MaxFilesRowCount = 50000
 
-type Service struct {
+type Service interface {
+	CreateFile(ctx context.Context, file *File) (*File, error)
+	GetFileByID(ctx context.Context, id string) (*File, error)
+	GetFilesByPath(ctx context.Context, path string) ([]File, error)
+	UpdateFile(ctx context.Context, file *File) (*File, error)
+	DeleteFile(ctx context.Context, id string) error
+	ListAllPaths(ctx context.Context) ([]string, error)
+	CreateFolder(ctx context.Context, path string) (*Folder, error)
+	RenameFile(ctx context.Context, fileID, newPath string) (*File, error)
+	RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error)
+	serverops.ServiceMeta
+}
+
+var _ Service = (*service)(nil)
+
+type service struct {
 	db libdb.DBManager
 }
 
-func New(db libdb.DBManager, config *serverops.Config) *Service {
-	return &Service{
+func New(db libdb.DBManager, config *serverops.Config) Service {
+	return &service{
 		db: db,
 	}
 }
@@ -56,7 +71,7 @@ type Metadata struct {
 	FileID      string `json:"fileId"`
 }
 
-func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
+func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	_, err := validateContentType(file.ContentType)
 	if err != nil {
 		return nil, err
@@ -162,7 +177,7 @@ func (s *Service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	return resFiles, nil
 }
 
-func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
+func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -189,7 +204,7 @@ func (s *Service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	return resFile, nil
 }
 
-func (s *Service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*File, error) {
+func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*File, error) {
 	// Get file record.
 	fileRecord, err := store.New(tx).GetFileByID(ctx, id)
 	if err != nil {
@@ -213,7 +228,7 @@ func (s *Service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*F
 	return resFile, nil
 }
 
-func (s *Service) GetFilesByPath(ctx context.Context, path string) ([]File, error) {
+func (s *service) GetFilesByPath(ctx context.Context, path string) ([]File, error) {
 	// Start a transaction to fetch files and their blobs.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -253,7 +268,7 @@ func (s *Service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 	return files, nil
 }
 
-func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
+func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	_, err := validateContentType(file.ContentType)
 	if err != nil {
 		return nil, err
@@ -324,7 +339,7 @@ func (s *Service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	return res, nil
 }
 
-func (s *Service) DeleteFile(ctx context.Context, id string) error {
+func (s *service) DeleteFile(ctx context.Context, id string) error {
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -365,7 +380,7 @@ func (s *Service) DeleteFile(ctx context.Context, id string) error {
 	return commit(ctx)
 }
 
-func (s *Service) ListAllPaths(ctx context.Context) ([]string, error) {
+func (s *service) ListAllPaths(ctx context.Context) ([]string, error) {
 	// Start a transaction.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer func() {
@@ -392,7 +407,7 @@ func (s *Service) ListAllPaths(ctx context.Context) ([]string, error) {
 	return paths, nil
 }
 
-func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error) {
+func (s *service) CreateFolder(ctx context.Context, path string) (*Folder, error) {
 	cleanedPath, err := sanitizePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
@@ -456,7 +471,7 @@ func (s *Service) CreateFolder(ctx context.Context, path string) (*Folder, error
 	}, nil
 }
 
-func (s *Service) RenameFile(ctx context.Context, fileID, newPath string) (*File, error) {
+func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File, error) {
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
 	if err != nil {
@@ -497,7 +512,7 @@ func (s *Service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 	return s.GetFileByID(ctx, fileID)
 }
 
-func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error) {
+func (s *service) RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error) {
 	// Start transaction
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
@@ -569,11 +584,11 @@ func (s *Service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 	}, nil
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "fileservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }
 
