@@ -11,7 +11,16 @@ type activityTrackerDecorator struct {
 	tracker     serverops.ActivityTracker
 }
 
-// WithActivityTracker creates a decorated FileService.
+// WithActivityTracker decorates a FileService implementation with an ActivityTracker.
+// It wraps each method call with tracking logic to report errors, side effects, and duration.
+//
+// This allows clients to plug in arbitrary tracking logic (such as logging, metrics, or tracing)
+// without modifying the core service logic.
+//
+// Example use case:
+//
+//	trackedService := fileservice.WithActivityTracker(realService, myTracker)
+//	trackedService.CreateFile(ctx, file)
 func WithActivityTracker(fileservice Service, tracker serverops.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		fileservice: fileservice,
