@@ -12,23 +12,32 @@ import (
 	"github.com/js402/cate/libs/libdb"
 )
 
-var _ serverops.ServiceMeta = &Service{}
+var _ serverops.ServiceMeta = &service{}
+var _ Service = &service{}
 
-type Service struct {
+type Service interface {
+	CurrentDownloadQueueState(ctx context.Context) ([]Job, error)
+	CancelDownloads(ctx context.Context, url string) error
+	RemoveDownloadFromQueue(ctx context.Context, modelName string) error
+	DownloadInProgress(ctx context.Context, statusCh chan<- *store.Status) error
+	serverops.ServiceMeta
+}
+
+type service struct {
 	dbInstance      libdb.DBManager
 	psInstance      libbus.Messenger
 	securityEnabled bool
 	jwtSecret       string
 }
 
-func New(dbInstance libdb.DBManager, psInstance libbus.Messenger) *Service {
-	return &Service{
+func New(dbInstance libdb.DBManager, psInstance libbus.Messenger) Service {
+	return &service{
 		dbInstance: dbInstance,
 		psInstance: psInstance,
 	}
 }
 
-type QueueJobs struct {
+type Job struct {
 	ID           string          `json:"id"`
 	TaskType     string          `json:"taskType"`
 	ModelJob     store.QueueItem `json:"modelJob"`
@@ -37,7 +46,7 @@ type QueueJobs struct {
 	CreatedAt    time.Time       `json:"createdAt"`
 }
 
-func (s *Service) CurrentQueueState(ctx context.Context) ([]QueueJobs, error) {
+func (s *service) CurrentDownloadQueueState(ctx context.Context) ([]Job, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -46,7 +55,7 @@ func (s *Service) CurrentQueueState(ctx context.Context) ([]QueueJobs, error) {
 	if err != nil {
 		return nil, err
 	}
-	var convQueue []QueueJobs
+	var convQueue []Job
 	var item store.QueueItem
 	for _, queue := range queue {
 
@@ -54,7 +63,7 @@ func (s *Service) CurrentQueueState(ctx context.Context) ([]QueueJobs, error) {
 		if err != nil {
 			return nil, err
 		}
-		convQueue = append(convQueue, QueueJobs{
+		convQueue = append(convQueue, Job{
 			ID:           queue.ID,
 			TaskType:     queue.TaskType,
 			ModelJob:     item,
@@ -67,7 +76,7 @@ func (s *Service) CurrentQueueState(ctx context.Context) ([]QueueJobs, error) {
 	return convQueue, nil
 }
 
-func (s *Service) CancelDownloads(ctx context.Context, url string) error {
+func (s *service) CancelDownloads(ctx context.Context, url string) error {
 	queueItem := store.Job{
 		ID: url,
 	}
@@ -78,7 +87,7 @@ func (s *Service) CancelDownloads(ctx context.Context, url string) error {
 	return s.psInstance.Publish(ctx, "queue_cancel", b)
 }
 
-func (s *Service) RemoveFromQueue(ctx context.Context, modelName string) error {
+func (s *service) RemoveDownloadFromQueue(ctx context.Context, modelName string) error {
 	tx, comm, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -122,8 +131,7 @@ func (s *Service) RemoveFromQueue(ctx context.Context, modelName string) error {
 	return nil
 }
 
-func (s *Service) InProgress(ctx context.Context, statusCh chan<- *store.Status) error {
-
+func (s *service) DownloadInProgress(ctx context.Context, statusCh chan<- *store.Status) error {
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(s.dbInstance.WithoutTransaction()), s, store.PermissionView); err != nil {
 		return err
 	}
@@ -169,10 +177,10 @@ func (s *Service) InProgress(ctx context.Context, statusCh chan<- *store.Status)
 	return nil
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "downloadservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

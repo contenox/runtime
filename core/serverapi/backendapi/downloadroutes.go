@@ -12,7 +12,7 @@ import (
 	"github.com/js402/cate/core/services/downloadservice"
 )
 
-func AddQueueRoutes(mux *http.ServeMux, _ *serverops.Config, dwService *downloadservice.Service) {
+func AddQueueRoutes(mux *http.ServeMux, _ *serverops.Config, dwService downloadservice.Service) {
 	s := &downloadManager{service: dwService}
 	mux.HandleFunc("GET /queue", s.getQueue)
 	mux.HandleFunc("DELETE /queue/{model}", s.removeFromQueue)
@@ -21,13 +21,13 @@ func AddQueueRoutes(mux *http.ServeMux, _ *serverops.Config, dwService *download
 }
 
 type downloadManager struct {
-	service *downloadservice.Service
+	service downloadservice.Service
 }
 
 func (s *downloadManager) getQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	currentQueue, err := s.service.CurrentQueueState(ctx)
+	currentQueue, err := s.service.CurrentDownloadQueueState(ctx)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.GetOperation)
 		return
@@ -43,7 +43,7 @@ func (s *downloadManager) removeFromQueue(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := s.service.RemoveFromQueue(r.Context(), modelName); err != nil {
+	if err := s.service.RemoveDownloadFromQueue(r.Context(), modelName); err != nil {
 		_ = serverops.Error(w, r, err, serverops.DeleteOperation)
 		return
 	}
@@ -70,7 +70,7 @@ func (s *downloadManager) inProgress(w http.ResponseWriter, r *http.Request) {
 
 	// Use a separate goroutine to subscribe and push updates into statusCh.
 	go func() {
-		if err := s.service.InProgress(r.Context(), statusCh); err != nil {
+		if err := s.service.DownloadInProgress(r.Context(), statusCh); err != nil {
 			log.Printf("error during InProgress subscription: %v", err)
 		}
 		// When InProgress returns (e.g. context canceled), close the channel.

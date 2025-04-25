@@ -11,7 +11,7 @@ import (
 	"github.com/js402/cate/core/services/modelservice"
 )
 
-func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService *modelservice.Service, dwService *downloadservice.Service) {
+func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService *modelservice.Service, dwService downloadservice.Service) {
 	s := &service{service: modelService, dwService: dwService}
 
 	mux.HandleFunc("POST /models", s.append)
@@ -21,7 +21,7 @@ func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService *model
 
 type service struct {
 	service   *modelservice.Service
-	dwService *downloadservice.Service
+	dwService downloadservice.Service
 }
 
 func (s *service) append(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +67,7 @@ func (s *service) delete(w http.ResponseWriter, r *http.Request) {
 	}
 	queue := r.URL.Query().Get("purge")
 	if queue == "true" {
-		if err := s.dwService.RemoveFromQueue(r.Context(), modelName); err != nil {
+		if err := s.dwService.RemoveDownloadFromQueue(r.Context(), modelName); err != nil {
 			_ = serverops.Error(w, r, err, serverops.DeleteOperation)
 			return
 		}
