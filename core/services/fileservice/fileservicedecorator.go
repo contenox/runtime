@@ -37,7 +37,7 @@ func (d *activityTrackerDecorator) CreateFile(ctx context.Context, file *File) (
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(createdFile.ID, nil)
+		reportChangeFn(createdFile.ID, createdFile)
 	}
 
 	return createdFile, opErr

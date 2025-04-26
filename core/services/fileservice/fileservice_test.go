@@ -25,45 +25,8 @@ func TestFileService(t *testing.T) {
 		}
 	}()
 
-	dbConn, _, dbCleanup, err := libdb.SetupLocalInstance(ctx, uuid.NewString(), "test", "test")
-	if err != nil {
-		t.Fatalf("failed to setup local database: %v", err)
-	}
+	_, fileService, dbCleanup := setupFileServiceTestEnv(ctx, t)
 	addCleanup(dbCleanup)
-
-	dbInstance, err := libdb.NewPostgresDBManager(ctx, dbConn, store.Schema)
-	if err != nil {
-		t.Fatalf("failed to create new Postgres DB Manager: %v", err)
-	}
-	err = serverops.NewServiceManager(&serverops.Config{
-		JWTExpiry:       "1h",
-		SecurityEnabled: "false",
-	})
-	if err != nil {
-		t.Fatalf("failed to create new Service Manager: %v", err)
-	}
-	fileService := fileservice.New(dbInstance, &serverops.Config{
-		JWTExpiry:       "1h",
-		SecurityEnabled: "false",
-	})
-	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
-		Email:        serverops.DefaultAdminUser,
-		ID:           uuid.NewString(),
-		Subject:      serverops.DefaultAdminUser,
-		FriendlyName: "Admin",
-	})
-	if err != nil {
-		t.Fatalf("failed to create user: %v", err)
-	}
-	err = store.New(dbInstance.WithoutTransaction()).CreateAccessEntry(ctx, &store.AccessEntry{
-		Identity:   serverops.DefaultAdminUser,
-		ID:         uuid.NewString(),
-		Resource:   serverops.DefaultServerGroup,
-		Permission: store.PermissionManage,
-	})
-	if err != nil {
-		t.Fatalf("failed to create access entry: %v", err)
-	}
 
 	t.Run("CreateFile", func(t *testing.T) {
 		testFile := &fileservice.File{
@@ -357,4 +320,47 @@ func TestFileService(t *testing.T) {
 			t.Error("Expected error when renaming to existing folder path, got nil")
 		}
 	})
+}
+
+func setupFileServiceTestEnv(ctx context.Context, t *testing.T) (libdb.DBManager, fileservice.Service, func()) {
+	t.Helper()
+	dbConn, _, dbCleanup, err := libdb.SetupLocalInstance(ctx, uuid.NewString(), "test", "test")
+	if err != nil {
+		t.Fatalf("failed to setup local database: %v", err)
+	}
+
+	dbInstance, err := libdb.NewPostgresDBManager(ctx, dbConn, store.Schema)
+	if err != nil {
+		t.Fatalf("failed to create new Postgres DB Manager: %v", err)
+	}
+	err = serverops.NewServiceManager(&serverops.Config{
+		JWTExpiry:       "1h",
+		SecurityEnabled: "false",
+	})
+	if err != nil {
+		t.Fatalf("failed to create new Service Manager: %v", err)
+	}
+	fileService := fileservice.New(dbInstance, &serverops.Config{
+		JWTExpiry:       "1h",
+		SecurityEnabled: "false",
+	})
+	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+		Email:        serverops.DefaultAdminUser,
+		ID:           uuid.NewString(),
+		Subject:      serverops.DefaultAdminUser,
+		FriendlyName: "Admin",
+	})
+	if err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	err = store.New(dbInstance.WithoutTransaction()).CreateAccessEntry(ctx, &store.AccessEntry{
+		Identity:   serverops.DefaultAdminUser,
+		ID:         uuid.NewString(),
+		Resource:   serverops.DefaultServerGroup,
+		Permission: store.PermissionManage,
+	})
+	if err != nil {
+		t.Fatalf("failed to create access entry: %v", err)
+	}
+	return dbInstance, fileService, dbCleanup
 }

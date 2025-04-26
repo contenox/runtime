@@ -77,6 +77,9 @@ func (f *fileVectorizationJobCreator) Start(ctx context.Context, operation strin
 			fmt.Printf("Error in activity %s on %s: %v\n", instance.operation, instance.subject, instance.err)
 			return
 		}
+		if job == nil {
+			return
+		}
 		tx := f.dbinstance.WithoutTransaction()
 		err := store.New(tx).AppendJob(ctx, *job)
 		if err != nil {

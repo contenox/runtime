@@ -1,40 +1,40 @@
 CREATE TABLE IF NOT EXISTS ollama_models (
-    id VARCHAR(36) PRIMARY KEY,
-    model VARCHAR(255) NOT NULL UNIQUE,
+    id VARCHAR(255) PRIMARY KEY,
+    model VARCHAR(512) NOT NULL UNIQUE,
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS llm_pool (
-    id VARCHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    purpose_type VARCHAR(255) NOT NULL,
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    purpose_type VARCHAR(512) NOT NULL,
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS llm_backends (
-    id VARCHAR(36) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    base_url TEXT NOT NULL UNIQUE,
-    type VARCHAR(255) NOT NULL,
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    base_url VARCHAR(512) NOT NULL UNIQUE,
+    type VARCHAR(512) NOT NULL,
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS llm_pool_backend_assignments (
-    pool_id VARCHAR(36) NOT NULL REFERENCES llm_pool(id) ON DELETE CASCADE,
-    backend_id VARCHAR(36) NOT NULL REFERENCES llm_backends(id) ON DELETE CASCADE,
+    pool_id VARCHAR(255) NOT NULL REFERENCES llm_pool(id) ON DELETE CASCADE,
+    backend_id VARCHAR(255) NOT NULL REFERENCES llm_backends(id) ON DELETE CASCADE,
     PRIMARY KEY (pool_id, backend_id),
     assigned_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ollama_model_assignments (
-    model_id VARCHAR(36) NOT NULL REFERENCES ollama_models(id) ON DELETE CASCADE,
-    llm_pool_id VARCHAR(36) NOT NULL REFERENCES llm_pool(id) ON DELETE CASCADE,
+    model_id VARCHAR(255) NOT NULL REFERENCES ollama_models(id) ON DELETE CASCADE,
+    llm_pool_id VARCHAR(255) NOT NULL REFERENCES llm_pool(id) ON DELETE CASCADE,
     PRIMARY KEY (model_id, llm_pool_id),
 
     created_at TIMESTAMP NOT NULL,
@@ -42,23 +42,23 @@ CREATE TABLE IF NOT EXISTS ollama_model_assignments (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-    id VARCHAR(255) PRIMARY KEY,
-    friendly_name TEXT,
-    email TEXT NOT NULL UNIQUE,
-    subject TEXT NOT NULL UNIQUE,
-    hashed_password TEXT,
-    recovery_code_hash TEXT,
-    salt TEXT,
+    id VARCHAR(512) PRIMARY KEY,
+    friendly_name VARCHAR(512),
+    email VARCHAR(512) NOT NULL UNIQUE,
+    subject VARCHAR(512) NOT NULL UNIQUE,
+    hashed_password VARCHAR(2048),
+    recovery_code_hash VARCHAR(2048),
+    salt VARCHAR(2048),
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS accesslists (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
 
-    identity VARCHAR(255) NOT NULL REFERENCES users(subject) ON DELETE CASCADE,
-    resource VARCHAR(255) NOT NULL,
+    identity VARCHAR(512) NOT NULL REFERENCES users(subject) ON DELETE CASCADE,
+    resource VARCHAR(512) NOT NULL,
     permission INT NOT NULL,
 
     created_at TIMESTAMP NOT NULL,
@@ -67,7 +67,10 @@ CREATE TABLE IF NOT EXISTS accesslists (
 
 CREATE TABLE IF NOT EXISTS job_queue_v2 (
     id VARCHAR(255) PRIMARY KEY,
-    task_type VARCHAR(255) NOT NULL,
+    task_type VARCHAR(512) NOT NULL,
+    operation VARCHAR(512),
+    subject VARCHAR(512),
+    entity_id VARCHAR(512),
     payload JSONB NOT NULL,
 
     scheduled_for INT,
@@ -76,12 +79,12 @@ CREATE TABLE IF NOT EXISTS job_queue_v2 (
 );
 
 CREATE TABLE IF NOT EXISTS files (
-    id VARCHAR(36) PRIMARY KEY,
-    path TEXT NOT NULL UNIQUE,
-    type VARCHAR(255) NOT NULL,
+    id VARCHAR(255) PRIMARY KEY,
+    path VARCHAR(1024) NOT NULL UNIQUE,
+    type VARCHAR(512) NOT NULL,
 
     meta JSONB NOT NULL,
-    blobs_id TEXT,
+    blobs_id VARCHAR(255),
     is_folder BOOLEAN DEFAULT FALSE,
 
     created_at TIMESTAMP NOT NULL,
@@ -90,7 +93,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE TABLE IF NOT EXISTS blobs (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     meta JSONB NOT NULL,
 
     data bytea NOT NULL,
@@ -100,13 +103,13 @@ CREATE TABLE IF NOT EXISTS blobs (
 );
 
 CREATE TABLE IF NOT EXISTS message_indices (
-    id VARCHAR(36) PRIMARY KEY,
-    identity VARCHAR(255) NOT NULL REFERENCES users(subject) ON DELETE CASCADE
+    id VARCHAR(255) PRIMARY KEY,
+    identity VARCHAR(512) NOT NULL REFERENCES users(subject) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS messages (
-    id VARCHAR(36) PRIMARY KEY,
-    idx_id VARCHAR(36) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
+    id VARCHAR(255) PRIMARY KEY,
+    idx_id VARCHAR(255) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
 
     payload JSONB NOT NULL,
     added_at TIMESTAMP NOT NULL

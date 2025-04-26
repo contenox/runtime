@@ -17,6 +17,9 @@ func TestAppendJobAndPopAll(t *testing.T) {
 		ID:           uuid.New().String(),
 		TaskType:     "test-task",
 		Payload:      []byte(`{"key": "value"}`),
+		Operation:    "create",
+		Subject:      "user",
+		EntityID:     uuid.New().String(),
 		ScheduledFor: 1620000000,
 		ValidUntil:   1620003600,
 	}
@@ -33,6 +36,9 @@ func TestAppendJobAndPopAll(t *testing.T) {
 	retrieved := jobs[0]
 	require.Equal(t, job.TaskType, retrieved.TaskType)
 	require.Equal(t, job.Payload, retrieved.Payload)
+	require.Equal(t, job.Operation, retrieved.Operation)
+	require.Equal(t, job.Subject, retrieved.Subject)
+	require.Equal(t, job.EntityID, retrieved.EntityID)
 	require.Equal(t, job.ScheduledFor, retrieved.ScheduledFor)
 	require.Equal(t, job.ValidUntil, retrieved.ValidUntil)
 }
