@@ -41,8 +41,8 @@ type Job struct {
 	ID           string          `json:"id"`
 	TaskType     string          `json:"taskType"`
 	ModelJob     store.QueueItem `json:"modelJob"`
-	ScheduledFor int             `json:"scheduledFor"`
-	ValidUntil   int             `json:"validUntil"`
+	ScheduledFor int64           `json:"scheduledFor"`
+	ValidUntil   int64           `json:"validUntil"`
 	CreatedAt    time.Time       `json:"createdAt"`
 }
 

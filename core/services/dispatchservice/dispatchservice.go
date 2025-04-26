@@ -3,6 +3,7 @@ package dispatchservice
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -89,7 +90,14 @@ func (s *service) GetServiceName() string {
 
 func (s *service) MarkJobAsDone(ctx context.Context, jobID string, leaserID string) error {
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	err := storeInstance.DeleteLeasedJob(ctx, jobID)
+	job, err := storeInstance.GetLeasedJob(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if job.Leaser != leaserID {
+		return fmt.Errorf("job %s is not leased by %s", jobID, leaserID)
+	}
+	err = storeInstance.DeleteLeasedJob(ctx, jobID)
 	if err != nil {
 		return err
 	}

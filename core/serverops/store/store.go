@@ -82,8 +82,8 @@ type Job struct {
 	Subject      string    `json:"subject"`
 	EntityID     string    `json:"entityId"`
 	Payload      []byte    `json:"payload"`
-	ScheduledFor int       `json:"scheduledFor"`
-	ValidUntil   int       `json:"validUntil"`
+	ScheduledFor int64     `json:"scheduledFor"`
+	ValidUntil   int64     `json:"validUntil"`
 	RetryCount   int       `json:"retryCount"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
