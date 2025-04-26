@@ -46,7 +46,7 @@ func (i *fileActivityInstance) CreateJob(ctx context.Context, id string, data an
 		Subject:   i.subject,
 		EntityID:  id,
 		TaskType:  "vectorize_" + file.ContentType,
-		// Payload:   payload, 	// Note: We don't include payload, it may be very large
+		Payload:   []byte("{}"), // Note: We don't include data, it may be very large
 	}
 	return task, nil
 }
