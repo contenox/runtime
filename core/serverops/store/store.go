@@ -78,6 +78,9 @@ type User struct {
 type Job struct {
 	ID           string    `json:"id"`
 	TaskType     string    `json:"taskType"`
+	Operation    string    `json:"operation"`
+	Subject      string    `json:"subject"`
+	EntityID     string    `json:"entityId"`
 	Payload      []byte    `json:"payload"`
 	ScheduledFor int       `json:"scheduledFor"`
 	ValidUntil   int       `json:"validUntil"`

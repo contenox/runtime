@@ -91,7 +91,7 @@ func (d *activityTrackerDecorator) UpdateFile(ctx context.Context, file *File) (
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(updatedFile.ID, nil)
+		reportChangeFn(updatedFile.ID, updatedFile)
 	}
 	return updatedFile, opErr
 }
@@ -142,7 +142,7 @@ func (d *activityTrackerDecorator) CreateFolder(ctx context.Context, path string
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(folder.ID, nil)
+		reportChangeFn(folder.ID, folder)
 	}
 	return folder, opErr
 }
@@ -161,7 +161,7 @@ func (d *activityTrackerDecorator) RenameFile(ctx context.Context, fileID, newPa
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(file.ID, nil)
+		reportChangeFn(file.ID, file)
 	}
 	return file, opErr
 }
