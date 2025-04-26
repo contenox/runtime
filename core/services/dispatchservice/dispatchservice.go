@@ -1,4 +1,4 @@
-package dispatchingservice
+package dispatchservice
 
 import (
 	"context"
@@ -32,6 +32,12 @@ type Service interface {
 
 type service struct {
 	dbInstance libdb.DBManager
+}
+
+func New(dbInstance libdb.DBManager, config *serverops.Config) *service {
+	return &service{
+		dbInstance: dbInstance,
+	}
 }
 
 // AssignPendingJob implements Service.
