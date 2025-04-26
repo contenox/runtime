@@ -40,19 +40,13 @@ func (i *fileActivityInstance) CreateJob(ctx context.Context, id string, data an
 	if file.ContentType == "" {
 		return nil, fmt.Errorf("file content type is empty")
 	}
-	// Note: We don't need the payload
-	// TODO: The URL to download the blob would be more helpful here.
-	// payload, err := json.Marshal(file)
-	// if err != nil {
-	// 	return err
-	// }
 	task := &store.Job{
 		ID:        uuid.NewString(),
 		Operation: i.operation,
 		Subject:   i.subject,
 		EntityID:  id,
 		TaskType:  "vectorize_" + file.ContentType,
-		// Payload:   payload,
+		// Payload:   payload, 	// Note: We don't include payload, it may be very large
 	}
 	return task, nil
 }
