@@ -126,8 +126,11 @@ func (s *store) ListJobs(ctx context.Context, createdAtCursor *time.Time, limit 
 		ORDER BY created_at
 		LIMIT $2;
 	`
-
-	rows, err := s.Exec.QueryContext(ctx, query, createdAtCursor, limit)
+	cursor := time.Now().UTC()
+	if createdAtCursor != nil {
+		cursor = *createdAtCursor
+	}
+	rows, err := s.Exec.QueryContext(ctx, query, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -198,14 +201,18 @@ func (s *store) DeleteLeasedJob(ctx context.Context, id string) error {
 }
 
 func (s *store) ListLeasedJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*LeasedJob, error) {
+	cursor := time.Now().UTC()
+	if createdAtCursor != nil {
+		cursor = createdAtCursor.UTC()
+	}
 	query := `
-		SELECT id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until,retry_count, created_at, leaser, lease_expiration
+		SELECT id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until, retry_count, created_at, leaser, lease_expiration
 		FROM leased_jobs
 		WHERE created_at > $1
 		ORDER BY created_at ASC
 		LIMIT $2;
 	`
-	rows, err := s.Exec.QueryContext(ctx, query, createdAtCursor, limit)
+	rows, err := s.Exec.QueryContext(ctx, query, cursor, limit)
 	if err != nil {
 		return nil, err
 	}

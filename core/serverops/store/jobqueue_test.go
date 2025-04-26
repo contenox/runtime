@@ -367,15 +367,16 @@ func TestLeaseExpiration(t *testing.T) {
 
 func TestEmptyListOperations(t *testing.T) {
 	ctx, s := store.SetupStore(t)
+	now := time.Now().UTC()
 
 	t.Run("empty_job_list", func(t *testing.T) {
-		jobs, err := s.ListJobs(ctx, nil, 10)
+		jobs, err := s.ListJobs(ctx, &now, 10)
 		require.NoError(t, err)
 		require.Empty(t, jobs)
 	})
 
 	t.Run("empty_leased_job_list", func(t *testing.T) {
-		jobs, err := s.ListLeasedJobs(ctx, nil, 10)
+		jobs, err := s.ListLeasedJobs(ctx, &now, 10)
 		require.NoError(t, err)
 		require.Empty(t, jobs)
 	})

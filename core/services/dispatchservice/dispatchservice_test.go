@@ -141,7 +141,7 @@ func TestJobListing(t *testing.T) {
 	ctx := context.Background()
 	db, service, cleanup := setupFileServiceTestEnv(ctx, t)
 	defer cleanup()
-
+	now := time.Now().UTC()
 	storeInstance := store.New(db.WithoutTransaction())
 	jobType := "test-listing-job"
 
@@ -149,18 +149,25 @@ func TestJobListing(t *testing.T) {
 	pendingJob := createTestJob(t, storeInstance, jobType)
 
 	// Create leased job
-	leasedJob := createTestJob(t, storeInstance, jobType)
+	leasedJob := &store.Job{
+		ID:           uuid.NewString(),
+		TaskType:     "test-listing-job",
+		Payload:      []byte("{}"),
+		ScheduledFor: time.Now().Unix(),
+		ValidUntil:   time.Now().Add(1 * time.Hour).Unix(),
+		CreatedAt:    time.Now().UTC(),
+	}
 	require.NoError(t, storeInstance.AppendLeasedJob(ctx, *leasedJob, 30*time.Minute, "leaser-1"))
 
 	t.Run("pending_jobs", func(t *testing.T) {
-		jobs, err := service.PendingJobs(ctx, nil)
+		jobs, err := service.PendingJobs(ctx, &now)
 		require.NoError(t, err)
 		require.Len(t, jobs, 1)
 		require.Equal(t, pendingJob.ID, jobs[0].ID)
 	})
 
 	t.Run("in_progress_jobs", func(t *testing.T) {
-		jobs, err := service.InProgressJobs(ctx, nil)
+		jobs, err := service.InProgressJobs(ctx, &now)
 		require.NoError(t, err)
 		require.Len(t, jobs, 1)
 		require.Equal(t, leasedJob.ID, jobs[0].ID)
