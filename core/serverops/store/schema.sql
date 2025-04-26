@@ -67,9 +67,6 @@ CREATE TABLE IF NOT EXISTS accesslists (
 
 CREATE TABLE IF NOT EXISTS leased_jobs (
     id VARCHAR(255) PRIMARY KEY,
-
-    lease_duration INT NOT NULL,
-    leaser VARCHAR(512) NOT NULL,
     task_type VARCHAR(512) NOT NULL,
     operation VARCHAR(512),
     subject VARCHAR(512),
@@ -78,6 +75,11 @@ CREATE TABLE IF NOT EXISTS leased_jobs (
 
     scheduled_for INT,
     valid_until INT,
+    retry_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL,
+
+    lease_duration INT NOT NULL,
+    leaser VARCHAR(512) NOT NULL,
     lease_expiration TIMESTAMP NOT NULL
 );
 
@@ -91,6 +93,7 @@ CREATE TABLE IF NOT EXISTS job_queue_v2 (
 
     scheduled_for INT,
     valid_until INT,
+    retry_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL
 );
 

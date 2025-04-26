@@ -84,7 +84,14 @@ type Job struct {
 	Payload      []byte    `json:"payload"`
 	ScheduledFor int       `json:"scheduledFor"`
 	ValidUntil   int       `json:"validUntil"`
+	RetryCount   int       `json:"retryCount"`
 	CreatedAt    time.Time `json:"createdAt"`
+}
+
+type LeasedJob struct {
+	Job
+	Leaser          string    `json:"leaser"`
+	LeaseExpiration time.Time `json:"leaseExpiration"`
 }
 
 type Resource struct {
@@ -217,6 +224,12 @@ type Store interface {
 	PopJobsForType(ctx context.Context, taskType string) ([]*Job, error)
 	PopJobForType(ctx context.Context, taskType string) (*Job, error)
 	GetJobsForType(ctx context.Context, taskType string) ([]*Job, error)
+	ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Job, error)
+
+	AppendLeasedJob(ctx context.Context, job Job, duration time.Duration, leaser string) error
+	GetLeasedJob(ctx context.Context, id string) (*LeasedJob, error)
+	DeleteLeasedJob(ctx context.Context, id string) error
+	ListLeasedJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*LeasedJob, error)
 
 	CreateAccessEntry(ctx context.Context, entry *AccessEntry) error
 	GetAccessEntryByID(ctx context.Context, id string) (*AccessEntry, error)

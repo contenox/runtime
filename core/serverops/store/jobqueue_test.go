@@ -22,6 +22,7 @@ func TestAppendJobAndPopAll(t *testing.T) {
 		EntityID:     uuid.New().String(),
 		ScheduledFor: 1620000000,
 		ValidUntil:   1620003600,
+		RetryCount:   0,
 	}
 
 	// Append the job.
@@ -41,6 +42,7 @@ func TestAppendJobAndPopAll(t *testing.T) {
 	require.Equal(t, job.EntityID, retrieved.EntityID)
 	require.Equal(t, job.ScheduledFor, retrieved.ScheduledFor)
 	require.Equal(t, job.ValidUntil, retrieved.ValidUntil)
+	require.Equal(t, job.RetryCount, retrieved.RetryCount)
 }
 
 func TestPopAllForType(t *testing.T) {
