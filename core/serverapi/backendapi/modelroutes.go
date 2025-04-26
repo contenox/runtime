@@ -1,6 +1,7 @@
 package backendapi
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -58,7 +59,7 @@ func (s *service) delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	modelName := url.PathEscape(r.PathValue("model"))
 	if modelName == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("model name required"), serverops.DeleteOperation)
+		serverops.Error(w, r, fmt.Errorf("model name is required: %w", serverops.ErrBadPathValue), serverops.DeleteOperation)
 		return
 	}
 	if err := s.service.Delete(ctx, modelName); err != nil {

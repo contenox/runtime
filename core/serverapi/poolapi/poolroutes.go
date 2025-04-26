@@ -1,6 +1,7 @@
 package poolapi
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -58,7 +59,7 @@ func (h *poolHandler) getByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := url.PathEscape(r.PathValue("id"))
 	if id == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("id required"), serverops.GetOperation)
+		serverops.Error(w, r, fmt.Errorf("id required: %w", serverops.ErrBadPathValue), serverops.GetOperation)
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *poolHandler) getByName(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	name := url.PathEscape(r.PathValue("name"))
 	if name == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("name required"), serverops.GetOperation)
+		serverops.Error(w, r, fmt.Errorf("id required: %w", serverops.ErrBadPathValue), serverops.GetOperation)
 		return
 	}
 
@@ -92,7 +93,7 @@ func (h *poolHandler) update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := url.PathEscape(r.PathValue("id"))
 	if id == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("id required"), serverops.UpdateOperation)
+		serverops.Error(w, r, fmt.Errorf("id required: %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 
@@ -115,7 +116,7 @@ func (h *poolHandler) delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := url.PathEscape(r.PathValue("id"))
 	if id == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("id required"), serverops.DeleteOperation)
+		serverops.Error(w, r, fmt.Errorf("id required: %w", serverops.ErrBadPathValue), serverops.DeleteOperation)
 		return
 	}
 
@@ -143,7 +144,7 @@ func (h *poolHandler) listByPurpose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	purpose := url.PathEscape(r.PathValue("purpose"))
 	if purpose == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("purpose required"), serverops.ListOperation)
+		serverops.Error(w, r, fmt.Errorf("id required: %w", serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 
@@ -163,7 +164,7 @@ func (h *poolHandler) assignBackend(w http.ResponseWriter, r *http.Request) {
 	backendID := url.PathEscape(r.PathValue("backendID"))
 
 	if poolID == "" || backendID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID and backendID required"), serverops.UpdateOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID and backendID are required: %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 
@@ -181,7 +182,7 @@ func (h *poolHandler) removeBackend(w http.ResponseWriter, r *http.Request) {
 	backendID := url.PathEscape(r.PathValue("backendID"))
 
 	if poolID == "" || backendID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID and backendID required"), serverops.UpdateOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID and backendID required: %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 
@@ -197,7 +198,7 @@ func (h *poolHandler) listBackends(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	poolID := url.PathEscape(r.PathValue("poolID"))
 	if poolID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID required"), serverops.ListOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID required: %w", serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 
@@ -214,7 +215,7 @@ func (h *poolHandler) listPoolsForBackend(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	backendID := url.PathEscape(r.PathValue("backendID"))
 	if backendID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("backendID required"), serverops.ListOperation)
+		serverops.Error(w, r, fmt.Errorf("backendID required: %w", serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 
@@ -234,7 +235,7 @@ func (h *poolHandler) assignModel(w http.ResponseWriter, r *http.Request) {
 	modelID := url.PathEscape(r.PathValue("modelID"))
 
 	if poolID == "" || modelID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID and modelID required"), serverops.UpdateOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID and modelID required: %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 
@@ -252,7 +253,7 @@ func (h *poolHandler) removeModel(w http.ResponseWriter, r *http.Request) {
 	modelID := url.PathEscape(r.PathValue("modelID"))
 
 	if poolID == "" || modelID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID and modelID required"), serverops.UpdateOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID and modelID required: %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 
@@ -268,7 +269,7 @@ func (h *poolHandler) listModels(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	poolID := url.PathEscape(r.PathValue("poolID"))
 	if poolID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("poolID required"), serverops.ListOperation)
+		serverops.Error(w, r, fmt.Errorf("poolID required: %w", serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 
@@ -285,7 +286,7 @@ func (h *poolHandler) listPoolsForModel(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	modelID := url.PathEscape(r.PathValue("modelID"))
 	if modelID == "" {
-		serverops.Error(w, r, serverops.ErrBadPathValue("modelID required"), serverops.ListOperation)
+		serverops.Error(w, r, fmt.Errorf("modelID required: %w", serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 

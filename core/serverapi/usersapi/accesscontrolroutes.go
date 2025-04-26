@@ -1,6 +1,7 @@
 package usersapi
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -89,7 +90,7 @@ func (a *accessManager) getByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("id parameter is missing %w", serverops.ErrBadPathValue), serverops.AuthorizeOperation)
 		return
 	}
 	withUserDetails := false
@@ -113,7 +114,7 @@ func (a *accessManager) update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("id parameter is missing %w", serverops.ErrBadPathValue), serverops.AuthorizeOperation)
 		return
 	}
 	entry, err := serverops.Decode[accessservice.AccessEntryRequest](r)
@@ -136,7 +137,7 @@ func (a *accessManager) delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("missing required id parameter %w", serverops.ErrBadPathValue), serverops.AuthorizeOperation)
 		return
 	}
 	if err := a.service.Delete(ctx, id); err != nil {

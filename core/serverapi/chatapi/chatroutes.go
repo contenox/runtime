@@ -1,6 +1,7 @@
 package chatapi
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -59,7 +60,7 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 	idStr := r.PathValue("id")
 	chatID, err := uuid.Parse(idStr)
 	if err != nil {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue(err.Error()), serverops.CreateOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.CreateOperation)
 		return
 	}
 
@@ -89,7 +90,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	// model := r.PathValue("model")
 	chatID, err := uuid.Parse(idStr)
 	if err != nil {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue(err.Error()), serverops.ServerOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.ServerOperation)
 		return
 	}
 
@@ -116,7 +117,7 @@ func (h *chatManagerHandler) history(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	chatID, err := uuid.Parse(idStr)
 	if err != nil {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required id parameter"), serverops.ListOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.ListOperation)
 		return
 	}
 

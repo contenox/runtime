@@ -10,11 +10,8 @@ import (
 	"github.com/js402/cate/libs/libdb"
 )
 
-type ErrBadPathValue string
-
-func (v ErrBadPathValue) Error() string {
-	return fmt.Sprintf("serverops: path value error %s", string(v))
-}
+var ErrInvalidParameterValue = errors.New("serverops: invalid parameter value type")
+var ErrBadPathValue = errors.New("serverops: bad path value")
 
 // ErrFileSizeLimitExceeded indicates the specific file exceeded its allowed size limit.
 var ErrFileSizeLimitExceeded = errors.New("serverops: file size limit exceeded")
@@ -115,6 +112,9 @@ func mapErrorToStatus(op Operation, err error) int {
 		return http.StatusInternalServerError
 	}
 	if errors.Is(err, ErrDecodeInvalidJSON) {
+		return http.StatusBadRequest // 400
+	}
+	if errors.Is(err, ErrInvalidParameterValue) || errors.Is(err, ErrBadPathValue) {
 		return http.StatusBadRequest // 400
 	}
 

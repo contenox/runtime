@@ -39,7 +39,7 @@ func (s *downloadManager) getQueue(w http.ResponseWriter, r *http.Request) {
 func (s *downloadManager) removeFromQueue(w http.ResponseWriter, r *http.Request) {
 	modelName := r.PathValue("model")
 	if modelName == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("model name required"), serverops.DeleteOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("missing model parameter %w", serverops.ErrBadPathValue), serverops.DeleteOperation)
 		return
 	}
 
@@ -61,7 +61,7 @@ func (s *downloadManager) inProgress(w http.ResponseWriter, r *http.Request) {
 	// Ensure the ResponseWriter supports flushing.
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		serverops.Error(w, r, serverops.ErrBadPathValue("streaming unsupported"), serverops.ServerOperation)
+		serverops.Error(w, r, fmt.Errorf("streaming unsupported"), serverops.ServerOperation)
 		return
 	}
 

@@ -1,6 +1,7 @@
 package backendapi
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -92,7 +93,7 @@ func (b *backendManager) get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("missing id parameter %w", serverops.ErrBadPathValue), serverops.GetOperation)
 		return
 	}
 	backend, err := b.service.Get(ctx, id)
@@ -108,7 +109,7 @@ func (b *backendManager) update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("missing id parameter %w", serverops.ErrBadPathValue), serverops.UpdateOperation)
 		return
 	}
 	backend, err := serverops.Decode[store.Backend](r)
@@ -130,7 +131,7 @@ func (b *backendManager) delete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, serverops.ErrBadPathValue("missing required parameters"), serverops.AuthorizeOperation)
+		_ = serverops.Error(w, r, fmt.Errorf("missing id parameter %w", serverops.ErrBadPathValue), serverops.DeleteOperation)
 		return
 	}
 	if err := b.service.Delete(ctx, id); err != nil {
