@@ -164,7 +164,7 @@ func (s *store) AppendLeasedJob(ctx context.Context, job Job, duration time.Dura
 		job.CreatedAt,
 		leaser,
 		leaseExpiration,
-		leaseDurationSeconds, // Add duration in seconds as 13th parameter
+		leaseDurationSeconds,
 	)
 	return err
 }
