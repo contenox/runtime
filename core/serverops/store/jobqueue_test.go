@@ -236,3 +236,147 @@ func TestGetAllForType(t *testing.T) {
 	require.Equal(t, jobB.ScheduledFor, jobsB[0].ScheduledFor)
 	require.Equal(t, jobB.ValidUntil, jobsB[0].ValidUntil)
 }
+
+func TestListJobs(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	// Create reference time
+	baseTime := time.Now().UTC()
+
+	// Create test jobs with sequential created_at times
+	jobs := []*store.Job{
+		{
+			ID:           uuid.New().String(),
+			TaskType:     "list-test",
+			ScheduledFor: 1630000000,
+			ValidUntil:   1630003600,
+			Payload:      []byte("{}"),
+		},
+		{
+			ID:           uuid.New().String(),
+			TaskType:     "list-test",
+			ScheduledFor: 1630000001,
+			ValidUntil:   1630003601,
+			Payload:      []byte("{}"),
+		},
+		{
+			ID:           uuid.New().String(),
+			TaskType:     "list-test",
+			ScheduledFor: 1630000002,
+			ValidUntil:   1630003602,
+			Payload:      []byte("{}"),
+		},
+	}
+
+	// Insert all jobs
+	for _, job := range jobs {
+		require.NoError(t, s.AppendJob(ctx, *job))
+	}
+
+	// Test cursor-based pagination
+	t.Run("cursor_pagination", func(t *testing.T) {
+		// Get jobs after first job's creation time
+		result, err := s.ListJobs(ctx, &baseTime, 2)
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		result, err = s.ListJobs(ctx, &baseTime, 3)
+		require.Equal(t, jobs[0].ID, result[0].ID)
+		require.Equal(t, jobs[1].ID, result[1].ID)
+		require.Equal(t, jobs[2].ID, result[2].ID)
+		time.Sleep(time.Microsecond)
+		cursor := baseTime.Add(1 * time.Minute)
+		result, err = s.ListJobs(ctx, &cursor, 3)
+		require.NoError(t, err)
+		require.Len(t, result, 0)
+	})
+}
+
+func TestLeasedJobLifecycle(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	// Create base job
+	originalJob := &store.Job{
+		ID:           uuid.New().String(),
+		TaskType:     "leased-job-test",
+		ScheduledFor: 1630000000,
+		ValidUntil:   1630003600,
+		RetryCount:   2,
+		Payload:      []byte("{}"),
+		CreatedAt:    time.Now().UTC(),
+	}
+
+	// Test lease operations
+	t.Run("full_lifecycle", func(t *testing.T) {
+		// Append to leased jobs
+		leaseDuration := 15 * time.Minute
+		require.NoError(t, s.AppendLeasedJob(ctx, *originalJob, leaseDuration, "test-leaser"))
+
+		// Verify lease metadata
+		leasedJob, err := s.GetLeasedJob(ctx, originalJob.ID)
+		require.NoError(t, err)
+		require.Equal(t, "test-leaser", leasedJob.Leaser)
+		require.WithinDuration(t, time.Now().UTC().Add(leaseDuration), leasedJob.LeaseExpiration, 1*time.Second)
+
+		// List leased jobs
+		jobs, err := s.ListLeasedJobs(ctx, &time.Time{}, 10)
+		require.NoError(t, err)
+		require.Len(t, jobs, 1)
+
+		// Delete leased job
+		require.NoError(t, s.DeleteLeasedJob(ctx, originalJob.ID))
+		_, err = s.GetLeasedJob(ctx, originalJob.ID)
+		require.Error(t, err)
+	})
+}
+
+func TestRetryCountPersistence(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	// Create job with retries
+	job := &store.Job{
+		ID:         uuid.New().String(),
+		TaskType:   "retry-test",
+		RetryCount: 3,
+		Payload:    []byte("{}"),
+	}
+
+	// Test retry count preservation
+	require.NoError(t, s.AppendJob(ctx, *job))
+	popped, err := s.PopJobForType(ctx, "retry-test")
+	require.NoError(t, err)
+	require.Equal(t, 3, popped.RetryCount)
+}
+
+func TestLeaseExpiration(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	// Create test job
+	job := &store.Job{ID: uuid.New().String(), TaskType: "lease-expiration-test", Payload: []byte("{}")}
+
+	// Test lease duration calculation
+	leaseDuration := 30 * time.Minute
+	require.NoError(t, s.AppendLeasedJob(ctx, *job, leaseDuration, "lease-test"))
+
+	leasedJob, err := s.GetLeasedJob(ctx, job.ID)
+	require.NoError(t, err)
+
+	expectedExpiration := time.Now().UTC().Add(leaseDuration)
+	require.WithinDuration(t, expectedExpiration, leasedJob.LeaseExpiration, 1*time.Second,
+		"Lease expiration should be set correctly")
+}
+
+func TestEmptyListOperations(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	t.Run("empty_job_list", func(t *testing.T) {
+		jobs, err := s.ListJobs(ctx, nil, 10)
+		require.NoError(t, err)
+		require.Empty(t, jobs)
+	})
+
+	t.Run("empty_leased_job_list", func(t *testing.T) {
+		jobs, err := s.ListLeasedJobs(ctx, nil, 10)
+		require.NoError(t, err)
+		require.Empty(t, jobs)
+	})
+}

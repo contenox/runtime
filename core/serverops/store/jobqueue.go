@@ -146,11 +146,12 @@ func (s *store) ListJobs(ctx context.Context, createdAtCursor *time.Time, limit 
 
 func (s *store) AppendLeasedJob(ctx context.Context, job Job, duration time.Duration, leaser string) error {
 	leaseExpiration := time.Now().UTC().Add(duration)
+	leaseDurationSeconds := int(duration.Seconds()) // Convert duration to integer seconds
 
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO leased_jobs
-		(id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until, retry_count, created_at, leaser, lease_expiration)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);`,
+		(id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until, retry_count, created_at, leaser, lease_expiration, lease_duration)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);`,
 		job.ID,
 		job.TaskType,
 		job.Operation,
@@ -163,11 +164,9 @@ func (s *store) AppendLeasedJob(ctx context.Context, job Job, duration time.Dura
 		job.CreatedAt,
 		leaser,
 		leaseExpiration,
+		leaseDurationSeconds, // Add duration in seconds as 13th parameter
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (s *store) GetLeasedJob(ctx context.Context, id string) (*LeasedJob, error) {
