@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS accesslists (
     updated_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS leased_jobs (
+    id VARCHAR(255) PRIMARY KEY,
+
+    lease_duration INT NOT NULL,
+    leaser VARCHAR(512) NOT NULL,
+    task_type VARCHAR(512) NOT NULL,
+    operation VARCHAR(512),
+    subject VARCHAR(512),
+    entity_id VARCHAR(512),
+    payload JSONB NOT NULL,
+
+    scheduled_for INT,
+    valid_until INT,
+    lease_expiration TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS job_queue_v2 (
     id VARCHAR(255) PRIMARY KEY,
     task_type VARCHAR(512) NOT NULL,
