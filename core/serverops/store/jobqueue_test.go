@@ -372,7 +372,7 @@ func TestLeasedJobLifecycle(t *testing.T) {
 		require.WithinDuration(t, time.Now().UTC().Add(leaseDuration), leasedJob.LeaseExpiration, 1*time.Second)
 
 		// List leased jobs
-		jobs, err := s.ListLeasedJobs(ctx, &time.Time{}, 10)
+		jobs, err := s.ListLeasedJobs(ctx, nil, 10)
 		require.NoError(t, err)
 		require.Len(t, jobs, 1)
 
