@@ -85,9 +85,8 @@ def login(base_url :str, email :str, password :str, headers :dict) -> dict:
     headers["Authorization"] = f"Bearer {response.json()['token']}"
     return headers
 
-def cycle(parser: parser.Parser):
+def load_config() -> dict:
     config = {}
-    print("loading configuration from environment variables.")
     required_vars = {
         "API_BASE_URL": "base_url",
         "WORKER_EMAIL": "email",
@@ -106,8 +105,9 @@ def cycle(parser: parser.Parser):
 
     if missing:
         raise ValueError(f"missing required environment variables: {', '.join(missing)}")
+    return config
 
-    print("configuration loaded successfully.")
+def cycle(parser: parser.Parser, config: dict):
     headers = {}
     try:
         headers = login(config["base_url"], config["email"], config["password"], headers)
