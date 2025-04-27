@@ -237,57 +237,111 @@ func TestGetAllForType(t *testing.T) {
 	require.Equal(t, jobB.ValidUntil, jobsB[0].ValidUntil)
 }
 
-func TestListJobs(t *testing.T) {
+func newTestJob(taskType string) *store.Job {
+	return &store.Job{
+		ID:        uuid.New().String(),
+		TaskType:  taskType,
+		Payload:   []byte(`{}`),
+		Operation: "test-op",
+		Subject:   "test-sub",
+		EntityID:  uuid.New().String(),
+	}
+}
+
+func TestListJobsPagination(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
-	// Create reference time
-	baseTime := time.Now().UTC()
+	var jobs []*store.Job
+	var jobIDs []string
 
-	// Create test jobs with sequential created_at times
-	jobs := []*store.Job{
-		{
-			ID:           uuid.New().String(),
-			TaskType:     "list-test",
-			ScheduledFor: 1630000000,
-			ValidUntil:   1630003600,
-			Payload:      []byte("{}"),
-		},
-		{
-			ID:           uuid.New().String(),
-			TaskType:     "list-test",
-			ScheduledFor: 1630000001,
-			ValidUntil:   1630003601,
-			Payload:      []byte("{}"),
-		},
-		{
-			ID:           uuid.New().String(),
-			TaskType:     "list-test",
-			ScheduledFor: 1630000002,
-			ValidUntil:   1630003602,
-			Payload:      []byte("{}"),
-		},
+	totalJobs := 5
+	for i := range totalJobs {
+		job := newTestJob("list-paginate-test")
+		err := s.AppendJob(ctx, *job)
+		require.NoError(t, err)
+
+		latestJobs, err := s.ListJobs(ctx, nil, 1)
+		require.NoError(t, err)
+		require.Len(t, latestJobs, 1)
+		require.Equal(t, job.ID, latestJobs[0].ID, "Failed to retrieve job %s immediately after insertion", job.ID)
+
+		job.CreatedAt = latestJobs[0].CreatedAt
+		jobs = append(jobs, job)
+		jobIDs = append(jobIDs, job.ID)
+
+		if i < totalJobs-1 {
+			time.Sleep(25 * time.Millisecond)
+		}
 	}
 
-	// Insert all jobs
-	for _, job := range jobs {
-		require.NoError(t, s.AppendJob(ctx, *job))
-	}
+	// Order of insertion (and expected increasing CreatedAt): jobs[0], jobs[1], jobs[2], jobs[3], jobs[4]
+	// Expected order from ListJobs (CreatedAt DESC): jobs[4], jobs[3], jobs[2], jobs[1], jobs[0]
 
-	// Test cursor-based pagination
-	t.Run("cursor_pagination", func(t *testing.T) {
-		// Get jobs after first job's creation time
-		result, err := s.ListJobs(ctx, &baseTime, 2)
+	limit := 2
+
+	t.Run("paginate_list_jobs_sequentially", func(t *testing.T) {
+		var nextCursor *time.Time
+		fetchedIDs := make([]string, 0, totalJobs)
+		pageCount := 0
+
+		for {
+			pageCount++
+			t.Logf("Fetching Page %d with cursor: %v", pageCount, nextCursor)
+
+			currentPageJobs, err := s.ListJobs(ctx, nextCursor, limit)
+			require.NoError(t, err, "Failed to list jobs for page %d", pageCount)
+
+			if pageCount == 1 { // First page expectations
+				require.NotEmpty(t, currentPageJobs, "First page should not be empty")
+				require.Equal(t, jobIDs[4], currentPageJobs[0].ID, "Page 1, Item 1 should be newest (jobs[4])")
+				if len(currentPageJobs) > 1 {
+					require.Equal(t, jobIDs[3], currentPageJobs[1].ID, "Page 1, Item 2 should be second newest (jobs[3])")
+					require.True(t, currentPageJobs[0].CreatedAt.After(currentPageJobs[1].CreatedAt) || currentPageJobs[0].CreatedAt.Equal(currentPageJobs[1].CreatedAt))
+				}
+			}
+
+			if len(currentPageJobs) == 0 {
+				t.Logf("Finished fetching pages after page %d", pageCount-1)
+				break // No more items left
+			}
+
+			// Append fetched IDs
+			for _, job := range currentPageJobs {
+				if nextCursor != nil {
+					require.True(t, job.CreatedAt.Equal(*nextCursor) || job.CreatedAt.Before(*nextCursor),
+						"Job %s (CreatedAt %v) on page %d is newer than cursor %v", job.ID, job.CreatedAt, pageCount, *nextCursor)
+				}
+				fetchedIDs = append(fetchedIDs, job.ID)
+			}
+
+			if len(currentPageJobs) < limit {
+				t.Logf("Reached last page (page %d) with %d items", pageCount, len(currentPageJobs))
+				break
+			}
+
+			// Set cursor for the next iteration
+			nextCursor = &currentPageJobs[len(currentPageJobs)-1].CreatedAt
+
+			// Safety break to prevent infinite loops in case of test logic error
+			require.LessOrEqual(t, pageCount, totalJobs, "Pagination seems stuck in a loop")
+		}
+
+		// Verify all jobs were fetched in the correct order
+		expectedOrderIDs := []string{jobIDs[4], jobIDs[3], jobIDs[2], jobIDs[1], jobIDs[0]}
+		require.Equal(t, expectedOrderIDs, fetchedIDs, "All jobs fetched page-by-page should match expected descending order")
+	})
+
+	t.Run("list_with_past_cursor", func(t *testing.T) {
+		pastTime := jobs[0].CreatedAt.Add(-time.Hour) // Time definitely before the first job
+		result, err := s.ListJobs(ctx, &pastTime, limit)
 		require.NoError(t, err)
-		require.Len(t, result, 2)
-		result, err = s.ListJobs(ctx, &baseTime, 3)
-		require.Equal(t, jobs[0].ID, result[0].ID)
-		require.Equal(t, jobs[1].ID, result[1].ID)
-		require.Equal(t, jobs[2].ID, result[2].ID)
-		time.Sleep(time.Microsecond)
-		cursor := baseTime.Add(1 * time.Minute)
-		result, err = s.ListJobs(ctx, &cursor, 3)
+		require.Empty(t, result, "Should return no jobs for a cursor time before all jobs")
+	})
+
+	t.Run("list_with_limit_zero", func(t *testing.T) {
+		result, err := s.ListJobs(ctx, nil, 0)
 		require.NoError(t, err)
-		require.Len(t, result, 0)
+		require.Empty(t, result, "ListJobs with limit 0 should return no jobs")
 	})
 }
 

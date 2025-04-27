@@ -126,7 +126,7 @@ func (s *store) ListAccessEntries(ctx context.Context, createdAtCursor time.Time
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT id, identity, resource, permission, created_at, updated_at
 		FROM accesslists
-		WHERE created_at <= $1
+		WHERE created_at < $1
 		ORDER BY created_at DESC LIMIT 10000`, createdAtCursor,
 	)
 	if err != nil {

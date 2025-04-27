@@ -10,6 +10,7 @@ import (
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi/backendapi"
 	"github.com/js402/cate/core/serverapi/chatapi"
+	"github.com/js402/cate/core/serverapi/dispatchapi"
 	"github.com/js402/cate/core/serverapi/filesapi"
 	"github.com/js402/cate/core/serverapi/indexapi"
 	"github.com/js402/cate/core/serverapi/poolapi"
@@ -20,6 +21,7 @@ import (
 	"github.com/js402/cate/core/services/accessservice"
 	"github.com/js402/cate/core/services/backendservice"
 	"github.com/js402/cate/core/services/chatservice"
+	"github.com/js402/cate/core/services/dispatchservice"
 	"github.com/js402/cate/core/services/downloadservice"
 	"github.com/js402/cate/core/services/fileservice"
 	"github.com/js402/cate/core/services/indexservice"
@@ -103,7 +105,8 @@ func New(
 	indexService := indexservice.New(ctx, embedder, vectorStore)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 	usersapi.AddAuthRoutes(mux, userService)
-
+	dispatchService := dispatchservice.New(dbInstance, config)
+	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
 	handler = enableCORS(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
@@ -117,6 +120,7 @@ func New(
 		downloadService,
 		fileService,
 		indexService,
+		dispatchService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

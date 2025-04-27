@@ -27,9 +27,9 @@ type dispatchHandler struct {
 }
 
 type AssignRequest struct {
-	LeaserID      string        `json:"leaserId"`
-	LeaseDuration time.Duration `json:"leaseDuration"`
-	JobTypes      []string      `json:"jobTypes"`
+	LeaserID      string   `json:"leaserId"`
+	LeaseDuration string   `json:"leaseDuration"`
+	JobTypes      []string `json:"jobTypes"`
 }
 
 func (h *dispatchHandler) assignJob(w http.ResponseWriter, r *http.Request) {
@@ -41,12 +41,16 @@ func (h *dispatchHandler) assignJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var duration *time.Duration
-	if req.LeaseDuration > 0 {
-		duration = &req.LeaseDuration
+	var duration time.Duration
+	if len(req.LeaseDuration) > 0 {
+		duration, err = time.ParseDuration(req.LeaseDuration)
+		if err != nil {
+			_ = serverops.Error(w, r, err, serverops.CreateOperation)
+			return
+		}
 	}
 
-	leasedJob, err := h.service.AssignPendingJob(ctx, req.LeaserID, duration, req.JobTypes...)
+	leasedJob, err := h.service.AssignPendingJob(ctx, req.LeaserID, &duration, req.JobTypes...)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

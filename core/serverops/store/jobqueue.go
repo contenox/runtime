@@ -122,8 +122,8 @@ func (s *store) ListJobs(ctx context.Context, createdAtCursor *time.Time, limit 
 	query := `
 		SELECT id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until, retry_count, created_at
 		FROM job_queue_v2
-		WHERE created_at > $1
-		ORDER BY created_at
+		WHERE created_at < $1
+		ORDER BY created_at DESC
 		LIMIT $2;
 	`
 	cursor := time.Now().UTC()
@@ -208,8 +208,8 @@ func (s *store) ListLeasedJobs(ctx context.Context, createdAtCursor *time.Time, 
 	query := `
 		SELECT id, task_type, operation, subject, entity_id, payload, scheduled_for, valid_until, retry_count, created_at, leaser, lease_expiration
 		FROM leased_jobs
-		WHERE created_at > $1
-		ORDER BY created_at ASC
+		WHERE created_at < $1
+		ORDER BY created_at DESC
 		LIMIT $2;
 	`
 	rows, err := s.Exec.QueryContext(ctx, query, cursor, limit)

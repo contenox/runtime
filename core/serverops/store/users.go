@@ -162,7 +162,7 @@ func (s *store) DeleteUser(ctx context.Context, id string) error {
 func (s *store) ListUsers(ctx context.Context, createdAtCursor time.Time) ([]*User, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT id, friendly_name, email, subject, hashed_password, recovery_code_hash, salt, created_at, updated_at
-		FROM users WHERE created_at <= $1
+		FROM users WHERE created_at < $1
 		ORDER BY created_at DESC LIMIT 10000`, createdAtCursor,
 	)
 	if err != nil {
