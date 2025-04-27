@@ -144,6 +144,9 @@ func (s *service) PendingJobs(ctx context.Context, createdAtCursor *time.Time) (
 	if err != nil {
 		return nil, err
 	}
+	if len(jobs) == 0 {
+		return []*store.Job{}, nil
+	}
 	return jobs, nil
 }
 
@@ -155,6 +158,9 @@ func (s *service) InProgressJobs(ctx context.Context, createdAtCursor *time.Time
 	jobs, err := storeInstance.ListLeasedJobs(ctx, createdAtCursor, 1000)
 	if err != nil {
 		return nil, err
+	}
+	if len(jobs) == 0 {
+		return []*store.LeasedJob{}, nil
 	}
 	return jobs, nil
 }

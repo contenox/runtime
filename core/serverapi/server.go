@@ -83,7 +83,7 @@ func New(
 		state.RunDownloadCycle, // operation
 	)
 	fileService := fileservice.New(dbInstance, config)
-	fileService = fileservice.WithActivityTracker(fileService, serverops.NoopTracker{})
+	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
 	filesapi.AddFileRoutes(mux, config, fileService)
 	downloadService := downloadservice.New(dbInstance, pubsub)
 	backendapi.AddQueueRoutes(mux, config, downloadService)
