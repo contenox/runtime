@@ -6,14 +6,14 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/js402/cate/libs/libollama"
+	"github.com/js402/cate/libs/libtestenv"
 	"github.com/ollama/ollama/api"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStartupOllamaInstance(t *testing.T) {
 	ctx := context.TODO()
-	uri, _, cleanup, err := libollama.SetupLocalInstance(ctx)
+	uri, _, cleanup, err := libtestenv.SetupLocalInstance(ctx)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		cleanup()
