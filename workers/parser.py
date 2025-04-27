@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing_extensions import Any
+from typing import Any
 
 class Parser(ABC):
     @abstractmethod

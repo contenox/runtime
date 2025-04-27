@@ -1,9 +1,9 @@
 import requests
 import os
-from workers import Parser
+from workers import parser
 
 class Steps():
-    def __init__(self, parser: Parser.Parser, base_url: str, lease_duration: int, leaser_id: str, headers: dict):
+    def __init__(self, parser: parser.Parser, base_url: str, lease_duration: int, leaser_id: str, headers: dict):
         """Loads required configuration from environment variables."""
         self.parser = parser
         self.leaser_id = leaser_id
@@ -16,7 +16,7 @@ class Steps():
         payload = {
             "leaserId": self.leaser_id,
             "leaseDuration": self.lease_duration,
-            "jobTypes": self.parser.supported_types,
+            "jobTypes": self.parser.supported_types(),
         }
         response = requests.post(
             f"{self.base_url}/leases",
@@ -85,7 +85,7 @@ def login(base_url :str, email :str, password :str, headers :dict) -> dict:
     headers["Authorization"] = f"Bearer {response.json()['token']}"
     return headers
 
-def cycle(parser: Parser.Parser):
+def cycle(parser: parser.Parser):
     config = {}
     print("loading configuration from environment variables.")
     required_vars = {
@@ -127,6 +127,7 @@ def cycle(parser: Parser.Parser):
             print(f"Error: {e}")
 
 def run(worker_steps: Steps):
+    job_id = None
     try:
         print("Leasing a job...")
         job = worker_steps.lease_job()
@@ -148,6 +149,6 @@ def run(worker_steps: Steps):
 
     except Exception as e:
         print(f"ERROR: {e}")
-        if 'job_id' in locals():
+        if job_id is not None:
             print(f"marking job {job_id} as failed.")
             worker_steps.mark_failed(job_id)

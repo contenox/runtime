@@ -1,7 +1,7 @@
-from typing_extensions import Any
-from workers import Parser
+from typing import Any
+from workers import parser
 
-class Text_Parser(Parser.Parser):
+class TextParser(parser.Parser):
     def __init__(self):
         super().__init__()
 
