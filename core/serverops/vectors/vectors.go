@@ -14,6 +14,7 @@ import (
 type valdStore struct {
 	conn   *grpc.ClientConn
 	client vald.Client
+	args   Args
 }
 
 type Store interface {
@@ -21,26 +22,29 @@ type Store interface {
 	Upsert(ctx context.Context, vector Vector) error
 	BatchInsert(ctx context.Context, vectors []Vector) error
 	Get(ctx context.Context, id string) (*Vector, error)
-	Search(ctx context.Context, query []float32, k int) ([]VectorSearchResult, error)
+	Search(ctx context.Context, query []float32, k int, minK int) ([]VectorSearchResult, error)
 	Delete(ctx context.Context, id string) error
 }
 
-func New(ctx context.Context, addr string) (Store, func() error, error) {
-	// Create a Vald client connection for Vald cluster.
-	close := func() error {
-		return nil
-	}
+type Args struct {
+	Timeout time.Duration
+	Epsilon float32
+	Radius  float32
+}
+
+func New(ctx context.Context, addr string, args Args) (Store, func() error, error) {
+	close := func() error { return nil }
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, close, err
 	}
 
-	// Creates Vald client for gRPC.
 	client := vald.NewValdClient(conn)
 	close = conn.Close
 	return &valdStore{
 		conn:   conn,
 		client: client,
+		args:   args,
 	}, close, nil
 }
 
@@ -56,10 +60,14 @@ func (vs *valdStore) Insert(ctx context.Context, v Vector) error {
 			Vector:    v.Data,
 			Timestamp: time.Now().UTC().Unix(),
 		},
+		Config: &payload.Insert_Config{
+			SkipStrictExistCheck: true,
+		},
 	})
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -110,15 +118,15 @@ type VectorSearchResult struct {
 	Distance float32
 }
 
-func (vs *valdStore) Search(ctx context.Context, query []float32, num int) ([]VectorSearchResult, error) {
+func (vs *valdStore) Search(ctx context.Context, query []float32, num int, minNum int) ([]VectorSearchResult, error) {
 	res, err := vs.client.Search(ctx, &payload.Search_Request{
 		Vector: query,
 		Config: &payload.Search_Config{
 			Num:     uint32(num),
-			MinNum:  1,
-			Radius:  0.0,
-			Epsilon: 0.01,
-			Timeout: int64(2 * time.Second),
+			MinNum:  uint32(minNum),
+			Radius:  vs.args.Radius,
+			Epsilon: vs.args.Epsilon,
+			Timeout: int64(vs.args.Timeout),
 		},
 	})
 	if err != nil {

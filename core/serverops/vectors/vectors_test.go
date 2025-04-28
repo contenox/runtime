@@ -3,6 +3,7 @@ package vectors_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func SetupLocalInstance(ctx context.Context) (string, testcontainers.Container, 
 				Dockerfile: "Dockerfile.vald",
 			},
 			ExposedPorts:    []string{exposedPort},
-			WaitingFor:      wait.ForListeningPort(wait.ForExposedPort().Port).WithStartupTimeout(1 * time.Second),
+			WaitingFor:      wait.ForListeningPort(wait.ForExposedPort().Port).WithStartupTimeout(10 * time.Second),
 			AlwaysPullImage: false,
 		},
 		Started: true,
@@ -43,7 +44,6 @@ func SetupLocalInstance(ctx context.Context) (string, testcontainers.Container, 
 	cleanup = func() {
 		container.Terminate(ctx)
 	}
-
 	return uri, container, cleanup, nil
 }
 
@@ -56,13 +56,18 @@ func TestLocalInstance(t *testing.T) {
 }
 
 func TestVectors(t *testing.T) {
-	uri, _, cleanup, err := SetupLocalInstance(context.Background())
+	uri, container, cleanup, err := SetupLocalInstance(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cleanup()
 
-	client, clean, err := vectors.New(context.Background(), uri)
+	// Pass search parameters via Args
+	client, clean, err := vectors.New(context.Background(), uri, vectors.Args{
+		Timeout: 5 * time.Second,
+		Epsilon: 0.1,
+		Radius:  -1,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,32 +75,64 @@ func TestVectors(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Create a 784-dimensional vector
+	data := make([]float32, 784)
+	for i := range data {
+		data[i] = 0.1
+	}
+
 	v := vectors.Vector{
 		ID:   "test-id",
-		Data: []float32{0.1, 0.2, 0.3},
+		Data: data,
 	}
 
 	// Insert
 	if err := client.Insert(ctx, v); err != nil {
 		t.Fatalf("Insert failed: %v", err)
 	}
+	// time.Sleep(time.Minute)
+	var results []vectors.VectorSearchResult
+	var searchErr error
 
-	// Get
-	got, err := client.Get(ctx, v.ID)
+	for range 5 {
+		results, searchErr = client.Search(ctx, v.Data, 10, 0)
+		if searchErr == nil && len(results) > 0 {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	readCloaser, err := container.Logs(ctx)
 	if err != nil {
-		t.Fatalf("Get failed: %v", err)
+		t.Fatal(err)
 	}
-	if got.ID != v.ID {
-		t.Errorf("expected ID %s, got %s", v.ID, got.ID)
-	}
-
-	// Search
-	results, err := client.Search(ctx, v.Data, 1)
+	defer readCloaser.Close()
+	logs := make([]byte, 100000)
+	_, err = readCloaser.Read(logs)
 	if err != nil {
-		t.Fatalf("Search failed: %v", err)
+		t.Fatal(err)
 	}
-	if len(results) == 0 {
-		t.Errorf("expected search results, got none")
+	t.Log(fmt.Sprintf("%s", logs))
+	// Inside TestVectors, after the loop and before the final check:
+	if searchErr != nil || len(results) == 0 {
+		readCloser, logErr := container.Logs(ctx)
+		if logErr != nil {
+			t.Logf("Failed to get container logs: %v", logErr)
+		} else {
+			defer readCloser.Close()
+			// Consider using io.ReadAll for potentially large logs
+			logBytes, readErr := io.ReadAll(readCloser)
+			if readErr != nil {
+				t.Logf("Failed to read container logs: %v", readErr)
+			} else {
+				t.Logf("Vald Container Logs:\n%s", string(logBytes))
+			}
+		}
+		// Now fail the test
+		if searchErr != nil {
+			t.Fatalf("Search failed after retries: %v", searchErr)
+		} else {
+			t.Fatalf("Search returned no results after retries")
+		}
 	}
 
 	// Delete

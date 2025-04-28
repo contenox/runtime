@@ -1,6 +1,7 @@
 FROM alpine:3.18 AS configgen
 
 WORKDIR /tmp/vald
+CMD mkdir -p /tmp/vald
 
 RUN apk add --no-cache git && \
     git clone https://github.com/vdaas/vald.git . && \
@@ -33,20 +34,20 @@ RUN apk add --no-cache git && \
     echo '  full_shutdown_duration: 600s' >> data/config.yaml && \
     echo '  tls:'                       >> data/config.yaml && \
     echo '    enabled: false'           >> data/config.yaml && \
-    echo 'ngt:'                         >> data/config.yaml && \
-    #    echo '  index_path: "/etc/server/backup"' >> data/config.yaml && \
-    echo '  dimension: 784'             >> data/config.yaml && \
-    echo '  bulk_insert_chunk_size: 10' >> data/config.yaml && \
-    echo '  distance_type: l2'          >> data/config.yaml && \
-    echo '  object_type: float'         >> data/config.yaml && \
-    echo '  creation_edge_size: 20'     >> data/config.yaml && \
-    echo '  search_edge_size: 10'       >> data/config.yaml && \
-    echo '  auto_index_duration_limit: 1m' >> data/config.yaml && \
-    echo '  auto_index_check_duration: 10s' >> data/config.yaml && \
-    echo '  auto_index_length: 100'      >> data/config.yaml && \
-    echo '  auto_save_index_duration: 90s' >> data/config.yaml && \
-    echo '  initial_delay_max_duration: 60s' >> data/config.yaml && \
-    echo '  default_pool_size: 500'      >> data/config.yaml && \
+    echo 'ngt:'                          >> data/config.yaml && \
+    echo '  index_path: "/tmp/vald/"' >> data/config.yaml && \
+    echo '  dimension: 784'              >> data/config.yaml && \
+    echo '  bulk_insert_chunk_size: 1'  >> data/config.yaml && \
+    echo '  distance_type: l2'           >> data/config.yaml && \
+    echo '  object_type: float'          >> data/config.yaml && \
+    echo '  creation_edge_size: 20'      >> data/config.yaml && \
+    echo '  search_edge_size: 10'        >> data/config.yaml && \
+    echo '  auto_index_duration_limit: 20s' >> data/config.yaml && \
+    echo '  auto_index_check_duration: 1s' >> data/config.yaml && \
+    echo '  auto_index_length: 1'         >> data/config.yaml && \
+    echo '  auto_save_index_duration: 1s' >> data/config.yaml && \
+    echo '  initial_delay_max_duration: 1s' >> data/config.yaml && \
+    echo '  default_pool_size: 1'       >> data/config.yaml && \
     rm -rf .git
 
 FROM vdaas/vald-agent-ngt
