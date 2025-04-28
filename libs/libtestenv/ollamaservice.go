@@ -29,7 +29,7 @@ func quiet() func() {
 	}
 }
 
-func SetupLocalInstance(ctx context.Context) (string, testcontainers.Container, func(), error) {
+func SetupOllamaLocalInstance(ctx context.Context) (string, testcontainers.Container, func(), error) {
 	defer quiet()()
 
 	cleanup := func() {}

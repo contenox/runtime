@@ -20,7 +20,7 @@ import (
 
 func TestStateLogic(t *testing.T) {
 	ctx := context.TODO()
-	uri, _, cleanup, err := libtestenv.SetupLocalInstance(ctx)
+	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -105,7 +105,7 @@ func TestStateLogic(t *testing.T) {
 
 func TestBackendDeletion(t *testing.T) {
 	ctx := context.TODO()
-	uri, _, cleanup, err := libtestenv.SetupLocalInstance(ctx)
+	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
 	defer cleanup()
 

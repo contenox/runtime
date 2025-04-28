@@ -21,7 +21,7 @@ func setupPoolTest(t *testing.T) (context.Context, string, *runtimestate.State, 
 	ctx := context.TODO()
 
 	// Setup Ollama instance
-	ollamaUrl, _, cleanupOllama, err := libtestenv.SetupLocalInstance(ctx)
+	ollamaUrl, _, cleanupOllama, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
 
 	// Setup database

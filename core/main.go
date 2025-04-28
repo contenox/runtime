@@ -97,7 +97,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL)
+	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
+		// TODO
+	})
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}

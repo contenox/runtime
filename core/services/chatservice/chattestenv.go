@@ -32,7 +32,7 @@ func SetupTestEnvironment(t *testing.T) (context.Context, *runtimestate.State, l
 	}
 
 	// Start local Ollama instance.
-	ollamaURI, _, ollamaCleanup, err := libtestenv.SetupLocalInstance(ctx)
+	ollamaURI, _, ollamaCleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	if err != nil {
 		t.Fatalf("failed to start local Ollama instance: %v", err)
 	}

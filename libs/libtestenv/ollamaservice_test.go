@@ -13,7 +13,7 @@ import (
 
 func TestStartupOllamaInstance(t *testing.T) {
 	ctx := context.TODO()
-	uri, _, cleanup, err := libtestenv.SetupLocalInstance(ctx)
+	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		cleanup()
