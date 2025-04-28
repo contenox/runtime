@@ -12,9 +12,9 @@ import (
 )
 
 type valdStore struct {
-	conn   *grpc.ClientConn
-	client vald.Client
-	args   Args
+	conn        *grpc.ClientConn
+	client      vald.Client
+	defaultArgs Args
 }
 
 type Store interface {
@@ -22,29 +22,32 @@ type Store interface {
 	Upsert(ctx context.Context, vector Vector) error
 	BatchInsert(ctx context.Context, vectors []Vector) error
 	Get(ctx context.Context, id string) (*Vector, error)
-	Search(ctx context.Context, query []float32, k int, minK int) ([]VectorSearchResult, error)
+	Search(ctx context.Context, query []float32, k int, minK int, args *SearchArgs) ([]VectorSearchResult, error)
 	Delete(ctx context.Context, id string) error
 }
 
 type Args struct {
 	Timeout time.Duration
-	Epsilon float32
-	Radius  float32
+	SearchArgs
 }
 
-func New(ctx context.Context, addr string, args Args) (Store, func() error, error) {
+type SearchArgs struct {
+	Radius  float32
+	Epsilon float32
+}
+
+func New(ctx context.Context, addr string, argsDefault Args) (Store, func() error, error) {
 	close := func() error { return nil }
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, close, err
 	}
-
 	client := vald.NewValdClient(conn)
 	close = conn.Close
 	return &valdStore{
-		conn:   conn,
-		client: client,
-		args:   args,
+		conn:        conn,
+		client:      client,
+		defaultArgs: argsDefault,
 	}, close, nil
 }
 
@@ -118,15 +121,18 @@ type VectorSearchResult struct {
 	Distance float32
 }
 
-func (vs *valdStore) Search(ctx context.Context, query []float32, num int, minNum int) ([]VectorSearchResult, error) {
+func (vs *valdStore) Search(ctx context.Context, query []float32, num int, minNum int, args *SearchArgs) ([]VectorSearchResult, error) {
+	if args == nil {
+		args = &vs.defaultArgs.SearchArgs
+	}
 	res, err := vs.client.Search(ctx, &payload.Search_Request{
 		Vector: query,
 		Config: &payload.Search_Config{
 			Num:     uint32(num),
 			MinNum:  uint32(minNum),
-			Radius:  vs.args.Radius,
-			Epsilon: vs.args.Epsilon,
-			Timeout: int64(vs.args.Timeout),
+			Radius:  args.Radius,
+			Epsilon: args.Epsilon,
+			Timeout: int64(vs.defaultArgs.Timeout),
 		},
 	})
 	if err != nil {
