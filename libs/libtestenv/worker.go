@@ -18,6 +18,7 @@ type WorkerConfig struct {
 }
 
 func SetupLocalWorkerInstance(ctx context.Context, config WorkerConfig) (testcontainers.Container, func(), error) {
+	quiet()()
 	// Create a new container with the specified image and configuration
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
@@ -38,7 +39,7 @@ func SetupLocalWorkerInstance(ctx context.Context, config WorkerConfig) (testcon
 		Started: true,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, func() {}, err
 	}
 
 	return container, func() {
