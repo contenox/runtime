@@ -4,22 +4,25 @@
 ├── compose.yaml
 ├── Dockerfile.core
 ├── Dockerfile.tokenizer
+├── Dockerfile.vald
 ├── lerna.json
 ├── LICENSE
 ├── Makefile
 ├── package.json
 ├── package-lock.json
+├── pyrightconfig.json
 ├── README.md
 ├── STRUCTURE.md
 ├── tsconfig.json
 ├── yarn.lock
 ```
 
-- `compose.yaml`: Use via Makefile. Defines the wiring of the infrastructure.
+- `compose.yaml`: Defines the wiring of the infrastructure. Use via Makefile!
 - `lerna.json`, `package.json`, `yarn.lock`, `packages/`: This is for building the frontend and UI library components.
 - `Makefile`: Contains commands for building, testing, running, or deploying parts of the project.
 - `README.md`: Have a look if you have not already.
 - `LICENSE`: APACHE 2.0!
+- `pyrightconfig.json` This is for linting the python codebase.
 
 ## Backend (`core` service)
 
@@ -39,7 +42,7 @@
 │   │   ├── mockmodelprovider.go
 ```
 
-### API Layer (`serverapi`)
+### Transport Layer (`serverapi`)
 Defines the HTTP API endpoints. Not all api-routes are/have to be exposed by the core.
 The API layers only tasks are encoding, error translation and exposing services.
 
@@ -52,6 +55,8 @@ It's modularized by functionality:
 - `systemapi`: Routes for system information/status (`/system`).
 - `tokenizerapi`: Handles tokenization requests. it uses gRPC for communication.
 - `usersapi`: Routes for user management, authentication, and access control (`/users`, `/auth`, `/access`).
+- `indexapi`: Routes for indexing and embedding (`/index`).
+- `dispatcherapi`: Routes for leasing and the lifecycle of jobs for workers.
 
 ```bash
 │   ├── serverapi
@@ -72,8 +77,7 @@ It's modularized by functionality:
 
 Contains the core logic for each functional area, orchestrating operations. Each service corresponds to an API module (e.g., `chatservice`, `userservice`, `modelservice`, `filesservice`, `poolservice`, `tokenizerservice`).
 services enforce authorization and authentication enforcement as requests by the service requirements. Also services orchistrate db-calls via transactions if needet.
-Data validation, which is not enforced via DB-schema is also handled here. Services should not use other services, if still required they are only allowed to rely on a
-other services interface.
+Data validation, which is not enforced via DB-schema is also handled here. Services should not use other services.
 
 ```bash
 │   └── services
@@ -293,3 +297,18 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 │   ├── ...
 │   └── test_services.py
 ```
+
+## Workers (`workers`)
+
+```bash
+workers/
+├── Dockerfile
+├── __init__.py
+├── parser.py
+├── plaintext.py
+├── requirements.txt
+├── start_worker.py
+└── worker.py
+```
+
+Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatcherapi endpoints and marking them as done, when the results are ingested into the core.
