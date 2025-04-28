@@ -181,7 +181,7 @@ Instructions to build the Docker image for this core backend service.
 - `src/lib`: Core frontend utilities, including API interaction (api.ts, Workspace.ts), authentication context (authContext.ts, AuthProvider.tsx), and type definitions (types.ts).
 - `src/config`: Routing configuration (routes.tsx).
 - `public`: Static assets.
-- `nginx.conf`: Suggests Nginx might be used to serve the frontend build artifacts, possibly within its own Docker container.
+- `nginx.conf`: Nginx: TODO - check if it's necessary.
 
 ```bash
 ├── frontend
