@@ -1,6 +1,7 @@
 import requests
 import os
 from workers import parser
+from time import sleep
 
 class AuthSession:
     def __init__(self, base_url: str, email: str, password: str):
@@ -57,7 +58,7 @@ class Steps:
     def lease_job(self):
         payload = {
             "leaserId": self.leaser_id,
-            "leaseDuration": self.lease_duration,
+            "leaseDuration": f"{self.lease_duration}s",
             "jobTypes": self.parser.supported_types(),
         }
         response = self.session.post(f"{self.base_url}/leases", json=payload)
@@ -116,15 +117,17 @@ def load_config() -> dict:
 
 def cycle(parser: parser.Parser, config: dict):
     try:
+        print("Starting AuthSession...")
         session = AuthSession(
             base_url=config["base_url"],
             email=config["email"],
             password=config["password"],
         )
+        print("AuthSession started")
     except Exception as e:
         print(f"Error during login: {e}")
         raise e
-
+    print("Starting Worker...")
     while True:
         try:
             worker = Steps(
@@ -145,6 +148,10 @@ def run(worker_steps: Steps):
         job = worker_steps.lease_job()
         file_id = job["entityId"]
         job_id = job["id"]
+        if job_id is None:
+            print("No job available")
+            sleep(1)
+            return
         print("Job leased")
         print(f"Downloading file {file_id}...")
         raw_data = worker_steps.fetch_file(file_id)

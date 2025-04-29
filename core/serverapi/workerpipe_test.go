@@ -16,11 +16,14 @@ import (
 	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/modelprovider"
+	"github.com/js402/cate/core/serverapi/dispatchapi"
 	"github.com/js402/cate/core/serverapi/filesapi"
 	"github.com/js402/cate/core/serverapi/indexapi"
+	"github.com/js402/cate/core/serverapi/usersapi"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/core/serverops/vectors"
+	"github.com/js402/cate/core/services/dispatchservice"
 	"github.com/js402/cate/core/services/fileservice"
 	"github.com/js402/cate/core/services/indexservice"
 	"github.com/js402/cate/core/services/testingsetup"
@@ -31,7 +34,7 @@ import (
 )
 
 func TestWorkerPipe(t *testing.T) {
-	port := fmt.Sprintf(":%d", rand.Intn(16383)+49152)
+	port := rand.Intn(16383) + 49152
 	config := &serverops.Config{
 		JWTExpiry:       "1h",
 		JWTSecret:       "securecryptngkeysecurecryptngkey",
@@ -77,19 +80,6 @@ func TestWorkerPipe(t *testing.T) {
 	indexService := indexservice.New(ctx, embedder, vectorStore)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
-		APIBaseURL:                  fmt.Sprintf("127.0.0.0:%s", port),
-		WorkerEmail:                 serverops.DefaultAdminUser,
-		WorkerPassword:              "test",
-		WorkerLeaserID:              "my-worker-1",
-		WorkerLeaseDurationSeconds:  2,
-		WorkerRequestTimeoutSeconds: 2,
-		WorkerType:                  "plaintext",
-	})
-	defer cleanup3()
-	if err != nil {
-		t.Fatal(err)
-	}
 	userService := userservice.New(dbInstance, config)
 	res, err := userService.Register(ctx, userservice.CreateUserRequest{
 		Email:        serverops.DefaultAdminUser,
@@ -99,13 +89,9 @@ func TestWorkerPipe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	usersapi.AddAuthRoutes(mux, userService)
 	ctx = context.WithValue(ctx, libauth.ContextTokenKey, res.Token)
-	go func() {
-		if err := http.ListenAndServe("127.0.0.1"+port, mux); err != nil {
-			log.Fatal(err)
-		}
-	}()
-	time.Sleep(time.Second * 30)
+
 	require.Eventually(t, func() bool {
 		currentState := state.Get(ctx)
 		r, err := json.Marshal(currentState)
@@ -167,6 +153,28 @@ func TestWorkerPipe(t *testing.T) {
 	if !found2 {
 		t.Fatalf("backend not found in pool")
 	}
+	dispatcher := dispatchservice.New(dbInstance, config)
+	dispatchapi.AddDispatchRoutes(mux, config, dispatcher)
+	go func() {
+		if err := http.ListenAndServe("0.0.0.0:"+fmt.Sprint(port), mux); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+		APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
+		WorkerEmail:                 serverops.DefaultAdminUser,
+		WorkerPassword:              "test",
+		WorkerLeaserID:              "my-worker-1",
+		WorkerLeaseDurationSeconds:  2,
+		WorkerRequestTimeoutSeconds: 2,
+		WorkerType:                  "plaintext",
+	})
+	defer cleanup3()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second * 30)
 	// ensure embedder is ready
 	embedderProvider, err := embedder.GetProvider(ctx)
 	if err != nil {
@@ -199,13 +207,12 @@ func TestWorkerPipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 10)
 		readCloser, err := workerContainer.Logs(ctx)
 		require.NoError(t, err, "failed to get worker logs stream")
 		defer readCloser.Close()
 
 		logBytes, err := io.ReadAll(readCloser)
-		// io.EOF is expected if the stream closes, not necessarily an error here
 		if err != nil && err != io.EOF {
 			t.Logf("Warning: failed to read all worker logs: %v", err)
 		}

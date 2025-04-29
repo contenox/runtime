@@ -9,7 +9,9 @@ def main():
     print("configuration loaded successfully.")
     worker_type = os.getenv("WORKER_TYPE", "plaintext").lower()
     if worker_type == "plaintext":
+        print("starting plaintext worker")
         cycle(TextParser(),config)
+        print("plaintext worker finished")
     else:
         raise ValueError(f"Unknown worker type: {worker_type}")
 
