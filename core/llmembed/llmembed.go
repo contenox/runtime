@@ -71,7 +71,7 @@ func (e *embedder) GetProvider(ctx context.Context) (modelprovider.Provider, err
 	}
 	var results []string
 	for _, backend := range backends {
-		if _, ok := backendsConv[backend.BaseURL]; !ok {
+		if _, ok := backendsConv[backend.BaseURL]; ok {
 			results = append(results, backend.BaseURL)
 		}
 	}
