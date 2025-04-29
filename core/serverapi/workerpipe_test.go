@@ -2,6 +2,7 @@ package serverapi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/modelprovider"
@@ -24,6 +24,8 @@ import (
 	"github.com/js402/cate/core/services/fileservice"
 	"github.com/js402/cate/core/services/indexservice"
 	"github.com/js402/cate/core/services/testingsetup"
+	"github.com/js402/cate/core/services/userservice"
+	"github.com/js402/cate/libs/libauth"
 	"github.com/js402/cate/libs/libtestenv"
 	"github.com/stretchr/testify/require"
 )
@@ -31,8 +33,10 @@ import (
 func TestWorkerPipe(t *testing.T) {
 	port := fmt.Sprintf(":%d", rand.Intn(16383)+49152)
 	config := &serverops.Config{
-		JWTExpiry:  "1h",
-		EmbedModel: "nomic-embed-text:latest",
+		JWTExpiry:       "1h",
+		JWTSecret:       "securecryptngkeysecurecryptngkey",
+		EmbedModel:      "nomic-embed-text:latest",
+		SecurityEnabled: "true",
 	}
 
 	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
@@ -76,44 +80,31 @@ func TestWorkerPipe(t *testing.T) {
 	workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
 		APIBaseURL:                  fmt.Sprintf("127.0.0.0:%s", port),
 		WorkerEmail:                 serverops.DefaultAdminUser,
-		WorkerPassword:              "",
+		WorkerPassword:              "test",
 		WorkerLeaserID:              "my-worker-1",
 		WorkerLeaseDurationSeconds:  2,
 		WorkerRequestTimeoutSeconds: 2,
-		WorkerType:                  "text-plain",
+		WorkerType:                  "plaintext",
 	})
 	defer cleanup3()
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+	userService := userservice.New(dbInstance, config)
+	res, err := userService.Register(ctx, userservice.CreateUserRequest{
 		Email:        serverops.DefaultAdminUser,
-		ID:           uuid.NewString(),
-		Subject:      serverops.DefaultAdminUser,
 		FriendlyName: "Admin",
+		Password:     "test",
 	})
 	if err != nil {
-		t.Fatalf("failed to create user: %v", err)
+		t.Fatal(err)
 	}
-	err = store.New(dbInstance.WithoutTransaction()).CreateAccessEntry(ctx, &store.AccessEntry{
-		Identity:   serverops.DefaultAdminUser,
-		ID:         uuid.NewString(),
-		Resource:   serverops.DefaultServerGroup,
-		Permission: store.PermissionManage,
-	})
-	if err != nil {
-		t.Fatalf("failed to create access entry: %v", err)
-	}
+	ctx = context.WithValue(ctx, libauth.ContextTokenKey, res.Token)
 	go func() {
 		if err := http.ListenAndServe("127.0.0.1"+port, mux); err != nil {
 			log.Fatal(err)
 		}
 	}()
-	file := &fileservice.File{
-		Path:        "updated.txt",
-		ContentType: "text/plain",
-		Data:        []byte("some demo text to be embedded"),
-	}
 	time.Sleep(time.Second * 30)
 	require.Eventually(t, func() bool {
 		currentState := state.Get(ctx)
@@ -183,6 +174,11 @@ func TestWorkerPipe(t *testing.T) {
 	}
 	if !embedderProvider.CanEmbed() {
 		t.Fatalf("embedder not ready")
+	}
+	file := &fileservice.File{
+		Path:        "updated.txt",
+		ContentType: "text/plain",
+		Data:        []byte("some demo text to be embedded"),
 	}
 	vectorData, err := client.Embed(ctx, string(file.Data))
 	if err != nil {
