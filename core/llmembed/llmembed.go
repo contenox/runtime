@@ -78,7 +78,7 @@ func (e *embedder) GetProvider(ctx context.Context) (modelprovider.Provider, err
 	if len(results) == 0 {
 		return nil, errors.New("no backends found")
 	}
-	provider := modelprovider.NewOllamaModelProvider("embed", results, modelprovider.WithEmbed(true))
+	provider := modelprovider.NewOllamaModelProvider(e.model.Model, results, modelprovider.WithEmbed(true))
 
 	return provider, nil
 }
