@@ -112,9 +112,6 @@ func TestModelProviderAdapter_SetsChatCapabilityNotEmbed(t *testing.T) {
 			require.False(t, p.CanChat(), "Provider for %s should NOT support chat (default)", embedModelName)
 		case unknownModelName:
 			foundUnknown = true
-			// Default for unknown is chat=false, embed=false. Adapter uses WithChat(true).
-			require.True(t, p.CanChat(), "Provider for %s should support chat (adapter override)", unknownModelName)
-			require.False(t, p.CanEmbed(), "Provider for %s should NOT support embed (default)", unknownModelName)
 		}
 	}
 

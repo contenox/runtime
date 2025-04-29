@@ -115,10 +115,14 @@ type OllamaOption func(*OllamaProvider)
 
 func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption) Provider {
 	// Define defaults based on model name
-	context := modelContextLengths[name]
-	canChat := canChat[name]
-	canEmbed := canEmbed[name]
-	canStream := canStreaming[name]
+	nameForMatching := name
+	if c := strings.Split(name, ":"); len(c) >= 1 && c[1] == "latest" {
+		nameForMatching = c[0] // llama3:latest
+	}
+	context := modelContextLengths[nameForMatching]
+	canChat := canChat[nameForMatching]
+	canEmbed := canEmbed[nameForMatching]
+	canStream := canStreaming[nameForMatching]
 
 	p := &OllamaProvider{
 		Name:           name,
@@ -158,11 +162,9 @@ var (
 	}
 
 	modelContextLengthsFullNames = map[string]int{
-		"smollm2:135m":           100000, // TODO: check if it's correct:30m
-		"codellama:34b-100k":     100000,
-		"mixtral-8x7b":           32768,
-		"dolphin-mixtral:latest": 32768,
-	}
+		"smollm2:135m":       100000, // TODO: check if it's correct:30m
+		"codellama:34b-100k": 100000,
+		"mixtral-8x7b":       32768}
 
 	canChat = map[string]bool{
 		"llama2": true, "llama3": true, "mistral": true,
