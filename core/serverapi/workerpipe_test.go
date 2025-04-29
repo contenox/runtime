@@ -156,6 +156,21 @@ func TestWorkerPipe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
 	}
+	// sanity-check 2
+	backends, err := store.New(dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, serverops.EmbedPoolID)
+	if err != nil {
+		t.Fatalf("failed to list backends for pool: %v", err)
+	}
+	found2 := false
+	for _, backend2 := range backends {
+		found2 = backend2.ID == backendID
+		if found2 {
+			break
+		}
+	}
+	if !found2 {
+		t.Fatalf("backend not found in pool")
+	}
 	// ensure embedder is ready
 	embedderProvider, err := embedder.GetProvider(ctx)
 	if err != nil {

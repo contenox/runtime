@@ -49,10 +49,14 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	if err != nil {
 		return nil, err
 	}
-
+	vectorData32 := make([]float32, len(vectorData))
+	// Iterate and cast each element
+	for i, v := range vectorData {
+		vectorData32[i] = float32(v)
+	}
 	err = s.vectors.Insert(ctx, vectors.Vector{
 		ID:   request.ID,
-		Data: vectorData,
+		Data: vectorData32,
 	})
 	if err != nil {
 		return nil, err

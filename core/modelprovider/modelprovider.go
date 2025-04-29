@@ -87,7 +87,24 @@ func (p *OllamaProvider) GetChatConnection(backendID string) (serverops.LLMChatC
 }
 
 func (p *OllamaProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error) {
-	return nil, fmt.Errorf("unimplemented")
+	if !p.CanEmbed() {
+		return nil, fmt.Errorf("provider %s (model %s) does not support embeddings", p.GetID(), p.ModelName())
+	}
+	u, err := url.Parse(backendID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid backend URL '%s' for provider %s: %w", backendID, p.GetID(), err)
+	}
+	// TODO: Consider using a configurable http.Client with timeouts
+	httpClient := http.DefaultClient
+	ollamaAPIClient := api.NewClient(u, httpClient)
+
+	embedClient := &OllamaEmbedClient{
+		ollamaClient: ollamaAPIClient,
+		modelName:    p.ModelName(),
+		backendURL:   backendID,
+	}
+
+	return embedClient, nil
 }
 
 func (p *OllamaProvider) GetStreamConnection(backendID string) (serverops.LLMStreamClient, error) {

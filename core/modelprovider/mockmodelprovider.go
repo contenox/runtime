@@ -81,8 +81,8 @@ func (m *mockChatClient) Chat(context.Context, []serverops.Message) (serverops.M
 type mockEmbedClient struct{}
 
 // Embed simulates embedding by returning a dummy vector.
-func (m *mockEmbedClient) Embed(ctx context.Context, prompt string) ([]float32, error) {
-	return []float32{0.1, 0.2, 0.3}, nil
+func (m *mockEmbedClient) Embed(ctx context.Context, prompt string) ([]float64, error) {
+	return []float64{0.1, 0.2, 0.3}, nil
 }
 
 type mockStreamClient struct{}

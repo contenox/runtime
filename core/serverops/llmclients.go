@@ -13,7 +13,7 @@ type LLMChatClient interface {
 }
 
 type LLMEmbedClient interface {
-	Embed(ctx context.Context, prompt string) ([]float32, error)
+	Embed(ctx context.Context, prompt string) ([]float64, error)
 }
 
 type LLMStreamClient interface {
