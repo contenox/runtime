@@ -89,7 +89,6 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 		}
 		t.Fatalf("failed to create backend: %v", err)
 	}
-
 	// Append model to the global model store.
 	err = dbStore.AppendModel(ctx, &store.Model{
 		Model: "smollm2:135m",

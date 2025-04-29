@@ -18,9 +18,7 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 	}
 	res := []Provider{}
 	for model, backends := range models {
-		provider := NewOllamaModelProvider(model, backends, WithChat(true),
-			WithContextLength(8192),
-		)
+		provider := NewOllamaModelProvider(model, backends)
 		res = append(res, provider)
 	}
 	return func(ctx context.Context, backendType string) ([]Provider, error) {

@@ -165,6 +165,34 @@ func TestResolveEmbed(t *testing.T) {
 			resolver:  llmresolver.ResolveRandomly,
 			wantErr:   nil,
 		},
+		{
+			name:     "model name with tag matches base",
+			embedReq: llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model:33m"},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:           "p3",
+					Name:         "text-embed-model",
+					CanEmbedFlag: true,
+					Backends:     []string{"b3"},
+				},
+			},
+			resolver: llmresolver.ResolveRandomly,
+			wantErr:  nil,
+		},
+		{
+			name:     "exact model match with tag",
+			embedReq: llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model:33m"},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:           "p4",
+					Name:         "text-embed-model:33m",
+					CanEmbedFlag: true,
+					Backends:     []string{"b4"},
+				},
+			},
+			resolver: llmresolver.ResolveRandomly,
+			wantErr:  nil,
+		},
 	}
 
 	for _, tt := range tests {

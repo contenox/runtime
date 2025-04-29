@@ -122,6 +122,7 @@ func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption
 
 var (
 	modelContextLengths = map[string]int{
+		"smollm2:135m":    100000, // TODO: check if it's correct
 		"llama2":          4096,
 		"llama3":          8192,
 		"mistral":         8192,  // Mistral 7B
@@ -140,6 +141,7 @@ var (
 	}
 
 	modelContextLengthsFullNames = map[string]int{
+		"smollm2:135m":           100000, // TODO: check if it's correct:30m
 		"codellama:34b-100k":     100000,
 		"mixtral-8x7b":           32768,
 		"dolphin-mixtral:latest": 32768,
@@ -151,11 +153,14 @@ var (
 		"gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
+		"smollm2:135m": true,
 	}
 
 	canEmbed = map[string]bool{
-		"deepseek": true,
-		"qwen":     true,
+		"deepseek":       true,
+		"qwen":           true,
+		"all-minilm":     true,
+		"all-minilm:33m": true,
 	}
 
 	canStreaming = map[string]bool{

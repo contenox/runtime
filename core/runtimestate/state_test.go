@@ -158,3 +158,81 @@ func TestBackendDeletion(t *testing.T) {
 		return len(backendState.Get(ctx)) == 0
 	}, 2*time.Second, 100*time.Millisecond)
 }
+
+func TestPoolBasedModelAssignment(t *testing.T) {
+	ctx := context.TODO()
+	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
+	require.NoError(t, err)
+	defer cleanup()
+
+	dbConn, _, cleanupDB, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
+	require.NoError(t, err)
+	defer cleanupDB()
+
+	dbInstance, err := libdb.NewPostgresDBManager(ctx, dbConn, store.Schema)
+	require.NoError(t, err)
+
+	dbStore := store.New(dbInstance.WithoutTransaction())
+	ps, cleanup2 := libbus.NewTestPubSub(t)
+	defer cleanup2()
+
+	// Create backend and pool
+	backendID := uuid.NewString()
+	poolID := uuid.NewString()
+
+	// 1. Create pool
+	err = dbStore.CreatePool(ctx, &store.Pool{
+		ID:          poolID,
+		Name:        "embed-pool",
+		PurposeType: "embed",
+	})
+	require.NoError(t, err)
+
+	// 2. Create backend and assign to pool
+	err = dbStore.CreateBackend(ctx, &store.Backend{
+		ID:      backendID,
+		Name:    "embed-backend",
+		BaseURL: uri,
+		Type:    "Ollama",
+	})
+	require.NoError(t, err)
+	err = dbStore.AssignBackendToPool(ctx, poolID, backendID)
+	require.NoError(t, err)
+
+	// 3. Create model and assign to pool
+	modelName := "all-minilm:33m"
+	modelID := uuid.NewString()
+	err = dbStore.AppendModel(ctx, &store.Model{
+		ID:    modelID,
+		Model: modelName,
+	})
+	require.NoError(t, err)
+	err = dbStore.AssignModelToPool(ctx, poolID, modelID)
+	require.NoError(t, err)
+
+	// Initialize state with pool support
+	backendState, err := runtimestate.New(ctx, dbInstance, ps, runtimestate.WithPools())
+	require.NoError(t, err)
+	triggerChan := make(chan struct{}, 10)
+
+	breaker := libroutine.NewRoutine(3, 10*time.Second)
+	go breaker.Loop(ctx, time.Second, triggerChan, backendState.RunBackendCycle, func(err error) {})
+	breaker2 := libroutine.NewRoutine(3, 10*time.Second)
+	go breaker2.Loop(ctx, time.Second, triggerChan, backendState.RunDownloadCycle, func(err error) {})
+
+	// Trigger sync and verify model download
+	triggerChan <- struct{}{}
+	require.Eventually(t, func() bool {
+		state := backendState.Get(ctx)
+		if len(state) == 0 {
+			return false
+		}
+		backendState := state[backendID]
+		for _, model := range backendState.PulledModels {
+			if model.Name == modelName {
+				return true
+			}
+		}
+		return false
+	}, 30*time.Second, 100*time.Millisecond)
+}
