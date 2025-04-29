@@ -116,7 +116,7 @@ type OllamaOption func(*OllamaProvider)
 func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption) Provider {
 	// Define defaults based on model name
 	nameForMatching := name
-	if c := strings.Split(name, ":"); len(c) >= 1 && c[1] == "latest" {
+	if c := strings.Split(name, ":"); len(c) >= 2 && c[1] == "latest" {
 		nameForMatching = c[0] // llama3:latest
 	}
 	context := modelContextLengths[nameForMatching]
