@@ -8,7 +8,12 @@ class AuthSession:
         self.base_url = base_url
         self.email = email
         self.password = password
-        self.token = None
+        self.session = requests.Session()
+        # Set default headers for all requests
+        self.session.headers.update({
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        })
         self.login()
 
     def login(self):
@@ -16,36 +21,27 @@ class AuthSession:
             "email": self.email,
             "password": self.password,
         }
-        response = requests.post(
+        response = self.session.post(
             f"{self.base_url}/login",
             json=payload,
         )
         if response.status_code != 200:
             raise Exception(f"Failed to login: {response.status_code} {response.text}")
         self.token = response.json()['token']
-
-    def auth_headers(self):
-        if not self.token:
-            raise Exception("No auth token, login first.")
-        return {
-            "Authorization": f"Bearer {self.token}",
-        }
+        # Update session headers with the authorization token
+        self.session.headers.update({"Authorization": f"Bearer {self.token}"})
 
     def post(self, url, **kwargs):
-        kwargs.setdefault('headers', {}).update(self.auth_headers())
-        return requests.post(url, **kwargs)
+        return self.session.post(url, **kwargs)
 
     def get(self, url, **kwargs):
-        kwargs.setdefault('headers', {}).update(self.auth_headers())
-        return requests.get(url, **kwargs)
+        return self.session.get(url, **kwargs)
 
     def patch(self, url, **kwargs):
-        kwargs.setdefault('headers', {}).update(self.auth_headers())
-        return requests.patch(url, **kwargs)
+        return self.session.patch(url, **kwargs)
 
     def delete(self, url, **kwargs):
-        kwargs.setdefault('headers', {}).update(self.auth_headers())
-        return requests.delete(url, **kwargs)
+        return self.session.delete(url, **kwargs)
 
 class Steps:
     def __init__(self, parser: parser.Parser, base_url: str, lease_duration: int, leaser_id: str, session: AuthSession):
@@ -91,7 +87,6 @@ class Steps:
         )
         if response.status_code != 204:
             raise Exception(f"Failed to ingest text: {response.status_code} {response.text}")
-
 
 def load_config() -> dict:
     config = {}

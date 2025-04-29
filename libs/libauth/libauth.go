@@ -21,6 +21,7 @@ var (
 	ErrIssuedAtInFuture        = errors.New("libauth: token is malformed: issued-at time is in the future")
 	ErrIdentityMissing         = errors.New("libauth: identity claim is missing")
 	ErrInvalidTokenClaims      = errors.New("libauth: invalid token claims")
+	ErrTokenMissing            = errors.New("libauth: token is missing")
 	ErrUnexpectedSigningMethod = errors.New("libauth: unexpected signing method")
 	ErrTokenParsingFailed      = errors.New("libauth: token parsing failed")
 	ErrTokenSigningFailed      = errors.New("libauth: token signing failed")
@@ -261,7 +262,7 @@ func GetClaims[T Authz](ctx context.Context, jwtSecret string) (T, error) {
 	var permClaims T
 	token, ok := ctx.Value(ContextTokenKey).(string)
 	if !ok {
-		return permClaims, ErrInvalidTokenClaims
+		return permClaims, ErrTokenMissing
 	}
 
 	permList, err := ValidateToken[T](ctx, token, jwtSecret)

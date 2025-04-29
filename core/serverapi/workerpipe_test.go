@@ -16,6 +16,7 @@ import (
 	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/modelprovider"
+	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverapi/dispatchapi"
 	"github.com/js402/cate/core/serverapi/filesapi"
 	"github.com/js402/cate/core/serverapi/indexapi"
@@ -38,6 +39,8 @@ func TestWorkerPipe(t *testing.T) {
 	config := &serverops.Config{
 		JWTExpiry:       "1h",
 		JWTSecret:       "securecryptngkeysecurecryptngkey",
+		EncryptionKey:   "securecryptngkeysecurecryptngkey",
+		SigningKey:      "securecryptngkeysecurecryptngkey",
 		EmbedModel:      "nomic-embed-text:latest",
 		SecurityEnabled: "true",
 	}
@@ -155,8 +158,9 @@ func TestWorkerPipe(t *testing.T) {
 	}
 	dispatcher := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatcher)
+	handler := serverapi.JWTMiddleware(config, mux)
 	go func() {
-		if err := http.ListenAndServe("0.0.0.0:"+fmt.Sprint(port), mux); err != nil {
+		if err := http.ListenAndServe("0.0.0.0:"+fmt.Sprint(port), handler); err != nil {
 			log.Fatal(err)
 		}
 	}()

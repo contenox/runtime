@@ -68,6 +68,7 @@ func mapErrorToStatus(op Operation, err error) int {
 		errors.Is(err, libauth.ErrIssuedAtInFuture) ||
 		errors.Is(err, libauth.ErrIdentityMissing) ||
 		errors.Is(err, libauth.ErrInvalidTokenClaims) ||
+		errors.Is(err, libauth.ErrTokenMissing) ||
 		errors.Is(err, libauth.ErrUnexpectedSigningMethod) ||
 		errors.Is(err, libauth.ErrTokenParsingFailed) ||
 		errors.Is(err, libauth.ErrTokenSigningFailed) {

@@ -110,7 +110,7 @@ func New(
 	handler = enableCORS(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
-	handler = jwtMiddleware(config, handler)
+	handler = JWTMiddleware(config, handler)
 	services := []serverops.ServiceMeta{
 		modelService,
 		backendService,
@@ -200,7 +200,7 @@ func authSourceNormalizerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func jwtMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
+func JWTMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if len(r.Header.Get("Authorization")) > 0 {
