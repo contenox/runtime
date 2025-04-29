@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -72,7 +73,7 @@ func TestWorkerPipe(t *testing.T) {
 	indexService := indexservice.New(ctx, embedder, vectorStore)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	_, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+	workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
 		APIBaseURL:                  fmt.Sprintf("127.0.0.0:%s", port),
 		WorkerEmail:                 serverops.DefaultAdminUser,
 		WorkerPassword:              "",
@@ -202,20 +203,30 @@ func TestWorkerPipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
-		// time.Sleep(time.Second * 10)
-		// results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil)
-		// if err != nil {
-		// 	t.Fatalf("failed to search vector store: %v", err)
-		// }
-		// if len(results) == 0 {
-		// 	t.Fatalf("no results found")
-		// }
-		// if len(results) != 1 {
-		// 	t.Fatalf("expected 1 result, got %d", len(results))
-		// }
-		// if results[0].ID != file.ID {
-		// 	t.Fatalf("expected file ID %s, got %s", file.ID, results[0].ID)
-		// }
+		time.Sleep(time.Second * 30)
+		readCloser, err := workerContainer.Logs(ctx)
+		require.NoError(t, err, "failed to get worker logs stream")
+		defer readCloser.Close()
+
+		logBytes, err := io.ReadAll(readCloser)
+		// io.EOF is expected if the stream closes, not necessarily an error here
+		if err != nil && err != io.EOF {
+			t.Logf("Warning: failed to read all worker logs: %v", err)
+		}
+		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
+		results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil)
+		if err != nil {
+			t.Fatalf("failed to search vector store: %v", err)
+		}
+		if len(results) == 0 {
+			t.Fatalf("no results found")
+		}
+		if len(results) != 1 {
+			t.Fatalf("expected 1 result, got %d", len(results))
+		}
+		if results[0].ID != file.ID {
+			t.Fatalf("expected file ID %s, got %s", file.ID, results[0].ID)
+		}
 	})
 
 }

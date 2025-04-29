@@ -23,8 +23,8 @@ func SetupLocalWorkerInstance(ctx context.Context, config WorkerConfig) (testcon
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			FromDockerfile: testcontainers.FromDockerfile{
-				Context:    "../../workers",
-				Dockerfile: "Dockerfile",
+				Context:    "../../",
+				Dockerfile: "Dockerfile.worker",
 			},
 			Env: map[string]string{
 				"API_BASE_URL":                   config.APIBaseURL,
