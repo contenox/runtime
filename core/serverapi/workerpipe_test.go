@@ -31,7 +31,7 @@ func TestWorkerPipe(t *testing.T) {
 	port := fmt.Sprintf(":%d", rand.Intn(16383)+49152)
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
-		EmbedModel: "all-minilm:33m",
+		EmbedModel: "nomic-embed-text:latest",
 	}
 
 	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
@@ -59,7 +59,11 @@ func TestWorkerPipe(t *testing.T) {
 	filesapi.AddFileRoutes(mux, config, fileService)
 
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
-		// TODO
+		Timeout: 1 * time.Second,
+		SearchArgs: vectors.SearchArgs{
+			Epsilon: 0.1,
+			Radius:  -1,
+		},
 	})
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
@@ -122,7 +126,7 @@ func TestWorkerPipe(t *testing.T) {
 			t.Logf("error compacting JSON: %v", err)
 			return false
 		}
-		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
+		return strings.Contains(string(r), `"name":"nomic-embed-text:latest"`)
 	}, 2*time.Minute, 100*time.Millisecond)
 	runtime := state.Get(ctx)
 	url := ""
@@ -132,7 +136,7 @@ func TestWorkerPipe(t *testing.T) {
 		url = runtimeState.Backend.BaseURL
 		backendID = runtimeState.Backend.ID
 		for _, lmr := range runtimeState.PulledModels {
-			if lmr.Model == "all-minilm:33m" {
+			if lmr.Model == "nomic-embed-text:latest" {
 				found = true
 				break
 			}
@@ -142,7 +146,7 @@ func TestWorkerPipe(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("all-minilm:33m not found")
+		t.Fatalf("nomic-embed-text:latest not found")
 	}
 	_ = url
 	err = store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backendID)
@@ -150,8 +154,8 @@ func TestWorkerPipe(t *testing.T) {
 		t.Fatalf("failed to assign backend to pool: %v", err)
 	}
 	// sanity check
-	_, err = llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
-		ModelName: "all-minilm:33m",
+	client, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+		ModelName: "nomic-embed-text:latest",
 	}, modelprovider.ModelProviderAdapter(ctx, state.Get(ctx)), llmresolver.ResolveRandomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
@@ -179,11 +183,39 @@ func TestWorkerPipe(t *testing.T) {
 	if !embedderProvider.CanEmbed() {
 		t.Fatalf("embedder not ready")
 	}
+	vectorData, err := client.Embed(ctx, string(file.Data))
+	if err != nil {
+		t.Fatalf("failed to embed file: %v", err)
+	}
+	vectorData32 := make([]float32, len(vectorData))
 
+	// Iterate and cast each element
+	for i, v := range vectorData {
+		vectorData32[i] = float32(v)
+	}
+
+	t.Logf("Dimension of query vector generated in test: %d", len(vectorData32))
+	// sanity-check 3
+	require.Equal(t, 768, len(vectorData32), "Query vector dimension mismatch")
 	t.Run("create a file should trigger vectorization", func(t *testing.T) {
 		file, err = fileService.CreateFile(ctx, file)
 		if err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
+		// time.Sleep(time.Second * 10)
+		// results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil)
+		// if err != nil {
+		// 	t.Fatalf("failed to search vector store: %v", err)
+		// }
+		// if len(results) == 0 {
+		// 	t.Fatalf("no results found")
+		// }
+		// if len(results) != 1 {
+		// 	t.Fatalf("expected 1 result, got %d", len(results))
+		// }
+		// if results[0].ID != file.ID {
+		// 	t.Fatalf("expected file ID %s, got %s", file.ID, results[0].ID)
+		// }
 	})
+
 }

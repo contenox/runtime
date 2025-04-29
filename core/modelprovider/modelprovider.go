@@ -176,10 +176,11 @@ var (
 	}
 
 	canEmbed = map[string]bool{
-		"deepseek":       true,
-		"qwen":           true,
-		"all-minilm":     true,
-		"all-minilm:33m": true,
+		"deepseek":         true,
+		"qwen":             true,
+		"all-minilm":       true,
+		"all-minilm:33m":   true,
+		"nomic-embed-text": true,
 	}
 
 	canStreaming = map[string]bool{

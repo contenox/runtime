@@ -39,7 +39,7 @@ func TestVectors(t *testing.T) {
 
 	ctx := context.Background()
 	t.Run("Empty Search", func(t *testing.T) {
-		emptyVec := make([]float32, 784)
+		emptyVec := make([]float32, 768)
 		_, err := client.Search(ctx, emptyVec, 1, 1, nil)
 		if err == nil {
 			t.Error("Expected error for empty vector search")
@@ -47,7 +47,7 @@ func TestVectors(t *testing.T) {
 	})
 	t.Run("Basic CRUD Operations", func(t *testing.T) {
 		// Test data
-		data := make([]float32, 784)
+		data := make([]float32, 768)
 		for i := range data {
 			data[i] = float32(i%255) / 255.0
 		}
@@ -97,7 +97,7 @@ func TestVectors(t *testing.T) {
 	t.Run("Upsert Operations", func(t *testing.T) {
 		v := vectors.Vector{
 			ID:   "upsert-test",
-			Data: make([]float32, 784),
+			Data: make([]float32, 768),
 		}
 
 		// Initial insert
@@ -106,7 +106,7 @@ func TestVectors(t *testing.T) {
 		}
 
 		// Update data
-		updatedData := make([]float32, 784)
+		updatedData := make([]float32, 768)
 		for i := range updatedData {
 			updatedData[i] = float32(i%100) / 100.0
 		}
@@ -134,7 +134,7 @@ func TestVectors(t *testing.T) {
 		const batchSize = 10
 		vs := make([]vectors.Vector, batchSize)
 		for i := range batchSize {
-			data := make([]float32, 784)
+			data := make([]float32, 768)
 			for j := range data {
 				data[j] = float32(i+j) / 1000.0
 			}
@@ -168,7 +168,7 @@ func TestVectors(t *testing.T) {
 	t.Run("Search Parameters", func(t *testing.T) {
 		v := vectors.Vector{
 			ID:   "search-params-test",
-			Data: make([]float32, 784),
+			Data: make([]float32, 768),
 		}
 
 		if err := client.Insert(ctx, v); err != nil {
