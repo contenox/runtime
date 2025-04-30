@@ -70,7 +70,7 @@ func TestGetProvider_WithBackends(t *testing.T) {
 	backend := &store.Backend{}
 	for _, l := range state.Get(ctx) {
 		backend = &l.Backend
-		return
+		break
 	}
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).CreateBackend(ctx, backend))
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
