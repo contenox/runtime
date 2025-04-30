@@ -69,16 +69,16 @@ Development is dynamic, but the immediate priorities are centered on bringing th
 
 ## ⚙️ Starting the Development Environment
 
-1. **Prepare the Environment**
+### Prepare the Environment
   * Copy and edit `.env-example` into a new `.env` file with the proper configuration.
   * Install prerequisites: Docker, Docker Compose, Yarn, and Go.
-2. **Build and Run the Backend Services**
+### Build and Run the Backend Services
   * Run the following to build Docker images and start all services:
     ```bash
     make run
     ```
   * Use `make logs` to tail the backend logs if needed.
-3. **Run the Frontend & UI**
+### Run the Frontend & UI
   * The backend includes a proxy (Backend-for-Frontend/BFF) to handle UI requests and authentication cookies correctly.
   * Start the UI development workflow, which builds UI components and runs the Vite dev server:
     ```bash
@@ -88,7 +88,7 @@ Development is dynamic, but the immediate priorities are centered on bringing th
   * **Important:** Do *not* use the local URL Vite might display (like `localhost:5173`), as login and other authenticated features will not work correctly through it due to how browser cookies are handled. Always access the UI through the backend's address during development. NOTE: Register
   as `admin@admin.com` for system privileges.
 
-4. **API Tests Setup & Execution**
+### API Tests Setup & Execution
   * Initialize the Python virtual environment and install API test dependencies:
     ```bash
     make api-init
