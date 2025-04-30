@@ -241,5 +241,4 @@ func TestWorkerPipe(t *testing.T) {
 			t.Fatalf("expected file ID %s, got %s", file.ID, results[0].ID)
 		}
 	})
-
 }

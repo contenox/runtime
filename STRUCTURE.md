@@ -5,6 +5,7 @@
 ├── Dockerfile.core
 ├── Dockerfile.tokenizer
 ├── Dockerfile.vald
+├── Dockerfile.worker
 ├── lerna.json
 ├── LICENSE
 ├── Makefile
@@ -12,6 +13,7 @@
 ├── package-lock.json
 ├── pyrightconfig.json
 ├── README.md
+├── start_worker.py
 ├── STRUCTURE.md
 ├── tsconfig.json
 ├── yarn.lock
@@ -24,7 +26,8 @@
 - `LICENSE`: APACHE 2.0!
 - `pyrightconfig.json` This is for linting the python codebase.
 
-## Backend (`core` service)
+## Platform's core (`core`)
+Provides shared utilities, interfaces, and implementations for operational concerns cutting across services.
 
 **Language**: `Go`
 
@@ -43,20 +46,20 @@
 ```
 
 ### Transport Layer (`serverapi`)
-Defines the HTTP API endpoints. Not all api-routes are/have to be exposed by the core.
-The API layers only tasks are encoding, error translation and exposing services.
+Defines the HTTP API endpoints. Not all api-routes are (or have to be) exposed by the core.
+The API layers tasks are only encoding, error translation and exposing services. Routes don't have to translate a service 1:1 they can and should combine multiple services to provide a supporting API.
 
 It's modularized by functionality:
 
 - `backendapi`: Routes for managing backend configurations, models, downloads (`/backend`, `/models`, `/downloads`).
 - `chatapi`: Routes for chat functionality (`/chat`).
+- `dispatchapi`: Routes for leasing and the lifecycle of jobs for workers.
 - `filesapi`: Routes for file uploads/management (`/files`).
+- `indexapi`: Routes for indexing and embedding (`/index`).
 - `poolapi`: Routes related to managing resource pools (likely model pools) (`/pool`).
 - `systemapi`: Routes for system information/status (`/system`).
 - `tokenizerapi`: Handles tokenization requests. it uses gRPC for communication.
 - `usersapi`: Routes for user management, authentication, and access control (`/users`, `/auth`, `/access`).
-- `indexapi`: Routes for indexing and embedding (`/index`).
-- `dispatcherapi`: Routes for leasing and the lifecycle of jobs for workers.
 
 ```bash
 │   ├── serverapi
@@ -71,13 +74,16 @@ It's modularized by functionality:
 │   │   ├── poolapi
 │   │   │   └── poolroutes.go
 │   │   ├── server.go
+│   │   ├── workerpipe_test.go
 ```
+
+system integration tests and the core server setup are also located in the `serverapi` module.
 
 ### Business Logic/Services (`services`)
 
-Contains the core logic for each functional area, orchestrating operations. Each service corresponds to an API module (e.g., `chatservice`, `userservice`, `modelservice`, `filesservice`, `poolservice`, `tokenizerservice`).
+Contains the core logic for each functional area, orchestrating operations. Each service corresponds to an API module (e.g., `chatservice`, `userservice`, `modelservice`, `filesservice`, `poolservice`, `tokenizerservice`, `dispatchservice`, `downloadservice`, `indexservice`).
 services enforce authorization and authentication enforcement as requests by the service requirements. Also services orchistrate db-calls via transactions if needet.
-Data validation, which is not enforced via DB-schema is also handled here. Services should not use other services.
+Data validation, which is not enforced via DB-schema is also handled here. Services should never use other services.
 
 ```bash
 │   └── services
@@ -90,6 +96,10 @@ Data validation, which is not enforced via DB-schema is also handled here. Servi
 │       │   ├── chatservice_test.go
 ```
 
+A service can be decorated with additional functionality, such as the activity tracker/hooks from `serverops`.
+Which is intended to prevent changing a service implementation to add additional functionality and allow extension
+of the system with features like tracing depending on the required operational logic.
+
 ### Operational Logic (`serverops`)
 
 ```bash
@@ -100,11 +110,11 @@ Data validation, which is not enforced via DB-schema is also handled here. Servi
 │   │   ├── errors.go
 ```
 
-Provides supporting functions for the server and services:
+Provides supporting functions and common interfaces for the server and services:
+- `activitytracker.go`: Provides a mechanism for attaching tracking system activity to services.
 - `auth.go`: Authentication/authorization helpers.
 - `config.go`: Configuration loading/management.
 - `llmclients.go`: Clients for interacting with LLMs.
-- `messagerepo`: Repository for storing chat messages.
 - `servicemanager.go`: mainly manages configuration of the services.
 
 #### `store`
@@ -123,6 +133,17 @@ The `schema.sql` PostgreSQL, managed by `libdb/postgres.go`.
 │   │       ├── store_test.go
 │   │       ├── users.go
 │   │       └── users_test.go
+```
+
+### Vector Store (`vectors`)
+
+Handles interaction with the Vald vector database. This component is responsible for storing, retrieving, and searching high-dimensional vector embeddings, primarily used for semantic search (RAG).
+
+```bash
+│   │   └── vectors
+│   │       ├── testing.go
+│   │       ├── vectors.go
+│   │       └── vectors_test.go
 ```
 
 ## LLM Integration (`llmresolver`, `modelprovider`)
@@ -302,13 +323,11 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 
 ```bash
 workers/
-├── Dockerfile
 ├── __init__.py
 ├── parser.py
 ├── plaintext.py
 ├── requirements.txt
-├── start_worker.py
 └── worker.py
 ```
 
-Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatcherapi endpoints and marking them as done, when the results are ingested into the core.
+Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatchapi endpoints and marking them as done, when the results are ingested into the core.
