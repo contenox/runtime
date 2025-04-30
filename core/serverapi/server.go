@@ -87,7 +87,7 @@ func New(
 	filesapi.AddFileRoutes(mux, config, fileService)
 	downloadService := downloadservice.New(dbInstance, pubsub)
 	backendapi.AddQueueRoutes(mux, config, downloadService)
-	modelService := modelservice.New(dbInstance)
+	modelService := modelservice.New(dbInstance, config)
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
 	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
 		ServerAddress: config.TokenizerServiceURL,
