@@ -29,7 +29,7 @@ cate combines several technologies to deliver its features:
   - User management and permissions utilize a **custom Access Control system**.
 - **Deployment**:
   - The system is designed to run **containerized** (e.g., using Docker).
-  - Users are expected to provide external dependencies like **PostgreSQL**, **Valkey**, and **Vald**. *(Added Vald)*
+  - Users are expected to provide external dependencies like **PostgreSQL**, **Valkey**, and **Vald**.
   - A `docker-compose.yml` file is provided for convenience, but operators typically deploy the cate container image(s) directly and manage configuration externally.
 
 ## 📊 Current State (As of April 2025)
