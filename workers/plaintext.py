@@ -5,7 +5,7 @@ class TextParser(parser.Parser):
     def __init__(self):
         super().__init__()
 
-    def parse(self, job_id: str, raw_data: Any) -> str:
+    def parse(self, raw_data: Any) -> str:
         """
         Parses raw byte data as plain text.
         """
@@ -13,4 +13,4 @@ class TextParser(parser.Parser):
         return parsed_text
 
     def supported_types(self) -> list[str]:
-        return ['text/plain']
+        return ['vectorize_text/plain']

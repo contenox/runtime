@@ -165,20 +165,6 @@ func TestWorkerPipe(t *testing.T) {
 		}
 	}()
 
-	workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
-		APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
-		WorkerEmail:                 serverops.DefaultAdminUser,
-		WorkerPassword:              "test",
-		WorkerLeaserID:              "my-worker-1",
-		WorkerLeaseDurationSeconds:  2,
-		WorkerRequestTimeoutSeconds: 2,
-		WorkerType:                  "plaintext",
-	})
-	defer cleanup3()
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(time.Second * 30)
 	// ensure embedder is ready
 	embedderProvider, err := embedder.GetProvider(ctx)
 	if err != nil {
@@ -211,7 +197,27 @@ func TestWorkerPipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
-		time.Sleep(time.Second * 10)
+		jobs, err := dispatcher.PendingJobs(ctx, nil)
+		require.NoError(t, err, "failed to get pending jobs")
+		for i, j := range jobs {
+			t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+		}
+		require.Equal(t, 1, len(jobs), "expected 1 pending job")
+		require.Equal(t, "vectorize_text/plain", jobs[0].TaskType, "expected plaintext job")
+		workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+			APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
+			WorkerEmail:                 serverops.DefaultAdminUser,
+			WorkerPassword:              "test",
+			WorkerLeaserID:              "my-worker-1",
+			WorkerLeaseDurationSeconds:  2,
+			WorkerRequestTimeoutSeconds: 2,
+			WorkerType:                  "plaintext",
+		})
+		defer cleanup3()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second * 30)
 		readCloser, err := workerContainer.Logs(ctx)
 		require.NoError(t, err, "failed to get worker logs stream")
 		defer readCloser.Close()
