@@ -69,6 +69,12 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 type SearchRequest struct {
 	Text string `json:"text"`
 	TopK int    `json:"topK"`
+	*SearchRequestArgs
+}
+
+type SearchRequestArgs struct {
+	Epsilon float32 `json:"epsilon"`
+	Radius  float32 `json:"radius"`
 }
 
 type SearchResult struct {
@@ -112,7 +118,15 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	}
 
 	// Perform vector search
-	results, err := s.vectors.Search(ctx, vectorData32, topK, 1, nil)
+	var args *vectors.SearchArgs
+	if request.SearchRequestArgs != nil {
+		args = &vectors.SearchArgs{
+			Epsilon: request.SearchRequestArgs.Epsilon,
+			Radius:  request.SearchRequestArgs.Radius,
+		}
+	}
+
+	results, err := s.vectors.Search(ctx, vectorData32, topK, 1, args)
 	if err != nil {
 		return nil, err
 	}
