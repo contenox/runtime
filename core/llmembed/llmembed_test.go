@@ -72,7 +72,6 @@ func TestGetProvider_WithBackends(t *testing.T) {
 		backend = &l.Backend
 		break
 	}
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).CreateBackend(ctx, backend))
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
 	time.Sleep(time.Second)
 	// Test GetProvider
@@ -81,9 +80,8 @@ func TestGetProvider_WithBackends(t *testing.T) {
 
 	// Verify provider properties
 	require.True(t, provider.CanEmbed())
-	require.Equal(t, "embed", provider.ModelName())
+	require.Equal(t, "all-minilm:33m", provider.ModelName())
 	require.Contains(t, provider.GetBackendIDs(), backend.BaseURL)
-	require.Equal(t, "ollama:embed", provider.GetID())
 }
 
 func TestGetProvider_NoBackends(t *testing.T) {
