@@ -49,6 +49,9 @@ func (s *Service) GetByName(ctx context.Context, name string) (*store.Pool, erro
 }
 
 func (s *Service) Update(ctx context.Context, pool *store.Pool) error {
+	if pool.ID == serverops.EmbedPoolID {
+		return serverops.ErrImmutablePool
+	}
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -57,6 +60,9 @@ func (s *Service) Update(ctx context.Context, pool *store.Pool) error {
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
+	if id == serverops.EmbedPoolID {
+		return serverops.ErrImmutablePool
+	}
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err

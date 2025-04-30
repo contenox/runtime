@@ -15,11 +15,15 @@ var (
 )
 
 type Service struct {
-	dbInstance libdb.DBManager
+	dbInstance              libdb.DBManager
+	immutableEmbedModelName string
 }
 
-func New(db libdb.DBManager) *Service {
-	return &Service{dbInstance: db}
+func New(db libdb.DBManager, config *serverops.Config) *Service {
+	return &Service{
+		dbInstance:              db,
+		immutableEmbedModelName: config.EmbedModel,
+	}
 }
 
 func (s *Service) Append(ctx context.Context, model *store.Model) error {
@@ -43,6 +47,9 @@ func (s *Service) List(ctx context.Context) ([]*store.Model, error) {
 
 func (s *Service) Delete(ctx context.Context, modelName string) error {
 	tx := s.dbInstance.WithoutTransaction()
+	if modelName == s.immutableEmbedModelName {
+		return serverops.ErrImmutableModel
+	}
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
