@@ -67,16 +67,14 @@ func TestGetProvider_WithBackends(t *testing.T) {
 	// Initialize embedder
 	embedder, err := llmembed.New(ctx, config, dbInstance, state)
 	require.NoError(t, err)
-
-	// Setup test backend
-	backend := &store.Backend{
-		ID:      uuid.NewString(),
-		BaseURL: "http://localhost:11434",
-		Type:    "Ollama",
+	backend := &store.Backend{}
+	for _, l := range state.Get(ctx) {
+		backend = &l.Backend
+		return
 	}
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).CreateBackend(ctx, backend))
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-
+	time.Sleep(time.Second)
 	// Test GetProvider
 	provider, err := embedder.GetProvider(ctx)
 	require.NoError(t, err)
