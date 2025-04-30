@@ -66,6 +66,69 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	}, nil
 }
 
+type SearchRequest struct {
+	Text string `json:"text"`
+	TopK int    `json:"topK"`
+}
+
+type SearchResult struct {
+	ID       string  `json:"id"`
+	Distance float32 `json:"distance"`
+}
+
+type SearchResponse struct {
+	Results []SearchResult `json:"results"`
+}
+
+func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
+	provider, err := s.embedder.GetProvider(ctx)
+	if err != nil {
+		return nil, err
+	}
+	embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+		ModelName: provider.ModelName(),
+	}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	if err != nil {
+		return nil, err
+	}
+	if embedClient == nil {
+		return nil, errors.New("embed client is nil")
+	}
+
+	// Generate query embedding
+	vectorData, err := embedClient.Embed(ctx, request.Text)
+	if err != nil {
+		return nil, err
+	}
+	vectorData32 := make([]float32, len(vectorData))
+	for i, v := range vectorData {
+		vectorData32[i] = float32(v)
+	}
+
+	// Handle TopK default
+	topK := request.TopK
+	if topK <= 0 {
+		topK = 10 // Default to 10 results
+	}
+
+	// Perform vector search
+	results, err := s.vectors.Search(ctx, vectorData32, topK, 1, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to API response format
+	searchResults := make([]SearchResult, len(results))
+	for i, res := range results {
+		searchResults[i] = SearchResult{
+			ID:       res.ID,
+			Distance: res.Distance,
+		}
+	}
+
+	return &SearchResponse{Results: searchResults}, nil
+}
+
 func (s *Service) GetServiceName() string {
 	return "indexservice"
 }
