@@ -1,10 +1,10 @@
-# cate: Cognitive AI/Agent Transformation Engine
+# cate
 
 A modular platform for building context-aware agents, semantic search, and task automation — grounded in your data.
 
 ## 🚀 Project Vision
 
-cate aims to become a platform for semantic search and user-defined AI agents that operate within specific contexts.
+cate (cognitive AI/Agent transformation engine/environment) aims to become a platform for semantic search and user-defined AI agents that operate within specific contexts.
 
 The project's vision is focused on delivering these core features:
 
