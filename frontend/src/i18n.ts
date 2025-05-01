@@ -247,8 +247,8 @@ const resources = {
         menu: 'Menü',
         cancel: 'Abbrechen',
         copyright: '© {{year}} Beam',
-        login: 'Anmelden', // Added
-        logout: 'Abmelden', // Added
+        login: 'Anmelden',
+        logout: 'Abmelden',
         name: 'Name',
         id: 'ID',
         error: 'Fehler',
@@ -307,7 +307,7 @@ const resources = {
       },
       state: {
         title: 'Backend-Status',
-        panel_description: 'Panel-Beschreibung', // Added (translated concept)
+        panel_description: 'Panel-Beschreibung',
         not_found: 'Kein Systemstatus verfügbar',
         error_loading: 'Fehler beim Laden des Systemstatus',
         pulled_models: 'Heruntergeladene Modelle', // Corrected from 'Pulled models'
@@ -328,8 +328,8 @@ const resources = {
       },
       chat: {
         conversation: 'Chat-Unterhaltung',
-        error_create_chat: 'Fehler beim Erstellen des Chats', // Added (translated concept)
-        no_chat_selected: 'Kein Chat ausgewählt', // Corrected value
+        error_create_chat: 'Fehler beim Erstellen des Chats',
+        no_chat_selected: 'Kein Chat ausgewählt',
         loading_chats: 'Chats werden geladen...',
         loading_history: 'Chatverlauf wird geladen...',
         list_error: 'Fehler beim Laden der Chats',
