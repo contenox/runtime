@@ -1,4 +1,4 @@
-import { Button, Card, P } from '@cate/ui';
+import { Button, P, Section } from '@cate/ui';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { User } from '../../../../lib/types';
@@ -23,31 +23,28 @@ const UserList: React.FC<UserListProps> = ({
   return (
     <>
       {users.map(user => (
-        <Card key={user.id} className="flex items-center justify-between p-4">
+        <Section key={user.id} title={user.friendlyName || user.email}>
           <div>
-            <P variant="cardTitle">{user.friendlyName || user.email}</P>
             <P>{user.email}</P>
             <P>
               {t('users.subject')}: {user.subject}
             </P>
           </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => onEdit(user)} className="text-primary">
-              {t('common.edit')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onDelete(user.id)}
-              className="text-error"
-              disabled={deletePending}>
-              {deletePending ? t('common.deleting') : t('common.delete')}
-            </Button>
-            <Button variant="ghost" onClick={() => goToAccessControlForUser(user.subject)}>
-              {t('accesscontrol.manage_title')}
-            </Button>
-          </div>
-        </Card>
+          <Button variant="ghost" size="sm" onClick={() => onEdit(user)} className="text-primary">
+            {t('common.edit')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(user.id)}
+            className="text-error"
+            disabled={deletePending}>
+            {deletePending ? t('common.deleting') : t('common.delete')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => goToAccessControlForUser(user.subject)}>
+            {t('accesscontrol.manage_title')}
+          </Button>
+        </Section>
       ))}
     </>
   );
