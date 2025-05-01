@@ -98,6 +98,8 @@ const resources = {
         section_description: 'Manage and Monitor LLM Backends',
         manage_title: 'Manage Backends',
         create_instruction: 'Create New Backend',
+        assigned_pools: 'Assigned Pools',
+        not_assigned_to_any_pools: 'Not assigned to any pools',
         list_title: 'Existing Backends',
         list_loading: 'Loading backends...',
         list_error: 'Error loading backends',
@@ -288,8 +290,8 @@ const resources = {
         form_update_action: 'Zugriffssteuerung aktualisieren',
       },
       backends: {
-        section_title: 'Backends', // Added
-        section_description: 'LLM-Backends verwalten und überwachen', // Added
+        section_title: 'Backends',
+        section_description: 'LLM-Backends verwalten und überwachen',
         manage_title: 'Backends verwalten',
         create_instruction: 'Neues Backend erstellen',
         list_title: 'Vorhandene Backends',

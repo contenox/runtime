@@ -72,7 +72,7 @@ export function usePoolsForBackend(backendID: string) {
     queryFn: () => api.listPoolsForBackend(backendID),
   });
 }
-// Similar hooks for model associations
+
 export function useAssignModelToPool() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { poolID: string; modelID: string }>({

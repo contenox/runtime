@@ -1,4 +1,4 @@
-import { Button, P, Section, Spinner } from '@cate/ui';
+import { Button, P, Section, Select, Spinner } from '@cate/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import {
@@ -68,7 +68,7 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onDelete(model.id)} // Pass ID
+          onClick={() => onDelete(model.id)}
           className="text-error"
           disabled={deletePending}>
           {deletePending ? t('common.deleting') : t('translation:model.model_delete')}
@@ -101,19 +101,14 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
         <label htmlFor={`assign-${model.id}`} className="text-sm font-medium">
           {t('model.assign_to_pool')}
         </label>
-        <select
+        <Select
           id={`assign-${model.id}`}
           className="flex-grow rounded border px-2 py-1 text-sm"
           value={selectedPoolToAssign}
           onChange={e => handleAssign(e.target.value)}
-          disabled={assignMutation.isPending || allPools.length === 0}>
-          <option value="">{t('model.select_pool_to_assign')}</option>
-          {allPools.map(pool => (
-            <option key={pool.id} value={pool.id}>
-              {pool.name}
-            </option>
-          ))}
-        </select>
+          defaultValue={t('model.select_pool_to_assign')}
+          disabled={assignMutation.isPending || allPools.length === 0}
+          options={allPools.map(pool => ({ value: pool.id, label: pool.name }))}></Select>
         {assignMutation.isPending && <Spinner size="sm" />}
       </div>
     </Section>
