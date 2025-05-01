@@ -105,3 +105,30 @@ export function usePoolByName(name: string) {
     queryFn: () => api.getPoolByName(name),
   });
 }
+
+export function useRemoveBackendFromPool() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { poolID: string; backendID: string }>({
+    mutationFn: ({ poolID, backendID }) => api.removeBackendFromPool(poolID, backendID),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'backends'] });
+      queryClient.invalidateQueries({ queryKey: ['backends', variables.backendID, 'pools'] });
+    },
+  });
+}
+export function useRemoveModelFromPool() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { poolID: string; modelID: string }>({
+    mutationFn: ({ poolID, modelID }) => api.removeModelFromPool(poolID, modelID),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'models'] });
+      queryClient.invalidateQueries({ queryKey: ['models', variables.modelID, 'pools'] });
+    },
+  });
+}
+export function usePoolsForModel(modelID: string) {
+  return useSuspenseQuery<Pool[]>({
+    queryKey: ['models', modelID, 'pools'],
+    queryFn: () => api.listPoolsForModel(modelID),
+  });
+}

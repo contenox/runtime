@@ -127,6 +127,9 @@ func (s *Service) AssignModel(ctx context.Context, poolID, modelID string) error
 }
 
 func (s *Service) RemoveModel(ctx context.Context, poolID, modelID string) error {
+	if poolID == serverops.EmbedPoolID {
+		return serverops.ErrImmutablePool
+	}
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
