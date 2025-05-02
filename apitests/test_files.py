@@ -112,3 +112,72 @@ def test_list_paths(base_url, admin_session, create_test_file):
     paths = response.json()
     assert isinstance(paths, list)
     assert test_file['path'] in paths
+
+def test_create_folder(base_url, admin_session):
+    """Test that an admin can create a folder."""
+    headers = admin_session
+    data = {'path': 'test/folder'}
+
+    response = requests.post(
+        f"{base_url}/folders",
+        json=data,
+        headers=headers
+    )
+
+    assert_status_code(response, 201)
+    folder_data = response.json()
+    assert 'id' in folder_data
+    assert folder_data['path'] == 'test/folder'
+
+
+def test_rename_folder(base_url, admin_session):
+    """Test that an admin can rename a folder."""
+    # Create a folder to rename
+    create_data = {'path': 'old/folder/path'}
+    create_response = requests.post(
+        f"{base_url}/folders",
+        json=create_data,
+        headers=admin_session
+    )
+    assert_status_code(create_response, 201)
+    folder_id = create_response.json()['id']
+
+    # Rename the folder
+    new_path = 'new/folder/path'
+    update_data = {'path': new_path}
+    update_response = requests.put(
+        f"{base_url}/folders/{folder_id}/path",
+        json=update_data,
+        headers=admin_session
+    )
+
+    assert_status_code(update_response, 200)
+    updated_folder = update_response.json()
+    assert updated_folder['id'] == folder_id
+    assert updated_folder['path'] == new_path
+
+def test_rename_file(base_url, admin_session, create_test_file):
+    """Test that an admin can rename a file's path."""
+    test_file = create_test_file()
+    new_path = 'renamed/file.txt'
+    data = {'path': new_path}
+
+    response = requests.put(
+        f"{base_url}/files/{test_file['id']}/path",
+        json=data,
+        headers=admin_session
+    )
+
+    assert_status_code(response, 200)
+    updated_file = response.json()
+    assert updated_file['id'] == test_file['id']
+    assert updated_file['path'] == new_path
+
+    # Verify the update via get metadata
+    get_response = requests.get(
+        f"{base_url}/files/{test_file['id']}",
+        headers=admin_session
+    )
+    assert_status_code(get_response, 200)
+    metadata = get_response.json()
+    assert metadata['path'] == new_path

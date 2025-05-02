@@ -131,5 +131,25 @@ export interface FileResponse {
   size: number;
 }
 
+export type FolderResponse = {
+  id: string;
+  path: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PathUpdateRequest = {
+  path: string;
+};
+
+export interface FileResponse {
+  id: string;
+  path: string;
+  contentType: string;
+  size: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Create a new type that excludes the password.
 export type AuthenticatedUser = Omit<User, 'password'>;

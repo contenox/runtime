@@ -6,6 +6,7 @@ import {
   ChatMessage,
   ChatSession,
   FileResponse,
+  FolderResponse,
   Job,
   Model,
   Pool,
@@ -170,4 +171,13 @@ export const api = {
   getDownloadFileUrl: (id: string) => `/api/files/${id}/download`,
 
   listFilesPaths: () => apiFetch<string[]>('/api/files/paths'),
+  // Folder management
+  createFolder: (data: { path: string }) =>
+    apiFetch<FolderResponse>('/api/folders', options('POST', data)),
+
+  renameFolder: (id: string, data: { path: string }) =>
+    apiFetch<FolderResponse>(`/api/folders/${id}/path`, options('PUT', data)),
+
+  renameFile: (id: string, data: { path: string }) =>
+    apiFetch<FileResponse>(`/api/files/${id}/path`, options('PUT', data)),
 };

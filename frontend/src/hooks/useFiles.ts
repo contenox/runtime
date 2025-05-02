@@ -6,7 +6,14 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { FileResponse } from '../lib/types';
+import { FileResponse, FolderResponse } from '../lib/types';
+
+const folderKeys = {
+  all: ['folders'] as const,
+  lists: () => [...folderKeys.all, 'list'] as const,
+  details: () => [...folderKeys.all, 'detail'] as const,
+  detail: (id: string) => [...folderKeys.details(), id] as const,
+};
 
 const fileKeys = {
   all: ['files'] as const,
@@ -67,5 +74,54 @@ export function useListFilePaths(): UseQueryResult<string[], Error> {
   return useQuery<string[], Error>({
     queryKey: fileKeys.paths(),
     queryFn: api.listFilesPaths,
+  });
+}
+
+export function useCreateFolder(): UseMutationResult<
+  FolderResponse,
+  Error,
+  { path: string },
+  unknown
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ path }) => api.createFolder({ path }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fileKeys.paths() });
+      queryClient.invalidateQueries({ queryKey: folderKeys.lists() });
+    },
+  });
+}
+
+export function useRenameFolder(): UseMutationResult<
+  FolderResponse,
+  Error,
+  { id: string; path: string },
+  unknown
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, path }) => api.renameFolder(id, { path }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: folderKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: fileKeys.paths() });
+      queryClient.invalidateQueries({ queryKey: folderKeys.lists() });
+    },
+  });
+}
+
+export function useRenameFile(): UseMutationResult<
+  FileResponse,
+  Error,
+  { id: string; path: string },
+  unknown
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, path }) => api.renameFile(id, { path }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fileKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: fileKeys.paths() });
+    },
   });
 }
