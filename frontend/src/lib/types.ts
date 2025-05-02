@@ -153,3 +153,20 @@ export interface FileResponse {
 
 // Create a new type that excludes the password.
 export type AuthenticatedUser = Omit<User, 'password'>;
+
+export type PendingJob = {
+  id: string;
+  taskType: string;
+  operation: string;
+  subject: string;
+  entityId: string;
+  scheduledFor: number;
+  validUntil: number;
+  retryCount: number;
+  createdAt: string;
+};
+
+export type InProgressJob = PendingJob & {
+  leaser: string;
+  leaseExpiration: string;
+};

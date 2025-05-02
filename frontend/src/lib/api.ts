@@ -7,8 +7,10 @@ import {
   ChatSession,
   FileResponse,
   FolderResponse,
+  InProgressJob,
   Job,
   Model,
+  PendingJob,
   Pool,
   UpdateAccessEntryRequest,
   UpdateUserRequest,
@@ -183,4 +185,11 @@ export const api = {
 
   renameFile: (id: string, data: { path: string }) =>
     apiFetch<FileResponse>(`/api/files/${id}/path`, options('PUT', data)),
+
+  // Job management
+  listPendingJobs: (cursor?: string) =>
+    apiFetch<PendingJob[]>(`/api/jobs/pending${cursor ? `?cursor=${cursor}` : ''}`),
+
+  listInProgressJobs: (cursor?: string) =>
+    apiFetch<InProgressJob[]>(`/api/jobs/in-progress${cursor ? `?cursor=${cursor}` : ''}`),
 };
