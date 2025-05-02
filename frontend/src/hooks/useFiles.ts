@@ -16,13 +16,6 @@ const fileKeys = {
   paths: () => [...fileKeys.all, 'paths'] as const,
 };
 
-export function useFiles(): UseQueryResult<FileResponse[], Error> {
-  return useQuery<FileResponse[], Error>({
-    queryKey: fileKeys.lists(),
-    queryFn: api.getFiles,
-  });
-}
-
 export function useFileMetadata(id: string): UseQueryResult<FileResponse, Error> {
   return useQuery<FileResponse, Error>({
     queryKey: fileKeys.detail(id!),

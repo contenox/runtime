@@ -16,9 +16,7 @@ import {
 } from '@cate/ui';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateFile, useDeleteFile, useFiles } from '../../../hooks/userFiles';
-import { api } from '../../../lib/api';
-import { FileResponse } from '../../../lib/types';
+import { useCreateFile, useDeleteFile, useListFilePaths } from '../../../hooks/useFiles';
 
 // Helper function to format bytes (optional, but useful)
 function formatBytes(bytes: number, decimals = 2): string {
@@ -35,7 +33,7 @@ export default function FilesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: files, isLoading: isLoadingFiles, error: filesError } = useFiles();
+  const { data: paths, isLoading: isLoadingFiles, error: filesError } = useListFilePaths();
   const createFileMutation = useCreateFile();
   const deleteFileMutation = useDeleteFile();
 
@@ -84,7 +82,7 @@ export default function FilesPage() {
       );
     }
 
-    if (!files || files.length === 0) {
+    if (!paths || paths.length === 0) {
       return (
         <EmptyState
           title={t('files.list_empty_title')}
@@ -93,35 +91,45 @@ export default function FilesPage() {
       );
     }
 
-    const columns = [t('common.path'), t('common.size'), t('common.type'), t('common.actions')];
+    // const columns = [t('common.path'), t('common.size'), t('common.type'), t('common.actions')];
 
     return (
-      <Table columns={columns}>
-        {files.map((file: FileResponse) => {
-          const isDeleting = deletingId === file.id;
+      <Table columns={['path']}>
+        {paths.map((path: string) => {
           return (
-            <TableRow key={file.id}>
-              <TableCell className="break-all">{file.path}</TableCell>
-              <TableCell>{formatBytes(file.size)}</TableCell>
-              <TableCell>{file.content_type}</TableCell>
-              <TableCell>
-                <Button
-                  variant="accent"
-                  size="sm"
-                  onClick={() => handleDeleteClick(file.id)}
-                  disabled={isDeleting || deleteFileMutation.isPending}>
-                  {isDeleting ? <Spinner size="sm" /> : t('common.delete')}
-                </Button>
-                <a href={api.getDownloadFileUrl(file.id)} download={file.path} className="ml-2">
-                  <Button variant="secondary" size="sm">
-                    {t('common.download')}
-                  </Button>
-                </a>
-              </TableCell>
+            <TableRow key={path}>
+              <TableCell className="break-all">{path}</TableCell>
             </TableRow>
           );
         })}
       </Table>
+
+      // <Table columns={columns}>
+      //   {files.map((file: FileResponse) => {
+      //     const isDeleting = deletingId === file.id;
+      //     return (
+      //       <TableRow key={file.id}>
+      //         <TableCell className="break-all">{file.path}</TableCell>
+      //         <TableCell>{formatBytes(file.size)}</TableCell>
+      //         <TableCell>{file.content_type}</TableCell>
+      //         <TableCell>
+      //           <Button
+      //             variant="accent"
+      //             size="sm"
+      //             onClick={() => handleDeleteClick(file.id)}
+      //             disabled={isDeleting || deleteFileMutation.isPending}>
+      //             {isDeleting ? <Spinner size="sm" /> : t('common.delete')}
+      //           </Button>
+      //           <a href={api.getDownloadFileUrl(file.id)} download={file.path} className="ml-2">
+      //             <Button variant="secondary" size="sm">
+      //               {t('common.download')}
+      //             </Button>
+      //           </a>
+      //         </TableCell>
+      //       </TableRow>
+      //     );
+      //   })}
+      // </Table>
     );
   };
 

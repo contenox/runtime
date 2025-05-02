@@ -157,12 +157,10 @@ export const api = {
   removeModelFromQueue: (model: string) => apiFetch<void>(`/api/queue/${model}`, options('DELETE')),
 
   // File management
-  getFiles: () => apiFetch<FileResponse[]>('/api/files'),
-
   getFileMetadata: (id: string) => apiFetch<FileResponse>(`/api/files/${id}`),
 
   createFile: (formData: FormData) =>
-    apiFetch<FileResponse>('/api/files', formDataOptions('POST', formData)),
+    apiFetch<FileResponse>('/api/files/', formDataOptions('POST', formData)),
 
   updateFile: (id: string, formData: FormData) =>
     apiFetch<FileResponse>(`/api/files/${id}`, formDataOptions('PUT', formData)),
