@@ -17,7 +17,7 @@ export default function BackendsPage() {
       content: <BackendsSection statusMap={statusMap} />,
     },
     {
-      id: 'pools', // New tab
+      id: 'pools',
       label: t('pools.manage_title'),
       content: <PoolsSection />,
     },

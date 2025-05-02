@@ -22,6 +22,7 @@ const resources = {
       navbar: {
         title: 'Beam!',
         home: 'Home',
+        files: 'Files',
         backends: 'Backends',
         settings: 'Settings',
         chat: 'Chat',

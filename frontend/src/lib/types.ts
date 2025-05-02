@@ -124,5 +124,12 @@ export type UpdateAccessEntryRequest = {
   permission?: string;
 };
 
+export interface FileResponse {
+  id: string;
+  path: string;
+  content_type: string;
+  size: number;
+}
+
 // Create a new type that excludes the password.
 export type AuthenticatedUser = Omit<User, 'password'>;

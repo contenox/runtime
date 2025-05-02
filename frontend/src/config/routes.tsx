@@ -1,9 +1,10 @@
 import { P } from '@cate/ui';
-import { Database, Home, MessageCircleCode, Settings, User2Icon } from 'lucide-react';
+import { Database, File, Home, MessageCircleCode, Settings, User2Icon } from 'lucide-react';
 import i18n from '../i18n';
 import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
 import ChatsListPage from '../pages/admin/chats/components/ChatListPage.tsx';
+import FilesPage from '../pages/admin/files/FilesPage.tsx';
 import UserPage from '../pages/admin/users/UserPage.tsx';
 import About from '../pages/public/about/About.tsx';
 import ByePage from '../pages/public/bye/Bye.tsx';
@@ -36,6 +37,14 @@ export const routes: RouteConfig[] = [
     element: BackendsPage,
     label: i18n.t('navbar.backends'),
     icon: <Database className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+  },
+  {
+    path: '/files',
+    element: FilesPage,
+    label: i18n.t('navbar.files'),
+    icon: <File className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
   },

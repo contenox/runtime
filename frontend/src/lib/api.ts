@@ -5,6 +5,7 @@ import {
   Backend,
   ChatMessage,
   ChatSession,
+  FileResponse,
   Job,
   Model,
   Pool,
@@ -34,6 +35,24 @@ const options = (method: HttpMethod, data?: unknown): ApiOptions => {
   }
 
   return options;
+};
+
+interface FormDataApiOptions {
+  method?: HttpMethod;
+  headers?: Record<string, string>;
+  body: FormData;
+  credentials?: RequestCredentials;
+}
+
+const formDataOptions = (method: HttpMethod, formData: FormData): FormDataApiOptions => {
+  // NOTE: We DO NOT set 'Content-Type': 'multipart/form-data'.
+  // The browser sets it automatically along with the correct boundary when using FormData.
+  return {
+    method,
+    body: formData,
+    credentials: 'same-origin',
+    // headers: {} // Intentionally omitted for Content-Type
+  };
 };
 
 export const api = {
@@ -136,4 +155,21 @@ export const api = {
   getCurrentUser: (): Promise<AuthenticatedUser> => apiFetch<AuthenticatedUser>('/api/ui/me'),
   // Queue management
   removeModelFromQueue: (model: string) => apiFetch<void>(`/api/queue/${model}`, options('DELETE')),
+
+  // File management
+  getFiles: () => apiFetch<FileResponse[]>('/api/files'),
+
+  getFileMetadata: (id: string) => apiFetch<FileResponse>(`/api/files/${id}`),
+
+  createFile: (formData: FormData) =>
+    apiFetch<FileResponse>('/api/files', formDataOptions('POST', formData)),
+
+  updateFile: (id: string, formData: FormData) =>
+    apiFetch<FileResponse>(`/api/files/${id}`, formDataOptions('PUT', formData)),
+
+  deleteFile: (id: string) => apiFetch<void>(`/api/files/${id}`, options('DELETE')),
+
+  getDownloadFileUrl: (id: string) => `/api/files/${id}/download`,
+
+  listFilesPaths: () => apiFetch<string[]>('/api/files/paths'),
 };
