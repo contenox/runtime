@@ -98,20 +98,23 @@ def test_delete_file(base_url, admin_session, create_test_file):
     )
     assert_status_code(get_response, 404)
 
-def test_list_paths(base_url, admin_session, create_test_file):
-    """Test that we can list file paths."""
+def test_list_files(base_url, admin_session, create_test_file):
+    """Test that we can list files with path filtering."""
     test_file = create_test_file()
     headers = admin_session
 
+    # Test filtering by path
     response = requests.get(
-        f"{base_url}/files/paths",
+        f"{base_url}/files",
+        params={'path': "test"},
         headers=headers
     )
 
     assert_status_code(response, 200)
-    paths = response.json()
-    assert isinstance(paths, list)
-    assert test_file['path'] in paths
+    files = response.json()
+    assert isinstance(files, list)
+    assert len(files) >= 1
+    assert any(f['path'] == test_file['path'] for f in files)
 
 def test_create_folder(base_url, admin_session):
     """Test that an admin can create a folder."""
@@ -181,3 +184,37 @@ def test_rename_file(base_url, admin_session, create_test_file):
     assert_status_code(get_response, 200)
     metadata = get_response.json()
     assert metadata['path'] == new_path
+
+def test_rename_folder_updates_child_paths(base_url, admin_session, create_test_file):
+    """Test renaming a folder updates nested file paths."""
+    # Create folder structure
+    folder_data = {'path': 'parent/old_folder'}
+    folder_res = requests.post(
+        f"{base_url}/folders",
+        json=folder_data,
+        headers=admin_session
+    )
+    assert_status_code(folder_res, 201)
+    folder_id = folder_res.json()['id']
+
+    # Create file inside folder
+    file_path = 'parent/old_folder/nested_file.txt'
+    test_file = create_test_file(path=file_path)
+
+    # Rename the folder
+    new_path = 'parent/new_folder'
+    update_res = requests.put(
+        f"{base_url}/folders/{folder_id}/path",
+        json={'path': new_path},
+        headers=admin_session
+    )
+    assert_status_code(update_res, 200)
+
+    # Verify file path updated
+    file_res = requests.get(
+        f"{base_url}/files/{test_file['id']}",
+        headers=admin_session
+    )
+    updated_file = file_res.json()
+    expected_path = 'parent/new_folder/nested_file.txt'
+    assert updated_file['path'] == expected_path

@@ -230,6 +230,8 @@ const resources = {
         upload_action: 'Upload',
         form_select_file: 'Select File',
         list_empty_message: 'No files found',
+        form_path_placeholder: 'Path',
+        form_path: 'Path',
       },
     },
   },

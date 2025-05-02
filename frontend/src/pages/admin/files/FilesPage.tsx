@@ -16,9 +16,9 @@ import {
 } from '@cate/ui';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCreateFile, useDeleteFile, useListFilePaths } from '../../../hooks/useFiles';
+import { useCreateFile, useDeleteFile, useListFiles } from '../../../hooks/useFiles';
+import { api } from '../../../lib/api';
 
-// Helper function to format bytes (optional, but useful)
 function formatBytes(bytes: number, decimals = 2): string {
   if (!+bytes) return '0 Bytes';
   const k = 1024;
@@ -31,28 +31,34 @@ function formatBytes(bytes: number, decimals = 2): string {
 export default function FilesPage() {
   const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadPath, setUploadPath] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const { data: paths, isLoading: isLoadingFiles, error: filesError } = useListFilePaths();
+  const { data: files, isLoading: isLoadingFiles, error: filesError } = useListFiles();
   const createFileMutation = useCreateFile();
   const deleteFileMutation = useDeleteFile();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setSelectedFile(file || null);
+    if (file && !uploadPath) {
+      setUploadPath(file.name);
+    }
   };
 
   const handleUploadSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedFile) return;
+
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('path', uploadPath);
+
     createFileMutation.mutate(formData, {
       onSuccess: () => {
         setSelectedFile(null);
-        // TODO: Consider resetting the input value itself if needed using a ref
+        setUploadPath('');
       },
-      // onError: (err) => { /* Handle specific upload error */ }
     });
   };
 
@@ -82,7 +88,7 @@ export default function FilesPage() {
       );
     }
 
-    if (!paths || paths.length === 0) {
+    if (!files || files.length === 0) {
       return (
         <EmptyState
           title={t('files.list_empty_title')}
@@ -91,45 +97,33 @@ export default function FilesPage() {
       );
     }
 
-    // const columns = [t('common.path'), t('common.size'), t('common.type'), t('common.actions')];
-
     return (
-      <Table columns={['path']}>
-        {paths.map((path: string) => {
+      <Table columns={[t('common.path'), t('common.type'), t('common.size'), t('common.actions')]}>
+        {files.map(file => {
+          const isDeleting = deletingId === file.id;
           return (
-            <TableRow key={path}>
-              <TableCell className="break-all">{path}</TableCell>
+            <TableRow key={file.id}>
+              <TableCell className="break-all">{file.path}</TableCell>
+              <TableCell>{file.contentType}</TableCell>
+              <TableCell>{formatBytes(file.size)}</TableCell>
+              <TableCell className="space-x-2">
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => handleDeleteClick(file.id)}
+                  disabled={isDeleting || deleteFileMutation.isPending}>
+                  {isDeleting ? <Spinner size="sm" /> : t('common.delete')}
+                </Button>
+                <a href={api.getDownloadFileUrl(file.id)} download={file.path}>
+                  <Button variant="secondary" size="sm">
+                    {t('common.download')}
+                  </Button>
+                </a>
+              </TableCell>
             </TableRow>
           );
         })}
       </Table>
-
-      // <Table columns={columns}>
-      //   {files.map((file: FileResponse) => {
-      //     const isDeleting = deletingId === file.id;
-      //     return (
-      //       <TableRow key={file.id}>
-      //         <TableCell className="break-all">{file.path}</TableCell>
-      //         <TableCell>{formatBytes(file.size)}</TableCell>
-      //         <TableCell>{file.content_type}</TableCell>
-      //         <TableCell>
-      //           <Button
-      //             variant="accent"
-      //             size="sm"
-      //             onClick={() => handleDeleteClick(file.id)}
-      //             disabled={isDeleting || deleteFileMutation.isPending}>
-      //             {isDeleting ? <Spinner size="sm" /> : t('common.delete')}
-      //           </Button>
-      //           <a href={api.getDownloadFileUrl(file.id)} download={file.path} className="ml-2">
-      //             <Button variant="secondary" size="sm">
-      //               {t('common.download')}
-      //             </Button>
-      //           </a>
-      //         </TableCell>
-      //       </TableRow>
-      //     );
-      //   })}
-      // </Table>
     );
   };
 
@@ -159,6 +153,13 @@ export default function FilesPage() {
           }>
           <FormField label={t('files.form_select_file')} required>
             <Input type="file" onChange={handleFileChange} />
+          </FormField>
+          <FormField label={t('files.form_path')}>
+            <Input
+              value={uploadPath}
+              onChange={e => setUploadPath(e.target.value)}
+              placeholder={t('files.form_path_placeholder')}
+            />
           </FormField>
         </Form>
       </Section>

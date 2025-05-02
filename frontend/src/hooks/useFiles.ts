@@ -70,10 +70,10 @@ export function useDeleteFile(): UseMutationResult<void, Error, string, unknown>
   });
 }
 
-export function useListFilePaths(): UseQueryResult<string[], Error> {
-  return useQuery<string[], Error>({
-    queryKey: fileKeys.paths(),
-    queryFn: api.listFilesPaths,
+export function useListFiles(path?: string): UseQueryResult<FileResponse[], Error> {
+  return useQuery<FileResponse[], Error>({
+    queryKey: [...fileKeys.lists(), { path }],
+    queryFn: () => api.listFiles(path),
   });
 }
 

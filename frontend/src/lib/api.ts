@@ -161,7 +161,7 @@ export const api = {
   getFileMetadata: (id: string) => apiFetch<FileResponse>(`/api/files/${id}`),
 
   createFile: (formData: FormData) =>
-    apiFetch<FileResponse>('/api/files/', formDataOptions('POST', formData)),
+    apiFetch<FileResponse>('/api/files', formDataOptions('POST', formData)),
 
   updateFile: (id: string, formData: FormData) =>
     apiFetch<FileResponse>(`/api/files/${id}`, formDataOptions('PUT', formData)),
@@ -170,7 +170,10 @@ export const api = {
 
   getDownloadFileUrl: (id: string) => `/api/files/${id}/download`,
 
-  listFilesPaths: () => apiFetch<string[]>('/api/files/paths'),
+  listFiles: (path?: string) => {
+    const query = path ? `?path=${encodeURIComponent(path)}` : '';
+    return apiFetch<FileResponse[]>(`/api/files${query}`);
+  },
   // Folder management
   createFolder: (data: { path: string }) =>
     apiFetch<FolderResponse>('/api/folders', options('POST', data)),

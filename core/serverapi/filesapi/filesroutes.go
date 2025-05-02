@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/js402/cate/core/serverops"
@@ -31,7 +32,7 @@ func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fil
 	mux.HandleFunc("PUT /files/{id}", f.update)
 	mux.HandleFunc("DELETE /files/{id}", f.delete)
 	mux.HandleFunc("GET /files/{id}/download", f.download)
-	mux.HandleFunc("GET /files/paths", f.listPaths)
+	mux.HandleFunc("GET /files", f.listFiles)
 	mux.HandleFunc("POST /folders", f.createFolder)
 	mux.HandleFunc("PUT /files/{id}/path", f.renameFile)
 	mux.HandleFunc("PUT /folders/{id}/path", f.renameFolder)
@@ -227,36 +228,18 @@ func mapFolderToResponse(f *fileservice.Folder) folderResponse {
 	}
 }
 
-func (f *fileManager) listPaths(w http.ResponseWriter, r *http.Request) {
+func (f *fileManager) listFiles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	pathFilter := r.URL.Query().Get("path")
-
-	var paths []string
+	pathFilter := url.QueryEscape(r.URL.Query().Get("path"))
 	var err error
 
-	if pathFilter != "" {
-		files, err := f.service.GetFilesByPath(ctx, pathFilter)
-		if err != nil {
-			_ = serverops.Error(w, r, err, serverops.ListOperation)
-			return
-		}
-		paths = make([]string, 0, len(files))
-		for _, f := range files {
-			paths = append(paths, f.Path)
-		}
-	} else {
-		paths, err = f.service.ListAllPaths(ctx)
-		if err != nil {
-			_ = serverops.Error(w, r, err, serverops.ListOperation)
-			return
-		}
+	files, err := f.service.GetFilesByPath(ctx, pathFilter)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
 	}
-
-	if paths == nil {
-		paths = []string{}
-	}
-	_ = serverops.Encode(w, r, http.StatusOK, paths)
+	_ = serverops.Encode(w, r, http.StatusOK, files)
 }
 
 func (f *fileManager) download(w http.ResponseWriter, r *http.Request) {
