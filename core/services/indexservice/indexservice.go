@@ -79,8 +79,8 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 }
 
 type SearchRequest struct {
-	Text string `json:"text"`
-	TopK int    `json:"topK"`
+	Query string `json:"text"`
+	TopK  int    `json:"topK"`
 	*SearchRequestArgs
 }
 
@@ -114,7 +114,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	}
 
 	// Generate query embedding
-	vectorData, err := embedClient.Embed(ctx, request.Text)
+	vectorData, err := embedClient.Embed(ctx, request.Query)
 	if err != nil {
 		return nil, err
 	}

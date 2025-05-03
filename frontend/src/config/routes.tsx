@@ -1,10 +1,20 @@
 import { P } from '@cate/ui';
-import { Database, File, Home, MessageCircleCode, Settings, Turtle, User2Icon } from 'lucide-react';
+import {
+  Database,
+  File,
+  Home,
+  MessageCircleCode,
+  Search,
+  Settings,
+  Turtle,
+  User2Icon,
+} from 'lucide-react';
 import i18n from '../i18n';
 import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
 import ChatsListPage from '../pages/admin/chats/components/ChatListPage.tsx';
 import FilesPage from '../pages/admin/files/FilesPage.tsx';
+import SearchPage from '../pages/admin/search/SearchPage.tsx';
 import ServerJobsPage from '../pages/admin/serverjobs/ServerJobsPage.tsx';
 import UserPage from '../pages/admin/users/UserPage.tsx';
 import About from '../pages/public/about/About.tsx';
@@ -77,6 +87,14 @@ export const routes: RouteConfig[] = [
     element: UserPage,
     label: i18n.t('navbar.users'),
     icon: <User2Icon className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+  },
+  {
+    path: '/search',
+    element: SearchPage,
+    label: i18n.t('navbar.search'),
+    icon: <Search className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
   },

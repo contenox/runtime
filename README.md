@@ -49,7 +49,7 @@ cate is in **active development**, while end-to-end features are still being ref
 * [x] **Tokenizer Service Migration** Moving tokenizer logic into a dedicated service to optimize core service build times and resource usage.
 * [x] **Document Ingestion Pipeline:** Building the initial RAG pipeline, with Python workers, to parse and process documents from the filestore and ingest the embeddings into **vald**. *(Replaced opensearch with vald)*
 * [x] **LLM Resolver:** Improving the logic (`llmresolver`) for selecting the optimal backend instance and model for requests, via a scoring system and routing policies.
-* [ ] **UI-Search:** Develop a UI-Search page to demo semantic search.
+* [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
 * [x] **Fixing wiring:** Ensuring previously built features are fully integrated and functional E2E.
 * [ ] **Cleaning:** Fix failing tests and get a basic CI running.
 

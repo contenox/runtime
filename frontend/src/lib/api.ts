@@ -12,6 +12,7 @@ import {
   Model,
   PendingJob,
   Pool,
+  SearchResponse,
   UpdateAccessEntryRequest,
   UpdateUserRequest,
   User,
@@ -192,4 +193,19 @@ export const api = {
 
   listInProgressJobs: (cursor?: string) =>
     apiFetch<InProgressJob[]>(`/api/jobs/in-progress${cursor ? `?cursor=${cursor}` : ''}`),
+
+  searchFiles: (query: string, topk?: number, radius?: number, epsilon?: number) => {
+    const params = new URLSearchParams();
+    params.append('q', query);
+    if (topk !== undefined) {
+      params.append('topk', topk.toString());
+    }
+    if (radius !== undefined) {
+      params.append('radius', radius.toString());
+    }
+    if (epsilon !== undefined) {
+      params.append('epsilon', epsilon.toString());
+    }
+    return apiFetch<SearchResponse>(`/api/search?${params.toString()}`);
+  },
 };

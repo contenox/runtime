@@ -10,6 +10,15 @@ export type Backend = {
   updatedAt?: string;
 };
 
+export type SearchResult = {
+  id: string;
+  distance: number;
+};
+
+export type SearchResponse = {
+  results: SearchResult[];
+};
+
 export type ModelJob = {
   url: string;
   model: string;
