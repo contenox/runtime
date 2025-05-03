@@ -1,4 +1,4 @@
-import { UseSuspenseQueryResult, useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { SearchResponse } from '../lib/types';
 
@@ -7,8 +7,8 @@ export function useSearch(
   topk?: number,
   radius?: number,
   epsilon?: number,
-): UseSuspenseQueryResult<SearchResponse, Error> {
-  return useSuspenseQuery({
+): UseQueryResult<SearchResponse, Error> {
+  return useQuery({
     queryKey: ['search', query, topk, radius, epsilon],
     queryFn: () => api.searchFiles(query, topk, radius, epsilon),
   });
