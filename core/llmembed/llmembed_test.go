@@ -21,8 +21,12 @@ import (
 func setupTestEnvironment(t *testing.T) (context.Context, *serverops.Config, libdb.DBManager, *runtimestate.State, func()) {
 	ctx := context.Background()
 	config := &serverops.Config{
-		EmbedModel: "all-minilm:33m",
-		JWTExpiry:  "1h",
+		EmbedModel:          "all-minilm:33m",
+		JWTExpiry:           "1h",
+		WorkerUserEmail:     "worker@internal",
+		WorkerUserPassword:  "securepassword",
+		WorkerUserAccountID: uuid.NewString(),
+		SigningKey:          "test-signing-key",
 	}
 
 	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)

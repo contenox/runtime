@@ -6,7 +6,7 @@ import { InProgressJob, PendingJob } from '../../../lib/types';
 
 export default function ServerJobsPage() {
   const { t } = useTranslation();
-  const [cursor, setCursor] = useState<Date>();
+  const [cursor] = useState<Date>(); // TODO: setCursor pagination
   const {
     data: pendingJobs,
     isLoading: pendingLoading,

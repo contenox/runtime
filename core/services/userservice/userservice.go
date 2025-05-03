@@ -2,8 +2,6 @@ package userservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -13,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libcipher"
 	"github.com/js402/cate/libs/libdb"
 )
 
@@ -69,14 +66,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (*Result, e
 		return nil, err
 	}
 
-	// Decode the stored hashed password.
-	decodedHash, err := base64.StdEncoding.DecodeString(user.HashedPassword)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode stored password: %w", err)
-	}
-
-	// Verify password.
-	passed, err := libcipher.CheckHash(s.signingKey, user.Salt, password, decodedHash)
+	passed, err := serverops.CheckPassword(password, user.HashedPassword, user.Salt, s.signingKey)
 	if err != nil || !passed {
 		return nil, errors.New("invalid credentials")
 	}
@@ -173,11 +163,12 @@ func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserR
 		FriendlyName: req.FriendlyName,
 	}
 	if req.Password != "" {
-		hashedPassword, err := libcipher.NewHash(libcipher.GenerateHashArgs{Payload: []byte(req.Password), SigningKey: []byte(s.signingKey)}, sha256.New)
+		hashedPassword, salt, err := serverops.NewPasswordHash(req.Password, s.signingKey)
 		if err != nil {
 			return nil, err
 		}
-		user.HashedPassword = base64.StdEncoding.EncodeToString(hashedPassword)
+		user.HashedPassword = hashedPassword
+		user.Salt = salt // Ensure store.User has a Salt field
 	}
 
 	err := store.New(tx).CreateUser(ctx, user)
@@ -283,14 +274,12 @@ func (s *Service) UpdateUserFields(ctx context.Context, id string, req UpdateUse
 		user.FriendlyName = req.FriendlyName
 	}
 	if req.Password != "" {
-		hashedPassword, err := libcipher.NewHash(libcipher.GenerateHashArgs{
-			Payload:    []byte(req.Password),
-			SigningKey: []byte(s.signingKey),
-		}, sha256.New)
+		hashedPassword, salt, err := serverops.NewPasswordHash(req.Password, s.signingKey)
 		if err != nil {
 			return nil, err
 		}
-		user.HashedPassword = base64.StdEncoding.EncodeToString(hashedPassword)
+		user.HashedPassword = hashedPassword
+		user.Salt = salt
 	}
 
 	// Persist the updated user. This method already handles merge logic and duplicate checks.

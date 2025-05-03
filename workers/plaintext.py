@@ -13,4 +13,4 @@ class TextParser(parser.Parser):
         return parsed_text
 
     def supported_types(self) -> list[str]:
-        return ['vectorize_text/plain']
+        return ['vectorize_text/plain; charset=utf-8']

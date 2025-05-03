@@ -2,12 +2,15 @@ package serverops
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/libs/libauth"
+	"github.com/js402/cate/libs/libcipher"
 )
 
 const DefaultServerGroup = "server"
@@ -170,4 +173,32 @@ func GetIdentity(ctx context.Context) (string, error) {
 	}
 
 	return libauth.GetIdentity[store.AccessList](ctx, jwtSecret)
+}
+
+func NewPasswordHash(password, signingKey string) (encodedHash, encodedSalt string, err error) {
+	args := libcipher.GenerateHashArgs{
+		Payload:    []byte(password),
+		SigningKey: []byte(signingKey),
+	}
+
+	hashBytes, err := libcipher.NewHash(args, sha256.New)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate password hash: %w", err)
+	}
+
+	// Encode hash and salt for storage
+	encodedHash = base64.StdEncoding.EncodeToString(hashBytes)
+	encodedSalt = base64.StdEncoding.EncodeToString(args.Salt)
+	return encodedHash, encodedSalt, nil
+}
+
+func CheckPassword(password, encodedHash, salt, signingKey string) (bool, error) {
+	// Decode stored values
+	hashBytes, err := base64.StdEncoding.DecodeString(encodedHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to decode hash: %w", err)
+	}
+
+	// Verify password
+	return libcipher.CheckHash(signingKey, salt, password, hashBytes)
 }

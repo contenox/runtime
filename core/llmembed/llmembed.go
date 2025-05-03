@@ -19,24 +19,34 @@ type Embedder interface {
 }
 
 func New(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (Embedder, error) {
-	pool, err := initPool(ctx, config, dbInstance, false)
+	tx, com, r, err := dbInstance.WithTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer r()
+
+	pool, err := initPool(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init pool: %w", err)
 	}
-	model, err := initModel(ctx, config, dbInstance, false)
+	model, err := initModel(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init model: %w", err)
 	}
-	err = assignModelToPool(ctx, config, dbInstance, model, pool)
+	err = assignModelToPool(ctx, config, tx, model, pool)
 	if err != nil {
 		return nil, fmt.Errorf("assign model to pool: %w", err)
+	}
+	err = initCredentials(ctx, config, tx)
+	if err != nil {
+		return nil, fmt.Errorf("init credentials: %w", err)
 	}
 	return &embedder{
 		pool:       pool,
 		model:      model,
 		dbInstance: dbInstance,
 		runtime:    runtime,
-	}, nil
+	}, com(ctx)
 }
 
 type embedder struct {
@@ -83,10 +93,10 @@ func (e *embedder) GetProvider(ctx context.Context) (modelprovider.Provider, err
 	return provider, nil
 }
 
-func initPool(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, created bool) (*store.Pool, error) {
-	pool, err := store.New(dbInstance.WithoutTransaction()).GetPool(ctx, serverops.EmbedPoolID)
+func initPool(ctx context.Context, config *serverops.Config, tx libdb.Exec, created bool) (*store.Pool, error) {
+	pool, err := store.New(tx).GetPool(ctx, serverops.EmbedPoolID)
 	if !created && errors.Is(err, libdb.ErrNotFound) {
-		err = store.New(dbInstance.WithoutTransaction()).CreatePool(ctx, &store.Pool{
+		err = store.New(tx).CreatePool(ctx, &store.Pool{
 			ID:          serverops.EmbedPoolID,
 			Name:        serverops.EmbedPoolName,
 			PurposeType: "Internal Embeddings",
@@ -94,7 +104,7 @@ func initPool(ctx context.Context, config *serverops.Config, dbInstance libdb.DB
 		if err != nil {
 			return nil, err
 		}
-		return initPool(ctx, config, dbInstance, true)
+		return initPool(ctx, config, tx, true)
 	}
 	if err != nil {
 		return nil, err
@@ -103,31 +113,35 @@ func initPool(ctx context.Context, config *serverops.Config, dbInstance libdb.DB
 	return pool, nil
 }
 
-func initModel(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, created bool) (*store.Model, error) {
+func initModel(ctx context.Context, config *serverops.Config, tx libdb.Exec, created bool) (*store.Model, error) {
 	tenantID, err := uuid.Parse(serverops.TenantID)
 	if err != nil {
 		return nil, err
 	}
 	modelID := uuid.NewSHA1(tenantID, []byte(config.EmbedModel))
-	model, err := store.New(dbInstance.WithoutTransaction()).GetModel(ctx, modelID.String())
+	storeInstance := store.New(tx)
+
+	model, err := storeInstance.GetModel(ctx, modelID.String())
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return nil, fmt.Errorf("get model: %w", err)
 	}
 	if !created && errors.Is(err, libdb.ErrNotFound) {
-		err = store.New(dbInstance.WithoutTransaction()).AppendModel(ctx, &store.Model{
+		err = storeInstance.AppendModel(ctx, &store.Model{
 			Model: config.EmbedModel,
 			ID:    modelID.String(),
 		})
 		if err != nil {
 			return nil, err
 		}
-		return initModel(ctx, config, dbInstance, true)
+		return initModel(ctx, config, tx, true)
 	}
 	return model, nil
 }
 
-func assignModelToPool(ctx context.Context, _ *serverops.Config, dbInstance libdb.DBManager, model *store.Model, pool *store.Pool) error {
-	models, err := store.New(dbInstance.WithoutTransaction()).ListModelsForPool(ctx, pool.ID)
+func assignModelToPool(ctx context.Context, _ *serverops.Config, tx libdb.Exec, model *store.Model, pool *store.Pool) error {
+	storeInstance := store.New(tx)
+
+	models, err := storeInstance.ListModelsForPool(ctx, pool.ID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +150,40 @@ func assignModelToPool(ctx context.Context, _ *serverops.Config, dbInstance libd
 			return nil
 		}
 	}
-	if err := store.New(dbInstance.WithoutTransaction()).AssignModelToPool(ctx, pool.ID, model.ID); err != nil {
+	if err := storeInstance.AssignModelToPool(ctx, pool.ID, model.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exec) error {
+	storeInstance := store.New(tx)
+	passwordHash, salt, err := serverops.NewPasswordHash(config.WorkerUserPassword, config.SigningKey)
+	if err != nil {
+		return err
+	}
+	entry, _ := storeInstance.GetAccessEntriesByIdentity(ctx, config.WorkerUserAccountID)
+	if entry != nil {
+		return nil
+	}
+	err = storeInstance.CreateUser(ctx, &store.User{
+		Email:          config.WorkerUserEmail,
+		ID:             config.WorkerUserAccountID,
+		Subject:        config.WorkerUserAccountID,
+		FriendlyName:   "Internal Worker Account",
+		HashedPassword: passwordHash,
+		Salt:           salt,
+	})
+	if err != nil {
+		return err
+	}
+	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
+		ID:         config.WorkerUserAccountID,
+		Identity:   config.WorkerUserAccountID,
+		Resource:   serverops.DefaultServerGroup, // TODO: reduce to minimal privilege
+		Permission: store.PermissionManage,       // TODO: reduce
+	})
+	if err != nil {
 		return err
 	}
 	return nil

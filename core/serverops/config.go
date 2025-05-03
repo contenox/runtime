@@ -34,6 +34,9 @@ type Config struct {
 	TokenizerServiceURL string `json:"tokenizer_service_url"`
 	EmbedModel          string `json:"embed_model"`
 	VectorStoreURL      string `json:"vector_service_url"`
+	WorkerUserAccountID string `json:"worker_user_account_id"`
+	WorkerUserPassword  string `json:"worker_user_password"`
+	WorkerUserEmail     string `json:"worker_user_email"`
 }
 
 type ConfigTokenizerService struct {

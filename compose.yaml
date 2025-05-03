@@ -67,6 +67,19 @@ services:
     environment:
       - NATS_USER=natsuser
       - NATS_PASSWORD=natspassword
+  text-worker:
+    build:
+      context: ./
+      dockerfile: Dockerfile.worker
+    environment:
+      API_BASE_URL: http://backend:8080
+      WORKER_TYPE: plaintext
+      WORKER_USER_EMAIL: worker@example.com
+      WORKER_USER_PASSWORD: workerpassword
+      WORKER_USER_ACCOUNT_ID: worker@example.com
+      WORKER_LEASER_ID: Text Worker 1
+      WORKER_LEASE_DURATION_SECONDS: 30
+      WORKER_REQUEST_TIMEOUT_SECONDS: 2
   # ollama:
   #   image: ollama/ollama:latest
   #   ports:
