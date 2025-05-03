@@ -71,7 +71,7 @@ func checkAuth(ctx context.Context, identity, resource string, requiredPermissio
 	}
 	authorized, err := accessList.RequireAuthorisation(resource, int(requiredPermission))
 	if err != nil && !errors.Is(err, store.ErrAccessEntryNotFound) {
-		return authorized, err
+		return authorized, fmt.Errorf("error during authorization check: %w", err)
 	}
 	if errors.Is(err, store.ErrAccessEntryNotFound) {
 		accessList, err = accessListFromStore(ctx, storeInstance, identity, resource)
@@ -80,6 +80,9 @@ func checkAuth(ctx context.Context, identity, resource string, requiredPermissio
 		}
 		authorized, err = accessList.RequireAuthorisation(resource, int(requiredPermission))
 		if errors.Is(err, store.ErrAccessEntryNotFound) {
+			return authorized, nil
+		}
+		if err != nil {
 			return authorized, fmt.Errorf("error during authorization check: %w", err)
 		}
 	}
