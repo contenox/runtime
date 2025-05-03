@@ -58,6 +58,8 @@ class Steps:
             "jobTypes": self.parser.supported_types(),
         }
         response = self.session.post(f"{self.base_url}/leases", json=payload)
+        if response.status_code == 404:
+            return None
         if response.status_code != 201:
             raise Exception(f"Failed to lease job: {response.status_code} {response.text}")
         return response.json()
@@ -80,13 +82,13 @@ class Steps:
         if response.status_code != 204:
             raise Exception(f"Failed to mark job failed: {response.status_code} {response.text}")
 
-    def ingest(self, file_id: str, text: str):
-        response = self.session.post(
-            f"{self.base_url}/index",
-            json={"text": text, "id": file_id},
-        )
-        if response.status_code != 204:
-            raise Exception(f"Failed to ingest text: {response.status_code} {response.text}")
+    def ingest(self, file_id: str, text: str, replace: bool = False):
+            response = self.session.post(
+                f"{self.base_url}/index",
+                json={"text": text, "id": file_id, "replace": replace},
+            )
+            if response.status_code not in [200, 204]:
+                raise Exception(f"Failed to ingest text: {response.status_code} {response.text}")
 
 def load_config() -> dict:
     config = {}
@@ -112,17 +114,17 @@ def load_config() -> dict:
 
 def cycle(parser: parser.Parser, config: dict):
     try:
-        print("Starting AuthSession...")
+        # print("Starting AuthSession...")
         session = AuthSession(
             base_url=config["base_url"],
             email=config["email"],
             password=config["password"],
         )
-        print("AuthSession started")
+        # print("AuthSession started")
     except Exception as e:
-        print(f"Error during login: {e}")
+        # print(f"Error during login: {e}")
         raise e
-    print("Starting Worker...")
+    # print("Starting Worker...")
     while True:
         try:
             worker = Steps(
@@ -139,23 +141,29 @@ def cycle(parser: parser.Parser, config: dict):
 def run(worker_steps: Steps):
     job_id = None
     try:
-        print("Leasing a job...")
+        # print("Leasing a job...")
         job = worker_steps.lease_job()
-        file_id = job["entityId"]
+        if job is None:
+            # print("No job available")
+            sleep(1)
+            return
+
         job_id = job["id"]
         if job_id is None:
-            print("No job available")
+            # print("No job available")
             sleep(1)
             return
         print("Job leased")
+        file_id = job["entityId"]
         print(f"Downloading file {file_id}...")
+        upsert = job["entityId"] == "update"
         raw_data = worker_steps.fetch_file(file_id)
         print("File downloaded")
         print("Parsing...")
         parsed = worker_steps.parser.parse(raw_data)
         print("Parsing complete")
         print("Ingesting text...")
-        worker_steps.ingest(file_id, parsed)
+        worker_steps.ingest(file_id, parsed, upsert)
         print("Ingestion complete")
         print(f"Marking job {job_id} as done.")
         worker_steps.mark_done(job_id)
@@ -164,5 +172,5 @@ def run(worker_steps: Steps):
     except Exception as e:
         print(f"ERROR: {e}")
         if job_id is not None:
-            print(f"marking job {job_id} as failed.")
+            # print(f"marking job {job_id} as failed.")
             worker_steps.mark_failed(job_id)

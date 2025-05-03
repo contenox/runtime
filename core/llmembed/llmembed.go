@@ -67,10 +67,12 @@ func (e *embedder) GetProvider(ctx context.Context) (modelprovider.Provider, err
 	if err != nil {
 		return nil, fmt.Errorf("unexpected error: %v", err)
 	}
-	poolID := e.pool.ID
-	backends, err := store.New(e.dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, poolID)
+	if len(providers) == 0 {
+		return nil, errors.New("no providers found")
+	}
+	backends, err := store.New(e.dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, serverops.EmbedPoolID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list backends: %v", err)
 	}
 	backendsConv := map[string]struct{}{}
 	for _, provider := range providers {

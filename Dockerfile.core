@@ -15,6 +15,7 @@ RUN go mod tidy && go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/cate .
 FROM alpine:3.19
+RUN apk add --no-cache curl # for healthcheck
 WORKDIR /app
 COPY --from=builder /app/cate /app/cate
 

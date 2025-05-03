@@ -19,10 +19,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 1s
+      timeout: 1s
+      retries: 20
   tokenizer:
     build:
       context: ./
@@ -73,7 +73,7 @@ services:
       dockerfile: Dockerfile.worker
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     environment:
       API_BASE_URL: http://backend:8080/api
       WORKER_TYPE: plaintext

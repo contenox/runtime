@@ -33,7 +33,7 @@ type Config struct {
 	UIBaseURL           string `json:"ui_base_url"`
 	TokenizerServiceURL string `json:"tokenizer_service_url"`
 	EmbedModel          string `json:"embed_model"`
-	VectorStoreURL      string `json:"vector_service_url"`
+	VectorStoreURL      string `json:"vector_store_url"`
 	WorkerUserAccountID string `json:"worker_user_account_id"`
 	WorkerUserPassword  string `json:"worker_user_password"`
 	WorkerUserEmail     string `json:"worker_user_email"`
@@ -123,6 +123,10 @@ func ValidateConfig(cfg *Config) error {
 	}
 	if cfg.WorkerUserAccountID == "" {
 		return fmt.Errorf("missing required configuration: worker_user_account_id")
+	}
+
+	if cfg.VectorStoreURL == "" {
+		return fmt.Errorf("missing required configuration: vector_store_url")
 	}
 
 	return nil

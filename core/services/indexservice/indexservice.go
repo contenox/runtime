@@ -3,6 +3,7 @@ package indexservice
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/js402/cate/core/llmembed"
 	"github.com/js402/cate/core/llmresolver"
@@ -23,8 +24,9 @@ func New(ctx context.Context, embedder llmembed.Embedder, vectors vectors.Store)
 }
 
 type IndexRequest struct {
-	Text string `json:"text"`
-	ID   string `json:"id"`
+	Text    string `json:"text"`
+	ID      string `json:"id"`
+	Replace bool   `json:"replace"`
 }
 
 type IndexResponse struct {
@@ -34,32 +36,42 @@ type IndexResponse struct {
 func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
 	provider, err := s.embedder.GetProvider(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
 	embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
 		ModelName: provider.ModelName(),
 	}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve embed client: %w", err)
 	}
 	if embedClient == nil {
 		return nil, errors.New("embed client is nil")
 	}
 	vectorData, err := embedClient.Embed(ctx, request.Text)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to embed text: %w", err)
 	}
 	vectorData32 := make([]float32, len(vectorData))
 	// Iterate and cast each element
 	for i, v := range vectorData {
 		vectorData32[i] = float32(v)
 	}
-	err = s.vectors.Insert(ctx, vectors.Vector{
+	v := vectors.Vector{
 		ID:   request.ID,
 		Data: vectorData32,
-	})
+	}
+	if request.Replace {
+		err = s.vectors.Upsert(ctx, v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upsert vector: %w", err)
+		}
+		return &IndexResponse{
+			ID: request.ID,
+		}, nil
+	}
+	err = s.vectors.Insert(ctx, v)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to insert vector: %w", err)
 	}
 	return &IndexResponse{
 		ID: request.ID,
