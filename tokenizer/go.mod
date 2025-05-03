@@ -6,6 +6,7 @@ replace github.com/js402/cate/core => ../core
 
 replace (
 	github.com/js402/cate/libs/libauth => ../libs/libauth
+	github.com/js402/cate/libs/libcipher => ../libs/libcipher
 	github.com/js402/cate/libs/libdb => ../libs/libdb
 )
 
@@ -15,7 +16,7 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303
 require (
 	github.com/js402/cate/core v0.0.0-00010101000000-000000000000
 	github.com/js402/cate/libs/libollama v0.0.0-20250415134247-d9ea7c0520f3
-	google.golang.org/grpc v1.71.1
+	google.golang.org/grpc v1.72.0
 )
 
 require (
@@ -61,6 +62,7 @@ require (
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/js402/cate/libs/libauth v0.0.0-00010101000000-000000000000 // indirect
+	github.com/js402/cate/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
 	github.com/js402/cate/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
@@ -80,7 +82,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nlpodyssey/gopickle v0.3.0 // indirect
-	github.com/ollama/ollama v0.6.5 // indirect
+	github.com/ollama/ollama v0.6.7 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pdevine/tensor v0.0.0-20240510204454-f88f4562727c // indirect
@@ -91,7 +93,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
-	github.com/testcontainers/testcontainers-go v0.36.0 // indirect
+	github.com/testcontainers/testcontainers-go v0.37.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
@@ -110,14 +112,14 @@ require (
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
 	golang.org/x/image v0.22.0 // indirect
-	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorgonia.org/vecf32 v0.9.0 // indirect
 	gorgonia.org/vecf64 v0.9.0 // indirect
