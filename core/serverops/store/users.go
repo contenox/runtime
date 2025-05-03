@@ -85,7 +85,7 @@ func (s *store) GetUserByEmail(ctx context.Context, email string) (*User, error)
 		return nil, libdb.ErrNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to get user by email", err)
+		return nil, fmt.Errorf("%w: failed to get user by email: %s", err, email)
 	}
 	return &user, nil
 }

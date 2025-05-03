@@ -71,12 +71,14 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.worker
+    depends_on:
+      backend:
+        condition: service_started
     environment:
-      API_BASE_URL: http://backend:8080
+      API_BASE_URL: http://backend:8080/api
       WORKER_TYPE: plaintext
-      WORKER_USER_EMAIL: worker@example.com
-      WORKER_USER_PASSWORD: workerpassword
-      WORKER_USER_ACCOUNT_ID: worker@example.com
+      WORKER_EMAIL: worker@example.com
+      WORKER_PASSWORD: workerpassword
       WORKER_LEASER_ID: Text Worker 1
       WORKER_LEASE_DURATION_SECONDS: 30
       WORKER_REQUEST_TIMEOUT_SECONDS: 2

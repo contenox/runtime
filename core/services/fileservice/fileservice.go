@@ -191,7 +191,12 @@ func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), id, store.PermissionView); err != nil {
+
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
+		Resource:           id,
+		RequiredPermission: store.PermissionView,
+		ResourceType:       "files",
+	}); err != nil {
 		return nil, fmt.Errorf("failed to authorize resource: %w", err)
 	}
 	resFile, err := s.getFileByID(ctx, tx, id)
@@ -292,7 +297,11 @@ func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), existing.ID, store.PermissionEdit); err != nil {
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
+		Resource:           existing.ID,
+		ResourceType:       "files",
+		RequiredPermission: store.PermissionEdit,
+	}); err != nil {
 		return nil, err
 	}
 	blobID := existing.BlobsID
@@ -359,7 +368,11 @@ func (s *service) DeleteFile(ctx context.Context, id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get file: %w", err)
 	}
-	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), file.ID, store.PermissionManage); err != nil {
+	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
+		ResourceType:       "files",
+		Resource:           file.ID,
+		RequiredPermission: store.PermissionManage,
+	}); err != nil {
 		return err
 	}
 	// Delete associated blob.
@@ -479,7 +492,11 @@ func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 	}
 	storeInstance := store.New(tx)
 
-	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, fileID, store.PermissionEdit); err != nil {
+	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+		ResourceType:       "files",
+		Resource:           fileID,
+		RequiredPermission: store.PermissionEdit,
+	}); err != nil {
 		return nil, err
 	}
 	fileRecord, err := storeInstance.GetFileByID(ctx, fileID)

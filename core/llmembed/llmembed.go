@@ -162,10 +162,14 @@ func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exe
 	if err != nil {
 		return err
 	}
-	entry, _ := storeInstance.GetAccessEntriesByIdentity(ctx, config.WorkerUserAccountID)
-	if entry != nil {
+	entries, err := storeInstance.GetAccessEntriesByIdentity(ctx, config.WorkerUserAccountID)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 0 {
 		return nil
 	}
+
 	err = storeInstance.CreateUser(ctx, &store.User{
 		Email:          config.WorkerUserEmail,
 		ID:             config.WorkerUserAccountID,
@@ -180,8 +184,17 @@ func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exe
 	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
 		ID:         config.WorkerUserAccountID,
 		Identity:   config.WorkerUserAccountID,
-		Resource:   serverops.DefaultServerGroup, // TODO: reduce to minimal privilege
-		Permission: store.PermissionManage,       // TODO: reduce
+		Resource:   serverops.DefaultServerGroup, // TODO: reduce privilege
+		Permission: store.PermissionManage,
+	})
+	if err != nil {
+		return err
+	}
+	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
+		ID:         config.WorkerUserAccountID,
+		Identity:   config.WorkerUserAccountID,
+		Resource:   "files",
+		Permission: store.PermissionView,
 	})
 	if err != nil {
 		return err

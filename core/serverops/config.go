@@ -115,5 +115,15 @@ func ValidateConfig(cfg *Config) error {
 		return fmt.Errorf("invalid configuration: security_enabled must be 'true' or 'false'")
 	}
 
+	if cfg.WorkerUserEmail == "" {
+		return fmt.Errorf("missing required configuration: worker_user_email")
+	}
+	if cfg.WorkerUserPassword == "" {
+		return fmt.Errorf("missing required configuration: worker_user_password")
+	}
+	if cfg.WorkerUserAccountID == "" {
+		return fmt.Errorf("missing required configuration: worker_user_account_id")
+	}
+
 	return nil
 }

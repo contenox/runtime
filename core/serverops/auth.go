@@ -26,8 +26,14 @@ func accessListFromStore(ctx context.Context, storeInstance store.Store, identit
 	return al, nil
 }
 
+type ResourceArgs struct {
+	ResourceType       string
+	Resource           string
+	RequiredPermission store.Permission
+}
+
 // CheckResourceAuthorization checks if the user has the required permission for a given resource.
-func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, resource string, requiredPermission store.Permission) error {
+func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, args ResourceArgs) error {
 	if instance := GetManagerInstance(); instance == nil {
 		return fmt.Errorf("BUG: Service Manager was not initialized")
 	}
@@ -36,12 +42,22 @@ func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, 
 		if err != nil {
 			return fmt.Errorf("unauthorized: failed to get user identity: %w", err)
 		}
-		authorized, err := checkAuth(ctx, identity, resource, requiredPermission, instance.GetSecret(), storeInstance)
-		if err != nil {
-			return err
+		tryAuth := []string{
+			args.ResourceType,
+			args.Resource,
+		}
+		authorized := false
+		for _, v := range tryAuth {
+			authorized, err = checkAuth(ctx, identity, v, args.RequiredPermission, instance.GetSecret(), storeInstance)
+			if err != nil {
+				return err
+			}
+			if authorized {
+				break
+			}
 		}
 		if !authorized {
-			return fmt.Errorf("unauthorized: user lacks permission %v for resource %s", requiredPermission, resource)
+			return fmt.Errorf("unauthorized: user %s lacks permission %v for resource %s type %s", identity, args.RequiredPermission, args.Resource, args.ResourceType)
 		}
 	}
 	return nil
