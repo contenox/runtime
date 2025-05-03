@@ -182,7 +182,7 @@ func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exe
 		return err
 	}
 	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
-		ID:         config.WorkerUserAccountID,
+		ID:         config.WorkerUserAccountID + "1",
 		Identity:   config.WorkerUserAccountID,
 		Resource:   serverops.DefaultServerGroup, // TODO: reduce privilege
 		Permission: store.PermissionManage,
@@ -191,7 +191,7 @@ func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exe
 		return err
 	}
 	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
-		ID:         config.WorkerUserAccountID,
+		ID:         config.WorkerUserAccountID + "2",
 		Identity:   config.WorkerUserAccountID,
 		Resource:   "files",
 		Permission: store.PermissionView,

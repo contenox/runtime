@@ -7,7 +7,7 @@ import {
   usePoolsForBackend,
   useRemoveBackendFromPool,
 } from '../../../../hooks/usePool';
-import { Backend, DownloadStatus } from '../../../../lib/types';
+import { Backend, DownloadStatus, Pool } from '../../../../lib/types';
 import { ModelStatusDisplay } from './ModelStatusDisplay';
 
 type BackendCardProps = {
@@ -22,7 +22,7 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
   const [deletingBackendId, setDeletingBackendId] = useState<string | null>(null);
 
   const { data: pools } = usePools();
-  const { data: backendPools } = usePoolsForBackend(backend.id);
+  const { data: backendPools = [] } = usePoolsForBackend(backend.id);
   const assignMutation = useAssignBackendToPool();
   const removeMutation = useRemoveBackendFromPool();
 
@@ -45,14 +45,17 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
   };
 
   const handleAssignPool = (poolId: string) => {
-    if (!poolId) return;
-
     setSelectedPoolToAssign(poolId);
     assignMutation.mutate(
       { poolID: poolId, backendID: backend.id },
       {
-        onSuccess: () => setSelectedPoolToAssign(''),
-        onError: () => setSelectedPoolToAssign(''),
+        onSuccess: () => {
+          setSelectedPoolToAssign('');
+        },
+        onError: error => {
+          console.error('Assign mutation failed for poolId:', poolId, 'Error:', error);
+          setSelectedPoolToAssign('');
+        },
       },
     );
   };
@@ -65,6 +68,8 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
     const key = `${baseUrl}:${modelName}`;
     return statusMap[key];
   };
+
+  const poolOptions = pools?.map((pool: Pool) => ({ value: pool.id, label: pool.name })) || [];
 
   return (
     <Section title={backend.name} key={backend.id}>
@@ -84,9 +89,9 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
 
       <div className="mt-4">
         <label className="block text-sm font-medium">{t('backends.assigned_pools')}</label>
-        {backendPools && backendPools.length > 0 ? (
+        {backendPools?.length > 0 ? (
           <ul className="list-inside list-disc pl-2">
-            {backendPools.map(pool => (
+            {backendPools.map((pool: Pool) => (
               <li key={pool.id} className="flex items-center justify-between py-1">
                 <span>{pool.name}</span>
                 <Button
@@ -112,10 +117,12 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
           id={`assign-${backend.id}`}
           className="flex-grow rounded border px-2 py-1 text-sm"
           value={selectedPoolToAssign}
-          onChange={e => handleAssignPool(e.target.value)}
-          disabled={assignMutation.isPending || !pools?.length}
-          defaultValue={t('backends.select_pool')}
-          options={pools.map(pool => ({ value: pool.id, label: pool.name }))}
+          onChange={e => {
+            handleAssignPool(e.target.value);
+          }}
+          disabled={assignMutation.isPending || !poolOptions.length}
+          placeholder={t('backends.select_pool')}
+          options={poolOptions}
         />
         {assignMutation.isPending && <Spinner size="sm" />}
       </div>
