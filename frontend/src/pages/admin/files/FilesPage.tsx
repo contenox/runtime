@@ -14,7 +14,7 @@ import {
   TableCell,
   TableRow,
 } from '@cate/ui';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateFile, useDeleteFile, useListFiles } from '../../../hooks/useFiles';
 import { api } from '../../../lib/api';
@@ -33,14 +33,31 @@ export default function FilesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadPath, setUploadPath] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | undefined>(undefined);
+  const [deleteError, setDeleteError] = useState<string | undefined>(undefined);
 
   const { data: files, isLoading: isLoadingFiles, error: filesError } = useListFiles();
   const createFileMutation = useCreateFile();
   const deleteFileMutation = useDeleteFile();
 
+  useEffect(() => {
+    if (uploadError) {
+      const timer = setTimeout(() => setUploadError(undefined), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [uploadError]);
+
+  useEffect(() => {
+    if (deleteError) {
+      const timer = setTimeout(() => setDeleteError(undefined), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [deleteError]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setSelectedFile(file || null);
+    setUploadError(undefined);
     if (file && !uploadPath) {
       setUploadPath(file.name);
     }
@@ -54,19 +71,29 @@ export default function FilesPage() {
     formData.append('file', selectedFile);
     formData.append('path', uploadPath);
 
+    setUploadError(undefined);
     createFileMutation.mutate(formData, {
       onSuccess: () => {
         setSelectedFile(null);
         setUploadPath('');
       },
+      onError: error => {
+        const message = error.message || t('errors.generic_upload');
+        setUploadError(message);
+      },
     });
   };
 
   const handleDeleteClick = (id: string) => {
+    setDeleteError(undefined);
     setDeletingId(id);
     deleteFileMutation.mutate(id, {
       onSettled: () => {
         setDeletingId(null);
+      },
+      onError: error => {
+        const message = error.message || t('errors.generic_delete');
+        setDeleteError(message);
       },
     });
   };
@@ -131,6 +158,11 @@ export default function FilesPage() {
     <GridLayout variant="body">
       <Section className="overflow-hidden">
         <H2 className="mb-4">{t('files.list_title')}</H2>
+        {deleteError && (
+          <Panel variant="error" className="mb-4">
+            {deleteError}
+          </Panel>
+        )}
         <Scrollable orientation="vertical">{renderFileList()}</Scrollable>
       </Section>
 
@@ -138,11 +170,7 @@ export default function FilesPage() {
         <Form
           title={t('files.upload_title')}
           onSubmit={handleUploadSubmit}
-          error={
-            createFileMutation.isError
-              ? createFileMutation.error?.message || t('errors.generic_upload')
-              : undefined
-          }
+          error={uploadError}
           actions={
             <Button
               type="submit"

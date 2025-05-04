@@ -80,6 +80,7 @@ const resources = {
         unknown: 'An unexpected error occurred',
         timeout: 'A timeout error occurred',
         invalidResponse: 'Bad response',
+        generic_delete: 'Failed to delete data',
         generic_fetch: 'Failed to fetch data',
         generic_upload: 'Failed to upload data',
       },
