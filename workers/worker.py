@@ -136,7 +136,20 @@ def cycle(parser: parser.Parser, config: dict):
             )
             run(worker)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Error in cycle: {e}")
+            error_str = str(e).lower()
+            if ("400" in error_str or "401" in error_str) and "token is expired" in error_str:
+                print("Authentication token likely expired. Attempting to re-login...")
+                session = AuthSession(
+                    base_url=config["base_url"],
+                    email=config["email"],
+                    password=config["password"],
+                )
+                sleep(5)
+            else:
+                print("An unexpected error occurred. Sleeping before retry...")
+                sleep(30)
+
 
 def run(worker_steps: Steps):
     job_id = None

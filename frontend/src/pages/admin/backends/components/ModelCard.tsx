@@ -1,4 +1,4 @@
-import { Button, P, Section, Select, Spinner } from '@cate/ui';
+import { Button, Label, P, Section, Select, Spinner } from '@cate/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import {
@@ -25,15 +25,16 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
   const assignMutation = useAssignModelToPool();
   const removeMutation = useRemoveModelFromPool();
 
-  const handleAssign = (poolID: string) => {
-    if (!poolID) return;
-
-    setSelectedPoolToAssign(poolID);
+  const handleAssign = (poolId: string) => {
+    setSelectedPoolToAssign(poolId);
     assignMutation.mutate(
-      { poolID, modelID: model.id },
+      { poolID: poolId, modelID: model.id },
       {
         onSuccess: () => {
           setSelectedPoolToAssign('');
+        },
+        onError: error => {
+          console.error('Assign mutation failed for poolId:', poolId, 'Error:', error);
         },
       },
     );
@@ -98,15 +99,15 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
         )}
       </div>
       <div className="flex items-center gap-2 border-t pt-4">
-        <label htmlFor={`assign-${model.id}`} className="text-sm font-medium">
+        <Label htmlFor={`assign-${model.id}`} className="text-sm font-medium">
           {t('model.assign_to_pool')}
-        </label>
+        </Label>
         <Select
           id={`assign-${model.id}`}
           className="flex-grow rounded border px-2 py-1 text-sm"
           value={selectedPoolToAssign}
           onChange={e => handleAssign(e.target.value)}
-          defaultValue={t('model.select_pool_to_assign')}
+          placeholder={t('model.select_pool_to_assign')}
           disabled={assignMutation.isPending || allPools.length === 0}
           options={allPools.map(pool => ({ value: pool.id, label: pool.name }))}></Select>
         {assignMutation.isPending && <Spinner size="sm" />}

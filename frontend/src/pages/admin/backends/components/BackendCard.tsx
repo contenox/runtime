@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, P, Section, Select, Spinner } from '@cate/ui';
+import { Button, ButtonGroup, Label, P, Section, Select, Spinner } from '@cate/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -83,12 +83,12 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
           key={model}
           modelName={model}
           downloadStatus={getDownloadStatusForModel(statusMap, backend.baseUrl, model)}
-          isPulled={false}
+          isPulled={backend.pulledModels.some(pulledModel => pulledModel.name === model)}
         />
       ))}
 
       <div className="mt-4">
-        <label className="block text-sm font-medium">{t('backends.assigned_pools')}</label>
+        <Label className="block text-sm font-medium">{t('backends.assigned_pools')}</Label>
         {backendPools?.length > 0 ? (
           <ul className="list-inside list-disc pl-2">
             {backendPools.map((pool: Pool) => (
@@ -110,9 +110,9 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
       </div>
 
       <div className="flex items-center gap-2 border-t pt-4">
-        <label htmlFor={`assign-${backend.id}`} className="text-sm font-medium">
+        <Label htmlFor={`assign-${backend.id}`} className="text-sm font-medium">
           {t('backends.assign_to_pool')}
-        </label>
+        </Label>
         <Select
           id={`assign-${backend.id}`}
           className="flex-grow rounded border px-2 py-1 text-sm"
