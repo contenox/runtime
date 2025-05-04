@@ -1,5 +1,5 @@
-import { Button, ButtonGroup, Label, P, Section, Select, Spinner } from '@cate/ui';
-import { useState } from 'react';
+import { Button, ButtonGroup, Label, P, Panel, Section, Select, Spinner } from '@cate/ui';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useAssignBackendToPool,
@@ -20,6 +20,8 @@ type BackendCardProps = {
 export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCardProps) {
   const { t } = useTranslation();
   const [deletingBackendId, setDeletingBackendId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const { data: pools } = usePools();
   const { data: backendPools = [] } = usePoolsForBackend(backend.id);
@@ -27,6 +29,20 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
   const removeMutation = useRemoveBackendFromPool();
 
   const [selectedPoolToAssign, setSelectedPoolToAssign] = useState('');
+
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   const isRemovingPool = (poolId: string) =>
     removeMutation.isPending && removeMutation.variables?.poolID === poolId;
@@ -41,7 +57,17 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
   };
 
   const handleRemovePool = (poolID: string) => {
-    removeMutation.mutate({ poolID, backendID: backend.id });
+    removeMutation.mutate(
+      { poolID, backendID: backend.id },
+      {
+        onSuccess: () => {
+          setSuccessMessage(t('backends.pool_removed_success'));
+        },
+        onError: error => {
+          setErrorMessage(error.message || t('backends.pool_remove_error'));
+        },
+      },
+    );
   };
 
   const handleAssignPool = (poolId: string) => {
@@ -51,10 +77,12 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
       {
         onSuccess: () => {
           setSelectedPoolToAssign('');
+          setSuccessMessage(t('backends.pool_assigned_success'));
         },
         onError: error => {
-          console.error('Assign mutation failed for poolId:', poolId, 'Error:', error);
+          console.error('Assign mutation failed:', error);
           setSelectedPoolToAssign('');
+          setErrorMessage(error.message || t('backends.pool_assign_error'));
         },
       },
     );
@@ -108,6 +136,18 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
           <P variant="muted">{t('backends.not_assigned_to_any_pools')}</P>
         )}
       </div>
+
+      {errorMessage && (
+        <Panel variant="error" className="mt-4">
+          {errorMessage}
+        </Panel>
+      )}
+
+      {successMessage && (
+        <Panel variant="flat" className="mt-4">
+          {successMessage}
+        </Panel>
+      )}
 
       <div className="flex items-center gap-2 border-t pt-4">
         <Label htmlFor={`assign-${backend.id}`} className="text-sm font-medium">

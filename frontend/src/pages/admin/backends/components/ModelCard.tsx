@@ -1,6 +1,6 @@
-import { Button, Label, P, Section, Select, Spinner } from '@cate/ui';
+import { Button, Label, P, Panel, Section, Select, Spinner } from '@cate/ui';
 import { t } from 'i18next';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   useAssignModelToPool,
   usePools,
@@ -17,13 +17,29 @@ type ModelCardProps = {
 
 export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
   const [selectedPoolToAssign, setSelectedPoolToAssign] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const { data: allPools } = usePools();
-
   const { data: associatedPools, isLoading: isLoadingAssociated } = usePoolsForModel(model.id);
-
   const assignMutation = useAssignModelToPool();
   const removeMutation = useRemoveModelFromPool();
+
+  const poolOptions = allPools?.map(pool => ({ value: pool.id, label: pool.name })) || [];
+
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   const handleAssign = (poolId: string) => {
     setSelectedPoolToAssign(poolId);
@@ -32,16 +48,25 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
       {
         onSuccess: () => {
           setSelectedPoolToAssign('');
+          setSuccessMessage(t('model.pool_assigned_success'));
         },
         onError: error => {
-          console.error('Assign mutation failed for poolId:', poolId, 'Error:', error);
+          console.error('Assign mutation failed:', error);
+          setSelectedPoolToAssign('');
+          setErrorMessage(error.message || t('model.pool_assign_error'));
         },
       },
     );
   };
 
   const handleRemove = (poolID: string) => {
-    removeMutation.mutate({ poolID, modelID: model.id });
+    removeMutation.mutate(
+      { poolID, modelID: model.id },
+      {
+        onSuccess: () => setSuccessMessage(t('model.pool_removed_success')),
+        onError: error => setErrorMessage(error.message || t('model.pool_remove_error')),
+      },
+    );
   };
 
   const isRemovingPool = (poolId: string) =>
@@ -75,6 +100,19 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
           {deletePending ? t('common.deleting') : t('translation:model.model_delete')}
         </Button>
       </div>
+
+      {errorMessage && (
+        <Panel variant="error" className="mt-2">
+          {errorMessage}
+        </Panel>
+      )}
+
+      {successMessage && (
+        <Panel variant="flat" className="mt-2">
+          {successMessage}
+        </Panel>
+      )}
+
       <div>
         <P>{t('model.assigned_pools')}</P>
         {isLoadingAssociated ? (
@@ -98,6 +136,7 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
           <P variant="muted">{t('model.not_assigned_to_any_pools')}</P>
         )}
       </div>
+
       <div className="flex items-center gap-2 border-t pt-4">
         <Label htmlFor={`assign-${model.id}`} className="text-sm font-medium">
           {t('model.assign_to_pool')}
@@ -108,8 +147,9 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
           value={selectedPoolToAssign}
           onChange={e => handleAssign(e.target.value)}
           placeholder={t('model.select_pool_to_assign')}
-          disabled={assignMutation.isPending || allPools.length === 0}
-          options={allPools.map(pool => ({ value: pool.id, label: pool.name }))}></Select>
+          disabled={assignMutation.isPending || poolOptions.length === 0}
+          options={poolOptions}
+        />
         {assignMutation.isPending && <Spinner size="sm" />}
       </div>
     </Section>

@@ -30,7 +30,11 @@ export const ChatInterface = ({ chatHistory, isLoading, error, className }: Chat
         </Panel>
       )}
 
-      {error && <Panel variant="error">{t('chat.error_history')}</Panel>}
+      {error && (
+        <Panel variant="error">
+          {error.response?.data?.error || error.message || t('chat.error_history')}
+        </Panel>
+      )}
 
       <div className="flex flex-col gap-4 p-4">
         {chatHistory?.map(message => <ChatMessage key={message.sentAt} message={message} />)}
