@@ -120,6 +120,14 @@ type Blob struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+type ChunkIndex struct {
+	ID           string `json:"id"`
+	VectorID     string `json:"vectorId"`
+	VectorStore  string `json:"vectorStore"`
+	ResourceID   string `json:"resourceId"`
+	ResourceType string `json:"resourceType"`
+}
+
 type Permission int
 
 const (
@@ -272,6 +280,13 @@ type Store interface {
 	CreateMessageIndex(ctx context.Context, id string, identity string) error
 	DeleteMessageIndex(ctx context.Context, id string, identity string) error
 	ListMessageIndices(ctx context.Context, identity string) ([]string, error)
+
+	CreateChunkIndex(ctx context.Context, chunk *ChunkIndex) error
+	GetChunkIndexByID(ctx context.Context, id string) (*ChunkIndex, error)
+	UpdateChunkIndex(ctx context.Context, chunk *ChunkIndex) error
+	DeleteChunkIndex(ctx context.Context, id string) error
+	ListChunkIndicesByVectorID(ctx context.Context, vectorID string) ([]*ChunkIndex, error)
+	ListChunkIndicesByResource(ctx context.Context, resourceID, resourceType string) ([]*ChunkIndex, error)
 }
 
 //go:embed schema.sql

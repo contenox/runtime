@@ -97,6 +97,18 @@ CREATE TABLE IF NOT EXISTS job_queue_v2 (
     created_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS chunks_idx (
+    id VARCHAR(255) PRIMARY KEY,
+    vector_id VARCHAR(255) NOT NULL,
+    vector_store VARCHAR(255) NOT NULL,
+
+    resource_id VARCHAR(255) NOT NULL,
+    resource_type VARCHAR(255) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chunks_idx_vector_id ON chunks_idx USING hash(vector_id);
+
+
 CREATE TABLE IF NOT EXISTS files (
     id VARCHAR(255) PRIMARY KEY,
     path VARCHAR(1024) NOT NULL UNIQUE,
