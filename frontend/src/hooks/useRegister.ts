@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { userKeys } from '../lib/queryKeys';
 import { AuthenticatedUser, User } from '../lib/types';
 
 export function useRegister(
@@ -18,7 +19,7 @@ export function useRegister(
   return useMutation<AuthenticatedUser, Error, Partial<User>>({
     mutationFn: api.register,
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: userKeys.current });
       if (options?.onSuccess) {
         options.onSuccess(data, variables, context);
       } else {

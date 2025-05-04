@@ -1,18 +1,19 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { backendKeys, modelKeys, poolKeys } from '../lib/queryKeys';
 import { Backend, Model, Pool } from '../lib/types';
 
 // Pool CRUD hooks
 export function usePools() {
   return useSuspenseQuery<Pool[]>({
-    queryKey: ['pools'],
+    queryKey: poolKeys.all,
     queryFn: () => api.getPools(),
   });
 }
 
 export function usePool(id: string) {
   return useSuspenseQuery<Pool>({
-    queryKey: ['pools', id],
+    queryKey: poolKeys.detail(id),
     queryFn: () => api.getPool(id),
   });
 }
@@ -22,7 +23,7 @@ export function useCreatePool() {
   return useMutation<Pool, Error, Partial<Pool>>({
     mutationFn: api.createPool,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      queryClient.invalidateQueries({ queryKey: poolKeys.all });
     },
   });
 }
@@ -32,7 +33,7 @@ export function useUpdatePool() {
   return useMutation<Pool, Error, { id: string; data: Partial<Pool> }>({
     mutationFn: ({ id, data }) => api.updatePool(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      queryClient.invalidateQueries({ queryKey: poolKeys.all });
     },
   });
 }
@@ -42,7 +43,7 @@ export function useDeletePool() {
   return useMutation<void, Error, string>({
     mutationFn: api.deletePool,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      queryClient.invalidateQueries({ queryKey: poolKeys.all });
     },
   });
 }
@@ -52,23 +53,24 @@ export function useAssignBackendToPool() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { poolID: string; backendID: string }>({
     mutationFn: ({ poolID, backendID }) => api.assignBackendToPool(poolID, backendID),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'backends'] });
-      queryClient.invalidateQueries({ queryKey: ['backends', variables.backendID, 'pools'] });
+    onSuccess: (_, { poolID, backendID }) => {
+      queryClient.invalidateQueries({ queryKey: backendKeys.pools(backendID) });
+      queryClient.invalidateQueries({ queryKey: poolKeys.backends(poolID) });
+      queryClient.invalidateQueries({ queryKey: backendKeys.all });
     },
   });
 }
 
 export function useBackendsForPool(poolID: string) {
   return useSuspenseQuery<Backend[]>({
-    queryKey: ['pools', poolID, 'backends'],
+    queryKey: poolKeys.backends(poolID),
     queryFn: () => api.listBackendsForPool(poolID),
   });
 }
 
 export function usePoolsForBackend(backendID: string) {
   return useSuspenseQuery<Pool[]>({
-    queryKey: ['backends', backendID, 'pools'],
+    queryKey: backendKeys.pools(backendID),
     queryFn: () => api.listPoolsForBackend(backendID),
   });
 }
@@ -77,16 +79,16 @@ export function useAssignModelToPool() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { poolID: string; modelID: string }>({
     mutationFn: ({ poolID, modelID }) => api.assignModelToPool(poolID, modelID),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'models'] });
-      queryClient.invalidateQueries({ queryKey: ['models', variables.modelID, 'pools'] });
+    onSuccess: (_, { poolID, modelID }) => {
+      queryClient.invalidateQueries({ queryKey: poolKeys.models(poolID) });
+      queryClient.invalidateQueries({ queryKey: modelKeys.pools(modelID) });
     },
   });
 }
 
 export function useModelsForPool(poolID: string) {
   return useSuspenseQuery<Model[]>({
-    queryKey: ['pools', poolID, 'models'],
+    queryKey: poolKeys.models(poolID),
     queryFn: () => api.listModelsForPool(poolID),
   });
 }
@@ -94,14 +96,14 @@ export function useModelsForPool(poolID: string) {
 // Additional utility hooks
 export function usePoolsByPurpose(purpose: string) {
   return useSuspenseQuery<Pool[]>({
-    queryKey: ['pools', 'purpose', purpose],
+    queryKey: poolKeys.byPurpose(purpose),
     queryFn: () => api.listPoolsByPurpose(purpose),
   });
 }
 
 export function usePoolByName(name: string) {
   return useSuspenseQuery<Pool>({
-    queryKey: ['pools', 'name', name],
+    queryKey: poolKeys.byName(name),
     queryFn: () => api.getPoolByName(name),
   });
 }
@@ -110,25 +112,27 @@ export function useRemoveBackendFromPool() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { poolID: string; backendID: string }>({
     mutationFn: ({ poolID, backendID }) => api.removeBackendFromPool(poolID, backendID),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'backends'] });
-      queryClient.invalidateQueries({ queryKey: ['backends', variables.backendID, 'pools'] });
+    onSuccess: (_, { poolID, backendID }) => {
+      queryClient.invalidateQueries({ queryKey: poolKeys.backends(poolID) });
+      queryClient.invalidateQueries({ queryKey: backendKeys.pools(backendID) });
     },
   });
 }
+
 export function useRemoveModelFromPool() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { poolID: string; modelID: string }>({
     mutationFn: ({ poolID, modelID }) => api.removeModelFromPool(poolID, modelID),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['pools', variables.poolID, 'models'] });
-      queryClient.invalidateQueries({ queryKey: ['models', variables.modelID, 'pools'] });
+    onSuccess: (_, { poolID, modelID }) => {
+      queryClient.invalidateQueries({ queryKey: poolKeys.models(poolID) });
+      queryClient.invalidateQueries({ queryKey: modelKeys.pools(modelID) });
     },
   });
 }
+
 export function usePoolsForModel(modelID: string) {
   return useSuspenseQuery<Pool[]>({
-    queryKey: ['models', modelID, 'pools'],
+    queryKey: modelKeys.pools(modelID),
     queryFn: () => api.listPoolsForModel(modelID),
   });
 }

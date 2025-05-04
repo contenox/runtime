@@ -1,5 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { searchKeys } from '../lib/queryKeys';
 import { SearchResponse } from '../lib/types';
 
 export function useSearch(
@@ -9,7 +10,7 @@ export function useSearch(
   epsilon?: number,
 ): UseQueryResult<SearchResponse, Error> {
   return useQuery({
-    queryKey: ['search', query, topk, radius, epsilon],
+    queryKey: searchKeys.all(query, topk, radius, epsilon),
     queryFn: () => api.searchFiles(query, topk, radius, epsilon),
   });
 }

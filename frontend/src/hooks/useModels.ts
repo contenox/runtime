@@ -5,11 +5,12 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { modelKeys } from '../lib/queryKeys';
 import { Model } from '../lib/types';
 
 export function useModels() {
   return useSuspenseQuery<Model[]>({
-    queryKey: ['models'],
+    queryKey: modelKeys.all,
     queryFn: api.getModels,
   });
 }
@@ -19,7 +20,7 @@ export function useCreateModel(): UseMutationResult<Model, Error, string, unknow
   return useMutation<Model, Error, string>({
     mutationFn: api.createModel,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['models'] });
+      queryClient.invalidateQueries({ queryKey: modelKeys.all });
     },
   });
 }
@@ -29,7 +30,7 @@ export function useDeleteModel(): UseMutationResult<void, Error, string, unknown
   return useMutation<void, Error, string>({
     mutationFn: api.deleteModel,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['models'] });
+      queryClient.invalidateQueries({ queryKey: modelKeys.all });
     },
   });
 }
@@ -39,7 +40,7 @@ export function useRemoveModelFromQueue(): UseMutationResult<void, Error, string
   return useMutation<void, Error, string>({
     mutationFn: api.removeModelFromQueue,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['state'] });
+      queryClient.invalidateQueries({ queryKey: stateKeys.all });
     },
   });
 }

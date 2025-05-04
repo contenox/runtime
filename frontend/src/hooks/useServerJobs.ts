@@ -1,11 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { jobKeys } from '../lib/queryKeys';
 import { InProgressJob, PendingJob } from '../lib/types';
-
-const jobKeys = {
-  pending: 'pending',
-  inprogress: 'inprogress',
-};
 
 export function usePendingJobs(cursor?: Date) {
   return useQuery<PendingJob[]>({

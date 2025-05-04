@@ -5,11 +5,12 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { jobKeys } from '../lib/queryKeys';
 import { Job } from '../lib/types';
 
 export function useQueue() {
   return useSuspenseQuery<Job[] | null>({
-    queryKey: ['jobs'],
+    queryKey: jobKeys.all,
     queryFn: api.getQueue,
   });
 }
@@ -19,7 +20,7 @@ export function useDeleteQueueEntry(): UseMutationResult<void, Error, string, un
   return useMutation<void, Error, string>({
     mutationFn: api.deleteQueueEntry,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
     },
   });
 }

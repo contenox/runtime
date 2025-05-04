@@ -6,22 +6,8 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
+import { fileKeys, folderKeys } from '../lib/queryKeys';
 import { FileResponse, FolderResponse } from '../lib/types';
-
-const folderKeys = {
-  all: ['folders'] as const,
-  lists: () => [...folderKeys.all, 'list'] as const,
-  details: () => [...folderKeys.all, 'detail'] as const,
-  detail: (id: string) => [...folderKeys.details(), id] as const,
-};
-
-const fileKeys = {
-  all: ['files'] as const,
-  lists: () => [...fileKeys.all, 'list'] as const,
-  details: () => [...fileKeys.all, 'detail'] as const,
-  detail: (id: string) => [...fileKeys.details(), id] as const,
-  paths: () => [...fileKeys.all, 'paths'] as const,
-};
 
 export function useFileMetadata(id: string): UseQueryResult<FileResponse, Error> {
   return useQuery<FileResponse, Error>({
