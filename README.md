@@ -51,7 +51,7 @@ cate is in **active development**, while end-to-end features are still being ref
 * [x] **LLM Resolver:** Improving the logic (`llmresolver`) for selecting the optimal backend instance and model for requests, via a scoring system and routing policies.
 * [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
 * [x] **Fixing wiring:** Ensuring previously built features are fully integrated and functional E2E.
-* [ ] **Cleaning:** Fix failing tests and get a basic CI running.
+* [x] **Cleaning:** Fix failing tests and get a basic CI running.
 
 ---
 Notes from the devslice:
