@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '../lib/types';
 
 export function useMe() {
   return useQuery<AuthenticatedUser>({
-    queryKey: userKeys.current,
+    queryKey: userKeys.current(),
     queryFn: api.getCurrentUser,
   });
 }

@@ -33,7 +33,7 @@ export function useUpdateUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
-      queryClient.invalidateQueries({ queryKey: userKeys.current });
+      queryClient.invalidateQueries({ queryKey: userKeys.current() });
       queryClient.invalidateQueries({ queryKey: accessKeys.all });
     },
   });
@@ -45,7 +45,7 @@ export function useDeleteUser(): UseMutationResult<void, Error, string, unknown>
     mutationFn: api.deleteUser,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
-      queryClient.invalidateQueries({ queryKey: userKeys.current });
+      queryClient.invalidateQueries({ queryKey: userKeys.current() });
       queryClient.invalidateQueries({ queryKey: accessKeys.all });
     },
   });

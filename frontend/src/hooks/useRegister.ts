@@ -19,7 +19,7 @@ export function useRegister(
   return useMutation<AuthenticatedUser, Error, Partial<User>>({
     mutationFn: api.register,
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: userKeys.current });
+      queryClient.invalidateQueries({ queryKey: userKeys.current() });
       if (options?.onSuccess) {
         options.onSuccess(data, variables, context);
       } else {

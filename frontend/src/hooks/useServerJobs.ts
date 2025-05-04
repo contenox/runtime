@@ -5,14 +5,14 @@ import { InProgressJob, PendingJob } from '../lib/types';
 
 export function usePendingJobs(cursor?: Date) {
   return useQuery<PendingJob[]>({
-    queryKey: [...jobKeys.pending, { cursor }],
+    queryKey: [...jobKeys.pending(), { cursor }],
     queryFn: () => api.listPendingJobs(cursor?.toISOString()),
   });
 }
 
 export function useInProgressJobs(cursor?: Date) {
   return useQuery<InProgressJob[]>({
-    queryKey: [...jobKeys.inprogress, { cursor }],
+    queryKey: [...jobKeys.inprogress(), { cursor }],
     queryFn: () => api.listInProgressJobs(cursor?.toISOString()),
   });
 }

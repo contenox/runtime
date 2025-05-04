@@ -19,7 +19,7 @@ export function useLogin(
   return useMutation<AuthenticatedUser, Error, Partial<User>, unknown>({
     mutationFn: api.login,
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: userKeys.current });
+      queryClient.invalidateQueries({ queryKey: userKeys.current() });
       if (options?.onSuccess) {
         options.onSuccess(data, variables, context);
       } else {

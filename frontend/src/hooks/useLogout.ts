@@ -18,7 +18,7 @@ export function useLogout(
   return useMutation<void, Error, void>({
     mutationFn: api.logout,
     onSuccess: (data, variables, context) => {
-      queryClient.resetQueries({ queryKey: userKeys.current });
+      queryClient.resetQueries({ queryKey: userKeys.current() });
       if (options?.onSuccess) {
         options.onSuccess(data, variables, context);
       } else {
