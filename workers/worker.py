@@ -82,10 +82,10 @@ class Steps:
         if response.status_code != 204:
             raise Exception(f"Failed to mark job failed: {response.status_code} {response.text}")
 
-    def ingest(self, file_id: str, text: str, replace: bool = False):
+    def ingest(self, file_id: str, chunks: list[str], replace: bool = False):
             response = self.session.post(
                 f"{self.base_url}/index",
-                json={"text": text, "id": file_id, "replace": replace},
+                json={"chunks": chunks, "id": file_id, "replace": replace},
             )
             if response.status_code not in [200, 204]:
                 raise Exception(f"Failed to ingest text: {response.status_code} {response.text}")
@@ -175,8 +175,11 @@ def run(worker_steps: Steps):
         print("Parsing...")
         parsed = worker_steps.parser.parse(raw_data)
         print("Parsing complete")
+        print("Chunking...")
+        chunks = worker_steps.parser.chunk(parsed)
+        print("Chunking complete")
         print("Ingesting text...")
-        worker_steps.ingest(file_id, parsed, upsert)
+        worker_steps.ingest(file_id, chunks, upsert)
         print("Ingestion complete")
         print(f"Marking job {job_id} as done.")
         worker_steps.mark_done(job_id)

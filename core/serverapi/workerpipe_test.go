@@ -80,7 +80,7 @@ func TestWorkerPipe(t *testing.T) {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	defer cleanup4()
-	indexService := indexservice.New(ctx, embedder, vectorStore)
+	indexService := indexservice.New(ctx, embedder, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	userService := userservice.New(dbInstance, config)
@@ -237,8 +237,12 @@ func TestWorkerPipe(t *testing.T) {
 		if len(results) != 1 {
 			t.Fatalf("expected 1 result, got %d", len(results))
 		}
-		if results[0].ID != file.ID {
-			t.Fatalf("expected file ID %s, got %s", file.ID, results[0].ID)
+		chunk, err := store.New(dbInstance.WithoutTransaction()).GetChunkIndexByID(ctx, results[0].ID)
+		if err != nil {
+			t.Fatalf("failed to get chunk index by ID: %v", err)
+		}
+		if chunk.ResourceID != file.ID {
+			t.Fatalf("expected file ID %s, got %s", file.ID, chunk.ResourceID)
 		}
 	})
 }

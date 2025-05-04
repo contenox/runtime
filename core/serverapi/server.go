@@ -102,7 +102,7 @@ func New(
 
 	accessService := accessservice.New(dbInstance)
 	usersapi.AddAccessRoutes(mux, config, accessService)
-	indexService := indexservice.New(ctx, embedder, vectorStore)
+	indexService := indexservice.New(ctx, embedder, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
