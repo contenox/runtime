@@ -10,7 +10,7 @@ export function useSearch(
   epsilon?: number,
 ): UseQueryResult<SearchResponse, Error> {
   return useQuery({
-    queryKey: searchKeys.all(query, topk, radius, epsilon),
+    queryKey: searchKeys.query({ query, topk, radius, epsilon }),
     queryFn: () => api.searchFiles(query, topk, radius, epsilon),
   });
 }

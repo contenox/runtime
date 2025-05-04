@@ -21,15 +21,15 @@ export const modelKeys = {
 
 export const stateKeys = {
   all: ['state'] as const,
-  pending: ['state', 'pending'] as const,
-  inProgress: ['state', 'inprogress'] as const,
+  pending: () => [...stateKeys.all, 'pending'],
+  inProgress: () => [...stateKeys.all, 'inprogress'],
 };
 
 export const folderKeys = {
   all: ['folders'] as const,
   lists: () => [...folderKeys.all, 'list'] as const,
   details: () => [...folderKeys.all, 'detail'] as const,
-  detail: (id: string) => [...folderKeys.details(), id] as const,
+  detail: (id: string) => [...fileKeys.details(), id] as const,
 };
 
 export const fileKeys = {
@@ -42,8 +42,8 @@ export const fileKeys = {
 
 export const jobKeys = {
   all: ['jobs'] as const,
-  pending: 'pending',
-  inprogress: 'inprogress',
+  pending: () => [...jobKeys.all, 'pending'],
+  inprogress: () => [...jobKeys.all, 'inprogress'],
 };
 
 export const accessKeys = {
@@ -62,8 +62,8 @@ export const chatKeys = {
 
 export const userKeys = {
   all: ['users'] as const,
-  current: ['user'] as const,
-  list: (from?: string) => [...userKeys.all, from] as const,
+  current: () => [...userKeys.all, 'current'],
+  list: (from?: string) => [...userKeys.all, 'list', { from }] as const,
 };
 
 export const systemKeys = {
@@ -71,8 +71,9 @@ export const systemKeys = {
 };
 
 export const searchKeys = {
-  all: (query: string, topk?: number, radius?: number, epsilon?: number) =>
-    ['search', query, topk, radius, epsilon] as const,
+  all: ['search'] as const,
+  query: (params: { query: string; topk?: number; radius?: number; epsilon?: number }) =>
+    [...searchKeys.all, params] as const,
 };
 
 export const typeKeys = {
