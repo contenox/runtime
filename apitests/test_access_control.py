@@ -12,7 +12,7 @@ def test_assign_manage_permission(base_url, generate_email, register_user, admin
     payload = {
         "identity": user_data['user_id'],
         "resource": "server",
-        "resourceType": "server",
+        "resourceType": "system",
         "permission": "manage"
     }
     headers = admin_session
@@ -23,5 +23,5 @@ def test_assign_manage_permission(base_url, generate_email, register_user, admin
     assert_status_code(list_response, 200)
     entries = list_response.json()
     print(entries)
-    found = any(entry.get("resource") == "server" and entry.get("permission") == "manage" and entry.get("resourceType") == "server" for entry in entries)
+    found = any(entry.get("resource") == "server" and entry.get("permission") == "manage" and entry.get("resourceType") == "system" for entry in entries)
     assert found, "Access entry for managing 'server' was not found for the user."

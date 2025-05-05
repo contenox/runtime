@@ -196,8 +196,8 @@ func initCredentials(ctx context.Context, config *serverops.Config, tx libdb.Exe
 	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
 		ID:           config.WorkerUserAccountID + "2",
 		Identity:     config.WorkerUserAccountID,
-		Resource:     "files",
-		ResourceType: serverops.DefaultServerGroup,
+		Resource:     store.ResourceTypeFiles,
+		ResourceType: store.ResourceTypeFiles,
 		Permission:   store.PermissionView,
 	})
 	if err != nil {

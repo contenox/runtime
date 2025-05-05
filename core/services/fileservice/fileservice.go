@@ -160,7 +160,7 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 		ID:           uuid.NewString(),
 		Identity:     creatorID,
 		Resource:     fileID,
-		ResourceType: serverops.DefaultServerGroup,
+		ResourceType: store.ResourceTypeFiles,
 		Permission:   store.PermissionManage,
 	}
 	if err := storeInstance.CreateAccessEntry(ctx, accessEntry); err != nil {
@@ -196,7 +196,7 @@ func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
 		Resource:           id,
 		RequiredPermission: store.PermissionView,
-		ResourceType:       "files",
+		ResourceType:       store.ResourceTypeFiles,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to authorize resource: %w", err)
 	}
@@ -300,7 +300,7 @@ func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	}
 	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
 		Resource:           existing.ID,
-		ResourceType:       "files",
+		ResourceType:       store.ResourceTypeFiles,
 		RequiredPermission: store.PermissionEdit,
 	}); err != nil {
 		return nil, err
@@ -370,7 +370,7 @@ func (s *service) DeleteFile(ctx context.Context, id string) error {
 		return fmt.Errorf("failed to get file: %w", err)
 	}
 	if err := serverops.CheckResourceAuthorization(ctx, store.New(tx), serverops.ResourceArgs{
-		ResourceType:       "files",
+		ResourceType:       store.ResourceTypeFiles,
 		Resource:           file.ID,
 		RequiredPermission: store.PermissionManage,
 	}); err != nil {
@@ -494,7 +494,7 @@ func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 	storeInstance := store.New(tx)
 
 	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
-		ResourceType:       "files",
+		ResourceType:       store.ResourceTypeFiles,
 		Resource:           fileID,
 		RequiredPermission: store.PermissionEdit,
 	}); err != nil {

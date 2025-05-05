@@ -97,11 +97,11 @@ type Result struct {
 func (s *Service) Register(ctx context.Context, req CreateUserRequest) (*Result, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	req.AllowedResources = []CreateUserRequestAllowedResources{
-		{Name: serverops.DefaultServerGroup, Permission: store.PermissionNone.String(), ResourceType: serverops.DefaultServerGroup},
+		{Name: serverops.DefaultServerGroup, Permission: store.PermissionNone.String(), ResourceType: store.ResourceTypeSystem},
 	}
 	if serverops.DefaultAdminUser == req.Email {
 		req.AllowedResources = []CreateUserRequestAllowedResources{
-			{Name: serverops.DefaultServerGroup, Permission: store.PermissionManage.String(), ResourceType: serverops.DefaultServerGroup},
+			{Name: serverops.DefaultServerGroup, Permission: store.PermissionManage.String(), ResourceType: store.ResourceTypeSystem},
 		}
 	}
 	userFromStore, err := s.createUser(ctx, tx, req)

@@ -102,6 +102,13 @@ type Resource struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+const (
+	ResourceTypeSystem = "system"
+	ResourceTypeFiles  = "files"
+	ResourceTypeBlobs  = "blobs"
+	ResourceTypeChunks = "chunks"
+)
+
 type File struct {
 	ID        string    `json:"id"`
 	Path      string    `json:"path"`
