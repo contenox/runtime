@@ -49,6 +49,9 @@ const AccessList: React.FC<Props> = ({
               {entry.identityDetails?.email && (
                 <P className="text-text-muted text-xs">{entry.identityDetails.email}</P>
               )}
+              {entry.fileDetails?.path && (
+                <P className="text-text-muted text-xs">{entry.fileDetails?.path}</P>
+              )}
               <P className="text-text-muted text-sm">
                 {t('accesscontrol.permission')}: {entry.permission}
               </P>
