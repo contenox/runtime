@@ -172,8 +172,7 @@ func (h *poolHandler) assignBackend(w http.ResponseWriter, r *http.Request) {
 		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
 		return
 	}
-
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusCreated, "backend assigned")
 }
 
 func (h *poolHandler) removeBackend(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +190,7 @@ func (h *poolHandler) removeBackend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusOK, "backend removed")
 }
 
 func (h *poolHandler) listBackends(w http.ResponseWriter, r *http.Request) {
