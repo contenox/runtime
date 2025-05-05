@@ -70,10 +70,6 @@ Steps needed:
 * [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
 * [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
 
----
-Notes from the devslice:
-- *Rationale for Vald:* Vald was selected over OpenSearch due to its specialized focus on high-performance/scalable vector search, resulting in simpler integration as a core engine component compared to OpenSearch's broad feature set. Additional benefits included its suitable gRPC API, improved type-safety within the Go ecosystem, and faster spin-up times for development environments.
-
 
 ## 🗺️ Roadmap (Near-Term Focus)
 
