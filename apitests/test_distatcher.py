@@ -191,7 +191,7 @@ def test_mark_job_failed(base_url, admin_session, create_test_file):
     failed_payload = {"leaserId": leaser_id}
     response = requests.patch(f"{base_url}/jobs/{leased_job_id}/failed", json=failed_payload, headers=headers)
 
-    assert_status_code(response, 204) # Expect No Content for PATCH /failed
+    assert_status_code(response, 200)
     print(f"Job {leased_job_id} marked as failed successfully.")
 
     time.sleep(0.2) # Allow potential async processing

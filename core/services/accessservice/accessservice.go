@@ -32,6 +32,13 @@ type AccessEntryRequest struct {
 
 	WithUserDetails *bool         `json:"withUserDetails,omitempty"`
 	IdentityDetails *UserMetadata `json:"identityDetails,omitempty"`
+	FileDetails     *FileMetadata `json:"fileDetails,omitempty"`
+}
+
+type FileMetadata struct {
+	ID   string `json:"id"`
+	Path string `json:"path"`
+	Type string `json:"type"`
 }
 
 type UserMetadata struct {
@@ -52,6 +59,12 @@ func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	}
 	if entry.ResourceType == "" {
 		return nil, serverops.ErrMissingParameter
+	}
+	if entry.ResourceType == store.ResourceTypeFiles {
+		_, err = store.New(tx).GetFileByID(ctx, entry.Resource)
+		if err != nil {
+			return nil, err
+		}
 	}
 	id := uuid.NewString()
 	err = store.New(tx).CreateAccessEntry(ctx, &store.AccessEntry{
@@ -123,6 +136,12 @@ func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	if entry.ResourceType == "" {
 		return nil, serverops.ErrMissingParameter
 	}
+	if entry.ResourceType == store.ResourceTypeFiles {
+		_, err = store.New(tx).GetFileByID(ctx, entry.Resource)
+		if err != nil {
+			return nil, err
+		}
+	}
 	err = store.New(tx).UpdateAccessEntry(ctx, &store.AccessEntry{
 		ID:           entry.ID,
 		Identity:     entry.Identity,
@@ -166,6 +185,17 @@ func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails b
 			Resource:     entries[i].Resource,
 		}
 		subjects[i] = entries[i].Identity
+		if withDetails && entries[i].ResourceType == store.ResourceTypeFiles {
+			file, err := store.New(tx).GetFileByID(ctx, entries[i].Resource)
+			if err != nil {
+				return nil, err
+			}
+			cE[i].FileDetails = &FileMetadata{
+				ID:   file.ID,
+				Path: file.Path,
+				Type: file.Type,
+			}
+		}
 	}
 	if withDetails {
 		users, err := store.New(tx).ListUsersBySubjects(ctx, subjects...)

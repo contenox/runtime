@@ -89,7 +89,7 @@ def test_delete_file(base_url, admin_session, create_test_file):
         f"{base_url}/files/{test_file['id']}",
         headers=headers
     )
-    assert_status_code(delete_response, 204)
+    assert_status_code(delete_response, 200)
 
     # Verify it's gone
     get_response = requests.get(

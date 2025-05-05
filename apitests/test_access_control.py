@@ -25,3 +25,18 @@ def test_assign_manage_permission(base_url, generate_email, register_user, admin
     print(entries)
     found = any(entry.get("resource") == "server" and entry.get("permission") == "manage" and entry.get("resourceType") == "system" for entry in entries)
     assert found, "Access entry for managing 'server' was not found for the user."
+
+def test_create_access_entry_invalid_file_resource(base_url, admin_session, generate_email, register_user):
+    """Test creating an access entry with an invalid file resource returns an error."""
+    email = generate_email()
+    user_info = register_user(email, "Test User", "password")
+    user_id = user_info['user_id']
+
+    payload = {
+        "identity": user_id,
+        "resource": "invalid-file-id-123",
+        "resourceType": "files",
+        "permission": "view"
+    }
+    response = requests.post(f"{base_url}/access-control", json=payload, headers=admin_session)
+    assert_status_code(response, 404)

@@ -113,6 +113,13 @@ export type AccessEntry = {
   createdAt?: string;
   updatedAt?: string;
   identityDetails?: IdentityDetails;
+  fileDetails?: filesDetails;
+};
+
+export type filesDetails = {
+  id: string;
+  path: string;
+  type: string;
 };
 
 export type IdentityDetails = {
