@@ -32,15 +32,19 @@ cate combines several technologies to deliver its features:
   - Users are expected to provide external dependencies like **PostgreSQL**, **Valkey**, and **Vald**.
   - A `docker-compose.yml` file is provided for convenience, but operators typically deploy the cate container image(s) directly and manage configuration externally.
 
-## 📊 Current State (As of April 2025)
+## 📊 Current State (As of May 2025)
 
-cate is in **active development**, while end-to-end features are still being refined and integrated, the following capabilities have established implementations:
+cate is in **active development**. Building upon the foundational components, the recent focus on semantic search has integrated several key capabilities, resulting in the following established implementations:
 
-* **Core Backend Services:** Modular Go services including llm-backend/model management (`backendservice`), chat session logic (`chatservice`), file handling (`fileservice`), user/access control (`userservice`, `accessservice`)
-* **Persistence & State:** Storage logic (`core/serverops/store`) is implemented for core entities using PostgreSQL, **Vald (for vector storage)**, and Valkey (via `libkv`). State synchronization for Ollama backends is functional. *(Corrected path, Replaced OpenSearch with Vald)*
-* **Foundational Libraries:** Core libraries (`libs/`) provide reusable components for DB/KV access, authentication (`libauth`), messaging (`libbus`), crypto (`libcipher`) and Ollama interaction (`libollama`).
-* **API & UI Structure:** The React frontend (`frontend/`) includes routing, core pages for chat, admin (users, backends) and JWT authentication flow via a BFF is implemented.
-* **Basic Operations:** The system is containerized (`Dockerfile`, `compose.yaml`), includes build/run processes (`Makefile`).
+* **Core Backend Services:** Modular Go services provide the backbone, including model management (`backendservice`), chat (`chatservice`), files (`fileservice`), users/access control (`userservice`, `accessservice`), **job dispatching (`dispatchservice`)**, **indexing (`indexservice`)**, and **backend pooling (`poolservice`)**.
+* **Persistence & State:** Core data (users, files, jobs, etc.) is stored in **PostgreSQL** (`core/serverops/store`). **Vald** is integrated as the **vector store** for embeddings (`core/vectors`). **Valkey** (via `libkv`) is available for key-value storage/caching needs. State synchronization for Ollama backends (`runtimestate`) is operational.
+* **Document Ingestion & RAG Pipeline:** An initial Retrieval-Augmented Generation (RAG) pipeline is functional. **Python workers (`workers/`)** lease processing jobs (`dispatchapi`), fetch files (`filesapi`), parse/chunk documents, interact with core services for embedding generation, and **ingest vector embeddings into Vald** via the `indexservice`.
+* **Semantic Search:** Basic semantic search capabilities over ingested documents are implemented. The `indexservice` handles embedding generation (using resolved LLM backends) and vector search queries against Vald.
+* **LLM Integration & Management:** The system interfaces with Ollama backends (`libollama`, `modelprovider`). Logic for **resolving (`llmresolver`) the appropriate LLM backend/model** based on defined pools and scoring has been implemented.
+* **Standalone Tokenizer Service:** Tokenization is handled by a dedicated **Go microservice (`tokenizer/`)** communicating via gRPC, optimizing core service resources and build times.
+* **Foundational Libraries:** Shared Go libraries (`libs/`) provide robust, reusable components for database access (`libdb`), key-value stores (`libkv`), authentication (`libauth`), messaging (`libbus`), cryptography (`libcipher`), Ollama interaction (`libollama`), testing utilities (`libtestenv`), and goroutine management (`libroutine`).
+* **API & UI Structure:** A **React frontend (`frontend/`)** provides the user interface, built using Vite. Key features include routing (`src/config/routes.tsx`), foundational pages (Login, Chat, Admin views for Users, Backends, Files, **Semantic Search**, Server Jobs), and secure **JWT authentication managed via a Backend-for-Frontend (BFF)** pattern (`src/lib/AuthProvider.tsx`, `src/hooks/`). A basic UI component library (`packages/ui`) is used.
+* **Basic Operations & CI:** The system is fully **containerized** (`Dockerfile.core`, `Dockerfile.tokenizer`, `Dockerfile.worker`, `compose.yaml`) with `make` targets for building, running (`make run`, `make ui-run`), and testing (`make api-test`). Basic Continuous Integration checks are operational.
 
 ## 🛠️ Last Development Slice
 
