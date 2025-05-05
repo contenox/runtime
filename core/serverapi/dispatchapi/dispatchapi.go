@@ -104,7 +104,7 @@ func (h *dispatchHandler) markFailed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusOK, "job marked as failed")
 }
 
 func (h *dispatchHandler) listPending(w http.ResponseWriter, r *http.Request) {

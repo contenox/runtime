@@ -261,7 +261,7 @@ func (h *poolHandler) removeModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusOK, "model removed")
 }
 
 func (h *poolHandler) listModels(w http.ResponseWriter, r *http.Request) {

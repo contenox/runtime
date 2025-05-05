@@ -68,6 +68,7 @@ export const userKeys = {
 
 export const systemKeys = {
   all: ['system'] as const,
+  resources: () => [...systemKeys.all, 'resources'],
 };
 
 export const searchKeys = {

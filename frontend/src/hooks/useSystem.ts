@@ -8,3 +8,10 @@ export function useSystemServices() {
     queryFn: api.getSystemServices,
   });
 }
+
+export function useSystemResources() {
+  return useSuspenseQuery<string[]>({
+    queryKey: systemKeys.resources(),
+    queryFn: api.getSystemResources,
+  });
+}

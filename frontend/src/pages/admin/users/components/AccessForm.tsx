@@ -2,7 +2,10 @@ import { Button, Form, Input, Label, P, Panel, Select, Spinner } from '@cate/ui'
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../../../../hooks/useAccess';
-import { useSystemServices } from '../../../../hooks/useSystem';
+import {
+  useSystemResources as useSystemResourceTypes,
+  useSystemServices,
+} from '../../../../hooks/useSystem';
 import { AccessEntry } from '../../../../lib/types';
 
 type Props = {
@@ -17,6 +20,8 @@ type Props = {
   setPermission: (value: string) => void;
   resource: string;
   setResource: (value: string) => void;
+  resourceType: string;
+  setResourceType: (value: string) => void;
 };
 
 const AccessForm: React.FC<Props> = ({
@@ -30,6 +35,8 @@ const AccessForm: React.FC<Props> = ({
   setPermission,
   resource,
   setResource,
+  resourceType,
+  setResourceType,
 }) => {
   const { t } = useTranslation();
   const {
@@ -39,7 +46,13 @@ const AccessForm: React.FC<Props> = ({
     error: permissionsError,
   } = usePermissions();
   const { data: services, isLoading, isError, error: servicesError } = useSystemServices();
-  if (isLoading || isPermissionsLoading) {
+  const {
+    data: resourceTypes,
+    isLoading: isResourcesLoading,
+    isError: isResourcesError,
+    error: resourcesError,
+  } = useSystemResourceTypes();
+  if (isLoading || isPermissionsLoading || isResourcesLoading) {
     return <Spinner></Spinner>;
   }
   if (isError) {
@@ -47,6 +60,9 @@ const AccessForm: React.FC<Props> = ({
   }
   if (isPermissionsError) {
     <Panel variant="error">{permissionsError?.message ?? t('common.error')}</Panel>;
+  }
+  if (isResourcesError) {
+    <Panel variant="error">{resourcesError?.message ?? t('common.error')}</Panel>;
   }
 
   return (
@@ -88,6 +104,15 @@ const AccessForm: React.FC<Props> = ({
           options={
             services?.map(service => ({ value: service, label: service, key: service })) || []
           }
+        />
+        <Label htmlFor="permission">{t('accesscontrol.resource_type')}</Label>
+        <Select
+          id="resourceType"
+          value={resourceType}
+          onChange={e => setResourceType(e.target.value)}
+          required
+          placeholder={t('accesscontrol.resource_type')}
+          options={resourceTypes?.map(type => ({ value: type, label: type, key: type })) || []}
         />
       </Panel>
       {error && <P className="text-error">{t('common.error')}</P>}

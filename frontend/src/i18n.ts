@@ -88,6 +88,7 @@ const resources = {
         manage_title: 'Manage Access Control',
         resource: 'Resource',
         resource_type: 'Resource Type',
+
         permission: 'Permission',
         identity: 'Identity',
         create_instruction: 'Create New Access Control',

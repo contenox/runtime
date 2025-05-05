@@ -31,12 +31,14 @@ export default function AccessControlSection({
   const [identity, setIdentity] = useState('');
   const [permission, setPermission] = useState('');
   const [resource, setResource] = useState('');
+  const [resourceType, setResourceType] = useState('');
 
   const resetForm = () => {
     setEditingEntry(null);
     setIdentity('');
     setPermission('');
     setResource('');
+    setResourceType('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -54,6 +56,7 @@ export default function AccessControlSection({
     setIdentity(entry.identity);
     setPermission(entry.permission);
     setResource(entry.resource);
+    setResourceType(entry.resourceType);
   };
 
   const handleDelete = (id: string) => {
@@ -91,6 +94,8 @@ export default function AccessControlSection({
           setPermission={setPermission}
           resource={resource}
           setResource={setResource}
+          resourceType={resourceType}
+          setResourceType={setResourceType}
         />
       </Section>
     </GridLayout>

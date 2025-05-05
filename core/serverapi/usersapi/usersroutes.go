@@ -91,7 +91,7 @@ func (u *userManager) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusOK, "user removed")
 }
 
 func (u *userManager) list(w http.ResponseWriter, r *http.Request) {

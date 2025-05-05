@@ -96,6 +96,7 @@ export const api = {
   deleteUser: (id: string) => apiFetch<void>(`/api/users/${id}`, options('DELETE')),
 
   getSystemServices: () => apiFetch<string[]>(`/api/system/services`),
+  getSystemResources: () => apiFetch<string[]>(`/api/system/resources`),
 
   getQueue: () => apiFetch<Job[] | null>(`/api/queue`),
   deleteQueueEntry: (model: string) => apiFetch<void>(`/api/queue/${model}`, options('DELETE')),

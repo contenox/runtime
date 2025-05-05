@@ -109,6 +109,13 @@ const (
 	ResourceTypeChunks = "chunks"
 )
 
+var ResourceTypes = []string{
+	ResourceTypeSystem,
+	ResourceTypeFiles,
+	ResourceTypeBlobs,
+	ResourceTypeChunks,
+}
+
 type File struct {
 	ID        string    `json:"id"`
 	Path      string    `json:"path"`

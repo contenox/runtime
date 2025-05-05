@@ -204,7 +204,7 @@ func (f *fileManager) delete(w http.ResponseWriter, r *http.Request) {
 		_ = serverops.Error(w, r, err, serverops.DeleteOperation)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	_ = serverops.Encode(w, r, http.StatusOK, "file removed")
 }
 
 type folderResponse struct {
