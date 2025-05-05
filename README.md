@@ -48,12 +48,12 @@ cate is in **active development**, while end-to-end features are still being ref
 * [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
 
 Steps needed:
-  * [x] **Backend Pooling** Finalizing the implementation for grouping backends manageable pools/fleets assigning models to them.
-  * [x] **Tokenizer Service Migration** Moving tokenizer logic into a dedicated service to optimize core service build times and resource usage.
-  * [x] **Document Ingestion Pipeline:** Building the initial RAG pipeline, with Python workers, to parse and process documents from the filestore and ingest the embeddings into **vald**. *(Replaced opensearch with vald)*
-  * [x] **LLM Resolver:** Improving the logic (`llmresolver`) for selecting the optimal backend instance and model for requests, via a scoring system and routing policies.
-  * [x] **Fixing wiring:** Ensuring previously built features are fully integrated and functional E2E.
-  * [x] **Cleaning:** Fix failing tests and get a basic CI running.
+    * [x] **Backend Pooling** Finalizing the implementation for grouping backends manageable pools/fleets assigning models to them.
+    * [x] **Tokenizer Service Migration** Moving tokenizer logic into a dedicated service to optimize core service build times and resource usage.
+    * [x] **Document Ingestion Pipeline:** Building the initial RAG pipeline, with Python workers, to parse and process documents from the filestore and ingest the embeddings into **vald**. *(Replaced opensearch with vald)*
+    * [x] **LLM Resolver:** Improving the logic (`llmresolver`) for selecting the optimal backend instance and model for requests, via a scoring system and routing policies.
+    * [x] **Fixing wiring:** Ensuring previously built features are fully integrated and functional E2E.
+    * [x] **Cleaning:** Fix failing tests and get a basic CI running.
 
 ---
 Notes from the devslice:
@@ -65,12 +65,12 @@ Notes from the devslice:
 * [ ] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
 
 Steps needed:
-  * [ ] **Expose Tokenizer Service to workers:** Implement a tokenizer service that can be used by workers to tokenize text.
-  * [ ] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
-  * [ ] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
-  * [ ] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
-  * [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
-  * [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
+    * [ ] **Expose Tokenizer Service to workers:** Implement a tokenizer service that can be used by workers to tokenize text.
+    * [ ] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
+    * [ ] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
+    * [ ] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
+    * [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
+    * [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
 
 
 ## 🗺️ Roadmap (Near-Term Focus)
