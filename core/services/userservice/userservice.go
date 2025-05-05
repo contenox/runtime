@@ -97,11 +97,11 @@ type Result struct {
 func (s *Service) Register(ctx context.Context, req CreateUserRequest) (*Result, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	req.AllowedResources = []CreateUserRequestAllowedResources{
-		{Name: serverops.DefaultServerGroup, Permission: store.PermissionNone.String()},
+		{Name: serverops.DefaultServerGroup, Permission: store.PermissionNone.String(), ResourceType: serverops.DefaultServerGroup},
 	}
 	if serverops.DefaultAdminUser == req.Email {
 		req.AllowedResources = []CreateUserRequestAllowedResources{
-			{Name: serverops.DefaultServerGroup, Permission: store.PermissionManage.String()},
+			{Name: serverops.DefaultServerGroup, Permission: store.PermissionManage.String(), ResourceType: serverops.DefaultServerGroup},
 		}
 	}
 	userFromStore, err := s.createUser(ctx, tx, req)
@@ -137,8 +137,9 @@ type CreateUserRequest struct {
 }
 
 type CreateUserRequestAllowedResources struct {
-	Name       string `json:"name"`
-	Permission string `json:"permission"`
+	Name         string `json:"name"`
+	Permission   string `json:"permission"`
+	ResourceType string `json:"resourceType"`
 }
 
 func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*store.User, error) {
@@ -185,10 +186,11 @@ func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserR
 			return nil, err
 		}
 		err = store.New(tx).CreateAccessEntry(ctx, &store.AccessEntry{
-			ID:         uuid.NewString(),
-			Identity:   user.Subject,
-			Resource:   curar.Name,
-			Permission: perm,
+			ID:           uuid.NewString(),
+			Identity:     user.Subject,
+			Resource:     curar.Name,
+			ResourceType: curar.ResourceType,
+			Permission:   perm,
 		})
 		if err != nil {
 			return nil, err

@@ -168,12 +168,13 @@ func PermissionFromString(s string) (Permission, error) {
 }
 
 type AccessEntry struct {
-	ID         string     `json:"id"`
-	Identity   string     `json:"identity"`
-	Resource   string     `json:"resource"`
-	Permission Permission `json:"permission"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	ID           string     `json:"id"`
+	Identity     string     `json:"identity"`
+	Resource     string     `json:"resource"`
+	ResourceType string     `json:"resourceType"`
+	Permission   Permission `json:"permission"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 type AccessList []*AccessEntry

@@ -157,10 +157,11 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	}
 	// Grant access to the creator.
 	accessEntry := &store.AccessEntry{
-		ID:         uuid.NewString(),
-		Identity:   creatorID,
-		Resource:   fileID,
-		Permission: store.PermissionManage,
+		ID:           uuid.NewString(),
+		Identity:     creatorID,
+		Resource:     fileID,
+		ResourceType: serverops.DefaultServerGroup,
+		Permission:   store.PermissionManage,
 	}
 	if err := storeInstance.CreateAccessEntry(ctx, accessEntry); err != nil {
 		return nil, fmt.Errorf("failed to create access entry: %w", err)

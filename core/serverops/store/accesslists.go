@@ -18,12 +18,13 @@ func (s *store) CreateAccessEntry(ctx context.Context, entry *AccessEntry) error
 
 	err := s.Exec.QueryRowContext(ctx, `
 		INSERT INTO accesslists
-		(id, identity, resource, permission, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		(id, identity, resource, resource_type, permission, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id`,
 		entry.ID,
 		entry.Identity,
 		entry.Resource,
+		entry.ResourceType,
 		entry.Permission,
 		entry.CreatedAt,
 		entry.UpdatedAt,
@@ -38,7 +39,7 @@ func (s *store) CreateAccessEntry(ctx context.Context, entry *AccessEntry) error
 func (s *store) GetAccessEntryByID(ctx context.Context, id string) (*AccessEntry, error) {
 	var entry AccessEntry
 	err := s.Exec.QueryRowContext(ctx, `
-		SELECT id, identity, resource, permission, created_at, updated_at
+		SELECT id, identity, resource, resource_type, permission, created_at, updated_at
 		FROM accesslists
 		WHERE id = $1`,
 		id,
@@ -46,6 +47,7 @@ func (s *store) GetAccessEntryByID(ctx context.Context, id string) (*AccessEntry
 		&entry.ID,
 		&entry.Identity,
 		&entry.Resource,
+		&entry.ResourceType,
 		&entry.Permission,
 		&entry.CreatedAt,
 		&entry.UpdatedAt,
@@ -68,11 +70,13 @@ func (s *store) UpdateAccessEntry(ctx context.Context, entry *AccessEntry) error
 		SET
 			identity = $1,
 			resource = $2,
-			permission = $3,
-			updated_at = $4
-		WHERE id = $5`,
+			resource_type = $3,
+			permission = $4,
+			updated_at = $5
+		WHERE id = $6`,
 		entry.Identity,
 		entry.Resource,
+		entry.ResourceType,
 		entry.Permission,
 		entry.UpdatedAt,
 		entry.ID,
@@ -124,7 +128,7 @@ func (s *store) DeleteAccessEntriesByResource(ctx context.Context, resource stri
 // ListAccessEntries returns all access control entries ordered by creation time
 func (s *store) ListAccessEntries(ctx context.Context, createdAtCursor time.Time) ([]*AccessEntry, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, identity, resource, permission, created_at, updated_at
+		SELECT id, identity, resource, resource_type, permission, created_at, updated_at
 		FROM accesslists
 		WHERE created_at < $1
 		ORDER BY created_at DESC LIMIT 10000`, createdAtCursor,
@@ -141,6 +145,7 @@ func (s *store) ListAccessEntries(ctx context.Context, createdAtCursor time.Time
 			&entry.ID,
 			&entry.Identity,
 			&entry.Resource,
+			&entry.ResourceType,
 			&entry.Permission,
 			&entry.CreatedAt,
 			&entry.UpdatedAt,
@@ -160,7 +165,7 @@ func (s *store) ListAccessEntries(ctx context.Context, createdAtCursor time.Time
 // GetAccessEntriesByIdentity returns all entries for a specific identity
 func (s *store) GetAccessEntriesByIdentity(ctx context.Context, identity string) ([]*AccessEntry, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, identity, resource, permission, created_at, updated_at
+		SELECT id, identity, resource, resource_type, permission, created_at, updated_at
 		FROM accesslists
 		WHERE identity = $1
 		ORDER BY created_at DESC LIMIT 10000`,
@@ -178,6 +183,7 @@ func (s *store) GetAccessEntriesByIdentity(ctx context.Context, identity string)
 			&entry.ID,
 			&entry.Identity,
 			&entry.Resource,
+			&entry.ResourceType,
 			&entry.Permission,
 			&entry.CreatedAt,
 			&entry.UpdatedAt,
@@ -196,7 +202,7 @@ func (s *store) GetAccessEntriesByIdentity(ctx context.Context, identity string)
 
 func (s *store) GetAccessEntriesByIdentityAndResource(ctx context.Context, identity string, resource string) ([]*AccessEntry, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, identity, resource, permission, created_at, updated_at
+		SELECT id, identity, resource, resource_type, permission, created_at, updated_at
 		FROM accesslists
 		WHERE identity = $1 AND resource = $2
 		ORDER BY created_at DESC LIMIT 10000`,
@@ -215,6 +221,7 @@ func (s *store) GetAccessEntriesByIdentityAndResource(ctx context.Context, ident
 			&entry.ID,
 			&entry.Identity,
 			&entry.Resource,
+			&entry.ResourceType,
 			&entry.Permission,
 			&entry.CreatedAt,
 			&entry.UpdatedAt,

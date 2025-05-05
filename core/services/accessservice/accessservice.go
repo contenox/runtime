@@ -21,10 +21,11 @@ func New(db libdb.DBManager) *Service {
 }
 
 type AccessEntryRequest struct {
-	ID         string `json:"id"`
-	Identity   string `json:"identity"`
-	Resource   string `json:"resource"`
-	Permission string `json:"permission"`
+	ID           string `json:"id"`
+	Identity     string `json:"identity"`
+	Resource     string `json:"resource"`
+	ResourceType string `json:"resourceType"`
+	Permission   string `json:"permission"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -51,10 +52,11 @@ func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	}
 	id := uuid.NewString()
 	err = store.New(tx).CreateAccessEntry(ctx, &store.AccessEntry{
-		ID:         id,
-		Identity:   entry.Identity,
-		Permission: perm,
-		Resource:   entry.Resource,
+		ID:           id,
+		Identity:     entry.Identity,
+		Permission:   perm,
+		Resource:     entry.Resource,
+		ResourceType: entry.ResourceType,
 	})
 	if err != nil {
 		return nil, err

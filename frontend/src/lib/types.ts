@@ -108,6 +108,7 @@ export type AccessEntry = {
   id: string;
   identity: string;
   resource: string;
+  resourceType: string;
   permission: string;
   createdAt?: string;
   updatedAt?: string;

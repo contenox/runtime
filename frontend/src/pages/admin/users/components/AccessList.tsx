@@ -55,6 +55,9 @@ const AccessList: React.FC<Props> = ({
               <P className="text-text-muted text-xs">
                 {t('accesscontrol.resource')}: {entry.resource}
               </P>
+              <P className="text-text-muted text-xs">
+                {t('accesscontrol.resource_type')}: {entry.resourceType}
+              </P>
             </div>
             <div className="flex gap-2">
               <Button
