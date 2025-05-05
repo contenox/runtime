@@ -42,7 +42,7 @@ cate is in **active development**, while end-to-end features are still being ref
 * **API & UI Structure:** The React frontend (`frontend/`) includes routing, core pages for chat, admin (users, backends) and JWT authentication flow via a BFF is implemented.
 * **Basic Operations:** The system is containerized (`Dockerfile`, `compose.yaml`), includes build/run processes (`Makefile`).
 
-## 🛠️ Current Development Slice
+## 🛠️ Last Development Slice
 
 -> Semantic Search
 * [x] **Backend Pooling** Finalizing the implementation for grouping backends manageable pools/fleets assigning models to them.
@@ -57,6 +57,19 @@ cate is in **active development**, while end-to-end features are still being ref
 Notes from the devslice:
 - *Rationale for Vald:* Vald was selected over OpenSearch due to its specialized focus on high-performance/scalable vector search, resulting in simpler integration as a core engine component compared to OpenSearch's broad feature set. Additional benefits included its suitable gRPC API, improved type-safety within the Go ecosystem, and faster spin-up times for development environments.
 
+## 🛠️ Current Development Slice
+
+-> Documents QA
+* [ ] **Expose Tokenizer Service to workers:** Implement a tokenizer service that can be used by workers to tokenize text.
+* [ ] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
+* [ ] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
+* [ ] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
+* [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
+* [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
+
+---
+Notes from the devslice:
+- *Rationale for Vald:* Vald was selected over OpenSearch due to its specialized focus on high-performance/scalable vector search, resulting in simpler integration as a core engine component compared to OpenSearch's broad feature set. Additional benefits included its suitable gRPC API, improved type-safety within the Go ecosystem, and faster spin-up times for development environments.
 
 
 ## 🗺️ Roadmap (Near-Term Focus)
