@@ -41,12 +41,13 @@ func (i *fileActivityInstance) CreateJob(ctx context.Context, id string, data an
 		return nil, fmt.Errorf("file content type is empty")
 	}
 	task := &store.Job{
-		ID:        uuid.NewString(),
-		Operation: i.operation,
-		Subject:   i.subject,
-		EntityID:  id,
-		TaskType:  "vectorize_" + file.ContentType,
-		Payload:   []byte("{}"), // Note: We don't include data, it may be very large
+		ID:         uuid.NewString(),
+		Operation:  i.operation,
+		Subject:    i.subject,
+		EntityID:   id,
+		EntityType: "file",
+		TaskType:   "vectorize_" + file.ContentType,
+		Payload:    []byte("{}"), // Note: We don't include data, it may be very large
 	}
 	return task, nil
 }

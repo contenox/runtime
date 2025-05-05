@@ -116,7 +116,7 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			VectorID:       id,
 			VectorStore:    "vald",
 			ResourceID:     request.ID,
-			ResourceType:   "file",
+			ResourceType:   job.EntityType,
 			EmbeddingModel: provider.ModelName(),
 		})
 		if err != nil {

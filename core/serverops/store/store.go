@@ -81,6 +81,7 @@ type Job struct {
 	Operation    string    `json:"operation"`
 	Subject      string    `json:"subject"`
 	EntityID     string    `json:"entityId"`
+	EntityType   string    `json:"entityType"`
 	Payload      []byte    `json:"payload"`
 	ScheduledFor int64     `json:"scheduledFor"`
 	ValidUntil   int64     `json:"validUntil"`
