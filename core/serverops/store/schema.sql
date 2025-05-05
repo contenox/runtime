@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS chunks_idx (
     id VARCHAR(255) PRIMARY KEY,
     vector_id VARCHAR(255) NOT NULL,
     vector_store VARCHAR(255) NOT NULL,
+    embedding_model VARCHAR(255) NOT NULL,
 
     resource_id VARCHAR(255) NOT NULL,
     resource_type VARCHAR(255) NOT NULL

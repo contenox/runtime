@@ -94,11 +94,12 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			return nil, fmt.Errorf("failed to insert vector: %w", err)
 		}
 		err = storeInstance.CreateChunkIndex(ctx, &store.ChunkIndex{
-			ID:           id,
-			VectorID:     id,
-			VectorStore:  "vald",
-			ResourceID:   request.ID,
-			ResourceType: "file",
+			ID:             id,
+			VectorID:       id,
+			VectorStore:    "vald",
+			ResourceID:     request.ID,
+			ResourceType:   "file",
+			EmbeddingModel: provider.ModelName(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create chunk index: %w", err)

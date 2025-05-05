@@ -13,11 +13,12 @@ func TestCreateAndGetChunkIndex(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{
-		ID:           uuid.NewString(),
-		VectorID:     uuid.NewString(),
-		VectorStore:  "vald",
-		ResourceID:   uuid.NewString(),
-		ResourceType: "document",
+		ID:             uuid.NewString(),
+		VectorID:       uuid.NewString(),
+		VectorStore:    "vald",
+		ResourceID:     uuid.NewString(),
+		ResourceType:   "document",
+		EmbeddingModel: "myllm",
 	}
 
 	err := s.CreateChunkIndex(ctx, chunk)
@@ -29,17 +30,19 @@ func TestCreateAndGetChunkIndex(t *testing.T) {
 	require.Equal(t, chunk.VectorStore, got.VectorStore)
 	require.Equal(t, chunk.ResourceID, got.ResourceID)
 	require.Equal(t, chunk.ResourceType, got.ResourceType)
+	require.Equal(t, chunk.EmbeddingModel, got.EmbeddingModel)
 }
 
 func TestUpdateChunkIndex(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{
-		ID:           uuid.NewString(),
-		VectorID:     uuid.NewString(),
-		VectorStore:  "vald",
-		ResourceID:   uuid.NewString(),
-		ResourceType: "document",
+		ID:             uuid.NewString(),
+		VectorID:       uuid.NewString(),
+		VectorStore:    "vald",
+		ResourceID:     uuid.NewString(),
+		ResourceType:   "document",
+		EmbeddingModel: "myllm",
 	}
 	s.CreateChunkIndex(ctx, chunk)
 
@@ -54,6 +57,7 @@ func TestUpdateChunkIndex(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, chunk.VectorID, updated.VectorID)
 	require.Equal(t, chunk.ResourceType, updated.ResourceType)
+	require.Equal(t, chunk.EmbeddingModel, updated.EmbeddingModel)
 }
 
 func TestDeleteChunkIndex(t *testing.T) {
@@ -112,23 +116,26 @@ func TestListChunkIndicesByResource(t *testing.T) {
 	// Create matching resources
 	for range 2 {
 		chunk := &store.ChunkIndex{
-			ID:           uuid.NewString(),
-			ResourceID:   targetResourceID,
-			ResourceType: targetType,
+			ID:             uuid.NewString(),
+			ResourceID:     targetResourceID,
+			ResourceType:   targetType,
+			EmbeddingModel: "myllm",
 		}
 		s.CreateChunkIndex(ctx, chunk)
 	}
 
 	// Create non-matching resources
 	s.CreateChunkIndex(ctx, &store.ChunkIndex{
-		ID:           uuid.NewString(),
-		ResourceID:   uuid.NewString(),
-		ResourceType: targetType,
+		ID:             uuid.NewString(),
+		ResourceID:     uuid.NewString(),
+		ResourceType:   targetType,
+		EmbeddingModel: "myllm",
 	})
 	s.CreateChunkIndex(ctx, &store.ChunkIndex{
-		ID:           uuid.NewString(),
-		ResourceID:   targetResourceID,
-		ResourceType: "image",
+		ID:             uuid.NewString(),
+		ResourceID:     targetResourceID,
+		ResourceType:   "image",
+		EmbeddingModel: "myllm",
 	})
 
 	chunks, err := s.ListChunkIndicesByResource(ctx, targetResourceID, targetType)

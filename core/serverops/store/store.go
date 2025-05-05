@@ -121,11 +121,12 @@ type Blob struct {
 }
 
 type ChunkIndex struct {
-	ID           string `json:"id"`
-	VectorID     string `json:"vectorId"`
-	VectorStore  string `json:"vectorStore"`
-	ResourceID   string `json:"resourceId"`
-	ResourceType string `json:"resourceType"`
+	ID             string `json:"id"`
+	VectorID       string `json:"vectorId"`
+	VectorStore    string `json:"vectorStore"`
+	ResourceID     string `json:"resourceId"`
+	ResourceType   string `json:"resourceType"`
+	EmbeddingModel string `json:"embeddingModel"`
 }
 
 type Permission int
