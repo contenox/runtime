@@ -47,7 +47,7 @@ cate is in **active development**, while end-to-end features are still being ref
 -> Semantic Search
 * [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
 
-Steps needed:
+  Steps needed:
     * [x] **Backend Pooling** Finalizing the implementation for grouping backends manageable pools/fleets assigning models to them.
     * [x] **Tokenizer Service Migration** Moving tokenizer logic into a dedicated service to optimize core service build times and resource usage.
     * [x] **Document Ingestion Pipeline:** Building the initial RAG pipeline, with Python workers, to parse and process documents from the filestore and ingest the embeddings into **vald**. *(Replaced opensearch with vald)*
@@ -64,7 +64,7 @@ Notes from the devslice:
 -> Documents QA
 * [ ] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
 
-Steps needed:
+  Steps needed:
     * [ ] **Expose Tokenizer Service to workers:** Implement a tokenizer service that can be used by workers to tokenize text.
     * [ ] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
     * [ ] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
