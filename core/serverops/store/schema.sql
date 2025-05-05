@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS leased_jobs (
     operation VARCHAR(512),
     subject VARCHAR(512),
     entity_id VARCHAR(512),
+    entity_type VARCHAR(512),
+
     payload JSONB NOT NULL,
 
     scheduled_for INT,
