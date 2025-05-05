@@ -152,8 +152,9 @@ type SearchRequestArgs struct {
 }
 
 type SearchResult struct {
-	ID       string  `json:"id"`
-	Distance float32 `json:"distance"`
+	ID           string  `json:"id"`
+	ResourceType string  `json:"type"`
+	Distance     float32 `json:"distance"`
 }
 
 type SearchResponse struct {
@@ -210,7 +211,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	}
 	searchResults := make([]SearchResult, len(results))
 	for i, res := range results {
-		_, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
+		chunkIndex, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
 		if errors.Is(err, libdb.ErrNotFound) {
 			err := s.vectors.Delete(ctx, res.ID)
 			if err != nil {
@@ -219,8 +220,9 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 			continue
 		}
 		searchResults[i] = SearchResult{
-			ID:       res.ID,
-			Distance: res.Distance,
+			ID:           chunkIndex.ResourceID,
+			ResourceType: chunkIndex.ResourceType,
+			Distance:     res.Distance,
 		}
 	}
 

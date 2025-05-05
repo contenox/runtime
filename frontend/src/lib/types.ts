@@ -12,6 +12,7 @@ export type Backend = {
 
 export type SearchResult = {
   id: string;
+  resourceType: string;
   distance: number;
 };
 

@@ -106,6 +106,7 @@ export default function SearchPage() {
               data.results.map(result => (
                 <Panel key={result.id} className="flex items-center justify-between">
                   <Span>{result.id}</Span>
+                  <Span>{result.resourceType}</Span>
                   <Span variant="muted">{result.distance.toFixed(4)}</Span>
                 </Panel>
               ))
