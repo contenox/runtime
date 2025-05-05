@@ -69,7 +69,7 @@ Notes from the devslice:
 * [ ] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
 
   Steps needed:
-    * [ ] **Expose Tokenizer Service to workers:** Implement a tokenizer service that can be used by workers to tokenize text.
+    * [ ] **Expose Tokenizer Service to workers:** Expose the tokenizer service via HTTP to be used by workers to tokenize text.
     * [ ] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
     * [ ] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
     * [ ] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
