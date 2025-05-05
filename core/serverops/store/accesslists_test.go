@@ -107,11 +107,11 @@ func TestDeleteAccessEntry(t *testing.T) {
 
 	// Create entry
 	entry := &store.AccessEntry{
-		ID:       uuid.NewString(),
-		Identity: "user|123",
-		Resource: "project:456",
-
-		Permission: 1,
+		ID:           uuid.NewString(),
+		Identity:     "user|123",
+		Resource:     "project:456",
+		ResourceType: "server",
+		Permission:   1,
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 
@@ -138,18 +138,20 @@ func TestDeleteAccessEntriesByIdentity(t *testing.T) {
 
 	// Create entry
 	entry := &store.AccessEntry{
-		ID:         uuid.NewString(),
-		Identity:   "user|123",
-		Resource:   "project:456",
-		Permission: 1,
+		ID:           uuid.NewString(),
+		Identity:     "user|123",
+		Resource:     "project:456",
+		ResourceType: "server",
+		Permission:   1,
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 	// Create entry
 	entry = &store.AccessEntry{
-		ID:         uuid.NewString(),
-		Identity:   "user|123",
-		Resource:   "project:457",
-		Permission: 1,
+		ID:           uuid.NewString(),
+		Identity:     "user|123",
+		Resource:     "project:457",
+		ResourceType: "server",
+		Permission:   1,
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 	ae, err := s.GetAccessEntriesByIdentity(ctx, "user|123")
@@ -186,10 +188,11 @@ func TestDeleteAccessEntriesByResource(t *testing.T) {
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 	// Create entry
 	entry = &store.AccessEntry{
-		ID:         uuid.NewString(),
-		Identity:   "user|123",
-		Resource:   "project:457",
-		Permission: 1,
+		ID:           uuid.NewString(),
+		Identity:     "user|123",
+		Resource:     "project:457",
+		ResourceType: "server",
+		Permission:   1,
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 	// Delete entry
@@ -263,9 +266,9 @@ func TestGetAccessEntriesByIdentity(t *testing.T) {
 
 	// Create test entries
 	entries := []*store.AccessEntry{
-		{ID: uuid.NewString(), Identity: "user|123", Resource: "res1", Permission: 1},
-		{ID: uuid.NewString(), Identity: "user|123", Resource: "res2", Permission: 2},
-		{ID: uuid.NewString(), Identity: "user|456", Resource: "res1", Permission: 2},
+		{ID: uuid.NewString(), Identity: "user|123", Resource: "res1", ResourceType: "server", Permission: 1},
+		{ID: uuid.NewString(), Identity: "user|123", Resource: "res2", ResourceType: "server", Permission: 2},
+		{ID: uuid.NewString(), Identity: "user|456", Resource: "res1", ResourceType: "server", Permission: 2},
 	}
 
 	for _, e := range entries {
@@ -307,10 +310,11 @@ func TestCreateDuplicateEntry(t *testing.T) {
 	}
 	require.NoError(t, s.CreateUser(ctx, user))
 	entry := &store.AccessEntry{
-		ID:         uuid.NewString(),
-		Identity:   "user|123",
-		Resource:   "project:456",
-		Permission: 1,
+		ID:           uuid.NewString(),
+		Identity:     "user|123",
+		Resource:     "project:456",
+		ResourceType: "server",
+		Permission:   1,
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 

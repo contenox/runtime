@@ -50,6 +50,9 @@ func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	if err != nil {
 		return nil, err
 	}
+	if entry.ResourceType == "" {
+		return nil, serverops.ErrMissingParameter
+	}
 	id := uuid.NewString()
 	err = store.New(tx).CreateAccessEntry(ctx, &store.AccessEntry{
 		ID:           id,
@@ -116,6 +119,9 @@ func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	perm, err := store.PermissionFromString(entry.Permission)
 	if err != nil {
 		return nil, err
+	}
+	if entry.ResourceType == "" {
+		return nil, serverops.ErrMissingParameter
 	}
 	err = store.New(tx).UpdateAccessEntry(ctx, &store.AccessEntry{
 		ID:           entry.ID,

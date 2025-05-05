@@ -354,10 +354,11 @@ func setupFileServiceTestEnv(ctx context.Context, t *testing.T) (libdb.DBManager
 		t.Fatalf("failed to create user: %v", err)
 	}
 	err = store.New(dbInstance.WithoutTransaction()).CreateAccessEntry(ctx, &store.AccessEntry{
-		Identity:   serverops.DefaultAdminUser,
-		ID:         uuid.NewString(),
-		Resource:   serverops.DefaultServerGroup,
-		Permission: store.PermissionManage,
+		Identity:     serverops.DefaultAdminUser,
+		ID:           uuid.NewString(),
+		Resource:     serverops.DefaultServerGroup,
+		ResourceType: serverops.DefaultServerGroup,
+		Permission:   store.PermissionManage,
 	})
 	if err != nil {
 		t.Fatalf("failed to create access entry: %v", err)

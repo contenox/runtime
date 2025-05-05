@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS accesslists (
 
     identity VARCHAR(512) NOT NULL REFERENCES users(subject) ON DELETE CASCADE,
     resource VARCHAR(512) NOT NULL,
-    resource_type VARCHAR(512),
+    resource_type VARCHAR(512) NOT NULL,
     permission INT NOT NULL,
 
     created_at TIMESTAMP NOT NULL,
