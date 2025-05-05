@@ -86,11 +86,12 @@ func (s *Service) getByID(ctx context.Context, tx libdb.Exec, id string, withUse
 		return nil, err
 	}
 	res := &AccessEntryRequest{
-		Identity:   entry.Identity,
-		Resource:   entry.Resource,
-		Permission: entry.Permission.String(),
-		UpdatedAt:  entry.UpdatedAt,
-		CreatedAt:  entry.CreatedAt,
+		Identity:     entry.Identity,
+		Resource:     entry.Resource,
+		ResourceType: entry.ResourceType,
+		Permission:   entry.Permission.String(),
+		UpdatedAt:    entry.UpdatedAt,
+		CreatedAt:    entry.CreatedAt,
 	}
 	if withUser {
 		user, err := store.New(tx).GetUserBySubject(ctx, entry.Identity)
@@ -117,10 +118,11 @@ func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 		return nil, err
 	}
 	err = store.New(tx).UpdateAccessEntry(ctx, &store.AccessEntry{
-		ID:         entry.ID,
-		Identity:   entry.Identity,
-		Permission: perm,
-		Resource:   entry.Resource,
+		ID:           entry.ID,
+		Identity:     entry.Identity,
+		ResourceType: entry.ResourceType,
+		Permission:   perm,
+		Resource:     entry.Resource,
 	})
 	withDetails := false
 	if entry.WithUserDetails != nil && *entry.WithUserDetails {
@@ -151,10 +153,11 @@ func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails b
 	subjects := make([]string, len(entries))
 	for i := range entries {
 		cE[i] = AccessEntryRequest{
-			ID:         entries[i].ID,
-			Identity:   entries[i].Identity,
-			Permission: entries[i].Permission.String(),
-			Resource:   entries[i].Resource,
+			ID:           entries[i].ID,
+			Identity:     entries[i].Identity,
+			ResourceType: entries[i].ResourceType,
+			Permission:   entries[i].Permission.String(),
+			Resource:     entries[i].Resource,
 		}
 		subjects[i] = entries[i].Identity
 	}
@@ -188,10 +191,11 @@ func (s *Service) ListByIdentity(ctx context.Context, identity string, withDetai
 	subjects := make([]string, len(entries))
 	for i := range entries {
 		cE[i] = AccessEntryRequest{
-			ID:         entries[i].ID,
-			Identity:   entries[i].Identity,
-			Permission: entries[i].Permission.String(),
-			Resource:   entries[i].Resource,
+			ID:           entries[i].ID,
+			Identity:     entries[i].Identity,
+			Permission:   entries[i].Permission.String(),
+			Resource:     entries[i].Resource,
+			ResourceType: entries[i].ResourceType,
 		}
 		subjects[i] = entries[i].Identity
 	}
