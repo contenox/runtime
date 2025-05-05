@@ -176,7 +176,7 @@ func TestDuplicateChunkIndexID(t *testing.T) {
 
 	err = s.CreateChunkIndex(ctx, chunk2)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), libdb.ErrConstraintViolation)
+	require.ErrorIs(t, err, libdb.ErrUniqueViolation)
 }
 
 func TestEmptyListings(t *testing.T) {
