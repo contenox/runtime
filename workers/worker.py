@@ -70,11 +70,11 @@ class Steps:
             raise Exception(f"Failed to fetch file: {response.status_code} {response.text}")
         return response.content
 
-    def mark_done(self, job_id):
-        payload = {"leaserId": self.leaser_id}
-        response = self.session.patch(f"{self.base_url}/jobs/{job_id}/done", json=payload)
-        if response.status_code != 204:
-            raise Exception(f"Failed to mark job done: {response.status_code} {response.text}")
+    # def mark_done(self, job_id):
+    #     payload = {"leaserId": self.leaser_id}
+    #     response = self.session.patch(f"{self.base_url}/jobs/{job_id}/done", json=payload)
+    #     if response.status_code != 204:
+    #         raise Exception(f"Failed to mark job done: {response.status_code} {response.text}")
 
     def mark_failed(self, job_id):
         payload = {"leaserId": self.leaser_id}
@@ -82,10 +82,10 @@ class Steps:
         if response.status_code != 204:
             raise Exception(f"Failed to mark job failed: {response.status_code} {response.text}")
 
-    def ingest(self, file_id: str, chunks: list[str], replace: bool = False):
+    def ingest(self, file_id: str, job_id: str, lease_id: str, chunks: list[str], replace: bool = False):
             response = self.session.post(
                 f"{self.base_url}/index",
-                json={"chunks": chunks, "id": file_id, "replace": replace},
+                json={"chunks": chunks, "id": file_id, "replace": replace, "jobId": job_id, "leaserId": lease_id},
             )
             if response.status_code not in [200, 204]:
                 raise Exception(f"Failed to ingest text: {response.status_code} {response.text}")
@@ -179,10 +179,10 @@ def run(worker_steps: Steps):
         chunks = worker_steps.parser.chunk(parsed)
         print("Chunking complete")
         print("Ingesting text...")
-        worker_steps.ingest(file_id, chunks, upsert)
+        worker_steps.ingest(file_id, job_id, worker_steps.leaser_id, chunks, upsert)
         print("Ingestion complete")
-        print(f"Marking job {job_id} as done.")
-        worker_steps.mark_done(job_id)
+        # print(f"Marking job {job_id} as done.")
+        # worker_steps.mark_done(job_id)
         print(f"Job {job_id} completed.")
 
     except Exception as e:

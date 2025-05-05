@@ -129,50 +129,50 @@ def test_list_in_progress_jobs(base_url, admin_session, create_test_file):
     assert found_job.get("leaser") == leaser_id
     assert found_job.get("entityId") == test_file['id']
 
-def test_mark_job_done(base_url, admin_session, create_test_file):
-    """Test marking a leased job as done."""
-    headers = admin_session
-    leaser_id = "worker-done"
-    print("\n--- Running Test: Mark Job Done ---")
+# def test_mark_job_done(base_url, admin_session, create_test_file):
+#     """Test marking a leased job as done."""
+#     headers = admin_session
+#     leaser_id = "worker-done"
+#     print("\n--- Running Test: Mark Job Done ---")
 
-    test_file, leased_job_data = create_and_lease_job(
-        base_url, headers, create_test_file, leaser_id=leaser_id
-    )
-    leased_job_id = leased_job_data["id"]
+#     test_file, leased_job_data = create_and_lease_job(
+#         base_url, headers, create_test_file, leaser_id=leaser_id
+#     )
+#     leased_job_id = leased_job_data["id"]
 
-    print(f"Marking job {leased_job_id} as done by leaser {leaser_id}...")
-    done_payload = {"leaserId": leaser_id}
-    response = requests.patch(f"{base_url}/jobs/{leased_job_id}/done", json=done_payload, headers=headers)
+#     print(f"Marking job {leased_job_id} as done by leaser {leaser_id}...")
+#     done_payload = {"leaserId": leaser_id}
+#     response = requests.patch(f"{base_url}/jobs/{leased_job_id}/done", json=done_payload, headers=headers)
 
-    # Verification
-    assert_status_code(response, 204) # Expect No Content for PATCH /done
-    print(f"Job {leased_job_id} marked as done successfully.")
+#     # Verification
+#     assert_status_code(response, 204) # Expect No Content for PATCH /done
+#     print(f"Job {leased_job_id} marked as done successfully.")
 
-    # Verify it's removed from in-progress
-    time.sleep(0.2) # Allow potential async processing
-    print("Verifying job is removed from in-progress list...")
-    response_inprogress = requests.get(f"{base_url}/jobs/in-progress", headers=headers)
-    assert_status_code(response_inprogress, 200)
-    in_progress_jobs = response_inprogress.json()
-    found_after_done = False
-    for job in in_progress_jobs:
-        if job.get("id") == leased_job_id:
-            found_after_done = True
-            break
-    assert not found_after_done, f"Job {leased_job_id} still found in in-progress after marking done"
-    print("Verified job is not in in-progress list.")
+#     # Verify it's removed from in-progress
+#     time.sleep(0.2) # Allow potential async processing
+#     print("Verifying job is removed from in-progress list...")
+#     response_inprogress = requests.get(f"{base_url}/jobs/in-progress", headers=headers)
+#     assert_status_code(response_inprogress, 200)
+#     in_progress_jobs = response_inprogress.json()
+#     found_after_done = False
+#     for job in in_progress_jobs:
+#         if job.get("id") == leased_job_id:
+#             found_after_done = True
+#             break
+#     assert not found_after_done, f"Job {leased_job_id} still found in in-progress after marking done"
+#     print("Verified job is not in in-progress list.")
 
-    print("Verifying job is not back in pending list...")
-    response_pending = requests.get(f"{base_url}/jobs/pending", headers=headers)
-    assert_status_code(response_pending, 200)
-    pending_jobs = response_pending.json()
-    found_in_pending = False
-    for job in pending_jobs:
-        if job.get("id") == leased_job_id:
-             found_in_pending = True
-             break
-    assert not found_in_pending, f"Job {leased_job_id} found back in pending after marking done"
-    print("Verified job is not in pending list.")
+#     print("Verifying job is not back in pending list...")
+#     response_pending = requests.get(f"{base_url}/jobs/pending", headers=headers)
+#     assert_status_code(response_pending, 200)
+#     pending_jobs = response_pending.json()
+#     found_in_pending = False
+#     for job in pending_jobs:
+#         if job.get("id") == leased_job_id:
+#              found_in_pending = True
+#              break
+#     assert not found_in_pending, f"Job {leased_job_id} found back in pending after marking done"
+#     print("Verified job is not in pending list.")
 
 
 def test_mark_job_failed(base_url, admin_session, create_test_file):

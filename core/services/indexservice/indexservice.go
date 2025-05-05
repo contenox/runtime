@@ -28,9 +28,11 @@ func New(ctx context.Context, embedder llmembed.Embedder, vectors vectors.Store,
 }
 
 type IndexRequest struct {
-	Chunks  []string `json:"chunks"`
-	ID      string   `json:"id"`
-	Replace bool     `json:"replace"`
+	Chunks   []string `json:"chunks"`
+	ID       string   `json:"id"`
+	Replace  bool     `json:"replace"`
+	JobID    string   `json:"jobId"`
+	LeaserID string   `json:"leaserId"`
 }
 
 type IndexResponse struct {
@@ -39,12 +41,28 @@ type IndexResponse struct {
 }
 
 func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
+	if request.LeaserID == "" {
+		return nil, serverops.ErrMissingParameter
+	}
+	if request.JobID == "" {
+		return nil, serverops.ErrMissingParameter
+	}
 	tx, commit, end, err := s.db.WithTransaction(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer end()
 	storeInstance := store.New(tx)
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionEdit); err != nil {
+		return nil, err
+	}
+	job, err := storeInstance.GetLeasedJob(ctx, request.JobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leased job %s: %w", request.JobID, err)
+	}
+	if job.Leaser != request.LeaserID {
+		return nil, fmt.Errorf("job is not leased by this leaser")
+	}
 	provider, err := s.embedder.GetProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
@@ -105,6 +123,10 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			return nil, fmt.Errorf("failed to create chunk index: %w", err)
 		}
 	}
+	err = storeInstance.DeleteLeasedJob(ctx, job.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to delete leased job: %w", err)
+	}
 	// on failure we don't commit the chunk-entries but endup with ingested vectors.
 	// this is not an issue, if on search we verify that to the matching vectors chunks exist
 	// and only then include them in the response.
@@ -139,6 +161,10 @@ type SearchResponse struct {
 }
 
 func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
+	storeInstance := store.New(s.db.WithoutTransaction())
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
+		return nil, err
+	}
 	provider, err := s.embedder.GetProvider(ctx)
 	if err != nil {
 		return nil, err
@@ -182,7 +208,6 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	if err != nil {
 		return nil, err
 	}
-	storeInstance := store.New(s.db.WithoutTransaction())
 	searchResults := make([]SearchResult, len(results))
 	for i, res := range results {
 		_, err := storeInstance.GetChunkIndexByID(ctx, res.ID)

@@ -14,6 +14,7 @@ var ErrInvalidParameterValue = errors.New("serverops: invalid parameter value ty
 var ErrBadPathValue = errors.New("serverops: bad path value")
 var ErrImmutableModel = errors.New("serverops: immutable model")
 var ErrImmutablePool = errors.New("serverops: immutable pool")
+var ErrMissingParameter = errors.New("serverops: missing parameter")
 
 // ErrFileSizeLimitExceeded indicates the specific file exceeded its allowed size limit.
 var ErrFileSizeLimitExceeded = errors.New("serverops: file size limit exceeded")
@@ -126,6 +127,9 @@ func mapErrorToStatus(op Operation, err error) int {
 	}
 	if errors.Is(err, ErrImmutablePool) {
 		return http.StatusForbidden // 403
+	}
+	if errors.Is(err, ErrMissingParameter) {
+		return http.StatusBadRequest // 400
 	}
 
 	// if errors.Is(err, messagerepo.ErrMessageNotFound) {
