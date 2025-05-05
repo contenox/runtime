@@ -9,7 +9,6 @@ class AuthSession:
         self.email = email
         self.password = password
         self.session = requests.Session()
-        # Set default headers for all requests
         self.session.headers.update({
             "Accept": "application/json",
             "Content-Type": "application/json"
@@ -21,27 +20,40 @@ class AuthSession:
             "email": self.email,
             "password": self.password,
         }
-        response = self.session.post(
-            f"{self.base_url}/login",
-            json=payload,
-        )
+        response = self.session.post(f"{self.base_url}/login", json=payload)
         if response.status_code != 200:
             raise Exception(f"Failed to login: {response.status_code} {response.text}")
         self.token = response.json()['token']
-        # Update session headers with the authorization token
         self.session.headers.update({"Authorization": f"Bearer {self.token}"})
 
-    def post(self, url, **kwargs):
-        return self.session.post(url, **kwargs)
+    def _request(self, method, url, retry=True, **kwargs):
+        full_url = f"{url}"
+        response = self.session.request(method, full_url, **kwargs)
+        if response.status_code == 401 or (
+            response.status_code == 400 and "token is expired" in response.text.lower()
+        ):
+            if retry:
+                print(f"Token expired during {method.upper()} {url}. Re-authenticating...")
+                self.refresh_token()
+                return self._request(method, url, retry=False, **kwargs)
+        return response
 
     def get(self, url, **kwargs):
-        return self.session.get(url, **kwargs)
+        return self._request("get", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self._request("post", url, **kwargs)
 
     def patch(self, url, **kwargs):
-        return self.session.patch(url, **kwargs)
+        return self._request("patch", url, **kwargs)
 
     def delete(self, url, **kwargs):
-        return self.session.delete(url, **kwargs)
+        return self._request("delete", url, **kwargs)
+
+    def refresh_token(self):
+        print("Refreshing authentication token...")
+        self.login()
+
 
 class Steps:
     def __init__(self, parser: parser.Parser, base_url: str, lease_duration: int, leaser_id: str, session: AuthSession):
@@ -69,12 +81,6 @@ class Steps:
         if response.status_code != 200:
             raise Exception(f"Failed to fetch file: {response.status_code} {response.text}")
         return response.content
-
-    # def mark_done(self, job_id):
-    #     payload = {"leaserId": self.leaser_id}
-    #     response = self.session.patch(f"{self.base_url}/jobs/{job_id}/done", json=payload)
-    #     if response.status_code != 204:
-    #         raise Exception(f"Failed to mark job done: {response.status_code} {response.text}")
 
     def mark_failed(self, job_id):
         payload = {"leaserId": self.leaser_id}
@@ -181,8 +187,6 @@ def run(worker_steps: Steps):
         print("Ingesting text...")
         worker_steps.ingest(file_id, job_id, worker_steps.leaser_id, chunks, upsert)
         print("Ingestion complete")
-        # print(f"Marking job {job_id} as done.")
-        # worker_steps.mark_done(job_id)
         print(f"Job {job_id} completed.")
 
     except Exception as e:
