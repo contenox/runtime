@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -250,4 +251,67 @@ func TestPromptingLifecycle(t *testing.T) {
 	response, err := promptClient.Prompt(context.Background(), "What is 1+1?")
 	require.NoError(t, err)
 	require.Contains(t, response, "2")
+}
+
+func TestChainBuildingPrompt(t *testing.T) {
+	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	// Configure task model and initialize engine
+	config.TasksModel = "qwen2.5:0.5b"
+	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+	require.NoError(t, err)
+
+	// Assign backend and wait for readiness
+	backend := &store.Backend{}
+	for _, l := range state.Get(ctx) {
+		backend = &l.Backend
+	}
+	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+
+	require.Eventually(t, func() bool {
+		currentState := state.Get(ctx)
+		r, _ := json.Marshal(currentState)
+		return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
+	}, 2*time.Minute, 100*time.Millisecond)
+
+	// Get provider and test prompting
+	provider, err := taskEngine.GetProvider(ctx)
+	require.NoError(t, err)
+
+	execClient, err := provider.GetPromptConnection(backend.BaseURL)
+	require.NoError(t, err)
+
+	text := `
+	The concept of "flow state," often described as being "in the zone," is characterized by complete immersion and energized focus in an activity. Individuals experiencing flow often report a feeling of spontaneous joy and a deep sense of satisfaction. Achieving this state typically requires a clear set of goals, immediate feedback, and a balance between the perceived challenge of the task and one's perceived skills. While often associated with creative arts or sports, flow can be experienced in almost any activity that meets these conditions. Understanding and cultivating flow can lead to increased productivity and greater personal fulfillment.
+	The city's public transportation system of Smalltown has seen significant improvements over the past decade, with new tram lines and more frequent bus services. Commuter satisfaction is reportedly at an all-time high. However, despite these advancements, traffic congestion in the downtown core during peak hours remains a major challenge. Several urban planners suggest that a more radical approach, such as congestion pricing or significantly expanding pedestrian-only zones, might be necessary to alleviate the gridlock. The mayor Jake Thompson, on the other hand, believes that further optimizing the existing public transit routes will eventually solve the problem.
+	`
+	prompt := fmt.Sprintf(`
+Extract atomic semantic keywords like names, dates and others from the following text. Avoid grouping or phrases. Return only important individual concepts, people, places, or terms. Format as a comma-separated list.
+
+Text: %s`, text)
+	response1, err := execClient.Prompt(context.Background(), prompt)
+	require.NoError(t, err)
+	t.Logf("Response 1: %s", response1)
+
+	response2, err := execClient.Prompt(ctx, prompt)
+	require.NoError(t, err)
+	t.Logf("Response 2: %s", response2)
+	prompt = fmt.Sprintf(`
+For each keyword and type below, write a one-line description explaining what it refers to in the original text.
+
+Keywords and types:
+%s
+
+Text: %s`, response2, text)
+	response3, err := execClient.Prompt(ctx, prompt)
+	response2 = strings.ToLower(response2)
+	response1 = strings.ToLower(response1)
+	response3 = strings.ToLower(response3)
+	require.Contains(t, response1, "flow state")
+	require.Contains(t, response1, "smalltown")
+	require.Contains(t, response1, "jake thompson")
+
+	require.Contains(t, response2, "flow state")
+	require.Contains(t, response2, "smalltown")
 }
