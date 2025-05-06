@@ -50,7 +50,7 @@ func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb
 	}, com(ctx)
 }
 
-func NewTaskEngine(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
+func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
 	tx, com, r, err := dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return nil, err

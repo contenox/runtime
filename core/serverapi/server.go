@@ -11,6 +11,7 @@ import (
 	"github.com/js402/cate/core/serverapi/backendapi"
 	"github.com/js402/cate/core/serverapi/chatapi"
 	"github.com/js402/cate/core/serverapi/dispatchapi"
+	"github.com/js402/cate/core/serverapi/execapi"
 	"github.com/js402/cate/core/serverapi/filesapi"
 	"github.com/js402/cate/core/serverapi/indexapi"
 	"github.com/js402/cate/core/serverapi/poolapi"
@@ -23,6 +24,7 @@ import (
 	"github.com/js402/cate/core/services/chatservice"
 	"github.com/js402/cate/core/services/dispatchservice"
 	"github.com/js402/cate/core/services/downloadservice"
+	"github.com/js402/cate/core/services/execservice"
 	"github.com/js402/cate/core/services/fileservice"
 	"github.com/js402/cate/core/services/indexservice"
 	"github.com/js402/cate/core/services/modelservice"
@@ -41,6 +43,7 @@ func New(
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
 	embedder llmrepo.ModelRepo,
+	execmodelrepo llmrepo.ModelRepo,
 	state *runtimestate.State,
 	vectorStore vectors.Store,
 ) (http.Handler, func() error, error) {
@@ -104,6 +107,9 @@ func New(
 	usersapi.AddAccessRoutes(mux, config, accessService)
 	indexService := indexservice.New(ctx, embedder, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
+
+	execService := execservice.New(ctx, execmodelrepo, dbInstance)
+	execapi.AddExecRoutes(mux, config, execService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
@@ -121,6 +127,7 @@ func New(
 		fileService,
 		indexService,
 		dispatchService,
+		execService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

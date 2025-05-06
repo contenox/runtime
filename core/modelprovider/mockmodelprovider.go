@@ -77,7 +77,7 @@ func (m *MockProvider) GetStreamConnection(backendID string) (serverops.LLMStrea
 }
 
 // GetPromptConnection implements Provider.
-func (m *MockProvider) GetPromptConnection(backendID string) (serverops.LLMPromptClient, error) {
+func (m *MockProvider) GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error) {
 	return &mockPromptClient{}, nil
 }
 

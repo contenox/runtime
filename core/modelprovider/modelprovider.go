@@ -22,7 +22,7 @@ type Provider interface {
 	CanStream() bool         // Supports streaming
 	CanPrompt() bool         // Supports prompting
 	GetChatConnection(backendID string) (serverops.LLMChatClient, error)
-	GetPromptConnection(backendID string) (serverops.LLMPromptClient, error)
+	GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error)
 	GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error)
 	GetStreamConnection(backendID string) (serverops.LLMStreamClient, error)
 }
@@ -114,7 +114,7 @@ func (p *OllamaProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbe
 	return embedClient, nil
 }
 
-func (p *OllamaProvider) GetPromptConnection(backendID string) (serverops.LLMPromptClient, error) {
+func (p *OllamaProvider) GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}

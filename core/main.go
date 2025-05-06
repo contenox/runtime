@@ -97,6 +97,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
+	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+	if err != nil {
+		log.Fatalf("initializing task engine failed: %v", err)
+	}
 	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: time.Second * 10, // TODO: Make this configurable
 		SearchArgs: vectors.SearchArgs{
@@ -108,7 +112,7 @@ func main() {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, state, vectorStore)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, state, vectorStore)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

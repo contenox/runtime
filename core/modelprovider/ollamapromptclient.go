@@ -50,4 +50,4 @@ func (o *OllamaPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	return content, nil
 }
 
-var _ serverops.LLMPromptClient = (*OllamaPromptClient)(nil)
+var _ serverops.LLMPromptExecClient = (*OllamaPromptClient)(nil)

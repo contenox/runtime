@@ -20,6 +20,6 @@ type LLMStreamClient interface {
 	Stream(ctx context.Context, prompt string) (<-chan string, error)
 }
 
-type LLMPromptClient interface {
+type LLMPromptExecClient interface {
 	Prompt(ctx context.Context, prompt string) (string, error)
 }

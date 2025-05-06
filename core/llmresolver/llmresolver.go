@@ -236,3 +236,32 @@ func ResolveStream(
 	}
 	return provider.GetStreamConnection(backend)
 }
+
+type ResolvePromptRequest struct {
+	ModelName string
+	Provider  string // Optional. Empty uses default.
+}
+
+func ResolvePromptExecute(
+	ctx context.Context,
+	reqExec ResolvePromptRequest,
+	getModels modelprovider.RuntimeState,
+	resolver Resolver,
+) (serverops.LLMPromptExecClient, error) {
+	if reqExec.ModelName == "" {
+		return nil, fmt.Errorf("model name is required")
+	}
+	req := ResolveRequest{
+		ModelNames: []string{reqExec.ModelName},
+		Provider:   reqExec.Provider,
+	}
+	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanPrompt)
+	if err != nil {
+		return nil, err
+	}
+	provider, backend, err := resolver(candidates)
+	if err != nil {
+		return nil, err
+	}
+	return provider.GetPromptConnection(backend)
+}

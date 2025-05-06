@@ -32,6 +32,7 @@ const (
 	ListOperation
 	AuthorizeOperation
 	ServerOperation
+	ExecuteOperation
 )
 
 // Map known error types to HTTP status codes
@@ -167,6 +168,8 @@ func mapErrorToStatus(op Operation, err error) int {
 	case AuthorizeOperation:
 		return http.StatusForbidden // 403
 	case ServerOperation: // Explicitly marked as server-side issue
+		return http.StatusInternalServerError // 500
+	case ExecuteOperation:
 		return http.StatusInternalServerError // 500
 	default:
 		// Catch-all for unknown operations or uncategorized errors

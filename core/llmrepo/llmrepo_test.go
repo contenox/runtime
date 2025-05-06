@@ -168,7 +168,7 @@ func TestNewTaskEngine_InitializesPoolAndModel(t *testing.T) {
 	config.TasksModel = "smollm2:135m"
 
 	// Initialize task engine
-	_, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	_, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Verify pool exists (same pool as embedder due to current code)
@@ -196,7 +196,7 @@ func TestGetProvider_WithBackends_Prompt(t *testing.T) {
 
 	// Set task model and initialize
 	config.TasksModel = "smollm2:135m"
-	taskEngine, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Assign backend to pool
@@ -224,7 +224,7 @@ func TestPromptingLifecycle(t *testing.T) {
 
 	// Configure task model and initialize engine
 	config.TasksModel = "smollm2:135m"
-	taskEngine, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Assign backend and wait for readiness
