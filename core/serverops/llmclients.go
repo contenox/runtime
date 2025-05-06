@@ -19,3 +19,7 @@ type LLMEmbedClient interface {
 type LLMStreamClient interface {
 	Stream(ctx context.Context, prompt string) (<-chan string, error)
 }
+
+type LLMPromptClient interface {
+	Prompt(ctx context.Context, prompt string) (string, error)
+}

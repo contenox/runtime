@@ -20,7 +20,9 @@ type Provider interface {
 	CanChat() bool           // Supports chat interactions
 	CanEmbed() bool          // Supports embeddings
 	CanStream() bool         // Supports streaming
+	CanPrompt() bool         // Supports prompting
 	GetChatConnection(backendID string) (serverops.LLMChatClient, error)
+	GetPromptConnection(backendID string) (serverops.LLMPromptClient, error)
 	GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error)
 	GetStreamConnection(backendID string) (serverops.LLMStreamClient, error)
 }
@@ -32,6 +34,7 @@ type OllamaProvider struct {
 	SupportsChat   bool
 	SupportsEmbed  bool
 	SupportsStream bool
+	SupportsPrompt bool
 	Backends       []string // we assume that Backend IDs are urls to the instance
 }
 
@@ -61,6 +64,10 @@ func (p *OllamaProvider) CanEmbed() bool {
 
 func (p *OllamaProvider) CanStream() bool {
 	return p.SupportsStream
+}
+
+func (p *OllamaProvider) CanPrompt() bool {
+	return p.SupportsPrompt
 }
 
 func (p *OllamaProvider) GetChatConnection(backendID string) (serverops.LLMChatClient, error) {
@@ -105,6 +112,27 @@ func (p *OllamaProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbe
 	}
 
 	return embedClient, nil
+}
+
+func (p *OllamaProvider) GetPromptConnection(backendID string) (serverops.LLMPromptClient, error) {
+	if !p.CanPrompt() {
+		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
+	}
+	u, err := url.Parse(backendID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid backend URL '%s' for provider %s: %w", backendID, p.GetID(), err)
+	}
+	// TODO: Consider using a configurable http.Client with timeouts
+	httpClient := http.DefaultClient
+	ollamaAPIClient := api.NewClient(u, httpClient)
+
+	promptClient := &OllamaPromptClient{
+		ollamaClient: ollamaAPIClient,
+		modelName:    p.ModelName(),
+		backendURL:   backendID,
+	}
+
+	return promptClient, nil
 }
 
 func (p *OllamaProvider) GetStreamConnection(backendID string) (serverops.LLMStreamClient, error) {

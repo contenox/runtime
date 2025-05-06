@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/llmrepo"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -14,12 +14,12 @@ import (
 )
 
 type Service struct {
-	embedder llmembed.Embedder
+	embedder llmrepo.ModelRepo
 	vectors  vectors.Store
 	db       libdb.DBManager
 }
 
-func New(ctx context.Context, embedder llmembed.Embedder, vectors vectors.Store, dbInstance libdb.DBManager) *Service {
+func New(ctx context.Context, embedder llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) *Service {
 	return &Service{
 		embedder: embedder,
 		vectors:  vectors,

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/llmrepo"
 	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/modelprovider"
 	"github.com/js402/cate/core/serverapi"
@@ -47,7 +47,7 @@ func TestWorkerPipe(t *testing.T) {
 
 	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
 	defer cleanup()
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}

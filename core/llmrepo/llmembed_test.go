@@ -1,4 +1,4 @@
-package llmembed_test
+package llmrepo_test
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/llmrepo"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -38,7 +38,7 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 	defer cleanup()
 
 	// Test initialization
-	_, err := llmembed.New(ctx, config, dbInstance, state)
+	_, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Verify pool creation
@@ -69,7 +69,7 @@ func TestGetProvider_WithBackends(t *testing.T) {
 	defer cleanup()
 
 	// Initialize embedder
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 	backend := &store.Backend{}
 	for _, l := range state.Get(ctx) {
@@ -92,7 +92,7 @@ func TestGetProvider_NoBackends(t *testing.T) {
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	_, err = embedder.GetProvider(ctx)
@@ -104,7 +104,7 @@ func TestGetRuntime_Adapter(t *testing.T) {
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Verify runtime adapter
@@ -126,7 +126,7 @@ func TestEmbeddingLifecycle(t *testing.T) {
 		backend = &l.Backend
 	}
 	// Initialize embedder
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))

@@ -16,6 +16,7 @@ type MockProvider struct {
 	Backends      []string
 	CanChatFlag   bool
 	CanEmbedFlag  bool
+	CanPromptFlag bool
 	CanStreamFlag bool
 }
 
@@ -54,6 +55,10 @@ func (m *MockProvider) CanStream() bool {
 	return m.CanStreamFlag
 }
 
+func (m *MockProvider) CanPrompt() bool {
+	return m.CanPromptFlag
+}
+
 // GetChatConnection returns a mock LLMChatClient.
 // Here we simply return a dummy implementation that meets the required interface.
 func (m *MockProvider) GetChatConnection(backendID string) (serverops.LLMChatClient, error) {
@@ -69,6 +74,11 @@ func (m *MockProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbedC
 // GetStreamConnection returns a dummy LLMStreamClient.
 func (m *MockProvider) GetStreamConnection(backendID string) (serverops.LLMStreamClient, error) {
 	return &mockStreamClient{}, nil
+}
+
+// GetPromptConnection implements Provider.
+func (m *MockProvider) GetPromptConnection(backendID string) (serverops.LLMPromptClient, error) {
+	return &mockPromptClient{}, nil
 }
 
 type mockChatClient struct{}
@@ -95,4 +105,11 @@ func (m *mockStreamClient) Stream(ctx context.Context, prompt string) (<-chan st
 		ch <- "streamed response for: " + prompt
 	}()
 	return ch, nil
+}
+
+type mockPromptClient struct{}
+
+// Prompt simulates prompting by returning a dummy response.
+func (m *mockPromptClient) Prompt(ctx context.Context, prompt string) (string, error) {
+	return "prompted response for: " + prompt, nil
 }

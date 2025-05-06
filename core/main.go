@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/llmrepo"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi"
 	"github.com/js402/cate/core/serverops"
@@ -93,7 +93,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing runtime state failed: %v", err)
 	}
-	embedder, err := llmembed.New(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}

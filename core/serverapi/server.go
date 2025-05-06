@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/js402/cate/core/llmembed"
+	"github.com/js402/cate/core/llmrepo"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverapi/backendapi"
 	"github.com/js402/cate/core/serverapi/chatapi"
@@ -40,7 +40,7 @@ func New(
 	config *serverops.Config,
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
-	embedder llmembed.Embedder,
+	embedder llmrepo.ModelRepo,
 	state *runtimestate.State,
 	vectorStore vectors.Store,
 ) (http.Handler, func() error, error) {
