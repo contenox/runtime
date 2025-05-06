@@ -92,6 +92,7 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 	// Append model to the global model store.
 	err = dbStore.AppendModel(ctx, &store.Model{
 		Model: "smollm2:135m",
+		ID:    uuid.NewString(),
 	})
 	if err != nil {
 		for _, fn := range cleanups {

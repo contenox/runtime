@@ -232,6 +232,12 @@ func WithEmbed(supports bool) OllamaOption {
 	}
 }
 
+func WithPrompt(supports bool) OllamaOption {
+	return func(p *OllamaProvider) {
+		p.SupportsPrompt = supports
+	}
+}
+
 func WithStream(supports bool) OllamaOption {
 	return func(p *OllamaProvider) {
 		p.SupportsStream = supports

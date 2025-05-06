@@ -47,6 +47,26 @@ func (s *store) GetModel(ctx context.Context, id string) (*Model, error) {
 	return &model, err
 }
 
+func (s *store) GetModelByName(ctx context.Context, name string) (*Model, error) {
+	var model Model
+	err := s.Exec.QueryRowContext(ctx, `
+        SELECT id, model, created_at, updated_at
+        FROM ollama_models
+        WHERE model = $1`,
+		name,
+	).Scan(
+		&model.ID,
+		&model.Model,
+		&model.CreatedAt,
+		&model.UpdatedAt,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, libdb.ErrNotFound
+	}
+	return &model, err
+}
+
 func (s *store) DeleteModel(ctx context.Context, modelName string) error {
 	result, err := s.Exec.ExecContext(ctx, `
 		DELETE FROM ollama_models

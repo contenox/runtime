@@ -159,3 +159,95 @@ func TestEmbeddingLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, embeddings)
 }
+
+func TestNewTaskEngine_InitializesPoolAndModel(t *testing.T) {
+	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	// Set task-specific model in config (assuming serverops.Config has this field)
+	config.TasksModel = "smollm2:135m"
+
+	// Initialize task engine
+	_, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	require.NoError(t, err)
+
+	// Verify pool exists (same pool as embedder due to current code)
+	poolStore := store.New(dbInstance.WithoutTransaction())
+	pool, err := poolStore.GetPool(ctx, serverops.EmbedPoolID)
+	require.NoError(t, err)
+	require.Equal(t, serverops.EmbedPoolName, pool.Name)
+
+	// Verify task model creation
+	modelStore := store.New(dbInstance.WithoutTransaction())
+	model, err := modelStore.GetModelByName(ctx, config.TasksModel)
+	require.NoError(t, err)
+	require.Equal(t, config.TasksModel, model.Model)
+
+	// Verify model assignment to pool
+	models, err := modelStore.ListModelsForPool(ctx, serverops.EmbedPoolID)
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	require.Equal(t, config.TasksModel, models[0].ID)
+}
+
+func TestGetProvider_WithBackends_Prompt(t *testing.T) {
+	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	// Set task model and initialize
+	config.TasksModel = "smollm2:135m"
+	taskEngine, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	require.NoError(t, err)
+
+	// Assign backend to pool
+	backend := &store.Backend{}
+	for _, l := range state.Get(ctx) {
+		backend = &l.Backend
+		break
+	}
+	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+	time.Sleep(time.Second) // Allow state refresh
+
+	// Get provider and verify capabilities
+	provider, err := taskEngine.GetProvider(ctx)
+	require.NoError(t, err)
+
+	require.True(t, provider.CanPrompt())
+	require.False(t, provider.CanEmbed())
+	require.Equal(t, "smollm2:135m", provider.ModelName())
+	require.Contains(t, provider.GetBackendIDs(), backend.BaseURL)
+}
+
+func TestPromptingLifecycle(t *testing.T) {
+	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	// Configure task model and initialize engine
+	config.TasksModel = "smollm2:135m"
+	taskEngine, err := llmrepo.NewTaskEngine(ctx, config, dbInstance, state)
+	require.NoError(t, err)
+
+	// Assign backend and wait for readiness
+	backend := &store.Backend{}
+	for _, l := range state.Get(ctx) {
+		backend = &l.Backend
+	}
+	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+
+	require.Eventually(t, func() bool {
+		currentState := state.Get(ctx)
+		r, _ := json.Marshal(currentState)
+		return strings.Contains(string(r), `"name":"smollm2:135m"`)
+	}, 2*time.Minute, 100*time.Millisecond)
+
+	// Get provider and test prompting
+	provider, err := taskEngine.GetProvider(ctx)
+	require.NoError(t, err)
+
+	promptClient, err := provider.GetPromptConnection(backend.BaseURL)
+	require.NoError(t, err)
+
+	response, err := promptClient.Prompt(context.Background(), "What is 1+1?")
+	require.NoError(t, err)
+	require.Contains(t, response, "2")
+}

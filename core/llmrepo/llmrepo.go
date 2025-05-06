@@ -45,6 +45,41 @@ func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb
 		model:      model,
 		dbInstance: dbInstance,
 		runtime:    runtime,
+		embed:      true,
+		prompt:     false,
+	}, com(ctx)
+}
+
+func NewTaskEngine(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
+	tx, com, r, err := dbInstance.WithTransaction(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer r()
+
+	pool, err := serverops.InitEmbedPool(ctx, config, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("init pool: %w", err)
+	}
+	model, err := serverops.InitTasksModel(ctx, config, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("init model: %w", err)
+	}
+	err = serverops.AssignModelToPool(ctx, config, tx, model, pool)
+	if err != nil {
+		return nil, fmt.Errorf("assign model to pool: %w", err)
+	}
+	err = serverops.InitCredentials(ctx, config, tx)
+	if err != nil {
+		return nil, fmt.Errorf("init credentials: %w", err)
+	}
+	return &modelManager{
+		pool:       pool,
+		model:      model,
+		dbInstance: dbInstance,
+		runtime:    runtime,
+		embed:      false,
+		prompt:     true,
 	}, com(ctx)
 }
 
@@ -54,6 +89,7 @@ type modelManager struct {
 	dbInstance libdb.DBManager
 	runtime    *runtimestate.State
 	embed      bool
+	prompt     bool
 }
 
 // GetRuntime implements Embedder.
@@ -90,7 +126,8 @@ func (e *modelManager) GetProvider(ctx context.Context) (modelprovider.Provider,
 	if len(results) == 0 {
 		return nil, errors.New("no backends found")
 	}
-	provider := modelprovider.NewOllamaModelProvider(e.model.Model, results, modelprovider.WithEmbed(e.embed))
-
+	provider := modelprovider.NewOllamaModelProvider(e.model.Model, results,
+		modelprovider.WithEmbed(e.embed),
+		modelprovider.WithPrompt(e.prompt))
 	return provider, nil
 }

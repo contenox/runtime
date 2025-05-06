@@ -223,6 +223,7 @@ type Store interface {
 
 	AppendModel(ctx context.Context, model *Model) error
 	GetModel(ctx context.Context, id string) (*Model, error)
+	GetModelByName(ctx context.Context, name string) (*Model, error)
 	DeleteModel(ctx context.Context, modelName string) error
 	ListModels(ctx context.Context) ([]*Model, error)
 

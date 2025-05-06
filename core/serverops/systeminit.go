@@ -58,7 +58,7 @@ func InitEmbedModel(ctx context.Context, config *Config, tx libdb.Exec, created 
 	modelID := uuid.NewSHA1(tenantID, []byte(config.EmbedModel))
 	storeInstance := store.New(tx)
 
-	model, err := storeInstance.GetModel(ctx, modelID.String())
+	model, err := storeInstance.GetModelByName(ctx, config.EmbedModel)
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return nil, fmt.Errorf("get model: %w", err)
 	}
@@ -83,7 +83,7 @@ func InitTasksModel(ctx context.Context, config *Config, tx libdb.Exec, created 
 	modelID := uuid.NewSHA1(tenantID, []byte(config.TasksModel))
 	storeInstance := store.New(tx)
 
-	model, err := storeInstance.GetModel(ctx, modelID.String())
+	model, err := storeInstance.GetModelByName(ctx, config.TasksModel)
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return nil, fmt.Errorf("get model: %w", err)
 	}

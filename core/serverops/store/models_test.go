@@ -99,3 +99,21 @@ func TestAppendDuplicateModel(t *testing.T) {
 	err = s.AppendModel(ctx, model)
 	require.Error(t, err)
 }
+
+func TestGetModelByName(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	model := &store.Model{
+		ID:    uuid.New().String(),
+		Model: "model-to-get",
+	}
+	err := s.AppendModel(ctx, model)
+	require.NoError(t, err)
+
+	foundModel, err := s.GetModelByName(ctx, "model-to-get")
+	require.NoError(t, err)
+	require.Equal(t, model.ID, foundModel.ID)
+	require.Equal(t, model.Model, foundModel.Model)
+	require.WithinDuration(t, model.CreatedAt, foundModel.CreatedAt, time.Second)
+	require.WithinDuration(t, model.UpdatedAt, foundModel.UpdatedAt, time.Second)
+}
