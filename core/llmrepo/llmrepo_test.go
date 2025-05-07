@@ -120,9 +120,30 @@ func TestGetRuntime_Adapter(t *testing.T) {
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
+	// Initialize embedder
 	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
-
+	backend := &store.Backend{}
+	for _, l := range state.Get(ctx) {
+		backend = &l.Backend
+		break
+	}
+	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+	require.Eventually(t, func() bool {
+		currentState := state.Get(ctx)
+		r, err := json.Marshal(currentState)
+		if err != nil {
+			t.Logf("error marshaling state: %v", err)
+			return false
+		}
+		dst := &bytes.Buffer{}
+		if err := json.Compact(dst, r); err != nil {
+			t.Logf("error compacting JSON: %v", err)
+			return false
+		}
+		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
+	}, 2*time.Minute, 100*time.Millisecond)
+	time.Sleep(time.Second * 30) // Test GetProvider
 	// Verify runtime adapter
 	runtimeAdapter := embedder.GetRuntime(ctx)
 	require.NotNil(t, runtimeAdapter)
