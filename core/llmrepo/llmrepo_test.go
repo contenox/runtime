@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/js402/cate/core/llmrepo"
+	"github.com/js402/cate/core/llmresolver"
+	"github.com/js402/cate/core/modelprovider"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -78,8 +80,21 @@ func TestGetProvider_WithBackends(t *testing.T) {
 		break
 	}
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-	time.Sleep(time.Second)
-	// Test GetProvider
+	require.Eventually(t, func() bool {
+		currentState := state.Get(ctx)
+		r, err := json.Marshal(currentState)
+		if err != nil {
+			t.Logf("error marshaling state: %v", err)
+			return false
+		}
+		dst := &bytes.Buffer{}
+		if err := json.Compact(dst, r); err != nil {
+			t.Logf("error compacting JSON: %v", err)
+			return false
+		}
+		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
+	}, 2*time.Minute, 100*time.Millisecond)
+	time.Sleep(time.Second * 30) // Test GetProvider
 	provider, err := embedder.GetProvider(ctx)
 	require.NoError(t, err)
 
@@ -188,7 +203,7 @@ func TestNewTaskEngine_InitializesPoolAndModel(t *testing.T) {
 	models, err := modelStore.ListModelsForPool(ctx, serverops.EmbedPoolID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
-	require.Equal(t, config.TasksModel, models[0].ID)
+	require.Equal(t, config.TasksModel, models[0].Model)
 }
 
 func TestGetProvider_WithBackends_Prompt(t *testing.T) {
@@ -259,6 +274,7 @@ func TestChainBuildingPrompt(t *testing.T) {
 
 	// Configure task model and initialize engine
 	config.TasksModel = "qwen2.5:0.5b"
+
 	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
@@ -314,4 +330,36 @@ Text: %s`, response2, text)
 
 	require.Contains(t, response2, "flow state")
 	require.Contains(t, response2, "smalltown")
+}
+
+func TestResolvePrompt_WithPromptOption(t *testing.T) {
+	// A provider that normally doesn't support prompt
+	providerNoPrompt := &modelprovider.MockProvider{
+		ID:            "force1",
+		Name:          "badname.5:0.5b",
+		ContextLength: 8192,
+		CanPromptFlag: false, // Normally not allowed
+		Backends:      []string{"b7"},
+	}
+
+	// Simulate applying WithPrompt(true) during provider construction
+	providerForcedPrompt := *providerNoPrompt
+	providerForcedPrompt.CanPromptFlag = true // Simulating WithPrompt(true)
+
+	getModels := func(_ context.Context, _ string) ([]modelprovider.Provider, error) {
+		return []modelprovider.Provider{&providerForcedPrompt}, nil
+	}
+
+	req := llmresolver.ResolvePromptRequest{
+		ModelName: "badname.5:0.5b",
+	}
+
+	client, err := llmresolver.ResolvePromptExecute(context.Background(), req, getModels, llmresolver.ResolveRandomly)
+
+	if err != nil {
+		t.Errorf("ResolvePromptExecute() unexpected error = %v", err)
+	}
+	if client == nil {
+		t.Errorf("ResolvePromptExecute() returned nil client, want non-nil")
+	}
 }

@@ -42,6 +42,7 @@ func TestWorkerPipe(t *testing.T) {
 		EncryptionKey:   "securecryptngkeysecurecryptngkey",
 		SigningKey:      "securecryptngkeysecurecryptngkey",
 		EmbedModel:      "nomic-embed-text:latest",
+		TasksModel:      "qwen2.5:0.5b",
 		SecurityEnabled: "true",
 	}
 
@@ -50,6 +51,10 @@ func TestWorkerPipe(t *testing.T) {
 	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
+	}
+	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+	if err != nil {
+		log.Fatalf("initializing exec repo failed: %v", err)
 	}
 	uri, _, cleanup2, err := vectors.SetupLocalInstance(ctx, "../../")
 	defer cleanup2()
@@ -80,7 +85,7 @@ func TestWorkerPipe(t *testing.T) {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	defer cleanup4()
-	indexService := indexservice.New(ctx, embedder, vectorStore, dbInstance)
+	indexService := indexservice.New(ctx, embedder, execRepo, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	userService := userservice.New(dbInstance, config)
@@ -109,25 +114,46 @@ func TestWorkerPipe(t *testing.T) {
 		}
 		return strings.Contains(string(r), `"name":"nomic-embed-text:latest"`)
 	}, 2*time.Minute, 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		currentState := state.Get(ctx)
+		r, err := json.Marshal(currentState)
+		if err != nil {
+			t.Logf("error marshaling state: %v", err)
+			return false
+		}
+		dst := &bytes.Buffer{}
+		if err := json.Compact(dst, r); err != nil {
+			t.Logf("error compacting JSON: %v", err)
+			return false
+		}
+		return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
+	}, 2*time.Minute, 100*time.Millisecond)
 	runtime := state.Get(ctx)
 	url := ""
 	backendID := ""
 	found := false
+	foundExecModel := false
 	for _, runtimeState := range runtime {
 		url = runtimeState.Backend.BaseURL
 		backendID = runtimeState.Backend.ID
 		for _, lmr := range runtimeState.PulledModels {
 			if lmr.Model == "nomic-embed-text:latest" {
 				found = true
-				break
+			}
+			if lmr.Model == "qwen2.5:0.5b" {
+				foundExecModel = true
 			}
 		}
-		if found {
+		if found && foundExecModel {
 			break
 		}
 	}
 	if !found {
 		t.Fatalf("nomic-embed-text:latest not found")
+	}
+	if !foundExecModel {
+		t.Fatalf("qwen2.5:0.5b not found")
 	}
 	_ = url
 	err = store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backendID)
@@ -217,7 +243,7 @@ func TestWorkerPipe(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 3)
 		readCloser, err := workerContainer.Logs(ctx)
 		require.NoError(t, err, "failed to get worker logs stream")
 		defer readCloser.Close()
@@ -227,7 +253,21 @@ func TestWorkerPipe(t *testing.T) {
 			t.Logf("Warning: failed to read all worker logs: %v", err)
 		}
 		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
-		results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil)
+		jobs, err = dispatcher.PendingJobs(ctx, nil)
+		found := -1
+		for i, j := range jobs {
+			if j.TaskType == "vectorize_text/plain; charset=utf-8" {
+				found = i
+			}
+			t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+		}
+		errText := ""
+		if found != -1 {
+			errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
+		}
+		require.Equal(t, -1, found, errText)
+
+		results, err := vectorStore.Search(ctx, vectorData32, -1, 1, nil) // prior 10
 		if err != nil {
 			t.Fatalf("failed to search vector store: %v", err)
 		}

@@ -82,7 +82,8 @@ class Steps:
             raise Exception(f"Failed to fetch file: {response.status_code} {response.text}")
         return response.content
 
-    def mark_failed(self, job_id):
+    def mark_failed(self, job_id, reason="unspecified"):
+        print(f"Marking job {job_id} as failed. Reason: {reason}")
         payload = {"leaserId": self.leaser_id}
         response = self.session.patch(f"{self.base_url}/jobs/{job_id}/failed", json=payload)
         if response.status_code != 204:
@@ -128,7 +129,7 @@ def cycle(parser: parser.Parser, config: dict):
         )
         # print("AuthSession started")
     except Exception as e:
-        # print(f"Error during login: {e}")
+        print(f"Error during login: {e}")
         raise e
     # print("Starting Worker...")
     while True:
@@ -193,4 +194,4 @@ def run(worker_steps: Steps):
         print(f"ERROR: {e}")
         if job_id is not None:
             # print(f"marking job {job_id} as failed.")
-            worker_steps.mark_failed(job_id)
+            worker_steps.mark_failed(job_id, reason=str(e))

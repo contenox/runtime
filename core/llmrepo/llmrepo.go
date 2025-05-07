@@ -94,34 +94,39 @@ type modelManager struct {
 
 // GetRuntime implements Embedder.
 func (e *modelManager) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
-	return modelprovider.ModelProviderAdapter(ctx, e.runtime.Get(ctx))
+	provider, err := e.GetProvider(ctx)
+
+	return func(ctx context.Context, backendType string) ([]modelprovider.Provider, error) {
+		if err != nil {
+			return nil, err
+		}
+		if backendType != "Ollama" && backendType != "" {
+			return nil, fmt.Errorf("unsupported backend-type")
+		}
+		return []modelprovider.Provider{provider}, nil
+	}
 }
 
 func (e *modelManager) GetProvider(ctx context.Context) (modelprovider.Provider, error) {
-	adapter := modelprovider.ModelProviderAdapter(ctx, e.runtime.Get(ctx))
-	providers, err := adapter(ctx, "Ollama")
-	if err != nil {
-		return nil, fmt.Errorf("unexpected error: %v", err)
-	}
-	if len(providers) == 0 {
-		return nil, errors.New("no providers found")
-	}
-	backends, err := store.New(e.dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, e.pool.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list backends: %v", err)
-	}
-	backendsConv := map[string]struct{}{}
-	for _, provider := range providers {
-		backendsInRuntime := provider.GetBackendIDs()
-		for _, backend := range backendsInRuntime {
-			backendsConv[backend] = struct{}{}
+	backends := map[string]store.Backend{}
+
+	for _, v := range e.runtime.Get(ctx) {
+		ok, err := e.backendIsInPool(ctx, v.Backend)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		for _, lmr := range v.PulledModels {
+			if lmr.Model == e.model.Model {
+				backends[v.Backend.BaseURL] = v.Backend
+			}
 		}
 	}
 	var results []string
 	for _, backend := range backends {
-		if _, ok := backendsConv[backend.BaseURL]; ok {
-			results = append(results, backend.BaseURL)
-		}
+		results = append(results, backend.BaseURL)
 	}
 	if len(results) == 0 {
 		return nil, errors.New("no backends found")
@@ -130,4 +135,18 @@ func (e *modelManager) GetProvider(ctx context.Context) (modelprovider.Provider,
 		modelprovider.WithEmbed(e.embed),
 		modelprovider.WithPrompt(e.prompt))
 	return provider, nil
+}
+
+func (e *modelManager) backendIsInPool(ctx context.Context, backendToVerify store.Backend) (bool, error) {
+	backendsConfiguredInPool, err := store.New(e.dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, e.pool.ID)
+	if err != nil {
+		return false, fmt.Errorf("failed to list backends for pool %s: %w", e.pool.ID, err)
+	}
+
+	for _, poolBackend := range backendsConfiguredInPool {
+		if poolBackend.BaseURL == backendToVerify.BaseURL {
+			return true, nil
+		}
+	}
+	return false, nil
 }

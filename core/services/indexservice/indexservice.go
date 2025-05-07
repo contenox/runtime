@@ -14,16 +14,18 @@ import (
 )
 
 type Service struct {
-	embedder llmrepo.ModelRepo
-	vectors  vectors.Store
-	db       libdb.DBManager
+	embedder   llmrepo.ModelRepo
+	promptExec llmrepo.ModelRepo
+	vectors    vectors.Store
+	db         libdb.DBManager
 }
 
-func New(ctx context.Context, embedder llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) *Service {
+func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) *Service {
 	return &Service{
-		embedder: embedder,
-		vectors:  vectors,
-		db:       dbInstance,
+		embedder:   embedder,
+		promptExec: promptExec,
+		vectors:    vectors,
+		db:         dbInstance,
 	}
 }
 
@@ -91,10 +93,15 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 
 	ids := make([]string, len(request.Chunks))
 	for i, chunk := range request.Chunks {
-		vectorData, err := embedClient.Embed(ctx, chunk)
+		enrichedChunk, err := s.enrichChunkWithKeywords(ctx, chunk)
+		if err != nil {
+			return nil, fmt.Errorf("failed to enrich chunk: %w", err)
+		}
+		vectorData, err := embedClient.Embed(ctx, enrichedChunk)
 		if err != nil {
 			return nil, fmt.Errorf("failed to embed text: %w", err)
 		}
+
 		vectorData32 := make([]float32, len(vectorData))
 		// Iterate and cast each element
 		for i, v := range vectorData {
@@ -227,6 +234,33 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	}
 
 	return &SearchResponse{Results: searchResults}, nil
+}
+
+func (s *Service) enrichChunkWithKeywords(ctx context.Context, chunk string) (string, error) {
+	prompt := fmt.Sprintf(`Extract 5-7 keywords from the following text:
+
+%s
+
+Return a comma-separated list of keywords.`, chunk)
+
+	provider, err := s.promptExec.GetProvider(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get provider: %w", err)
+	}
+
+	promptClient, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
+		ModelName: provider.ModelName(),
+	}, s.promptExec.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve prompt client for model %s: %w", provider.ModelName(), err)
+	}
+	response, err := promptClient.Prompt(ctx, prompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute the prompt: %w", err)
+	}
+	println("promptClient", response)
+	enriched := fmt.Sprintf("%s\n\nKeywords: %s", chunk, response)
+	return enriched, nil
 }
 
 func (s *Service) GetServiceName() string {

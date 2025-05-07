@@ -105,7 +105,7 @@ func New(
 
 	accessService := accessservice.New(dbInstance)
 	usersapi.AddAccessRoutes(mux, config, accessService)
-	indexService := indexservice.New(ctx, embedder, vectorStore, dbInstance)
+	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	execService := execservice.New(ctx, execmodelrepo, dbInstance)

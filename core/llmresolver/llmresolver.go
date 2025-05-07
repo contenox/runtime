@@ -83,7 +83,20 @@ func filterCandidates(
 	}
 
 	if len(candidates) == 0 {
-		return nil, ErrNoSatisfactoryModel
+		var builder strings.Builder
+
+		builder.WriteString("no models matched requirements:\n")
+		builder.WriteString(fmt.Sprintf("- provider: %q\n", providerType))
+		builder.WriteString(fmt.Sprintf("- model names: %v\n", req.ModelNames))
+		builder.WriteString(fmt.Sprintf("- required context length: %d\n", req.ContextLength))
+
+		builder.WriteString("- available models:\n")
+		for _, p := range providers {
+			builder.WriteString(fmt.Sprintf("  • %s (ID: %s, context: %d, canchat: %v, can embed: %v, canprompt: %v)\n",
+				p.ModelName(), p.GetID(), p.GetContextLength(), p.CanChat(), p.CanEmbed(), p.CanPrompt()))
+		}
+
+		return nil, fmt.Errorf("%w\n%s", ErrNoSatisfactoryModel, builder.String())
 	}
 
 	return candidates, nil
@@ -204,17 +217,16 @@ func ResolveEmbed(
 		return nil, fmt.Errorf("model name is required")
 	}
 	req := ResolveRequest{
-		ModelNames:    []string{embedReq.ModelName},
-		Provider:      embedReq.Provider,
-		ContextLength: 0,
+		ModelNames: []string{embedReq.ModelName},
+		Provider:   embedReq.Provider,
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanEmbed)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to filter candidates %w", err)
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed apply resolver %w", err)
 	}
 	return provider.GetEmbedConnection(backend)
 }

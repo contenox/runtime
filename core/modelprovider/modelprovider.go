@@ -151,6 +151,7 @@ func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption
 	canChat := canChat[nameForMatching]
 	canEmbed := canEmbed[nameForMatching]
 	canStream := canStreaming[nameForMatching]
+	canPrompt := canPrompt[nameForMatching]
 
 	p := &OllamaProvider{
 		Name:           name,
@@ -159,6 +160,7 @@ func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption
 		SupportsChat:   canChat,
 		SupportsEmbed:  canEmbed,
 		SupportsStream: canStream,
+		SupportsPrompt: canPrompt,
 		Backends:       backends,
 	}
 
@@ -187,6 +189,7 @@ var (
 		"zephyr":          8192,  // Zephyr 7B (based on Mistral)
 		"neural-chat":     8192,  // Intel fine-tuned LLM
 		"dolphin-mixtral": 32768, // Mixtral fine-tune
+		"qwen2.5:0.5b":    4128,  //TODO:check
 	}
 
 	modelContextLengthsFullNames = map[string]int{
@@ -209,6 +212,11 @@ var (
 		"all-minilm":       true,
 		"all-minilm:33m":   true,
 		"nomic-embed-text": true,
+	}
+
+	canPrompt = map[string]bool{
+		// "qwen2.5":      true,
+		// "qwen2.5:0.5b": true,
 	}
 
 	canStreaming = map[string]bool{
