@@ -267,7 +267,7 @@ func TestWorkerPipe(t *testing.T) {
 		}
 		require.Equal(t, -1, found, errText)
 
-		results, err := vectorStore.Search(ctx, vectorData32, -1, 1, nil) // prior 10
+		results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil) // prior 10
 		if err != nil {
 			t.Fatalf("failed to search vector store: %v", err)
 		}

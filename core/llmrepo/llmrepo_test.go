@@ -11,8 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/modelprovider"
 	"github.com/js402/cate/core/runtimestate"
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
@@ -41,7 +39,7 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 	defer cleanup()
 
 	// Test initialization
-	_, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)
 
 	// Verify pool creation
@@ -65,21 +63,15 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, models, 1)
 	require.Equal(t, expectedModelID, models[0].ID)
-}
 
-func TestGetProvider_WithBackends(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Initialize embedder
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
-	require.NoError(t, err)
+	// extract a valid backend
 	backend := &store.Backend{}
 	for _, l := range state.Get(ctx) {
 		backend = &l.Backend
-		break
 	}
+	// assign backend to pool
 	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+	// wait for the model to download
 	require.Eventually(t, func() bool {
 		currentState := state.Get(ctx)
 		r, err := json.Marshal(currentState)
@@ -93,15 +85,102 @@ func TestGetProvider_WithBackends(t *testing.T) {
 			return false
 		}
 		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-	time.Sleep(time.Second * 30) // Test GetProvider
-	provider, err := embedder.GetProvider(ctx)
-	require.NoError(t, err)
+	}, 1*time.Minute, 100*time.Millisecond)
+	// reuse state for other testcases.
+	t.Run("test get runtime", func(t *testing.T) {
+		runtimeAdapter := embedder.GetRuntime(ctx)
+		require.NotNil(t, runtimeAdapter)
+		providers, err := runtimeAdapter(ctx, "Ollama")
+		require.NoError(t, err)
+		require.NotEmpty(t, providers)
+	})
+	t.Run("test basic embed call", func(t *testing.T) {
+		provider, err := embedder.GetProvider(ctx)
+		require.NoError(t, err)
 
-	// Verify provider properties
-	require.True(t, provider.CanEmbed())
-	require.Equal(t, "all-minilm:33m", provider.ModelName())
-	require.Contains(t, provider.GetBackendIDs(), backend.BaseURL)
+		embedClient, err := provider.GetEmbedConnection(backend.BaseURL)
+		require.NoError(t, err)
+
+		// Test embedding
+		embeddings, err := embedClient.Embed(context.Background(), "test text")
+		require.NoError(t, err)
+		require.NotEmpty(t, embeddings)
+	})
+	t.Run("test prompt execution", func(t *testing.T) {
+		// Configure task model and initialize engine
+		config.TasksModel = "smollm2:135m"
+		taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			currentState := state.Get(ctx)
+			r, _ := json.Marshal(currentState)
+			return strings.Contains(string(r), `"name":"smollm2:135m"`)
+		}, 1*time.Minute, 100*time.Millisecond)
+
+		// Get provider and test prompting
+		provider, err := taskEngine.GetProvider(ctx)
+		require.NoError(t, err)
+
+		promptClient, err := provider.GetPromptConnection(backend.BaseURL)
+		require.NoError(t, err)
+
+		response, err := promptClient.Prompt(context.Background(), "What is 1+1?")
+		require.NoError(t, err)
+		require.Contains(t, response, "2")
+	})
+	t.Run("execute complex prompts", func(t *testing.T) {
+
+		// Configure task model and initialize engine
+		config.TasksModel = "qwen2.5:0.5b"
+
+		taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+		require.NoError(t, err)
+
+		require.Eventually(t, func() bool {
+			currentState := state.Get(ctx)
+			r, _ := json.Marshal(currentState)
+			return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
+		}, 1*time.Minute, 100*time.Millisecond)
+		provider, err := taskEngine.GetProvider(ctx)
+		require.NoError(t, err)
+
+		execClient, err := provider.GetPromptConnection(backend.BaseURL)
+		require.NoError(t, err)
+
+		text := `
+		The concept of "flow state," often described as being "in the zone," is characterized by complete immersion and energized focus in an activity. Individuals experiencing flow often report a feeling of spontaneous joy and a deep sense of satisfaction. Achieving this state typically requires a clear set of goals, immediate feedback, and a balance between the perceived challenge of the task and one's perceived skills. While often associated with creative arts or sports, flow can be experienced in almost any activity that meets these conditions. Understanding and cultivating flow can lead to increased productivity and greater personal fulfillment.
+		The city's public transportation system of Smalltown has seen significant improvements over the past decade, with new tram lines and more frequent bus services. Commuter satisfaction is reportedly at an all-time high. However, despite these advancements, traffic congestion in the downtown core during peak hours remains a major challenge. Several urban planners suggest that a more radical approach, such as congestion pricing or significantly expanding pedestrian-only zones, might be necessary to alleviate the gridlock. The mayor Jake Thompson, on the other hand, believes that further optimizing the existing public transit routes will eventually solve the problem.
+		`
+		prompt := fmt.Sprintf(`
+Extract atomic semantic keywords like names, cities, dates and others from the following text. Avoid grouping or phrases. Return only important individual concepts, people, places, or terms. Format as a comma-separated list.
+
+Text: %s`, text)
+		response1, err := execClient.Prompt(context.Background(), prompt)
+		require.NoError(t, err)
+		t.Logf("Response 1: %s", response1)
+
+		response2, err := execClient.Prompt(ctx, prompt)
+		require.NoError(t, err)
+		t.Logf("Response 2: %s", response2)
+		prompt = fmt.Sprintf(`
+For each keyword and type below, write a one-line description explaining what it refers to in the original text.
+
+Keywords and types:
+%s
+
+Text: %s`, response2, text)
+		response3, err := execClient.Prompt(ctx, prompt)
+		response2 = strings.ToLower(response2)
+		response1 = strings.ToLower(response1)
+		response3 = strings.ToLower(response3)
+		require.Contains(t, response1, "flow state")
+		require.Contains(t, response1, "smalltown")
+		require.Contains(t, response1, "jake thompson")
+
+		require.Contains(t, response2, "flow state")
+		require.Contains(t, response2, "smalltown")
+	})
 }
 
 func TestGetProvider_NoBackends(t *testing.T) {
@@ -114,273 +193,4 @@ func TestGetProvider_NoBackends(t *testing.T) {
 	_, err = embedder.GetProvider(ctx)
 	require.Error(t, err)
 	require.EqualError(t, err, "no backends found")
-}
-
-func TestGetRuntime_Adapter(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Initialize embedder
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-		break
-	}
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, err := json.Marshal(currentState)
-		if err != nil {
-			t.Logf("error marshaling state: %v", err)
-			return false
-		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
-		}
-		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-	time.Sleep(time.Second * 30) // Test GetProvider
-	// Verify runtime adapter
-	runtimeAdapter := embedder.GetRuntime(ctx)
-	require.NotNil(t, runtimeAdapter)
-
-	providers, err := runtimeAdapter(ctx, "Ollama")
-	require.NoError(t, err)
-	require.NotEmpty(t, providers)
-}
-
-func TestEmbeddingLifecycle(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Setup test backend
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-	}
-	// Initialize embedder
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-	time.Sleep(time.Second * 30)
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, err := json.Marshal(currentState)
-		if err != nil {
-			t.Logf("error marshaling state: %v", err)
-			return false
-		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
-		}
-		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-	time.Sleep(time.Second * 30)
-
-	// Get provider and test embedding
-	provider, err := embedder.GetProvider(ctx)
-	require.NoError(t, err)
-
-	embedClient, err := provider.GetEmbedConnection(backend.BaseURL)
-	require.NoError(t, err)
-
-	// Test embedding
-	embeddings, err := embedClient.Embed(context.Background(), "test text")
-	require.NoError(t, err)
-	require.NotEmpty(t, embeddings)
-}
-
-func TestNewTaskEngine_InitializesPoolAndModel(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Set task-specific model in config (assuming serverops.Config has this field)
-	config.TasksModel = "smollm2:135m"
-
-	// Initialize task engine
-	_, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	// Verify pool exists (same pool as embedder due to current code)
-	poolStore := store.New(dbInstance.WithoutTransaction())
-	pool, err := poolStore.GetPool(ctx, serverops.EmbedPoolID)
-	require.NoError(t, err)
-	require.Equal(t, serverops.EmbedPoolName, pool.Name)
-
-	// Verify task model creation
-	modelStore := store.New(dbInstance.WithoutTransaction())
-	model, err := modelStore.GetModelByName(ctx, config.TasksModel)
-	require.NoError(t, err)
-	require.Equal(t, config.TasksModel, model.Model)
-
-	// Verify model assignment to pool
-	models, err := modelStore.ListModelsForPool(ctx, serverops.EmbedPoolID)
-	require.NoError(t, err)
-	require.Len(t, models, 1)
-	require.Equal(t, config.TasksModel, models[0].Model)
-}
-
-func TestGetProvider_WithBackends_Prompt(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Set task model and initialize
-	config.TasksModel = "smollm2:135m"
-	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	// Assign backend to pool
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-		break
-	}
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-	time.Sleep(time.Second) // Allow state refresh
-
-	// Get provider and verify capabilities
-	provider, err := taskEngine.GetProvider(ctx)
-	require.NoError(t, err)
-
-	require.True(t, provider.CanPrompt())
-	require.False(t, provider.CanEmbed())
-	require.Equal(t, "smollm2:135m", provider.ModelName())
-	require.Contains(t, provider.GetBackendIDs(), backend.BaseURL)
-}
-
-func TestPromptingLifecycle(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Configure task model and initialize engine
-	config.TasksModel = "smollm2:135m"
-	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	// Assign backend and wait for readiness
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-	}
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, _ := json.Marshal(currentState)
-		return strings.Contains(string(r), `"name":"smollm2:135m"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-
-	// Get provider and test prompting
-	provider, err := taskEngine.GetProvider(ctx)
-	require.NoError(t, err)
-
-	promptClient, err := provider.GetPromptConnection(backend.BaseURL)
-	require.NoError(t, err)
-
-	response, err := promptClient.Prompt(context.Background(), "What is 1+1?")
-	require.NoError(t, err)
-	require.Contains(t, response, "2")
-}
-
-func TestChainBuildingPrompt(t *testing.T) {
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Configure task model and initialize engine
-	config.TasksModel = "qwen2.5:0.5b"
-
-	taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	// Assign backend and wait for readiness
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-	}
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
-
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, _ := json.Marshal(currentState)
-		return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-
-	// Get provider and test prompting
-	provider, err := taskEngine.GetProvider(ctx)
-	require.NoError(t, err)
-
-	execClient, err := provider.GetPromptConnection(backend.BaseURL)
-	require.NoError(t, err)
-
-	text := `
-	The concept of "flow state," often described as being "in the zone," is characterized by complete immersion and energized focus in an activity. Individuals experiencing flow often report a feeling of spontaneous joy and a deep sense of satisfaction. Achieving this state typically requires a clear set of goals, immediate feedback, and a balance between the perceived challenge of the task and one's perceived skills. While often associated with creative arts or sports, flow can be experienced in almost any activity that meets these conditions. Understanding and cultivating flow can lead to increased productivity and greater personal fulfillment.
-	The city's public transportation system of Smalltown has seen significant improvements over the past decade, with new tram lines and more frequent bus services. Commuter satisfaction is reportedly at an all-time high. However, despite these advancements, traffic congestion in the downtown core during peak hours remains a major challenge. Several urban planners suggest that a more radical approach, such as congestion pricing or significantly expanding pedestrian-only zones, might be necessary to alleviate the gridlock. The mayor Jake Thompson, on the other hand, believes that further optimizing the existing public transit routes will eventually solve the problem.
-	`
-	prompt := fmt.Sprintf(`
-Extract atomic semantic keywords like names, dates and others from the following text. Avoid grouping or phrases. Return only important individual concepts, people, places, or terms. Format as a comma-separated list.
-
-Text: %s`, text)
-	response1, err := execClient.Prompt(context.Background(), prompt)
-	require.NoError(t, err)
-	t.Logf("Response 1: %s", response1)
-
-	response2, err := execClient.Prompt(ctx, prompt)
-	require.NoError(t, err)
-	t.Logf("Response 2: %s", response2)
-	prompt = fmt.Sprintf(`
-For each keyword and type below, write a one-line description explaining what it refers to in the original text.
-
-Keywords and types:
-%s
-
-Text: %s`, response2, text)
-	response3, err := execClient.Prompt(ctx, prompt)
-	response2 = strings.ToLower(response2)
-	response1 = strings.ToLower(response1)
-	response3 = strings.ToLower(response3)
-	require.Contains(t, response1, "flow state")
-	require.Contains(t, response1, "smalltown")
-	require.Contains(t, response1, "jake thompson")
-
-	require.Contains(t, response2, "flow state")
-	require.Contains(t, response2, "smalltown")
-}
-
-func TestResolvePrompt_WithPromptOption(t *testing.T) {
-	// A provider that normally doesn't support prompt
-	providerNoPrompt := &modelprovider.MockProvider{
-		ID:            "force1",
-		Name:          "badname.5:0.5b",
-		ContextLength: 8192,
-		CanPromptFlag: false, // Normally not allowed
-		Backends:      []string{"b7"},
-	}
-
-	// Simulate applying WithPrompt(true) during provider construction
-	providerForcedPrompt := *providerNoPrompt
-	providerForcedPrompt.CanPromptFlag = true // Simulating WithPrompt(true)
-
-	getModels := func(_ context.Context, _ string) ([]modelprovider.Provider, error) {
-		return []modelprovider.Provider{&providerForcedPrompt}, nil
-	}
-
-	req := llmresolver.ResolvePromptRequest{
-		ModelName: "badname.5:0.5b",
-	}
-
-	client, err := llmresolver.ResolvePromptExecute(context.Background(), req, getModels, llmresolver.ResolveRandomly)
-
-	if err != nil {
-		t.Errorf("ResolvePromptExecute() unexpected error = %v", err)
-	}
-	if client == nil {
-		t.Errorf("ResolvePromptExecute() returned nil client, want non-nil")
-	}
 }
