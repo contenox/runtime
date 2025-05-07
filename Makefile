@@ -3,6 +3,9 @@
 core-test:
 	go test -C ./core/ ./...
 
+core-smoketest:
+	SMOKETESTS=true go test -C ./core/ ./...
+
 libs-test:
 	for d in libs/*; do \
 	  if [ -f "$$d/go.mod" ]; then \

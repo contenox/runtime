@@ -2,6 +2,7 @@ package modelprovider_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/js402/cate/core/modelprovider"
@@ -12,6 +13,9 @@ import (
 )
 
 func TestOllamaChatClient_HappyPath(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 	runtime := backendState.Get(ctx)

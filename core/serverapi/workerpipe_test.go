@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,9 @@ import (
 )
 
 func TestWorkerPipe(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	port := rand.Intn(16383) + 49152
 	config := &serverops.Config{
 		JWTExpiry:       "1h",

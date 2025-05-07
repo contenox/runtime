@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,9 @@ func setupTestEnvironment(t *testing.T) (context.Context, *serverops.Config, lib
 }
 
 func TestNew_InitializesPoolAndModel(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
@@ -130,7 +134,6 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 		require.Contains(t, response, "2")
 	})
 	t.Run("execute complex prompts", func(t *testing.T) {
-
 		// Configure task model and initialize engine
 		config.TasksModel = "qwen2.5:0.5b"
 
@@ -184,6 +187,9 @@ Text: %s`, response2, text)
 }
 
 func TestGetProvider_NoBackends(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 

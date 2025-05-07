@@ -3,6 +3,7 @@ package runtimestate_test
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +47,9 @@ func setupPoolTest(t *testing.T) (context.Context, string, *runtimestate.State, 
 }
 
 func TestPoolAwareStateLogic(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, ollamaUrl, backendState, dbStore, cleanup := setupPoolTest(t)
 	defer cleanup()
 
@@ -110,6 +114,9 @@ func TestPoolAwareStateLogic(t *testing.T) {
 }
 
 func TestPoolBackendIsolation(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, ollamaUrl, backendState, dbStore, cleanup := setupPoolTest(t)
 	defer cleanup()
 
@@ -172,6 +179,9 @@ func TestPoolBackendIsolation(t *testing.T) {
 }
 
 func TestPoolBackendRemoval(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, ollamaUrl, backendState, dbStore, cleanup := setupPoolTest(t)
 	defer cleanup()
 
