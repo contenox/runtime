@@ -288,5 +288,21 @@ func TestWorkerPipe(t *testing.T) {
 		if chunk.ResourceID != file.ID {
 			t.Fatalf("expected file ID %s, got %s", file.ID, chunk.ResourceID)
 		}
+		resp, err := indexService.Search(ctx, &indexservice.SearchRequest{
+			Query: "give me the file with the demo text",
+			TopK:  10,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundID := false
+		for _, sr := range resp.Results {
+			if sr.ID == file.ID {
+				foundID = true
+			}
+		}
+		if !foundID {
+			t.Fatal("file was not found")
+		}
 	})
 }
