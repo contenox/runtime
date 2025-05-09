@@ -5,7 +5,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { modelKeys, stateKeys } from '../lib/queryKeys';
+import { modelKeys } from '../lib/queryKeys';
 import { Model } from '../lib/types';
 
 export function useModels() {
@@ -40,7 +40,7 @@ export function useRemoveModelFromQueue(): UseMutationResult<void, Error, string
   return useMutation<void, Error, string>({
     mutationFn: api.removeModelFromQueue,
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: stateKeys.pending() });
+      queryClient.invalidateQueries({ queryKey: modelKeys.all });
     },
   });
 }

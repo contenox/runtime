@@ -37,7 +37,7 @@ export default function ModelsSection() {
     <>
       {models.map(model => (
         <ModelCard
-          key={model.model} // Assuming model is unique (or use model.id if available)
+          key={model.model}
           model={model}
           onDelete={handleDeleteModel}
           deletePending={deletingModel === model.model}

@@ -17,6 +17,8 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
+const tokenizerMaxPromptBytes = 16 * 1024 // 16 KiB
+
 type Service struct {
 	state      *runtimestate.State
 	dbInstance libdb.DBManager
@@ -140,11 +142,11 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 	}
 
 	convertedMessage := make([]api.Message, len(messages))
-	for _, m := range messages {
-		convertedMessage = append(convertedMessage, api.Message{
+	for i, m := range messages {
+		convertedMessage[i] = api.Message{
 			Role:    m.Role,
 			Content: m.Content,
-		})
+		}
 	}
 	contextLength, err := s.CalculateContextSize(ctx, messages)
 	if err != nil {
@@ -280,11 +282,19 @@ func (s *Service) CalculateContextSize(ctx context.Context, messages []serverops
 	if selectedModel == "" {
 		selectedModel = "tiny"
 	}
-
-	count, err := s.tokenizer.CountTokens(ctx, selectedModel, prompt)
-	if err != nil {
-		return 0, fmt.Errorf("failed to estimate context size %w", err)
+	count := 0
+	if len(prompt) >= tokenizerMaxPromptBytes {
+		for start := 0; start < len(prompt); start += tokenizerMaxPromptBytes {
+			end := min(start+tokenizerMaxPromptBytes, len(prompt))
+			chunk := prompt[start:end]
+			tokens, err := s.tokenizer.CountTokens(ctx, selectedModel, chunk)
+			if err != nil {
+				return 0, fmt.Errorf("failed to estimate context size at chunk [%d:%d]: %w", start, end, err)
+			}
+			count += tokens
+		}
 	}
+
 	return count, nil
 }
 

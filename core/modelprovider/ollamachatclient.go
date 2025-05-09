@@ -29,36 +29,66 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	req := &api.ChatRequest{
 		Model:    c.modelName,
 		Messages: apiMessages,
-		Stream:   &stream, // Explicitly set stream to false
-		// Options: nil, // Add specific Ollama options if needed (e.g., temperature)
+		Stream:   &stream,
 	}
 
 	var finalResponse api.ChatResponse
 
+	// Handle the API call first
 	err := c.ollamaClient.Chat(ctx, req, func(res api.ChatResponse) error {
-		// NOTE: This callback should ideally be called only once when stream=false and res.Done=true
+		// For non-streaming, we expect exactly one response with Done=true
 		if res.Done {
-			finalResponse = res
-		} else if res.Message.Content != "" {
-			// NOTE: Sometimes non-streaming might still send intermediate message chunks? Capture the last one.
 			finalResponse = res
 		}
 		return nil
 	})
 
+	// Check for API-level errors first (network issues, etc.)
 	if err != nil {
 		return serverops.Message{}, fmt.Errorf("ollama API chat request failed for model %s: %w", c.modelName, err)
 	}
 
-	// Ensure finalResponse has meaningful data, especially Message.Content
-	if finalResponse.Message.Content == "" && !finalResponse.Done {
-		return serverops.Message{}, fmt.Errorf("ollama chat completed without a final message for model %s", c.modelName)
+	// Check if we received any response at all
+	if finalResponse.Message.Role == "" {
+		return serverops.Message{}, fmt.Errorf("no response received from Ollama for model %s", c.modelName)
 	}
 
-	resultMessage := serverops.Message{
-		Role:    finalResponse.Message.Role, // Usually "assistant"
+	// Handle completion reasons
+	switch finalResponse.DoneReason {
+	case "error":
+		// Server-side error during generation
+		return serverops.Message{}, fmt.Errorf(
+			"ollama generation error for model %s: %s",
+			c.modelName,
+			finalResponse.Message.Content,
+		)
+	case "length":
+		// Treat token limit hits as application errors
+		return serverops.Message{}, fmt.Errorf(
+			"token limit reached for model %s (partial response: %q)",
+			c.modelName,
+			finalResponse.Message.Content,
+		)
+	case "stop":
+		// Normal completion, but ensure content exists
+		if finalResponse.Message.Content == "" {
+			return serverops.Message{}, fmt.Errorf(
+				"empty content from model %s despite normal completion",
+				c.modelName,
+			)
+		}
+	default:
+		// Unknown completion reason
+		return serverops.Message{}, fmt.Errorf(
+			"unexpected completion reason %q for model %s",
+			finalResponse.DoneReason,
+			c.modelName,
+		)
+	}
+
+	// Successful response
+	return serverops.Message{
+		Role:    finalResponse.Message.Role,
 		Content: finalResponse.Message.Content,
-	}
-
-	return resultMessage, nil
+	}, nil
 }

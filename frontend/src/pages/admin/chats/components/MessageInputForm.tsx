@@ -1,4 +1,4 @@
-import { Button, Input, Spinner } from '@cate/ui';
+import { Button, Spinner, Textarea } from '@cate/ui';
 import { t } from 'i18next';
 import { FormEvent } from 'react';
 
@@ -24,8 +24,7 @@ export const MessageInputForm = ({
   return (
     <form onSubmit={onSubmit} className={className}>
       <div className="flex gap-2">
-        <Input
-          type="text"
+        <Textarea
           placeholder={placeholder}
           value={value}
           onChange={e => onChange(e.target.value)}

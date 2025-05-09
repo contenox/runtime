@@ -94,7 +94,7 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onDelete(model.id)}
+          onClick={() => onDelete(model.model)}
           className="text-error"
           disabled={deletePending}>
           {deletePending ? t('common.deleting') : t('translation:model.model_delete')}

@@ -342,6 +342,7 @@ func (c *ollamatokenizer) loadModel(modelName string) (*llama.Model, error) {
 }
 
 func (c *ollamatokenizer) CountTokens(modelName, prompt string) (int, error) {
+	// todo tokenize each chunk of 16384 bytes and sum the count
 	a, err := c.Tokenize(modelName, prompt)
 	if err != nil {
 		return 0, err
@@ -353,8 +354,8 @@ func (c *ollamatokenizer) CountTokens(modelName, prompt string) (int, error) {
 // Tokenize tokenizes the given text using the specified model.
 func (c *ollamatokenizer) Tokenize(modelName, prompt string) ([]int, error) {
 	promptLen := len(prompt)
-	if promptLen > maxPromptBytes {
-		return []int{}, fmt.Errorf("input prompt size (%d bytes) exceeds maximum allowed size (%d bytes)", promptLen, maxPromptBytes)
+	if promptLen > MaxPromptBytes {
+		return []int{}, fmt.Errorf("input prompt size (%d bytes) exceeds maximum allowed size (%d bytes)", promptLen, MaxPromptBytes)
 	}
 	model, err := c.loadModel(modelName)
 	if err != nil {
