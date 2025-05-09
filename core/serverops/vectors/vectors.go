@@ -2,13 +2,14 @@ package vectors
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/vdaas/vald-client-go/v1/payload"
 	"github.com/vdaas/vald-client-go/v1/vald"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 type valdStore struct {
@@ -136,11 +137,11 @@ func (vs *valdStore) Search(ctx context.Context, query []float32, num int, minNu
 		},
 	})
 	if err != nil {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.NotFound {
+			return []VectorSearchResult{}, nil
+		}
 		return nil, err
-	}
-
-	if res == nil || len(res.Results) == 0 {
-		return nil, errors.New("no results found")
 	}
 
 	results := make([]VectorSearchResult, 0, len(res.Results))

@@ -37,13 +37,21 @@ func (im *indexManager) index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
-	q := url.QueryEscape(r.URL.Query().Get("q"))
+	q, err := url.QueryUnescape(r.URL.Query().Get("q"))
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.GetOperation)
+		return
+	}
 	k := 0
 	var radius *float32
 	var epsilon *float32
-	var err error
-	if url.QueryEscape(r.URL.Query().Get("topk")) != "" {
-		topK := url.QueryEscape(r.URL.Query().Get("topk"))
+
+	if r.URL.Query().Get("topk") != "" {
+		topK, err := url.QueryUnescape(r.URL.Query().Get("topk"))
+		if err != nil {
+			_ = serverops.Error(w, r, err, serverops.GetOperation)
+			return
+		}
 		k64, err := strconv.ParseInt(topK, 10, 32)
 		if err != nil {
 			_ = serverops.Error(w, r, err, serverops.GetOperation)
@@ -51,8 +59,12 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 		}
 		k = int(k64)
 	}
-	if url.QueryEscape(r.URL.Query().Get("radius")) != "" {
-		rad := url.QueryEscape(r.URL.Query().Get("radius"))
+	if r.URL.Query().Get("radius") != "" {
+		rad, err := url.QueryUnescape(r.URL.Query().Get("radius"))
+		if err != nil {
+			_ = serverops.Error(w, r, err, serverops.GetOperation)
+			return
+		}
 		radiusV, err := strconv.ParseFloat(rad, 32)
 		if err != nil {
 			_ = serverops.Error(w, r, err, serverops.GetOperation)
@@ -61,8 +73,12 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 		t := float32(radiusV)
 		radius = &t
 	}
-	if url.QueryEscape(r.URL.Query().Get("epsilon")) != "" {
-		p := url.QueryEscape(r.URL.Query().Get("epsilon"))
+	if r.URL.Query().Get("epsilon") != "" {
+		p, err := url.QueryUnescape(r.URL.Query().Get("epsilon"))
+		if err != nil {
+			_ = serverops.Error(w, r, err, serverops.GetOperation)
+			return
+		}
 		convEpsilon, err := strconv.ParseFloat(p, 32)
 		if err != nil {
 			_ = serverops.Error(w, r, err, serverops.GetOperation)

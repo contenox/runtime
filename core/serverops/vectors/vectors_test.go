@@ -40,9 +40,12 @@ func TestVectors(t *testing.T) {
 	ctx := context.Background()
 	t.Run("Empty Search", func(t *testing.T) {
 		emptyVec := make([]float32, 768)
-		_, err := client.Search(ctx, emptyVec, 1, 1, nil)
-		if err == nil {
-			t.Error("Expected error for empty vector search")
+		results, err := client.Search(ctx, emptyVec, 1, 1, nil)
+		if err != nil {
+			t.Fatalf("Expected no error for empty search, got: %v", err)
+		}
+		if len(results) != 0 {
+			t.Errorf("Expected 0 results, got: %d", len(results))
 		}
 	})
 	t.Run("Basic CRUD Operations", func(t *testing.T) {

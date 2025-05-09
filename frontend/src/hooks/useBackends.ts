@@ -12,6 +12,7 @@ export function useBackends() {
   return useSuspenseQuery<Backend[]>({
     queryKey: backendKeys.all,
     queryFn: api.getBackends,
+    refetchInterval: 3000,
   });
 }
 

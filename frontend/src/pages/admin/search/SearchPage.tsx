@@ -16,9 +16,9 @@ import { useSearch } from '../../../hooks/useSearch';
 export default function SearchPage() {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const [topk, setTopk] = useState<number>();
-  const [radius, setRadius] = useState<number>();
-  const [epsilon, setEpsilon] = useState<number>();
+  const [topk, setTopk] = useState<number | undefined>(10);
+  const [radius, setRadius] = useState<number | undefined>(20);
+  const [epsilon, setEpsilon] = useState<number | undefined>(0.1);
   const [searchParams, setSearchParams] = useState<{
     query: string;
     topk?: number;

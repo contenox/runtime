@@ -102,6 +102,7 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
   return (
     <Section title={backend.name} key={backend.id}>
       <P>{backend.baseUrl}</P>
+      {backend.error && <Panel variant="error">{backend.error}</Panel>}
       <P>
         {t('common.type')} {backend.type}
       </P>
@@ -111,7 +112,7 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
           key={model}
           modelName={model}
           downloadStatus={getDownloadStatusForModel(statusMap, backend.baseUrl, model)}
-          isPulled={backend.pulledModels.some(pulledModel => pulledModel.name === model)}
+          isPulled={backend.pulledModels?.some(pulledModel => pulledModel.name === model)}
         />
       ))}
 

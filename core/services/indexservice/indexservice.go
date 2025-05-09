@@ -169,7 +169,8 @@ type SearchResult struct {
 }
 
 type SearchResponse struct {
-	Results []SearchResult `json:"results"`
+	Results      []SearchResult `json:"results"`
+	TriedQueries []string       `json:"TriedQuery"`
 }
 
 func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
@@ -177,87 +178,94 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
 		return nil, err
 	}
+	tryQuery := []string{request.Query}
 
-	// Enhance the search query
-	enhancedQuery, err := s.enhanceQuery(ctx, request.Query)
+	isQuestion, err := s.classifyQuestion(ctx, request.Query)
 	if err != nil {
-		// Fallback to original query on enhancement failure
-		enhancedQuery = request.Query
+		return nil, fmt.Errorf("question classification failed: %w", err)
 	}
-
-	// Generate enhanced query embedding
-	provider, err := s.embedder.GetProvider(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
-		ModelName: provider.ModelName(),
-	}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
-	if err != nil {
-		return nil, err
-	}
-
-	vectorData, err := embedClient.Embed(ctx, enhancedQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to embed query: %w", err)
-	}
-
-	vectorData32 := make([]float32, len(vectorData))
-	for i, v := range vectorData {
-		vectorData32[i] = float32(v)
-	}
-
-	// Handle TopK default
-	topK := request.TopK
-	if topK <= 0 {
-		topK = 10
-	}
-
-	// Perform vector search
-	var args *vectors.SearchArgs
-	if request.SearchRequestArgs != nil {
-		args = &vectors.SearchArgs{
-			Epsilon: request.Epsilon,
-			Radius:  request.Radius,
-		}
-	}
-
-	results, err := s.vectors.Search(ctx, vectorData32, topK, 1, args)
-	if err != nil {
-		return nil, fmt.Errorf("vector search failed: %w", err)
-	}
-
-	// Process results and verify chunk indices
-	searchResults := make([]SearchResult, 0, len(results))
-	for _, res := range results {
-		chunkIndex, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
-		if errors.Is(err, libdb.ErrNotFound) {
-			if delErr := s.vectors.Delete(ctx, res.ID); delErr != nil {
-				fmt.Printf("failed to clean orphaned vector %s: %v\n", res.ID, delErr)
-			}
-			continue
-		}
+	if isQuestion {
+		stripedQuery, err := s.convertQuestionQuery(ctx, request.Query)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get chunk index: %w", err)
+			return nil, fmt.Errorf("question rewriteQuery failed: %w", err)
+		}
+		tryQuery = append(tryQuery, stripedQuery)
+	}
+	searchResults := make([]SearchResult, 0)
+	for _, query := range tryQuery {
+
+		// Generate enhanced query embedding
+		provider, err := s.embedder.GetProvider(ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		searchResults = append(searchResults, SearchResult{
-			ID:           chunkIndex.ResourceID,
-			ResourceType: chunkIndex.ResourceType,
-			Distance:     res.Distance,
-		})
-	}
+		embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+			ModelName: provider.ModelName(),
+		}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
+		if err != nil {
+			return nil, err
+		}
 
-	return &SearchResponse{Results: searchResults}, nil
+		vectorData, err := embedClient.Embed(ctx, query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to embed query: %w", err)
+		}
+
+		vectorData32 := make([]float32, len(vectorData))
+		for i, v := range vectorData {
+			vectorData32[i] = float32(v)
+		}
+
+		// Handle TopK default
+		topK := request.TopK
+		if topK <= 0 {
+			topK = 10
+		}
+
+		// Perform vector search
+		var args *vectors.SearchArgs
+		if request.SearchRequestArgs != nil {
+			args = &vectors.SearchArgs{
+				Epsilon: request.Epsilon,
+				Radius:  request.Radius,
+			}
+		}
+
+		results, err := s.vectors.Search(ctx, vectorData32, topK, 1, args)
+		if err != nil {
+			return nil, fmt.Errorf("vector search failed: %w for query %s", err, query)
+		}
+
+		// Process results and verify chunk indices
+		for _, res := range results {
+			chunkIndex, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
+			if errors.Is(err, libdb.ErrNotFound) {
+				if delErr := s.vectors.Delete(ctx, res.ID); delErr != nil {
+					fmt.Printf("failed to clean orphaned vector %s: %v\n", res.ID, delErr)
+				}
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to get chunk index: %w", err)
+			}
+
+			searchResults = append(searchResults, SearchResult{
+				ID:           chunkIndex.ResourceID,
+				ResourceType: chunkIndex.ResourceType,
+				Distance:     res.Distance,
+			})
+		}
+	}
+	return &SearchResponse{Results: searchResults, TriedQueries: tryQuery}, nil
 }
 
 func (s *Service) findKeywords(ctx context.Context, chunk string) (string, error) {
 	prompt := fmt.Sprintf(`Extract 5-7 keywords from the following text:
 
-%s
+	%s
 
-Return a comma-separated list of keywords.`, chunk)
+	Return a comma-separated list of keywords.`, chunk)
 
 	provider, err := s.promptExec.GetProvider(ctx)
 	if err != nil {
@@ -277,42 +285,10 @@ Return a comma-separated list of keywords.`, chunk)
 	return response, nil
 }
 
-func (s *Service) enhanceQuery(ctx context.Context, query string) (string, error) {
-	isQuestion, err := s.classifyQuestion(ctx, query)
-	if err != nil {
-		return "", fmt.Errorf("question classification failed: %w", err)
-	}
+func (s *Service) classifyQuestion(ctx context.Context, input string) (bool, error) {
+	prompt := fmt.Sprintf(`Analyze if the following input is a question? Answer strictly with "yes" or "no".
 
-	if isQuestion {
-		return s.rewriteQuery(ctx, query, questionRewritePrompt)
-	}
-
-	isOptimal, err := s.checkQueryOptimality(ctx, query)
-	if err != nil || isOptimal {
-		return query, err
-	}
-
-	return s.rewriteQuery(ctx, query, standardRewritePrompt)
-}
-
-const (
-	questionRewritePrompt = `Transform the following question into a comprehensive search query. Retain the core intent while adding relevant context and keywords.
-
-Question: %s
-
-Optimized query:`
-
-	standardRewritePrompt = `Improve the following search query for a document retrieval system. Enhance clarity and add missing context while preserving original meaning.
-
-Original query: %s
-
-Improved query:`
-)
-
-func (s *Service) classifyQuestion(ctx context.Context, query string) (bool, error) {
-	prompt := fmt.Sprintf(`Is the following input a question? Answer strictly with "yes" or "no".
-
-Input: %s`, query)
+	Input: %s`, input)
 
 	response, err := s.executePrompt(ctx, prompt)
 	if err != nil {
@@ -322,20 +298,13 @@ Input: %s`, query)
 	return strings.EqualFold(strings.TrimSpace(response), "yes"), nil
 }
 
-func (s *Service) checkQueryOptimality(ctx context.Context, query string) (bool, error) {
-	prompt := fmt.Sprintf(`Does this query contain sufficient context and keywords for effective document search? Answer with "yes" or "no".
+func (s *Service) convertQuestionQuery(ctx context.Context, query string) (string, error) {
+	promptTemplate := `Convert the following question into a search query using exactly the original keywords by removing question words.
 
-Query: %s`, query)
+	Input: %s
 
-	response, err := s.executePrompt(ctx, prompt)
-	if err != nil {
-		return false, err
-	}
+	Optimized query:`
 
-	return strings.EqualFold(strings.TrimSpace(response), "yes"), nil
-}
-
-func (s *Service) rewriteQuery(ctx context.Context, query, promptTemplate string) (string, error) {
 	prompt := fmt.Sprintf(promptTemplate, query)
 	return s.executePrompt(ctx, prompt)
 }
