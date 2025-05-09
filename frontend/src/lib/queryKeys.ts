@@ -77,6 +77,10 @@ export const searchKeys = {
     [...searchKeys.all, params] as const,
 };
 
+export const execKeys = {
+  all: ['exec'] as const,
+};
+
 export const typeKeys = {
   all: ['types'] as const,
 };

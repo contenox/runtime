@@ -2,6 +2,7 @@ import requests
 import os
 from workers import parser
 from time import sleep
+from workers import chunker
 
 class AuthSession:
     def __init__(self, base_url: str, email: str, password: str):
@@ -56,8 +57,9 @@ class AuthSession:
 
 
 class Steps:
-    def __init__(self, parser: parser.Parser, base_url: str, lease_duration: int, leaser_id: str, session: AuthSession):
+    def __init__(self, parser: parser.Parser, chunker: chunker.Chunker, base_url: str, lease_duration: int, leaser_id: str, session: AuthSession):
         self.parser = parser
+        self.chunker = chunker
         self.leaser_id = leaser_id
         self.lease_duration = lease_duration
         self.base_url = base_url
@@ -119,7 +121,7 @@ def load_config() -> dict:
         raise ValueError(f"missing required environment variables: {', '.join(missing)}")
     return config
 
-def cycle(parser: parser.Parser, config: dict):
+def cycle(parser: parser.Parser, chunker: chunker.Chunker, config: dict):
     try:
         # print("Starting AuthSession...")
         session = AuthSession(
@@ -136,6 +138,7 @@ def cycle(parser: parser.Parser, config: dict):
         try:
             worker = Steps(
                 parser=parser,
+                chunker=chunker,
                 base_url=config["base_url"],
                 leaser_id=config["leaser_id"],
                 lease_duration=int(config["lease_duration"]),
@@ -183,7 +186,7 @@ def run(worker_steps: Steps):
         parsed = worker_steps.parser.parse(raw_data)
         print("Parsing complete")
         print("Chunking...")
-        chunks = worker_steps.parser.chunk(parsed)
+        chunks = worker_steps.chunker.chunk(parsed)
         print("Chunking complete")
         print("Ingesting text...")
         worker_steps.ingest(file_id, job_id, worker_steps.leaser_id, chunks, upsert)

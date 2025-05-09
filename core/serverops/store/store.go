@@ -105,6 +105,7 @@ type Resource struct {
 const (
 	ResourceTypeSystem = "system"
 	ResourceTypeFiles  = "files"
+	ResourceTypeFile   = "file"
 	ResourceTypeBlobs  = "blobs"
 	ResourceTypeChunks = "chunks"
 )

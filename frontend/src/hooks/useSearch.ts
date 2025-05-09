@@ -11,6 +11,7 @@ export function useSearch(
 ): UseQueryResult<SearchResponse, Error> {
   return useQuery({
     queryKey: searchKeys.query({ query, topk, radius, epsilon }),
-    queryFn: () => api.searchFiles(query, topk, radius, epsilon),
+    queryFn: () => api.searchFiles(query, topk, radius, epsilon, true),
+    enabled: query.trim().length > 0,
   });
 }

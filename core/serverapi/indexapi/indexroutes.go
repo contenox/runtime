@@ -87,7 +87,7 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 		t := float32(convEpsilon)
 		epsilon = &t
 	}
-	// TODO
+
 	var args *indexservice.SearchRequestArgs
 	if radius != nil && epsilon != nil {
 		args = &indexservice.SearchRequestArgs{Radius: *radius, Epsilon: *epsilon}
@@ -95,7 +95,9 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 	req := indexservice.SearchRequest{Query: q, TopK: k,
 		SearchRequestArgs: args,
 	}
-
+	if r.URL.Query().Get("expand") == "files" {
+		req.ExpandFiles = true
+	}
 	resp, err := im.service.Search(r.Context(), &req)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.GetOperation)

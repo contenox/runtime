@@ -1,5 +1,6 @@
 //(import "./components.css"
 import "./index.css";
+export * from "./components/TextArea";
 export * from "./components/Accordion";
 export * from "./components/Badge";
 export * from "./components/Button";

@@ -12,6 +12,7 @@ export function RegisterForm({ onSwitch }: FormSwitchProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const {
     mutate: registerMutate,
@@ -22,9 +23,10 @@ export function RegisterForm({ onSwitch }: FormSwitchProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      console.error('Passwords do not match');
+      setLocalError(t('register.password_mismatch', 'Passwords do not match'));
       return;
     }
+    setLocalError(null);
     registerMutate({ email, password });
   };
 
@@ -33,9 +35,10 @@ export function RegisterForm({ onSwitch }: FormSwitchProps) {
       title={t('register.title')}
       onSubmit={handleSubmit}
       error={
-        registerError
+        localError ||
+        (registerError
           ? t('register.error', 'Registration error: {{error}}', { error: registerError.message })
-          : undefined
+          : undefined)
       }
       onError={errorMsg => console.error('Form error:', errorMsg)}
       actions={

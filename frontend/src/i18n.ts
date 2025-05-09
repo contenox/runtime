@@ -32,6 +32,7 @@ const resources = {
         bye: 'Bye',
         serverjobs: 'Server Jobs',
         search: 'Search',
+        prompt: 'Prompt',
       },
       common: {
         delete: 'Delete',
@@ -272,6 +273,7 @@ const resources = {
         query_placeholder: 'Query',
         query: 'Query',
         search: 'Search',
+        search_invite: 'Search results will appear here',
         topk: 'Top K',
         radius_placeholder: 'Radius',
         radius: 'Radius',
@@ -281,6 +283,16 @@ const resources = {
         results: 'Results',
         no_results: 'No results found',
       },
+    },
+    prompt: {
+      title: 'Execute Prompt',
+      prompt: 'Prompt',
+      prompt_placeholder: 'Enter your prompt here...',
+      submit: 'Run',
+      executing: 'Running your prompt...',
+      error: 'An error occurred while executing the prompt',
+      results: 'Execution Result',
+      no_response: 'No response received.',
     },
   },
   de: {

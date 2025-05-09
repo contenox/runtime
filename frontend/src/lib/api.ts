@@ -5,6 +5,8 @@ import {
   Backend,
   ChatMessage,
   ChatSession,
+  Exec,
+  ExecResp,
   FileResponse,
   FolderResponse,
   InProgressJob,
@@ -195,7 +197,13 @@ export const api = {
   listInProgressJobs: (cursor?: string) =>
     apiFetch<InProgressJob[]>(`/api/jobs/in-progress${cursor ? `?cursor=${cursor}` : ''}`),
 
-  searchFiles: (query: string, topk?: number, radius?: number, epsilon?: number) => {
+  searchFiles: (
+    query: string,
+    topk?: number,
+    radius?: number,
+    epsilon?: number,
+    expandFiles?: boolean,
+  ) => {
     const params = new URLSearchParams();
     params.append('q', query);
     if (topk !== undefined) {
@@ -207,6 +215,10 @@ export const api = {
     if (epsilon !== undefined) {
       params.append('epsilon', epsilon.toString());
     }
+    if (expandFiles !== undefined) {
+      params.append('expand', 'files');
+    }
     return apiFetch<SearchResponse>(`/api/search?${params.toString()}`);
   },
+  execPrompt: (data: Exec) => apiFetch<ExecResp>(`/api/execute`, options('POST', data)),
 };

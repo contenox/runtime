@@ -14,6 +14,7 @@ export type SearchResult = {
   id: string;
   resourceType: string;
   distance: number;
+  fileMeta: FileResponse;
 };
 
 export type SearchResponse = {
@@ -187,4 +188,13 @@ export type PendingJob = {
 export type InProgressJob = PendingJob & {
   leaser: string;
   leaseExpiration: string;
+};
+
+export type Exec = {
+  prompt: string;
+};
+
+export type ExecResp = {
+  id: string;
+  response: string;
 };

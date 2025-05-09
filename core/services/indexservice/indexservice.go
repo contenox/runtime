@@ -81,7 +81,7 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 		return nil, errors.New("embed client is nil")
 	}
 	if request.Replace {
-		chunks, err := storeInstance.ListChunkIndicesByResource(ctx, request.ID, "file")
+		chunks, err := storeInstance.ListChunkIndicesByResource(ctx, request.ID, store.ResourceTypeFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chunk index by ID: %w", err)
 		}
@@ -152,8 +152,9 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 }
 
 type SearchRequest struct {
-	Query string `json:"text"`
-	TopK  int    `json:"topK"`
+	Query       string `json:"text"`
+	TopK        int    `json:"topK"`
+	ExpandFiles bool   `json:"expandFiles"`
 	*SearchRequestArgs
 }
 
@@ -163,9 +164,10 @@ type SearchRequestArgs struct {
 }
 
 type SearchResult struct {
-	ID           string  `json:"id"`
-	ResourceType string  `json:"type"`
-	Distance     float32 `json:"distance"`
+	ID           string      `json:"id"`
+	ResourceType string      `json:"type"`
+	Distance     float32     `json:"distance"`
+	FileMeta     *store.File `json:"fileMeta"`
 }
 
 type SearchResponse struct {
@@ -255,6 +257,28 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 				ResourceType: chunkIndex.ResourceType,
 				Distance:     res.Distance,
 			})
+		}
+	}
+	deduplicate := map[string]SearchResult{}
+	for _, sr := range searchResults {
+		deduplicate[sr.ID] = sr
+	}
+	searchResults = searchResults[:len(deduplicate)]
+
+	i := 0
+	for _, sr := range deduplicate {
+		searchResults[i] = sr
+		i++
+	}
+	if request.ExpandFiles {
+		for i, sr := range searchResults {
+			if sr.ResourceType == store.ResourceTypeFile {
+				file, err := storeInstance.GetFileByID(ctx, sr.ID)
+				if err != nil {
+					return nil, fmt.Errorf("BADSERVER STATE %w", err)
+				}
+				searchResults[i].FileMeta = file
+			}
 		}
 	}
 	return &SearchResponse{Results: searchResults, TriedQueries: tryQuery}, nil

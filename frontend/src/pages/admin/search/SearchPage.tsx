@@ -89,8 +89,8 @@ export default function SearchPage() {
       </Section>
 
       <Section>
-        {isPending && <Spinner size="lg" />}
-
+        {searchParams?.query?.trim() && isPending && <Spinner size="lg" />}
+        {!searchParams?.query?.trim() && <Panel>{t('search.search_invite')}</Panel>}
         {isError && (
           <Panel variant="error">
             {t('search.error')}: {error?.message}
@@ -107,6 +107,7 @@ export default function SearchPage() {
                 <Panel key={result.id} className="flex items-center justify-between">
                   <Span>{result.id}</Span>
                   <Span>{result.resourceType}</Span>
+                  <Span>{result.fileMeta?.path}</Span>
                   <Span variant="muted">{result.distance.toFixed(4)}</Span>
                 </Panel>
               ))

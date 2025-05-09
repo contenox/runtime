@@ -1,5 +1,6 @@
 import { P } from '@cate/ui';
 import {
+  ChevronsRight,
   Database,
   File,
   Home,
@@ -14,6 +15,7 @@ import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
 import ChatsListPage from '../pages/admin/chats/components/ChatListPage.tsx';
 import FilesPage from '../pages/admin/files/FilesPage.tsx';
+import ExecPromptPage from '../pages/admin/prompt/ExecPromptPage.tsx';
 import SearchPage from '../pages/admin/search/SearchPage.tsx';
 import ServerJobsPage from '../pages/admin/serverjobs/ServerJobsPage.tsx';
 import UserPage from '../pages/admin/users/UserPage.tsx';
@@ -95,6 +97,14 @@ export const routes: RouteConfig[] = [
     element: SearchPage,
     label: i18n.t('navbar.search'),
     icon: <Search className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+  },
+  {
+    path: '/exec',
+    element: ExecPromptPage,
+    label: i18n.t('navbar.prompt'),
+    icon: <ChevronsRight className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
   },
