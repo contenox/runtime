@@ -225,44 +225,67 @@ func (s *State) cleanupStaleBackends(currentIDs map[string]struct{}) error {
 
 // syncBackendsWithPools is the pool-aware reconciliation logic called by RunBackendCycle.
 // It:
-//  1. Fetches all configured pools from the database
+//  1. Fetches all configured pools from the database.
 //  2. For each pool:
-//     a. Retrieves associated backends
-//     b. Fetches pool-specific models
-//     c. Processes each backend with its pool's models
-//  3. After processing all pools:
-//     a. Performs global cleanup of state entries for backends not found in any pool
+//     a. Retrieves its associated backends and models.
+//     b. Aggregates models for each backend, collecting a unique set of all models
+//     that a backend should have based on all pools it belongs to.
+//     c. Tracks all active backend IDs encountered.
+//  3. After processing all pools and aggregating models:
+//     a. For each unique backend, processes it once with its complete aggregated set of models.
+//  4. Performs global cleanup of state entries for backends not found in any pool (those not
+//     associated with any pool).
 //
 // This fixed version aggregates backend IDs across all pools before cleanup to prevent
 // premature deletion of valid cross-pool backends.
 func (s *State) syncBackendsWithPools(ctx context.Context) error {
 	tx := s.dbInstance.WithoutTransaction()
-	store := store.New(tx)
+	dbStore := store.New(tx)
 
-	pools, err := store.ListPools(ctx)
+	allPools, err := dbStore.ListPools(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching pools: %v", err)
 	}
 
-	currentIDs := make(map[string]struct{}) // Shared across all pools
+	allBackendObjects := make(map[string]*store.Backend)
+	backendToAggregatedModels := make(map[string]map[string]*store.Model)
+	activeBackendIDs := make(map[string]struct{})
 
-	for _, pool := range pools {
-		backends, err := store.ListBackendsForPool(ctx, pool.ID)
+	for _, pool := range allPools {
+		poolBackends, err := dbStore.ListBackendsForPool(ctx, pool.ID)
 		if err != nil {
 			return fmt.Errorf("fetching backends for pool %s: %v", pool.ID, err)
 		}
 
-		models, err := store.ListModelsForPool(ctx, pool.ID)
+		poolModels, err := dbStore.ListModelsForPool(ctx, pool.ID)
 		if err != nil {
-			return fmt.Errorf("fetching models: %v", err)
+			return fmt.Errorf("fetching models for pool %s: %v", pool.ID, err)
 		}
 
-		// Process pool's backends and accumulate IDs
-		s.processBackends(ctx, backends, models, currentIDs)
+		for _, backend := range poolBackends {
+			activeBackendIDs[backend.ID] = struct{}{}
+			if _, exists := allBackendObjects[backend.ID]; !exists {
+				allBackendObjects[backend.ID] = backend
+			}
+			if _, exists := backendToAggregatedModels[backend.ID]; !exists {
+				backendToAggregatedModels[backend.ID] = make(map[string]*store.Model)
+			}
+			for _, model := range poolModels {
+				backendToAggregatedModels[backend.ID][model.Model] = model
+			}
+		}
 	}
 
-	// Single cleanup after processing all pools
-	return s.cleanupStaleBackends(currentIDs)
+	// Now, process each unique backend once with its fully aggregated list of models.
+	for backendID, backendObj := range allBackendObjects {
+		modelsForThisBackend := make([]*store.Model, 0, len(backendToAggregatedModels[backendID]))
+		for _, model := range backendToAggregatedModels[backendID] {
+			modelsForThisBackend = append(modelsForThisBackend, model)
+		}
+		s.processBackend(ctx, backendObj, modelsForThisBackend)
+	}
+
+	return s.cleanupStaleBackends(activeBackendIDs)
 }
 
 // syncBackends is the global reconciliation logic called by RunBackendCycle.
