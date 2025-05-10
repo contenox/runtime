@@ -77,7 +77,7 @@
   --color-dark-primary-200: #9fbde5;
   --color-dark-primary-300: #7aa3d8;
   --color-dark-primary-400: #5689cb;
-  --color-dark-primary-500: #3b82f6; /* Same base for consistency */
+  --color-dark-primary-500: #3b82f6; /*  */
   --color-dark-primary-600: #2563eb;
   --color-dark-primary-700: #1d4ed8;
   --color-dark-primary-800: #1e40af;
@@ -261,7 +261,7 @@
 
   /* ========== Dark Mode Surface Colors (Cool Blue-Gray) ========== */
   --color-dark-surface-50: #0d1117; /* Bridge between bg-light and surface-100 */
-  --color-dark-surface-100: #111827; /* Your chosen rich slate-blue */
+  --color-dark-surface-100: #111827; /* rich slate-blue */
   --color-dark-surface-200: #182032; /* Dark steel blue */
   --color-dark-surface-300: #1f283d; /* Medium navy */
   --color-dark-surface-400: #263048; /* Soft blue-gray */
