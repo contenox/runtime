@@ -36,9 +36,7 @@ func setupTestEnvironment(t *testing.T) (context.Context, *serverops.Config, lib
 }
 
 func TestNew_InitializesPoolAndModel(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
+
 	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 

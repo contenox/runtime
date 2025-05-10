@@ -25,7 +25,6 @@ export function useChatHistory(id: string) {
     queryKey: chatKeys.history(id),
     queryFn: () => api.getChatHistory(id),
     enabled: !!id,
-    refetchInterval: 5000,
   });
 }
 

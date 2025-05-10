@@ -33,9 +33,11 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	}
 
 	var finalResponse api.ChatResponse
+	var content string
 
 	// Handle the API call first
 	err := c.ollamaClient.Chat(ctx, req, func(res api.ChatResponse) error {
+		content += res.Message.Content
 		// For non-streaming, we expect exactly one response with Done=true
 		if res.Done {
 			finalResponse = res
@@ -89,6 +91,6 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	// Successful response
 	return serverops.Message{
 		Role:    finalResponse.Message.Role,
-		Content: finalResponse.Message.Content,
+		Content: content,
 	}, nil
 }

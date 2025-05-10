@@ -96,13 +96,13 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 
 	req, err := serverops.Decode[chatRequest](r)
 	if err != nil {
-		_ = serverops.Error(w, r, err, serverops.ServerOperation)
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 
 	reply, err := h.manager.Chat(ctx, chatID.String(), req.Message)
 	if err != nil {
-		_ = serverops.Error(w, r, err, serverops.ServerOperation)
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 

@@ -27,28 +27,38 @@ func (o *OllamaPromptClient) Prompt(ctx context.Context, prompt string) (string,
 		},
 	}
 
-	var content string
+	var (
+		content       string
+		finalResponse api.GenerateResponse
+	)
 
-	// Execute the Generate request and handle responses via the callback
 	err := o.ollamaClient.Generate(ctx, req, func(gr api.GenerateResponse) error {
-		content += gr.Response // Aggregate response content
+		content += gr.Response
 		if gr.Done {
-			println(gr.DoneReason)
-			return nil
+			finalResponse = gr
 		}
-		// if gr.Done && gr.DoneReason != "" {
-		// 	generateErr = fmt.Errorf("generation error: %s", gr.DoneReason)
-		// }
 		return nil
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("ollama generate API call failed: %w", err)
+		return "", fmt.Errorf("ollama generate API call failed for model %s: %w", o.modelName, err)
 	}
 
-	// Ensure content is not empty
-	if content == "" {
-		return "", fmt.Errorf("ollama generate returned empty content for model %s", o.modelName)
+	if !finalResponse.Done {
+		return "", fmt.Errorf("no completion received from Ollama for model %s", o.modelName)
+	}
+
+	switch finalResponse.DoneReason {
+	case "error":
+		return "", fmt.Errorf("ollama generation error for model %s: %s", o.modelName, content)
+	case "length":
+		return "", fmt.Errorf("token limit reached for model %s (partial response: %q)", o.modelName, content)
+	case "stop":
+		if content == "" {
+			return "", fmt.Errorf("empty content from model %s despite normal completion", o.modelName)
+		}
+	default:
+		return "", fmt.Errorf("unexpected completion reason %q for model %s", finalResponse.DoneReason, o.modelName)
 	}
 
 	return content, nil
