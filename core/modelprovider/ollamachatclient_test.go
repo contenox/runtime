@@ -2,7 +2,6 @@ package modelprovider_test
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/js402/cate/core/modelprovider"
@@ -13,9 +12,9 @@ import (
 )
 
 func TestOllamaChatClient_HappyPath(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
+	// if os.Getenv("SMOKETESTS") == "" {
+	// 	t.Skip("Set env SMOKETESTS to true to run this test")
+	// }
 	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 	runtime := backendState.Get(ctx)
@@ -133,4 +132,42 @@ func TestOllamaChatClient_ChatWithNonExistentModel(t *testing.T) {
 	assert.ErrorContains(t, err, "ollama API chat request failed", "Error message should indicate API failure")
 	assert.ErrorContains(t, err, nonExistentModel, "Error message should mention the problematic model name")
 	t.Logf("Confirmed error for non-existent model: %v", err)
+}
+
+func TestOllamaChatClient_LargeInput(t *testing.T) {
+	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
+	defer cleanup()
+
+	runtime := backendState.Get(ctx)
+	url := ""
+	for _, state := range runtime {
+		url = state.Backend.BaseURL
+	}
+	require.NotEmpty(t, url, "Failed to get backend URL from test setup")
+
+	provider := modelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, modelprovider.WithChat(true))
+	require.True(t, provider.CanChat())
+
+	client, err := provider.GetChatConnection(url)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	// Generate a huge input string
+	hugeInput := make([]byte, 100_000)
+	for i := range hugeInput {
+		hugeInput[i] = 'a'
+	}
+	hugeMessage := string(hugeInput)
+
+	// Send huge input to chat client
+	response, err := client.Chat(ctx, []serverops.Message{
+		{Content: hugeMessage, Role: "user"},
+	})
+	if err == nil {
+		t.Fatalf("expected an error %s", response.Content)
+	}
+	if err != nil {
+		t.Logf("Expected error for huge input: %v", err)
+	}
+	assert.Contains(t, err.Error(), "empty content from model", "Error should come from the ollama API", response.Content)
 }
