@@ -3,7 +3,7 @@ import i18n from '../i18n';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 const envTimeout = import.meta.env.VITE_API_TIMEOUT;
 const parsedTimeout = envTimeout ? parseInt(envTimeout, 10) : NaN;
-const API_TIMEOUT = !isNaN(parsedTimeout) ? parsedTimeout : 10000;
+const API_TIMEOUT = !isNaN(parsedTimeout) ? parsedTimeout : 100000;
 
 export class ApiError extends Error {
   constructor(
