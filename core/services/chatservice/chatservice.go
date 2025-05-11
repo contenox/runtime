@@ -85,7 +85,7 @@ func (s *Service) AddInstruction(ctx context.Context, id string, message string)
 	if err != nil {
 		return err
 	}
-	err = store.New(tx).AppendMessage(ctx, &store.Message{
+	err = store.New(tx).AppendMessages(ctx, &store.Message{
 		ID:      uuid.NewString(),
 		IDX:     id,
 		Payload: payload,
@@ -96,41 +96,16 @@ func (s *Service) AddInstruction(ctx context.Context, id string, message string)
 	return nil
 }
 
-func (s *Service) addMessage(ctx context.Context, id string, message string) error {
-	msg := serverops.Message{
-		Role:    "user",
-		Content: message,
-	}
-	payload, err := json.Marshal(&msg)
-	if err != nil {
-		return err
-	}
-	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
-		ID:      uuid.NewString(),
-		IDX:     id,
-		Payload: payload,
-	})
-
-	return err
-}
-
 func (s *Service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
-
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
 	}
 	// TODO: check authorization for the chat instance.
-
-	// Save the user's message.
-	if err := s.addMessage(ctx, subjectID, message); err != nil {
-		return "", err
-	}
 	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
 		return "", err
 	}
-
 	// Convert stored messages into the api.Message slice.
 	var messages []serverops.Message
 	for _, msg := range conversation {
@@ -140,17 +115,21 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 		}
 		messages = append(messages, parsedMsg)
 	}
-
+	msg := serverops.Message{
+		Role:    "user",
+		Content: message,
+	}
+	messages = append(messages, msg)
+	contextLength, err := s.CalculateContextSize(ctx, messages)
+	if err != nil {
+		return "", fmt.Errorf("could not estimate context size %w", err)
+	}
 	convertedMessage := make([]api.Message, len(messages))
 	for i, m := range messages {
 		convertedMessage[i] = api.Message{
 			Role:    m.Role,
 			Content: m.Content,
 		}
-	}
-	contextLength, err := s.CalculateContextSize(ctx, messages)
-	if err != nil {
-		return "", fmt.Errorf("could not estimate context size %w", err)
 	}
 	chatClient, err := llmresolver.ResolveChat(ctx, llmresolver.ResolveRequest{
 		ContextLength: contextLength,
@@ -171,11 +150,21 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
-	err = store.New(s.dbInstance.WithoutTransaction()).AppendMessage(ctx, &store.Message{
-		ID:      uuid.New().String(),
-		IDX:     subjectID,
-		Payload: jsonData,
-	})
+	payload, err := json.Marshal(&msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal user message %w", err)
+	}
+	err = store.New(tx).AppendMessages(ctx,
+		&store.Message{
+			ID:      uuid.NewString(),
+			IDX:     subjectID,
+			Payload: payload,
+		},
+		&store.Message{
+			ID:      uuid.New().String(),
+			IDX:     subjectID,
+			Payload: jsonData,
+		})
 	if err != nil {
 		return "", err
 	}
@@ -283,16 +272,14 @@ func (s *Service) CalculateContextSize(ctx context.Context, messages []serverops
 		selectedModel = "tiny"
 	}
 	count := 0
-	if len(prompt) >= tokenizerMaxPromptBytes {
-		for start := 0; start < len(prompt); start += tokenizerMaxPromptBytes {
-			end := min(start+tokenizerMaxPromptBytes, len(prompt))
-			chunk := prompt[start:end]
-			tokens, err := s.tokenizer.CountTokens(ctx, selectedModel, chunk)
-			if err != nil {
-				return 0, fmt.Errorf("failed to estimate context size at chunk [%d:%d]: %w", start, end, err)
-			}
-			count += tokens
+	for start := 0; start < len(prompt); start += tokenizerMaxPromptBytes {
+		end := min(start+tokenizerMaxPromptBytes, len(prompt))
+		chunk := prompt[start:end]
+		tokens, err := s.tokenizer.CountTokens(ctx, selectedModel, chunk)
+		if err != nil {
+			return 0, fmt.Errorf("failed to estimate context size at chunk [%d:%d]: %w", start, end, err)
 		}
+		count += tokens
 	}
 
 	return count, nil

@@ -292,7 +292,7 @@ type Store interface {
 	GetBlobByID(ctx context.Context, id string) (*Blob, error)
 	DeleteBlob(ctx context.Context, id string) error
 
-	AppendMessage(ctx context.Context, message *Message) error
+	AppendMessages(ctx context.Context, messages ...*Message) error
 	DeleteMessages(ctx context.Context, stream string) error
 	ListMessages(ctx context.Context, stream string) ([]*Message, error)
 

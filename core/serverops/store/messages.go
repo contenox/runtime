@@ -3,22 +3,33 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
-func (s *store) AppendMessage(ctx context.Context, message *Message) error {
-	now := time.Now().UTC()
-	message.AddedAt = now
+func (s *store) AppendMessages(ctx context.Context, messages ...*Message) error {
+	if len(messages) == 0 {
+		return nil
+	}
 
-	_, err := s.Exec.ExecContext(ctx, `
-		INSERT INTO messages
-		(id, idx_id, payload, added_at)
-		VALUES ($1, $2, $3, $4)`,
-		message.ID,
-		message.IDX,
-		message.Payload,
-		message.AddedAt,
+	now := time.Now().UTC()
+	valueStrings := make([]string, 0, len(messages))
+	valueArgs := make([]any, 0, len(messages)*4)
+
+	for i, msg := range messages {
+		msg.AddedAt = now
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
+		valueArgs = append(valueArgs, msg.ID, msg.IDX, msg.Payload, msg.AddedAt)
+	}
+
+	stmt := fmt.Sprintf(`
+		INSERT INTO messages (id, idx_id, payload, added_at)
+		VALUES %s`,
+		// Join all placeholders
+		strings.Join(valueStrings, ","),
 	)
+
+	_, err := s.Exec.ExecContext(ctx, stmt, valueArgs...)
 	return err
 }
 
