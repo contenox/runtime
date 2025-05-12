@@ -3,7 +3,6 @@ package fileservice_test
 import (
 	"bytes"
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -73,21 +72,23 @@ func TestFileService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateFile failed: %v", err)
 		}
-
+		if createdFile.Path != "update.txt" {
+			t.Fatalf("CreateFile failed path value is bad: %v", err)
+		}
 		newData := []byte("updated data")
 		updateFile := &fileservice.File{
-			ID:          createdFile.ID,
-			Path:        "updated.txt",
+			ID:   createdFile.ID,
+			Path: "update.txt",
+			// Path:        "updated.txt", // Updating file-paths require now a renaming operation
 			ContentType: "text/plain",
 			Data:        newData,
 		}
-
 		updatedFile, err := fileService.UpdateFile(ctx, updateFile)
 		if err != nil {
 			t.Fatalf("UpdateFile failed: %v", err)
 		}
 
-		if updatedFile.Path != "updated.txt" {
+		if updatedFile.Path != "update.txt" {
 			t.Errorf("Expected path 'updated.txt', got %s", updatedFile.Path)
 		}
 		if !bytes.Equal(updatedFile.Data, newData) {
@@ -130,8 +131,8 @@ func TestFileService(t *testing.T) {
 	})
 
 	t.Run("CreateFolder", func(t *testing.T) {
-		path := "test_folder"
-		folder, err := fileService.CreateFolder(ctx, path)
+		name := "test_folder"
+		folder, err := fileService.CreateFolder(ctx, "", name)
 		if err != nil {
 			t.Fatalf("CreateFolder failed: %v", err)
 		}
@@ -139,8 +140,8 @@ func TestFileService(t *testing.T) {
 		if folder.ID == "" {
 			t.Error("Expected non-empty folder ID")
 		}
-		if folder.Path != path {
-			t.Errorf("Expected path '%s', got '%s'", path, folder.Path)
+		if folder.Path != name {
+			t.Errorf("Expected path '%s', got '%s'", name, folder.Path)
 		}
 	})
 
@@ -175,15 +176,62 @@ func TestFileService(t *testing.T) {
 		}
 	})
 
+	t.Run("CreateFolder", func(t *testing.T) {
+		folderPath := "folder1"
+		folder, err := fileService.CreateFolder(ctx, "", folderPath)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		storedFolder, err := fileService.GetFolderByID(ctx, folder.ID)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		if storedFolder.ID != folder.ID {
+			if err != nil {
+				t.Fatalf("CreateFolder failed ids mismatched")
+			}
+		}
+	})
+
+	t.Run("CreateMiniTree", func(t *testing.T) {
+		folderPath := "folder1"
+		folder, err := fileService.CreateFolder(ctx, "", folderPath)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		storedFolder, err := fileService.GetFolderByID(ctx, folder.ID)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		if storedFolder.ID != folder.ID {
+			if err != nil {
+				t.Fatalf("CreateFolder failed ids mismatched")
+			}
+		}
+		folderPath = "folder2"
+		folder2, err := fileService.CreateFolder(ctx, folder.ID, folderPath)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		storedFolder, err = fileService.GetFolderByID(ctx, folder2.ID)
+		if err != nil {
+			t.Fatalf("CreateFolder failed: %v", err)
+		}
+		if storedFolder.Path != "folder1/folder2" {
+			t.Fatalf("CreateFolder failed path mismatch %s %s", storedFolder.Path, "folder1/folder2")
+		}
+	})
+
 	t.Run("RenameFolder", func(t *testing.T) {
 		folderPath := "old_folder"
-		folder, err := fileService.CreateFolder(ctx, folderPath)
+		folder, err := fileService.CreateFolder(ctx, "", folderPath)
 		if err != nil {
 			t.Fatalf("CreateFolder failed: %v", err)
 		}
 
 		file1 := &fileservice.File{
 			Path:        folderPath + "/file1.txt",
+			ParentID:    folder.ID,
 			ContentType: "text/plain",
 			Data:        []byte("data1"),
 		}
@@ -191,9 +239,13 @@ func TestFileService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CreateFile failed for file1: %v", err)
 		}
-
+		subFolder, err := fileService.CreateFolder(ctx, folder.ID, "sub")
+		if err != nil {
+			t.Fatalf("CreateFolder(ctx, folderPath+/sub): %v", err)
+		}
 		file2 := &fileservice.File{
 			Path:        folderPath + "/sub/file2.txt",
+			ParentID:    subFolder.ID,
 			ContentType: "text/plain",
 			Data:        []byte("data2"),
 		}
@@ -202,21 +254,21 @@ func TestFileService(t *testing.T) {
 			t.Fatalf("CreateFile failed for file2: %v", err)
 		}
 
-		newFolderPath := "new_folder"
-		renamedFolder, err := fileService.RenameFolder(ctx, folder.ID, newFolderPath)
+		newName := "new_folder"
+		renamedFolder, err := fileService.RenameFolder(ctx, folder.ID, newName)
 		if err != nil {
 			t.Fatalf("RenameFolder failed: %v", err)
 		}
 
-		if renamedFolder.Path != newFolderPath {
-			t.Errorf("Folder path expected '%s', got '%s'", newFolderPath, renamedFolder.Path)
+		if renamedFolder.Path != newName {
+			t.Errorf("Folder path expected '%s', got '%s'", newName, renamedFolder.Path)
 		}
 
 		retrievedFile1, err := fileService.GetFileByID(ctx, createdFile1.ID)
 		if err != nil {
 			t.Fatalf("GetFileByID failed for file1: %v", err)
 		}
-		expectedPath1 := newFolderPath + "/file1.txt"
+		expectedPath1 := newName + "/file1.txt"
 		if retrievedFile1.Path != expectedPath1 {
 			t.Errorf("File1 path expected '%s', got '%s'", expectedPath1, retrievedFile1.Path)
 		}
@@ -225,50 +277,83 @@ func TestFileService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetFileByID failed for file2: %v", err)
 		}
-		expectedPath2 := newFolderPath + "/sub/file2.txt"
+		expectedPath2 := newName + "/sub/file2.txt"
 		if retrievedFile2.Path != expectedPath2 {
 			t.Errorf("File2 path expected '%s', got '%s'", expectedPath2, retrievedFile2.Path)
 		}
 	})
 
 	t.Run("ListAllPaths", func(t *testing.T) {
-		paths := []string{
-			"path1.txt",
-			"path2.txt",
-			"folder1",
-			"folder1/file1.txt",
-		}
+		// paths := []string{
+		// 	"folder1",
+		// 	"folder1/folder2",
+		// 	"folder1/folder2/file1.txt",
+		// 	"folder1/file1.txt",
+		// 	"path1.txt",
+		// 	"path2.txt",
+		// }
 
-		for _, path := range paths {
-			if strings.Contains(path, ".") {
-				file := &fileservice.File{
-					Path:        path,
-					ContentType: "text/plain",
-					Data:        []byte("data"),
-				}
-				_, err := fileService.CreateFile(ctx, file)
-				if err != nil {
-					t.Fatalf("CreateFile failed for %s: %v", path, err)
-				}
-			} else {
-				_, err := fileService.CreateFolder(ctx, path)
-				if err != nil {
-					t.Fatalf("CreateFolder failed for %s: %v", path, err)
-				}
-			}
-		}
-
-		listedPaths, err := fileService.ListAllPaths(ctx)
+		folder1, err := fileService.CreateFolder(ctx, "", "folder1")
 		if err != nil {
 			t.Fatalf("ListAllPaths failed: %v", err)
 		}
-
-		expectedPaths := make(map[string]bool)
-		for _, p := range paths {
-			expectedPaths[p] = true
+		folder2, err := fileService.CreateFolder(ctx, folder1.ID, "folder2")
+		if err != nil {
+			t.Fatalf("ListAllPaths failed: %v", err)
+		}
+		_, err = fileService.CreateFile(ctx, &fileservice.File{
+			ID:          uuid.NewString(),
+			Path:        "folder1/folder2/file1.txt",
+			ParentID:    folder2.ID,
+			ContentType: "text/plain",
+			Data:        []byte("data1"),
+		})
+		if err != nil {
+			t.Fatalf("ListAllPaths failed: %v", err)
+		}
+		_, err = fileService.CreateFile(ctx, &fileservice.File{
+			ID:          uuid.NewString(),
+			Path:        "folder1/file1.txt",
+			ParentID:    folder1.ID,
+			ContentType: "text/plain",
+			Data:        []byte("data1"),
+		})
+		if err != nil {
+			t.Fatalf("ListAllPaths failed: %v", err)
+		}
+		_, err = fileService.CreateFile(ctx, &fileservice.File{
+			ID:          uuid.NewString(),
+			Path:        "path1.txt",
+			ParentID:    "",
+			ContentType: "text/plain",
+			Data:        []byte("data1"),
+		})
+		if err != nil {
+			t.Fatalf("ListAllPaths failed: %v", err)
+		}
+		_, err = fileService.CreateFile(ctx, &fileservice.File{
+			ID:          uuid.NewString(),
+			Path:        "path2.txt",
+			ParentID:    "",
+			ContentType: "text/plain",
+			Data:        []byte("data1"),
+		})
+		files, err := fileService.GetFilesByPath(ctx, "")
+		if err != nil {
+			t.Fatalf("ListAllPaths failed: %v", err)
+		}
+		expectedLevel0 := []string{
+			"folder1",
+			"path1.txt",
+			"path2.txt",
 		}
 
-		for _, listed := range listedPaths {
+		expectedPaths := make(map[string]bool)
+		for _, p := range files {
+			expectedPaths[p.Path] = true
+		}
+
+		for _, listed := range expectedLevel0 {
 			delete(expectedPaths, listed)
 		}
 
@@ -304,13 +389,13 @@ func TestFileService(t *testing.T) {
 	})
 	t.Run("RenameFolder_ConflictWithExistingFolder", func(t *testing.T) {
 		// Create destination folder
-		_, err := fileService.CreateFolder(ctx, "existing_folder")
+		_, err := fileService.CreateFolder(ctx, "", "existing_folder")
 		if err != nil {
 			t.Fatalf("CreateFolder failed for existing_folder: %v", err)
 		}
 
 		// Create folder to rename
-		folderToRename, err := fileService.CreateFolder(ctx, "folder_to_rename")
+		folderToRename, err := fileService.CreateFolder(ctx, "", "folder_to_rename")
 		if err != nil {
 			t.Fatalf("CreateFolder failed for folder_to_rename: %v", err)
 		}

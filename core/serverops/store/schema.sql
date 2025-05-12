@@ -116,7 +116,6 @@ CREATE INDEX IF NOT EXISTS idx_chunks_idx_vector_id ON chunks_idx USING hash(vec
 
 CREATE TABLE IF NOT EXISTS files (
     id VARCHAR(255) PRIMARY KEY,
-    path VARCHAR(1024) NOT NULL UNIQUE,
     type VARCHAR(512) NOT NULL,
 
     meta JSONB NOT NULL,
@@ -125,8 +124,20 @@ CREATE TABLE IF NOT EXISTS files (
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
-
 );
+
+CREATE TABLE IF NOT EXISTS filestree (
+    id VARCHAR(255) PRIMARY KEY,
+    parent_id VARCHAR(255),
+    name VARCHAR(1024) NOT NULL,
+
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    UNIQUE (parent_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_filetree_list ON filestree (name, parent_id);
+CREATE INDEX IF NOT EXISTS idx_filetree_parent_id ON filestree USING hash(parent_id);
 
 CREATE TABLE IF NOT EXISTS blobs (
     id VARCHAR(255) PRIMARY KEY,
@@ -162,7 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at);
 CREATE INDEX IF NOT EXISTS idx_accesslists_created_at ON accesslists (created_at);
 
 -- For filesystem --
-CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);
+-- CREATE INDEX IF NOT EXISTS idx_files_path ON files (path);
 ALTER TABLE accesslists ADD CONSTRAINT fk_accesslists_identity FOREIGN KEY (identity) REFERENCES users(subject) ON DELETE CASCADE;
 
 -- CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at);

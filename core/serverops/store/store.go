@@ -119,7 +119,6 @@ var ResourceTypes = []string{
 
 type File struct {
 	ID        string    `json:"id"`
-	Path      string    `json:"path"`
 	Type      string    `json:"type"`
 	Meta      []byte    `json:"meta"`
 	IsFolder  bool      `json:"isFolder"`
@@ -280,13 +279,18 @@ type Store interface {
 	CreateFile(ctx context.Context, file *File) error
 	GetFileByID(ctx context.Context, id string) (*File, error)
 	UpdateFile(ctx context.Context, file *File) error
-	UpdateFilePath(ctx context.Context, id string, newPath string) error
-	BulkUpdateFilePaths(ctx context.Context, updates map[string]string) error
 	DeleteFile(ctx context.Context, id string) error
-	ListFilesByPath(ctx context.Context, path string) ([]File, error)
 	ListFiles(ctx context.Context) ([]string, error)
 	EstimateFileCount(ctx context.Context) (int64, error)
 	EnforceMaxFileCount(ctx context.Context, maxCount int64) error
+
+	ListFileIDsByParentID(ctx context.Context, parentID string) ([]string, error)
+	ListFileIDsByName(ctx context.Context, parentID, name string) ([]string, error)
+	GetFileNameByID(ctx context.Context, id string) (string, error)
+	CreateFileNameID(ctx context.Context, id, parentID, name string) error
+	UpdateFileNameByID(ctx context.Context, id string, name string) error
+	GetFileParentID(ctx context.Context, id string) (string, error)
+	DeleteFileNameID(ctx context.Context, id string) error
 
 	CreateBlob(ctx context.Context, blob *Blob) error
 	GetBlobByID(ctx context.Context, id string) (*Blob, error)

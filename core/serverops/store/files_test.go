@@ -17,7 +17,6 @@ func TestCreateAndGetFile(t *testing.T) {
 	// Create a new file
 	file := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/path/to/file.txt",
 		Type:    "text/plain",
 		Meta:    []byte(`{"description": "Test file"}`),
 		BlobsID: uuid.NewString(),
@@ -32,50 +31,11 @@ func TestCreateAndGetFile(t *testing.T) {
 	retrieved, err := s.GetFileByID(ctx, file.ID)
 	require.NoError(t, err)
 	require.Equal(t, file.ID, retrieved.ID)
-	require.Equal(t, file.Path, retrieved.Path)
 	require.Equal(t, file.Type, retrieved.Type)
 	require.Equal(t, file.Meta, retrieved.Meta)
 	require.Equal(t, file.BlobsID, retrieved.BlobsID)
 	require.WithinDuration(t, file.CreatedAt, retrieved.CreatedAt, time.Second)
 	require.WithinDuration(t, file.UpdatedAt, retrieved.UpdatedAt, time.Second)
-}
-
-// TestGetFilesByPath verifies that files can be retrieved by path.
-func TestGetFilesByPath(t *testing.T) {
-	ctx, s := store.SetupStore(t)
-
-	path := "/common/path/"
-	files, err := s.ListFilesByPath(ctx, path)
-	require.NoError(t, err)
-	require.Len(t, files, 0)
-	// Create several files with the same path
-	file1 := &store.File{
-		ID:      uuid.NewString(),
-		Path:    path + uuid.NewString(),
-		Type:    "text/plain",
-		Meta:    []byte(`{"description": "File 1"}`),
-		BlobsID: uuid.NewString(),
-	}
-	file2 := &store.File{
-		ID:      uuid.NewString(),
-		Path:    path + uuid.NewString(),
-		Type:    "text/plain",
-		Meta:    []byte(`{"description": "File 2"}`),
-		BlobsID: uuid.NewString(),
-	}
-
-	require.NoError(t, s.CreateFile(ctx, file1))
-	require.NoError(t, s.CreateFile(ctx, file2))
-
-	files, err = s.ListFilesByPath(ctx, path)
-	require.NoError(t, err)
-	require.Len(t, files, 2)
-
-	// Optionally verify that the returned files match the ones inserted.
-	ids := map[string]bool{file1.ID: true, file2.ID: true}
-	for _, f := range files {
-		require.True(t, ids[f.ID])
-	}
 }
 
 // TestUpdateFile verifies that a file's fields can be updated.
@@ -85,7 +45,6 @@ func TestUpdateFile(t *testing.T) {
 	// Create a file to update.
 	file := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/old/path/file.txt",
 		Type:    "text/plain",
 		Meta:    []byte(`{"description": "Old description"}`),
 		BlobsID: uuid.NewString(),
@@ -93,7 +52,6 @@ func TestUpdateFile(t *testing.T) {
 	require.NoError(t, s.CreateFile(ctx, file))
 
 	// Update file fields.
-	file.Path = "/new/path/file.txt"
 	file.Type = "application/json"
 	file.Meta = []byte(`{"description": "New description"}`)
 	file.BlobsID = uuid.NewString()
@@ -104,7 +62,6 @@ func TestUpdateFile(t *testing.T) {
 	// Retrieve the file and verify the changes.
 	updated, err := s.GetFileByID(ctx, file.ID)
 	require.NoError(t, err)
-	require.Equal(t, "/new/path/file.txt", updated.Path)
 	require.Equal(t, "application/json", updated.Type)
 	require.Equal(t, file.Meta, updated.Meta)
 	require.Equal(t, file.BlobsID, updated.BlobsID)
@@ -118,7 +75,6 @@ func TestDeleteFile(t *testing.T) {
 	// Create a file to delete.
 	file := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/path/to/delete.txt",
 		Type:    "text/plain",
 		Meta:    []byte(`{"description": "To be deleted"}`),
 		BlobsID: uuid.NewString(),
@@ -153,14 +109,12 @@ func TestListAll(t *testing.T) {
 	// Insert several files with various paths.
 	file1 := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/path/one/1",
 		Type:    "text/plain",
 		Meta:    []byte(`{"description": "File one"}`),
 		BlobsID: uuid.NewString(),
 	}
 	file2 := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/path/two",
 		Type:    "text/plain",
 		Meta:    []byte(`{"description": "File two"}`),
 		BlobsID: uuid.NewString(),
@@ -168,7 +122,6 @@ func TestListAll(t *testing.T) {
 	// Duplicate path with file1.
 	file3 := &store.File{
 		ID:      uuid.NewString(),
-		Path:    "/path/one",
 		Type:    "application/json",
 		Meta:    []byte(`{"description": "Another file at path one"}`),
 		BlobsID: uuid.NewString(),
@@ -181,58 +134,101 @@ func TestListAll(t *testing.T) {
 	// List all.
 	files, err = s.ListFiles(ctx)
 	require.NoError(t, err)
-	// Expecting only two distinct paths: "/path/one" and "/path/two".
 	require.Len(t, files, 3)
-
-	// Optionally verify that the returned paths are correct.
-	distinctPaths := map[string]bool{}
-	for _, p := range files {
-		distinctPaths[p] = true
-	}
-	require.True(t, distinctPaths["/path/one"], "Expected path '/path/one' to be present")
-	require.True(t, distinctPaths["/path/two"], "Expected path '/path/two' to be present")
 }
-func TestBulkUpdateFilePaths_Success(t *testing.T) {
+
+func TestCreateAndGetFileNameID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
-	// Create test files
-	file1 := &store.File{
-		ID:      uuid.NewString(),
-		Path:    "/bulk/old1",
-		Type:    "text/plain",
-		Meta:    []byte(`{"desc": "1"}`),
-		BlobsID: uuid.NewString(),
-	}
-	file2 := &store.File{
-		ID:      uuid.NewString(),
-		Path:    "/bulk/old2",
-		Type:    "text/plain",
-		Meta:    []byte(`{"desc": "2"}`),
-		BlobsID: uuid.NewString(),
-	}
-	require.NoError(t, s.CreateFile(ctx, file1))
-	require.NoError(t, s.CreateFile(ctx, file2))
+	id := uuid.NewString()
+	parentID := uuid.NewString()
+	name := "example.txt"
 
-	originalUpdatedAt1 := file1.UpdatedAt
-	originalUpdatedAt2 := file2.UpdatedAt
-
-	// Prepare update
-	updates := map[string]string{
-		file1.ID: "/bulk/new1",
-		file2.ID: "/bulk/new2",
-	}
-
-	time.Sleep(1 * time.Second) // ensure UpdatedAt changes
-	require.NoError(t, s.BulkUpdateFilePaths(ctx, updates))
-
-	// Verify updates
-	updated1, err := s.GetFileByID(ctx, file1.ID)
+	err := s.CreateFileNameID(ctx, id, parentID, name)
 	require.NoError(t, err)
-	require.Equal(t, "/bulk/new1", updated1.Path)
-	require.True(t, updated1.UpdatedAt.After(originalUpdatedAt1))
 
-	updated2, err := s.GetFileByID(ctx, file2.ID)
+	gotName, err := s.GetFileNameByID(ctx, id)
 	require.NoError(t, err)
-	require.Equal(t, "/bulk/new2", updated2.Path)
-	require.True(t, updated2.UpdatedAt.After(originalUpdatedAt2))
+	require.Equal(t, name, gotName)
+
+	gotParentID, err := s.GetFileParentID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, parentID, gotParentID)
+}
+
+func TestUpdateFileNameByID(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	id := uuid.NewString()
+	parentID := uuid.NewString()
+	initialName := "initial.txt"
+	newName := "updated.txt"
+
+	require.NoError(t, s.CreateFileNameID(ctx, id, parentID, initialName))
+
+	err := s.UpdateFileNameByID(ctx, id, newName)
+	require.NoError(t, err)
+
+	gotName, err := s.GetFileNameByID(ctx, id)
+	require.NoError(t, err)
+	require.Equal(t, newName, gotName)
+}
+
+func TestDeleteFileNameID(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	id := uuid.NewString()
+	parentID := uuid.NewString()
+	name := "todelete.txt"
+
+	require.NoError(t, s.CreateFileNameID(ctx, id, parentID, name))
+
+	require.NoError(t, s.DeleteFileNameID(ctx, id))
+
+	_, err := s.GetFileNameByID(ctx, id)
+	require.ErrorIs(t, err, libdb.ErrNotFound)
+}
+
+func TestListFileIDsByParentID(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	parentID := uuid.NewString()
+	id1 := uuid.NewString()
+	id2 := uuid.NewString()
+
+	require.NoError(t, s.CreateFileNameID(ctx, id1, parentID, "a.txt"))
+	require.NoError(t, s.CreateFileNameID(ctx, id2, parentID, "b.txt"))
+
+	ids, err := s.ListFileIDsByParentID(ctx, parentID)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{id1, id2}, ids)
+}
+
+func TestListFileIDsByEmptyParentID(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	id1 := uuid.NewString()
+	id2 := uuid.NewString()
+
+	require.NoError(t, s.CreateFileNameID(ctx, id1, "", "a.txt"))
+	require.NoError(t, s.CreateFileNameID(ctx, id2, "", "b.txt"))
+
+	ids, err := s.ListFileIDsByParentID(ctx, "")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{id1, id2}, ids)
+}
+
+func TestListFileIDsByName(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	parentID := uuid.NewString()
+	uniqueName := "unique.txt"
+	id := uuid.NewString()
+
+	require.NoError(t, s.CreateFileNameID(ctx, id, parentID, uniqueName))
+
+	ids, err := s.ListFileIDsByName(ctx, parentID, uniqueName)
+	require.NoError(t, err)
+	require.NotEmpty(t, ids)
+	require.Contains(t, ids, id)
 }

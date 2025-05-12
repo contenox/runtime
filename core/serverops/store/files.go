@@ -10,16 +10,151 @@ import (
 	"github.com/js402/cate/libs/libdb"
 )
 
+func (s *store) ListFileIDsByParentID(ctx context.Context, parentID string) ([]string, error) {
+	rows, err := s.Exec.QueryContext(ctx, `
+        SELECT id
+        FROM filestree
+        WHERE parent_id = $1`,
+		parentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+	return ids, nil
+}
+
+func (s *store) ListFileIDsByName(ctx context.Context, parentID, name string) ([]string, error) {
+	rows, err := s.Exec.QueryContext(ctx, `
+			SELECT id
+        FROM filestree
+        WHERE name = $1 and parent_id = $2`,
+		name, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+	return ids, nil
+}
+
+func (s *store) GetFileParentID(ctx context.Context, id string) (string, error) {
+	var parentID *string
+	err := s.Exec.QueryRowContext(ctx, `
+        SELECT parent_id
+        FROM filestree
+        WHERE id = $1`,
+		id,
+	).Scan(
+		&parentID,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", libdb.ErrNotFound
+	}
+	if parentID == nil {
+		return "", libdb.ErrNotFound
+	}
+	return *parentID, err
+}
+
+func (s *store) GetFileNameByID(ctx context.Context, id string) (string, error) {
+	var name *string
+	err := s.Exec.QueryRowContext(ctx, `
+        SELECT name
+        FROM filestree
+        WHERE id = $1`,
+		id,
+	).Scan(
+		&name,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", libdb.ErrNotFound
+	}
+	if name == nil {
+		return "", libdb.ErrNotFound
+	}
+	return *name, err
+}
+
+func (s *store) CreateFileNameID(ctx context.Context, id, parentID, name string) error {
+	now := time.Now().UTC()
+	_, err := s.Exec.ExecContext(ctx, `
+       INSERT INTO filestree
+       (id, parent_id, name, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+		id,
+		parentID,
+		name,
+		now,
+		now,
+	)
+
+	return err
+}
+
+func (s *store) DeleteFileNameID(ctx context.Context, id string) error {
+	result, err := s.Exec.ExecContext(ctx, `
+        DELETE FROM filestree
+        WHERE id = $1`,
+		id,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete file: %w", err)
+	}
+	return checkRowsAffected(result)
+}
+
+func (s *store) UpdateFileNameByID(ctx context.Context, id string, name string) error {
+	updatedAt := time.Now().UTC()
+
+	result, err := s.Exec.ExecContext(ctx, `
+        UPDATE filestree
+        SET name = $2,
+            updated_at = $3
+        WHERE id = $1`,
+		id,
+		name,
+		updatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update file: %w", err)
+	}
+	return checkRowsAffected(result)
+}
+
 func (s *store) CreateFile(ctx context.Context, file *File) error {
 	now := time.Now().UTC()
 	file.CreatedAt = now
 	file.UpdatedAt = now
 	_, err := s.Exec.ExecContext(ctx, `
         INSERT INTO files
-        (id, path, type, meta, blobs_id, is_folder, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        (id, type, meta, blobs_id, is_folder, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
 		file.ID,
-		file.Path,
 		file.Type,
 		file.Meta,
 		file.BlobsID,
@@ -27,19 +162,19 @@ func (s *store) CreateFile(ctx context.Context, file *File) error {
 		file.CreatedAt,
 		file.UpdatedAt,
 	)
+
 	return err
 }
 
 func (s *store) GetFileByID(ctx context.Context, id string) (*File, error) {
 	var file File
 	err := s.Exec.QueryRowContext(ctx, `
-        SELECT id, path, type, meta, blobs_id, is_folder, created_at, updated_at
+        SELECT id, type, meta, blobs_id, is_folder, created_at, updated_at
         FROM files
         WHERE id = $1`,
 		id,
 	).Scan(
 		&file.ID,
-		&file.Path,
 		&file.Type,
 		&file.Meta,
 		&file.BlobsID,
@@ -54,58 +189,18 @@ func (s *store) GetFileByID(ctx context.Context, id string) (*File, error) {
 	return &file, err
 }
 
-func (s *store) ListFilesByPath(ctx context.Context, path string) ([]File, error) {
-	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, path, type, meta, blobs_id, is_folder, created_at, updated_at
-        FROM files
-        WHERE path LIKE $1`,
-		path+"%",
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, libdb.ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var files []File
-	for rows.Next() {
-		var file File
-		if err := rows.Scan(
-			&file.ID,
-			&file.Path,
-			&file.Type,
-			&file.Meta,
-			&file.BlobsID,
-			&file.IsFolder,
-			&file.CreatedAt,
-			&file.UpdatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan message: %w", err)
-		}
-		files = append(files, file)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows iteration error: %w", err)
-	}
-
-	return files, nil
-}
-
 func (s *store) UpdateFile(ctx context.Context, file *File) error {
 	file.UpdatedAt = time.Now().UTC()
 
 	result, err := s.Exec.ExecContext(ctx, `
         UPDATE files
-        SET path = $2,
-            type = $3,
-            meta = $4,
-            is_folder = $5,
-            blobs_id = $6,
-            updated_at = $7
+        SET type = $2,
+            meta = $3,
+            is_folder = $4,
+            blobs_id = $5,
+            updated_at = $6
         WHERE id = $1`,
 		file.ID,
-		file.Path,
 		file.Type,
 		file.Meta,
 		file.IsFolder,
@@ -116,63 +211,6 @@ func (s *store) UpdateFile(ctx context.Context, file *File) error {
 	if err != nil {
 		return fmt.Errorf("failed to update file: %w", err)
 	}
-	return checkRowsAffected(result)
-}
-
-func (s *store) UpdateFilePath(ctx context.Context, id string, newPath string) error {
-	now := time.Now().UTC()
-
-	result, err := s.Exec.ExecContext(ctx, `
-		UPDATE files
-		SET path = $2,
-			updated_at = $3
-		WHERE id = $1`,
-		id,
-		newPath,
-		now,
-	)
-	if err != nil {
-		return err
-	}
-
-	return checkRowsAffected(result)
-}
-
-func (s *store) BulkUpdateFilePaths(ctx context.Context, updates map[string]string) error {
-	if len(updates) == 0 {
-		return nil
-	}
-	now := time.Now().UTC()
-	sqlPrefix := "UPDATE files SET updated_at = $1, path = CASE id "
-	sqlSuffix := " END WHERE id IN ("
-	args := []any{now}
-	ids := []string{}
-	i := 2
-
-	for id, newPath := range updates {
-		sqlPrefix += fmt.Sprintf("WHEN $%d THEN $%d ", i, i+1)
-		args = append(args, id, newPath)
-		ids = append(ids, fmt.Sprintf("$%d", i))
-		i += 2
-	}
-	sqlPrefix += "ELSE path" // to avoid avoid SQL errors, not be strictly necessary with WHERE IN
-
-	// Build WHERE IN clause placeholders ($N, $N+1, ...)
-	placeholders := ""
-	for j := range len(updates) {
-		placeholders += fmt.Sprintf("$%d", j*2+2) // Reference the ID args
-		if j < len(updates)-1 {
-			placeholders += ","
-		}
-	}
-
-	finalSQL := sqlPrefix + sqlSuffix + placeholders + ")"
-
-	result, err := s.Exec.ExecContext(ctx, finalSQL, args...)
-	if err != nil {
-		return fmt.Errorf("failed bulk update paths with CASE: %w", err)
-	}
-
 	return checkRowsAffected(result)
 }
 
@@ -191,25 +229,25 @@ func (s *store) DeleteFile(ctx context.Context, id string) error {
 
 func (s *store) ListFiles(ctx context.Context) ([]string, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT DISTINCT path FROM files
+        SELECT id FROM files
     `)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list paths: %w", err)
+		return nil, fmt.Errorf("failed to list ids: %w", err)
 	}
 	defer rows.Close()
 
-	var paths []string
+	var ids []string
 	for rows.Next() {
-		var path string
-		if err := rows.Scan(&path); err != nil {
-			return nil, fmt.Errorf("failed to scan path: %w", err)
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan id: %w", err)
 		}
-		paths = append(paths, path)
+		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows iteration error: %w", err)
 	}
-	return paths, nil
+	return ids, nil
 }
 
 func (s *store) EstimateFileCount(ctx context.Context) (int64, error) {

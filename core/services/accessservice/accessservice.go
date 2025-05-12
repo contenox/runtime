@@ -191,8 +191,8 @@ func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails b
 				return nil, err
 			}
 			cE[i].FileDetails = &FileMetadata{
-				ID:   file.ID,
-				Path: file.Path,
+				ID: file.ID,
+				// Path: file.Path,
 				Type: file.Type,
 			}
 		}

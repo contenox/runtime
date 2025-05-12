@@ -272,7 +272,8 @@ func (f *fileManager) download(w http.ResponseWriter, r *http.Request) {
 }
 
 type folderCreateRequest struct {
-	Path string `json:"path"`
+	Path     string `json:"path"`
+	ParentID string `json:"parentId"`
 }
 type pathUpdateRequest struct {
 	Path string `json:"path"`
@@ -291,7 +292,7 @@ func (f *fileManager) createFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	folder, err := f.service.CreateFolder(ctx, req.Path)
+	folder, err := f.service.CreateFolder(ctx, req.ParentID, req.Path)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

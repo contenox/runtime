@@ -12,6 +12,23 @@ type activityTrackerDecorator struct {
 	tracker     serverops.ActivityTracker
 }
 
+// GetFolderByID implements Service.
+func (d *activityTrackerDecorator) GetFolderByID(ctx context.Context, id string) (*Folder, error) {
+	reportErrFn, _, endFn := d.tracker.Start(
+		ctx,
+		"read",
+		"file",
+		"fileID", id,
+	)
+	defer endFn()
+
+	foundFile, opErr := d.fileservice.GetFolderByID(ctx, id)
+	if opErr != nil {
+		reportErrFn(opErr)
+	}
+	return foundFile, opErr
+}
+
 // WithActivityTracker decorates a FileService implementation with an ActivityTracker.
 // It intercepts each method call, using the tracker to report on the operation's
 // lifecycle (start, end), outcome (error), and any resulting state changes.
@@ -114,31 +131,16 @@ func (d *activityTrackerDecorator) DeleteFile(ctx context.Context, id string) er
 	return opErr
 }
 
-func (d *activityTrackerDecorator) ListAllPaths(ctx context.Context) ([]string, error) {
-	reportErrFn, _, endFn := d.tracker.Start(
-		ctx,
-		"list",
-		"path",
-	)
-	defer endFn()
-
-	paths, opErr := d.fileservice.ListAllPaths(ctx)
-	if opErr != nil {
-		reportErrFn(opErr)
-	}
-	return paths, opErr
-}
-
-func (d *activityTrackerDecorator) CreateFolder(ctx context.Context, path string) (*Folder, error) {
+func (d *activityTrackerDecorator) CreateFolder(ctx context.Context, parentID, name string) (*Folder, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"create",
 		"folder",
-		"path", path,
+		"name", name,
 	)
 	defer endFn()
 
-	folder, opErr := d.fileservice.CreateFolder(ctx, path)
+	folder, opErr := d.fileservice.CreateFolder(ctx, parentID, name)
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {

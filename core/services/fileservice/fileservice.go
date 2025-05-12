@@ -26,13 +26,13 @@ const MaxFilesRowCount = 50000
 type Service interface {
 	CreateFile(ctx context.Context, file *File) (*File, error)
 	GetFileByID(ctx context.Context, id string) (*File, error)
+	GetFolderByID(ctx context.Context, id string) (*Folder, error)
 	GetFilesByPath(ctx context.Context, path string) ([]File, error)
 	UpdateFile(ctx context.Context, file *File) (*File, error)
 	DeleteFile(ctx context.Context, id string) error
-	ListAllPaths(ctx context.Context) ([]string, error)
-	CreateFolder(ctx context.Context, path string) (*Folder, error)
-	RenameFile(ctx context.Context, fileID, newPath string) (*File, error)
-	RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error)
+	CreateFolder(ctx context.Context, parentID, name string) (*Folder, error)
+	RenameFile(ctx context.Context, fileID, newName string) (*File, error)
+	RenameFolder(ctx context.Context, folderID, newName string) (*Folder, error)
 	serverops.ServiceMeta
 }
 
@@ -52,6 +52,7 @@ func New(db libdb.DBManager, config *serverops.Config) Service {
 type File struct {
 	ID          string `json:"id"`
 	Path        string `json:"path"`
+	ParentID    string `json:"ParentId"`
 	Size        int64  `json:"size"`
 	ContentType string `json:"contentType"`
 	Data        []byte `json:"data"`
@@ -76,12 +77,13 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	if file.Path == "" {
+		return nil, fmt.Errorf("path is required for files")
+	}
 	cleanedPath, err := sanitizePath(file.Path)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
-	file.Path = cleanedPath
 
 	// Generate IDs.
 	fileID := uuid.NewString()
@@ -93,7 +95,6 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 
 	meta := Metadata{
 		SpecVersion: "1.0",
-		Path:        file.Path,
 		Hash:        hashString,
 		Size:        int64(len(file.Data)),
 		FileID:      fileID,
@@ -132,15 +133,19 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 		fmt.Printf("SERVER ERROR: file creation blocked: limit reached (%d max) %v", err, MaxFilesRowCount)
 		return nil, err
 	}
-
+	segments := strings.Split(cleanedPath, "/")
+	fileName := segments[len(segments)-1]
+	err = storeInstance.CreateFileNameID(ctx, fileID, file.ParentID, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create path-id mapping: %w", err)
+	}
 	if err = storeInstance.CreateBlob(ctx, blob); err != nil {
 		return nil, fmt.Errorf("failed to create blob: %w", err)
 	}
-
+	file.Path, _ = strings.CutPrefix(cleanedPath, "/")
 	// Create file record.
 	fileRecord := &store.File{
 		ID:      fileID,
-		Path:    file.Path,
 		Type:    file.ContentType,
 		Meta:    bMeta,
 		BlobsID: blobID,
@@ -166,7 +171,7 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err := storeInstance.CreateAccessEntry(ctx, accessEntry); err != nil {
 		return nil, fmt.Errorf("failed to create access entry: %w", err)
 	}
-	resFiles, err := s.getFileByID(ctx, tx, fileID)
+	resFiles, err := s.getFileByID(ctx, tx, fileID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +181,33 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	}
 
 	return resFiles, nil
+}
+
+func (s *service) GetFolderByID(ctx context.Context, id string) (*Folder, error) {
+	// Start a transaction.
+	tx, commit, rTx, err := s.db.WithTransaction(ctx)
+	defer func() {
+		if err := rTx(); err != nil {
+			log.Println("failed to rollback transaction", err)
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
+		return nil, err
+	}
+	resFile, err := s.getFileByID(ctx, tx, id, false)
+	if err != nil {
+		return nil, err
+	}
+	if err := commit(ctx); err != nil {
+		return nil, err
+	}
+	return &Folder{
+		ID:   resFile.ID,
+		Path: resFile.Path,
+	}, nil
 }
 
 func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
@@ -200,7 +232,7 @@ func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	}); err != nil {
 		return nil, fmt.Errorf("failed to authorize resource: %w", err)
 	}
-	resFile, err := s.getFileByID(ctx, tx, id)
+	resFile, err := s.getFileByID(ctx, tx, id, true)
 	if err != nil {
 		return nil, err
 	}
@@ -210,25 +242,55 @@ func (s *service) GetFileByID(ctx context.Context, id string) (*File, error) {
 	return resFile, nil
 }
 
-func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string) (*File, error) {
+func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, withBlob bool) (*File, error) {
 	// Get file record.
-	fileRecord, err := store.New(tx).GetFileByID(ctx, id)
+	storeInstance := store.New(tx)
+	fileRecord, err := storeInstance.GetFileByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	// Get associated blob.
-	blob, err := store.New(tx).GetBlobByID(ctx, fileRecord.BlobsID)
-	if err != nil {
-		return nil, err
+	var data []byte
+	if withBlob {
+		// Get associated blob.
+		blob, err := storeInstance.GetBlobByID(ctx, fileRecord.BlobsID)
+		if err != nil {
+			return nil, err
+		}
+		data = blob.Data
+	}
+	// Reconstruct the File.
+	resolvedPath := ""
+	curID := id
+	for {
+		parentID, err := storeInstance.GetFileParentID(ctx, curID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve location for id '%s': %w", curID, err)
+		}
+		if parentID == "" {
+			name, err := storeInstance.GetFileNameByID(ctx, id)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve name for id '%s': %w", curID, err)
+			}
+			resolvedPath = resolvedPath + name
+			break
+		}
+		name, err := storeInstance.GetFileNameByID(ctx, parentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve name for id '%s': %w", curID, err)
+		}
+		resolvedPath = name + "/" + resolvedPath
+		curID = parentID
 	}
 
-	// Reconstruct the File.
+	resolvedPath, _ = strings.CutPrefix(resolvedPath, "/")
+	resolvedPath, _ = strings.CutSuffix(resolvedPath, "/")
+
 	resFile := &File{
 		ID:          fileRecord.ID,
-		Path:        fileRecord.Path,
+		Path:        resolvedPath,
 		ContentType: fileRecord.Type,
-		Data:        blob.Data,
-		Size:        int64(len(blob.Data)),
+		Data:        data,
+		Size:        int64(len(data)),
 	}
 
 	return resFile, nil
@@ -248,23 +310,67 @@ func (s *service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
-	fileRecords, err := store.New(tx).ListFilesByPath(ctx, path)
-	if err != nil {
-		return nil, err
+	parentID := ""
+	segments := strings.FieldsFunc(path, func(r rune) bool { return r == '/' })
+	depth := len(segments)
+	var entryIDs []string
+	for curDepth := range depth {
+		curName := segments[curDepth]
+		if curDepth == depth {
+			break
+		}
+		entryIDs, err = store.New(tx).ListFileIDsByName(ctx, parentID, curName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve filestree %w", err)
+		}
+		found := false
+		for _, entryID := range entryIDs {
+			name, err := store.New(tx).GetFileNameByID(ctx, entryID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to revolve name from tree %w", err)
+			}
+			if segments[curDepth] == name {
+				curName = name
+				parentID = entryID
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("unable to resolve path")
+		}
 	}
-
+	if depth == 0 {
+		entryIDs, err = store.New(tx).ListFileIDsByParentID(ctx, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch root dir %w", err)
+		}
+	}
+	var fileRecords []*store.File
+	for _, entryID := range entryIDs {
+		file, err := store.New(tx).GetFileByID(ctx, entryID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch file %w", err)
+		}
+		fileRecords = append(fileRecords, file)
+	}
 	var files []File
 	for _, fr := range fileRecords {
-		blob, err := store.New(tx).GetBlobByID(ctx, fr.BlobsID)
+		// blob, err := store.New(tx).GetBlobByID(ctx, fr.BlobsID)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		name, err := store.New(tx).GetFileNameByID(ctx, fr.ID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to fetch the filename %w", err)
 		}
+		cleanedPath, _ := strings.CutPrefix(path+"/"+name, "/")
 		files = append(files, File{
 			ID:          fr.ID,
-			Path:        fr.Path,
+			Path:        cleanedPath,
 			ContentType: fr.Type,
 			//Data:        blob.Data, // Don't include data in response without permission check
-			Size: int64(len(blob.Data)),
+			// Size: int64(len(blob.Data)),
 		})
 	}
 
@@ -311,10 +417,10 @@ func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	hashString := hex.EncodeToString(hashBytes[:])
 	meta := Metadata{
 		SpecVersion: "1.0",
-		Path:        file.Path,
-		Hash:        hashString,
-		Size:        int64(len(file.Data)),
-		FileID:      file.ID,
+		// Path:        file.Path,
+		Hash:   hashString,
+		Size:   int64(len(file.Data)),
+		FileID: file.ID,
 	}
 	bMeta, err := json.Marshal(&meta)
 	if err != nil {
@@ -330,7 +436,6 @@ func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 
 	updated := &store.File{
 		ID:      file.ID,
-		Path:    file.Path,
 		Type:    file.ContentType,
 		Meta:    bMeta,
 		BlobsID: blobID,
@@ -338,8 +443,7 @@ func (s *service) UpdateFile(ctx context.Context, file *File) (*File, error) {
 	if err := store.New(tx).UpdateFile(ctx, updated); err != nil {
 		return nil, fmt.Errorf("failed to update file record: %w", err)
 	}
-
-	res, err := s.getFileByID(ctx, tx, file.ID)
+	res, err := s.getFileByID(ctx, tx, file.ID, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reload file: %w", err)
 	}
@@ -385,7 +489,9 @@ func (s *service) DeleteFile(ctx context.Context, id string) error {
 	if err := storeInstance.DeleteFile(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
-
+	if err := storeInstance.DeleteFileNameID(ctx, id); err != nil {
+		return fmt.Errorf("failed to delete from file tree: %w", err)
+	}
 	// Remove related access entries.
 	if err := storeInstance.DeleteAccessEntriesByResource(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete access entries: %w", err)
@@ -394,47 +500,14 @@ func (s *service) DeleteFile(ctx context.Context, id string) error {
 	return commit(ctx)
 }
 
-func (s *service) ListAllPaths(ctx context.Context) ([]string, error) {
-	// Start a transaction.
-	tx, commit, rTx, err := s.db.WithTransaction(ctx)
-	defer func() {
-		if err := rTx(); err != nil {
-			log.Println("failed to rollback transaction", err)
-		}
-	}()
-	if err != nil {
-		return nil, err
-	}
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-	// Retrieve the distinct paths using the store method.
-	paths, err := store.New(tx).ListFiles(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list all paths: %w", err)
-	}
-
-	// Commit the transaction.
-	if err := commit(ctx); err != nil {
-		return nil, err
-	}
-	return paths, nil
-}
-
-func (s *service) CreateFolder(ctx context.Context, path string) (*Folder, error) {
-	cleanedPath, err := sanitizePath(path)
-	if err != nil {
-		return nil, fmt.Errorf("invalid path: %w", err)
-	}
-
+func (s *service) CreateFolder(ctx context.Context, parentID string, name string) (*Folder, error) {
 	// Generate folder ID
 	folderID := uuid.NewString()
-
 	// Create metadata
 	meta := Metadata{
 		SpecVersion: "1.0",
-		Path:        cleanedPath,
-		FileID:      folderID,
+		// Path:        cleanedPath,
+		FileID: folderID,
 		// Hash and Size are omitted for folders
 	}
 	bMeta, err := json.Marshal(&meta)
@@ -463,10 +536,13 @@ func (s *service) CreateFolder(ctx context.Context, path string) (*Folder, error
 		return nil, fmt.Errorf("too many files in the system: %w", err)
 	}
 
+	err = storeInstance.CreateFileNameID(ctx, folderID, parentID, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create path-id mapping: %w", err)
+	}
 	// Create folder record
 	folderRecord := &store.File{
 		ID:       folderID,
-		Path:     cleanedPath,
 		Meta:     bMeta,
 		IsFolder: true,
 	}
@@ -475,17 +551,22 @@ func (s *service) CreateFolder(ctx context.Context, path string) (*Folder, error
 		return nil, fmt.Errorf("failed to create folder: %w", err)
 	}
 
+	folder, err := s.getFileByID(ctx, tx, folderID, false)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return &Folder{
 		ID:   folderID,
-		Path: cleanedPath,
+		Path: folder.Path,
 	}, nil
 }
 
-func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File, error) {
+func (s *service) RenameFile(ctx context.Context, fileID, newName string) (*File, error) {
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
 	if err != nil {
@@ -500,6 +581,7 @@ func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 	}); err != nil {
 		return nil, err
 	}
+
 	fileRecord, err := storeInstance.GetFileByID(ctx, fileID)
 	if err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
@@ -507,30 +589,22 @@ func (s *service) RenameFile(ctx context.Context, fileID, newPath string) (*File
 	if fileRecord.IsFolder {
 		return nil, fmt.Errorf("target is a folder, use RenameFolder instead")
 	}
-
-	cleanedPath, err := sanitizePath(newPath)
+	err = storeInstance.UpdateFileNameByID(ctx, fileID, newName)
 	if err != nil {
-		return nil, fmt.Errorf("invalid path: %w", err)
+		return nil, fmt.Errorf("failed to update name %w", err)
 	}
-	existing, err := storeInstance.ListFilesByPath(ctx, cleanedPath)
+	n, err := s.getFileByID(ctx, tx, fileID, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check path availability: %w", err)
+		return nil, fmt.Errorf("failed to fetch changes %w", err)
 	}
-	if len(existing) > 0 {
-		return nil, fmt.Errorf("path '%s' already exists", cleanedPath)
-	}
-	if err := storeInstance.UpdateFilePath(ctx, fileID, cleanedPath); err != nil {
-		return nil, fmt.Errorf("failed to rename file: %w", err)
-	}
-
 	if err := commit(ctx); err != nil {
 		return nil, err
 	}
 
-	return s.GetFileByID(ctx, fileID)
+	return n, nil
 }
 
-func (s *service) RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error) {
+func (s *service) RenameFolder(ctx context.Context, folderID, newName string) (*Folder, error) {
 	// Start transaction
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
 	defer rTx()
@@ -551,46 +625,14 @@ func (s *service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 	if !folderRecord.IsFolder {
 		return nil, fmt.Errorf("target is not a folder")
 	}
-	oldPath := folderRecord.Path
-
-	// Sanitize and validate new path
-	cleanedPath, err := sanitizePath(newPath)
+	err = storeInstance.UpdateFileNameByID(ctx, folderID, newName)
 	if err != nil {
-		return nil, fmt.Errorf("invalid path: %w", err)
+		return nil, fmt.Errorf("failed to update path: %w", err)
 	}
-
-	// Check for existing file/folder at new path
-	existing, err := storeInstance.ListFilesByPath(ctx, cleanedPath)
+	n, err := s.getFileByID(ctx, tx, folderID, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check path availability: %w", err)
+		return nil, fmt.Errorf("failed to fetch changes %w", err)
 	}
-	if len(existing) > 0 {
-		return nil, fmt.Errorf("path '%s' already exists", cleanedPath)
-	}
-
-	// Update folder's own path
-	if err := storeInstance.UpdateFilePath(ctx, folderID, cleanedPath); err != nil {
-		return nil, fmt.Errorf("failed to rename folder: %w", err)
-	}
-
-	// List all files under the old folder path (prefix match)
-	descendants, err := storeInstance.ListFilesByPath(ctx, oldPath+"/%")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list folder contents: %w", err)
-	}
-
-	// Prepare bulk updates (ID -> new path)
-	updates := make(map[string]string)
-	for _, file := range descendants {
-		newFilePath := strings.Replace(file.Path, oldPath, cleanedPath, 1)
-		updates[file.ID] = newFilePath
-	}
-
-	// Apply bulk updates
-	if err := storeInstance.BulkUpdateFilePaths(ctx, updates); err != nil {
-		return nil, fmt.Errorf("failed to update descendant paths: %w", err)
-	}
-
 	// Commit transaction
 	if err := commit(ctx); err != nil {
 		return nil, err
@@ -598,7 +640,7 @@ func (s *service) RenameFolder(ctx context.Context, folderID, newPath string) (*
 
 	return &Folder{
 		ID:   folderID,
-		Path: cleanedPath,
+		Path: n.Path,
 	}, nil
 }
 
