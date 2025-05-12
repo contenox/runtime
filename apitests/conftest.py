@@ -104,14 +104,14 @@ def create_test_file(base_url, admin_session, tmp_path):
     """Fixture to create a test file and return its metadata."""
     def _create_test_file(content="Test content", path=None):
         if path is None:
-            path = f"test/{uuid.uuid4().hex}.txt"
+            path = f"test-{uuid.uuid4().hex}.txt"
 
         file_path = tmp_path / "tempfile.txt"
         file_path.write_text(content)
 
         with open(file_path, 'rb') as f:
             files = {'file': f}
-            data = {'path': path}
+            data = {'name': path}
             response = requests.post(
                 f"{base_url}/files",
                 files=files,
@@ -123,3 +123,27 @@ def create_test_file(base_url, admin_session, tmp_path):
             file_data['content'] = content
             return file_data
     return _create_test_file
+
+@pytest.fixture
+def create_test_folder(base_url, admin_session):
+    """Fixture to create a test folder and return its metadata (simple pattern)."""
+
+    def _create_test_folder(path, parent_id=""):
+        folder_path = path
+        logger.info(f"Creating folder: path='{folder_path}', parent_id='{parent_id}'")
+
+        data = {'path': folder_path, 'parentId': parent_id}
+
+        response = requests.post(
+            f"{base_url}/folders",
+            json=data,
+            headers=admin_session
+        )
+        response.raise_for_status()
+
+        folder_data = response.json()
+        assert 'id' in folder_data
+        logger.info(f"Folder created successfully: {folder_data}")
+        return folder_data # Return the parsed JSON data
+
+    return _create_test_folder

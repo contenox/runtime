@@ -59,8 +59,9 @@ type File struct {
 }
 
 type Folder struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	ParentID string `json:"ParentId"`
 }
 
 // Metadata holds file metadata.
@@ -135,6 +136,9 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	}
 	segments := strings.Split(cleanedPath, "/")
 	fileName := segments[len(segments)-1]
+	if len(segments) > 1 && file.ParentID == "" {
+		return nil, fmt.Errorf("parentId parameter is required")
+	}
 	err = storeInstance.CreateFileNameID(ctx, fileID, file.ParentID, fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create path-id mapping: %w", err)
@@ -205,8 +209,9 @@ func (s *service) GetFolderByID(ctx context.Context, id string) (*Folder, error)
 		return nil, err
 	}
 	return &Folder{
-		ID:   resFile.ID,
-		Path: resFile.Path,
+		ID:       resFile.ID,
+		ParentID: resFile.ParentID,
+		Path:     resFile.Path,
 	}, nil
 }
 
@@ -561,8 +566,9 @@ func (s *service) CreateFolder(ctx context.Context, parentID string, name string
 	}
 
 	return &Folder{
-		ID:   folderID,
-		Path: folder.Path,
+		ID:       folderID,
+		Path:     folder.Path,
+		ParentID: parentID,
 	}, nil
 }
 
@@ -639,8 +645,9 @@ func (s *service) RenameFolder(ctx context.Context, folderID, newName string) (*
 	}
 
 	return &Folder{
-		ID:   folderID,
-		Path: n.Path,
+		ID:       folderID,
+		ParentID: n.ParentID,
+		Path:     n.Path,
 	}, nil
 }
 

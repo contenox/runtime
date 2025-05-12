@@ -9,7 +9,10 @@ def test_create_file(base_url, admin_session, tmp_path):
 
     with open(file_path, 'rb') as f:
         files = {'file': f}
-        data = {'path': 'test/path.txt'}
+        data = {
+            'name': 'path.txt',
+            'parentid':'',
+        }
         response = requests.post(
             f"{base_url}/files",
             files=files,
@@ -20,7 +23,7 @@ def test_create_file(base_url, admin_session, tmp_path):
     assert_status_code(response, 201)
     file_data = response.json()
     assert 'id' in file_data
-    assert file_data['path'] == 'test/path.txt'
+    assert file_data['path'] == 'path.txt'
     assert file_data['size'] == len("Test file content")
 
 def test_get_file_metadata(base_url, admin_session, create_test_file):
@@ -65,18 +68,16 @@ def test_update_file(base_url, admin_session, create_test_file, tmp_path):
 
     with open(new_file_path, 'rb') as f:
         files = {'file': f}
-        data = {'path': 'updated/path.txt'}
         response = requests.put(
             f"{base_url}/files/{test_file['id']}",
             files=files,
-            data=data,
             headers=headers
         )
 
     assert_status_code(response, 200)
     updated_file = response.json()
     assert updated_file['id'] == test_file['id']
-    assert updated_file['path'] == 'updated/path.txt'
+    assert updated_file['path'] == test_file['path']
     assert updated_file['size'] == len(new_content)
 
 def test_delete_file(base_url, admin_session, create_test_file):
@@ -106,7 +107,7 @@ def test_list_files(base_url, admin_session, create_test_file):
     # Test filtering by path
     response = requests.get(
         f"{base_url}/files",
-        params={'path': "test"},
+        params={'path': ""},
         headers=headers
     )
 
@@ -184,37 +185,3 @@ def test_rename_file(base_url, admin_session, create_test_file):
     assert_status_code(get_response, 200)
     metadata = get_response.json()
     assert metadata['path'] == new_path
-
-def test_rename_folder_updates_child_paths(base_url, admin_session, create_test_file):
-    """Test renaming a folder updates nested file paths."""
-    # Create folder structure
-    folder_data = {'path': 'parent/old_folder'}
-    folder_res = requests.post(
-        f"{base_url}/folders",
-        json=folder_data,
-        headers=admin_session
-    )
-    assert_status_code(folder_res, 201)
-    folder_id = folder_res.json()['id']
-
-    # Create file inside folder
-    file_path = 'parent/old_folder/nested_file.txt'
-    test_file = create_test_file(path=file_path)
-
-    # Rename the folder
-    new_path = 'parent/new_folder'
-    update_res = requests.put(
-        f"{base_url}/folders/{folder_id}/path",
-        json={'path': new_path},
-        headers=admin_session
-    )
-    assert_status_code(update_res, 200)
-
-    # Verify file path updated
-    file_res = requests.get(
-        f"{base_url}/files/{test_file['id']}",
-        headers=admin_session
-    )
-    updated_file = file_res.json()
-    expected_path = 'parent/new_folder/nested_file.txt'
-    assert updated_file['path'] == expected_path

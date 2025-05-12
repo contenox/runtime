@@ -19,7 +19,8 @@ const (
 	MaxRequestSize      = fileservice.MaxUploadSize + 10*1024
 	multipartFormMemory = 8 << 20
 	formFieldFile       = "file"
-	formFieldPath       = "path"
+	formFieldName       = "name"
+	formFieldParent     = "parentid"
 )
 
 func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fileservice.Service) {
@@ -64,7 +65,8 @@ func mapFileToResponse(f *fileservice.File) fileResponse {
 func (f *fileManager) processAndReadFileUpload(w http.ResponseWriter, r *http.Request) (
 	*multipart.FileHeader, // header
 	[]byte, // fileData
-	string, // path
+	string, // name
+	string, //parent
 	string, // mimeType
 	error, // err
 ) {
@@ -80,25 +82,25 @@ func (f *fileManager) processAndReadFileUpload(w http.ResponseWriter, r *http.Re
 		} else {
 			localErr = fmt.Errorf("failed to parse multipart form: %w", parseErr)
 		}
-		return nil, nil, "", "", localErr
+		return nil, nil, "", "", "", localErr
 	}
 
 	filePart, header, formErr := r.FormFile(formFieldFile)
 	if formErr != nil {
 		if errors.Is(formErr, http.ErrMissingFile) {
-			return nil, nil, "", "", formErr
+			return nil, nil, "", "", "", formErr
 		}
 		localErr := fmt.Errorf("invalid '%s' upload: %w", formFieldFile, formErr)
-		return nil, nil, "", "", localErr
+		return nil, nil, "", "", "", localErr
 	}
 	defer filePart.Close()
 
 	// a quick check.
 	if header.Size > fileservice.MaxUploadSize {
-		return nil, nil, "", "", serverops.ErrFileSizeLimitExceeded
+		return nil, nil, "", "", "", serverops.ErrFileSizeLimitExceeded
 	}
 	if header.Size == 0 {
-		return nil, nil, "", "", serverops.ErrFileEmpty
+		return nil, nil, "", "", "", serverops.ErrFileEmpty
 	}
 
 	// Reading one extra byte allows us to detect if the original file was larger than the limit.
@@ -106,33 +108,33 @@ func (f *fileManager) processAndReadFileUpload(w http.ResponseWriter, r *http.Re
 	fileData, readErr := io.ReadAll(limitedReader)
 	if readErr != nil {
 		localErr := fmt.Errorf("failed to read file content for '%s': %w", header.Filename, readErr)
-		return nil, nil, "", "", localErr
+		return nil, nil, "", "", "", localErr
 	}
 
 	// If we read more than MaxUploadSize bytes, it means the original stream had more data.
 	if int64(len(fileData)) > fileservice.MaxUploadSize {
-		return nil, nil, "", "", serverops.ErrFileSizeLimitExceeded
+		return nil, nil, "", "", "", serverops.ErrFileSizeLimitExceeded
 	}
 	// We now have the file data, guaranteed to be <= MaxUploadSize bytes.
-
 	detectedMimeType := http.DetectContentType(fileData)
 
-	var resultPath string
-	specifiedPath := r.FormValue(formFieldPath)
-	if specifiedPath == "" {
-		resultPath = header.Filename
+	var resultName string
+	specifiedName := r.FormValue(formFieldName)
+	if specifiedName == "" {
+		resultName = header.Filename
 	} else {
-		resultPath = specifiedPath
+		resultName = specifiedName
 	}
+	parentID := r.FormValue(formFieldParent)
 
-	return header, fileData, resultPath, detectedMimeType, nil
+	return header, fileData, resultName, parentID, detectedMimeType, nil
 }
 
 // create handles the creation of a new file using multipart/form-data.
 func (f *fileManager) create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	header, fileData, path, mimeType, err := f.processAndReadFileUpload(w, r)
+	header, fileData, path, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -140,6 +142,7 @@ func (f *fileManager) create(w http.ResponseWriter, r *http.Request) {
 
 	req := fileservice.File{
 		Path:        path,
+		ParentID:    parentID,
 		ContentType: mimeType,
 		Data:        fileData,
 		Size:        header.Size,
@@ -172,7 +175,7 @@ func (f *fileManager) update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 
-	header, fileData, path, mimeType, err := f.processAndReadFileUpload(w, r)
+	header, fileData, path, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
 	if err != nil {
 		// Pass the raw error to serverops.Error
 		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
@@ -182,6 +185,7 @@ func (f *fileManager) update(w http.ResponseWriter, r *http.Request) {
 	req := fileservice.File{
 		ID:          id,
 		Path:        path,
+		ParentID:    parentID,
 		ContentType: mimeType,
 		Data:        fileData,
 		Size:        header.Size,
