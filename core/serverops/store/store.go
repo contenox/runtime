@@ -251,11 +251,13 @@ type Store interface {
 	PopJobForType(ctx context.Context, taskType string) (*Job, error)
 	GetJobsForType(ctx context.Context, taskType string) ([]*Job, error)
 	ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Job, error)
+	DeleteJobsByEntity(ctx context.Context, entityID, entityType string) error
 
 	AppendLeasedJob(ctx context.Context, job Job, duration time.Duration, leaser string) error
 	GetLeasedJob(ctx context.Context, id string) (*LeasedJob, error)
 	DeleteLeasedJob(ctx context.Context, id string) error
 	ListLeasedJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*LeasedJob, error)
+	DeleteLeasedJobs(ctx context.Context, entityID, entityType string) error
 
 	CreateAccessEntry(ctx context.Context, entry *AccessEntry) error
 	GetAccessEntryByID(ctx context.Context, id string) (*AccessEntry, error)

@@ -231,3 +231,19 @@ func (s *store) ListLeasedJobs(ctx context.Context, createdAtCursor *time.Time, 
 
 	return jobs, nil
 }
+
+func (s *store) DeleteJobsByEntity(ctx context.Context, entityID, entityType string) error {
+	_, err := s.Exec.ExecContext(ctx, `
+        DELETE FROM job_queue_v2
+        WHERE entity_id = $1 AND entity_type = $2;
+    `, entityID, entityType)
+	return err
+}
+
+func (s *store) DeleteLeasedJobs(ctx context.Context, entityID, entityType string) error {
+	_, err := s.Exec.ExecContext(ctx, `
+        DELETE FROM leased_jobs
+        WHERE entity_id = $1 AND entity_type = $2;
+    `, entityID, entityType)
+	return err
+}

@@ -122,6 +122,9 @@ func (s *service) MarkJobAsFailed(ctx context.Context, jobID string, leaserID st
 	if err != nil {
 		return err
 	}
+	if job.Leaser != leaserID {
+		return fmt.Errorf("job %s not leased by %s", jobID, leaserID)
+	}
 	err = storeInstance.DeleteLeasedJob(ctx, jobID)
 	if err != nil {
 		return err

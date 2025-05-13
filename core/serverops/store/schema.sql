@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS job_queue_v2 (
     created_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS entity_events (
+    id VARCHAR(255) PRIMARY KEY,
+    entity_id VARCHAR(255) NOT NULL,
+    entity_type VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    processed_at TIMESTAMP,
+    error TEXT
+);
+
 CREATE TABLE IF NOT EXISTS chunks_idx (
     id VARCHAR(255) PRIMARY KEY,
     vector_id VARCHAR(255) NOT NULL,

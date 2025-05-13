@@ -135,6 +135,35 @@ func TestMarkJobAsFailed(t *testing.T) {
 		err := service.MarkJobAsFailed(ctx, job.ID, "wrong-leaser")
 		require.Error(t, err)
 	})
+
+	t.Run("job_already_deleted", func(t *testing.T) {
+		job := createTestJob(t, storeInstance, "test-deleted-job")
+		originalRetries := job.RetryCount
+
+		// Assign job
+		_, err := service.AssignPendingJob(ctx, "leaser-1", nil, job.TaskType)
+		require.NoError(t, err)
+
+		// Manually delete leased job (simulate external cleanup/expiry)
+		err = storeInstance.DeleteLeasedJob(ctx, job.ID)
+		require.NoError(t, err)
+
+		// Attempt to mark as failed
+		err = service.MarkJobAsFailed(ctx, job.ID, "leaser-1")
+		require.Error(t, err, "should error when job missing")
+		require.Contains(t, err.Error(), "not found", "error should indicate missing job")
+
+		// Verify not requeued
+		requeued, err := storeInstance.PopJobForType(ctx, job.TaskType)
+		require.Error(t, err, "should have no jobs to pop")
+		require.Nil(t, requeued, "no job should exist in queue")
+
+		// Verify retry count unchanged
+		if requeued != nil {
+			require.Equal(t, originalRetries, requeued.RetryCount,
+				"retry count should not increment")
+		}
+	})
 }
 
 func TestJobListing(t *testing.T) {
