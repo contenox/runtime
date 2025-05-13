@@ -77,7 +77,7 @@ func setupFileServiceBenchmark(ctx context.Context, t testing.TB) (fileservice.S
 func createFileForBenchmark(ctx context.Context, b *testing.B, fs fileservice.Service, parentID, fileName string, data []byte, contentType string) *fileservice.File {
 	b.Helper()
 	file := &fileservice.File{
-		Path:        fileName,
+		Name:        fileName,
 		ContentType: contentType,
 		Data:        data,
 		ParentID:    parentID,
@@ -126,7 +126,7 @@ func BenchmarkCreateFile(b *testing.B) {
 	for b.Loop() {
 		fileName := fmt.Sprintf("bench_%s.txt", uuid.NewString())
 		file := &fileservice.File{
-			Path:        fileName,
+			Name:        fileName,
 			ParentID:    "",
 			ContentType: "text/plain",
 			Data:        fileData,
@@ -326,7 +326,6 @@ func BenchmarkListAllPaths(b *testing.B) {
 	//   /subfolder_of_folder_d3...
 	//     /folder_d2_uYYYYYY
 	//       ...
-	// Depth 2, Breadth 2 for a moderate tree. Adjust as needed.
 	populateFolderTree(ctx, b, fileService, "", 3, 4, fileData)
 	// Also create some direct root items to ensure GetFilesByPath("") lists them.
 	createFileForBenchmark(ctx, b, fileService, "", "a_root_file.txt", fileData, "text/plain")
@@ -354,7 +353,7 @@ func BenchmarkCreateFileParallel(b *testing.B) {
 		for pb.Next() {
 			fileName := fmt.Sprintf("bench_parallel_%s.txt", uuid.NewString())
 			file := &fileservice.File{
-				Path:        fileName,
+				Name:        fileName,
 				ParentID:    "", // Explicitly root
 				ContentType: "text/plain",
 				Data:        fileData,
