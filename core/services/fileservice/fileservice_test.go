@@ -25,8 +25,7 @@ func TestFileService(t *testing.T) {
 		}
 	}()
 
-	testRunCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	testRunCtx := context.Background()
 
 	// Pass testRunCtx to setupFileServiceTestEnv
 	_, fileService, dbCleanup := setupFileServiceTestEnv(testRunCtx, t)
