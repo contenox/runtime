@@ -12,21 +12,14 @@ type activityTrackerDecorator struct {
 	tracker     serverops.ActivityTracker
 }
 
-// GetFolderByID implements Service.
-func (d *activityTrackerDecorator) GetFolderByID(ctx context.Context, id string) (*Folder, error) {
-	reportErrFn, _, endFn := d.tracker.Start(
-		ctx,
-		"read",
-		"file",
-		"fileID", id,
-	)
-	defer endFn()
+// MoveFile implements Service.
+func (d *activityTrackerDecorator) MoveFile(ctx context.Context, fileID string, newParentID string) (*File, error) {
+	panic("unimplemented")
+}
 
-	foundFile, opErr := d.fileservice.GetFolderByID(ctx, id)
-	if opErr != nil {
-		reportErrFn(opErr)
-	}
-	return foundFile, opErr
+// MoveFolder implements Service.
+func (d *activityTrackerDecorator) MoveFolder(ctx context.Context, folderID string, newParentID string) (*Folder, error) {
+	panic("unimplemented")
 }
 
 // WithActivityTracker decorates a FileService implementation with an ActivityTracker.
@@ -149,17 +142,17 @@ func (d *activityTrackerDecorator) CreateFolder(ctx context.Context, parentID, n
 	return folder, opErr
 }
 
-func (d *activityTrackerDecorator) RenameFile(ctx context.Context, fileID, newPath string) (*File, error) {
+func (d *activityTrackerDecorator) RenameFile(ctx context.Context, fileID, newName string) (*File, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"rename",
 		"file",
 		"fileID", fileID,
-		"newPath", newPath,
+		"newName", newName,
 	)
 	defer endFn()
 
-	file, opErr := d.fileservice.RenameFile(ctx, fileID, newPath)
+	file, opErr := d.fileservice.RenameFile(ctx, fileID, newName)
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
@@ -168,25 +161,60 @@ func (d *activityTrackerDecorator) RenameFile(ctx context.Context, fileID, newPa
 	return file, opErr
 }
 
-func (d *activityTrackerDecorator) RenameFolder(ctx context.Context, folderID, newPath string) (*Folder, error) {
+func (d *activityTrackerDecorator) RenameFolder(ctx context.Context, folderID, newName string) (*Folder, error) {
 	// Operation: "rename", Subject: "folder"
-	// Args: Pass the folder ID and the new path
+	// Args: Pass the folder ID and the new name
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"rename",
 		"folder",
-		"folderID", folderID,
-		"newPath", newPath,
+		"fileID", folderID,
+		"newName", newName,
 	)
 	defer endFn()
 
-	folder, opErr := d.fileservice.RenameFolder(ctx, folderID, newPath)
+	folder, opErr := d.fileservice.RenameFolder(ctx, folderID, newName)
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
 		reportChangeFn(folder.ID, folder)
 	}
 	return folder, opErr
+}
+
+func (d *activityTrackerDecorator) DeleteFolder(ctx context.Context, folderID string) error {
+	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
+		ctx,
+		"delete",
+		"folder",
+		"fileID", folderID,
+	)
+	defer endFn()
+
+	opErr := d.fileservice.DeleteFolder(ctx, folderID)
+	if opErr != nil {
+		reportErrFn(opErr)
+	} else {
+		reportChangeFn(folderID, nil)
+	}
+	return opErr
+
+}
+
+func (d *activityTrackerDecorator) GetFolderByID(ctx context.Context, id string) (*Folder, error) {
+	reportErrFn, _, endFn := d.tracker.Start(
+		ctx,
+		"read",
+		"file",
+		"fileID", id,
+	)
+	defer endFn()
+
+	foundFile, opErr := d.fileservice.GetFolderByID(ctx, id)
+	if opErr != nil {
+		reportErrFn(opErr)
+	}
+	return foundFile, opErr
 }
 
 func (d *activityTrackerDecorator) GetServiceName() string {

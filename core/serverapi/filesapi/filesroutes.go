@@ -31,12 +31,14 @@ func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fil
 	mux.HandleFunc("POST /files", f.create)
 	mux.HandleFunc("GET /files/{id}", f.getMetadata)
 	mux.HandleFunc("PUT /files/{id}", f.update)
-	mux.HandleFunc("DELETE /files/{id}", f.delete)
+	mux.HandleFunc("DELETE /files/{id}", f.deleteFile)
 	mux.HandleFunc("GET /files/{id}/download", f.download)
 	mux.HandleFunc("GET /files", f.listFiles)
+
 	mux.HandleFunc("POST /folders", f.createFolder)
-	mux.HandleFunc("PUT /files/{id}/path", f.renameFile)
-	mux.HandleFunc("PUT /folders/{id}/path", f.renameFolder)
+	mux.HandleFunc("PUT /files/{id}/name", f.renameFile)
+	mux.HandleFunc("PUT /folders/{id}/name", f.renameFolder)
+	mux.HandleFunc("DELETE /folders/{id}", f.deleteFolder)
 }
 
 type fileManager struct {
@@ -46,8 +48,8 @@ type fileManager struct {
 type fileResponse struct {
 	ID          string `json:"id"`
 	Path        string `json:"path"`
-	ContentType string `json:"contentType"`
-	Size        int64  `json:"size"`
+	ContentType string `json:"contentType,omitempty"` // omitempty for folders
+	Size        int64  `json:"size"`                  // Will be 0 for folders if mapped directly
 }
 
 func mapFileToResponse(f *fileservice.File) fileResponse {
@@ -201,19 +203,20 @@ func (f *fileManager) update(w http.ResponseWriter, r *http.Request) {
 }
 
 // delete - No change needed
-func (f *fileManager) delete(w http.ResponseWriter, r *http.Request) {
+func (f *fileManager) deleteFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if err := f.service.DeleteFile(ctx, id); err != nil {
 		_ = serverops.Error(w, r, err, serverops.DeleteOperation)
 		return
 	}
-	_ = serverops.Encode(w, r, http.StatusOK, "file removed")
+	_ = serverops.Encode(w, r, http.StatusOK, map[string]string{"message": "file removed"})
 }
 
 type folderResponse struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	ParentID string `json:"parentId,omitempty"`
 }
 
 func mapServiceFileToFileResponse(f *fileservice.File) fileResponse {
@@ -227,8 +230,9 @@ func mapServiceFileToFileResponse(f *fileservice.File) fileResponse {
 
 func mapFolderToResponse(f *fileservice.Folder) folderResponse {
 	return folderResponse{
-		ID:   f.ID,
-		Path: f.Path,
+		ID:       f.ID,
+		Path:     f.Path,
+		ParentID: f.ParentID,
 	}
 }
 
@@ -276,11 +280,11 @@ func (f *fileManager) download(w http.ResponseWriter, r *http.Request) {
 }
 
 type folderCreateRequest struct {
-	Path     string `json:"path"`
+	Name     string `json:"name"`
 	ParentID string `json:"parentId"`
 }
-type pathUpdateRequest struct {
-	Path string `json:"path"`
+type nameUpdateRequest struct {
+	Name string `json:"name"`
 }
 
 func (f *fileManager) createFolder(w http.ResponseWriter, r *http.Request) {
@@ -291,12 +295,12 @@ func (f *fileManager) createFolder(w http.ResponseWriter, r *http.Request) {
 		_ = serverops.Error(w, r, fmt.Errorf("invalid request body: %w", err), serverops.CreateOperation)
 		return
 	}
-	if req.Path == "" {
-		_ = serverops.Error(w, r, fmt.Errorf("missing 'path' in request body"), serverops.CreateOperation)
+	if req.Name == "" {
+		_ = serverops.Error(w, r, fmt.Errorf("missing 'name' in request body"), serverops.CreateOperation)
 		return
 	}
 
-	folder, err := f.service.CreateFolder(ctx, req.ParentID, req.Path)
+	folder, err := f.service.CreateFolder(ctx, req.ParentID, req.Name)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -313,17 +317,17 @@ func (f *fileManager) renameFolder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req pathUpdateRequest
+	var req nameUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = serverops.Error(w, r, fmt.Errorf("invalid request body: %w", err), serverops.UpdateOperation)
 		return
 	}
-	if req.Path == "" {
-		_ = serverops.Error(w, r, fmt.Errorf("missing 'path' in request body"), serverops.UpdateOperation)
+	if req.Name == "" {
+		_ = serverops.Error(w, r, fmt.Errorf("missing 'name' in request body"), serverops.UpdateOperation)
 		return
 	}
 
-	folder, err := f.service.RenameFolder(ctx, id, req.Path)
+	folder, err := f.service.RenameFolder(ctx, id, req.Name)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
 		return
@@ -340,21 +344,38 @@ func (f *fileManager) renameFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req pathUpdateRequest
+	var req nameUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		_ = serverops.Error(w, r, fmt.Errorf("invalid request body: %w", err), serverops.UpdateOperation)
 		return
 	}
-	if req.Path == "" {
-		_ = serverops.Error(w, r, fmt.Errorf("missing 'path' in request body"), serverops.UpdateOperation)
+	if req.Name == "" {
+		_ = serverops.Error(w, r, fmt.Errorf("missing 'name' in request body"), serverops.UpdateOperation)
 		return
 	}
 
-	file, err := f.service.RenameFile(ctx, id, req.Path)
+	file, err := f.service.RenameFile(ctx, id, req.Name)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
 		return
 	}
 
 	_ = serverops.Encode(w, r, http.StatusOK, mapServiceFileToFileResponse(file))
+}
+
+func (f *fileManager) deleteFolder(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	if id == "" {
+		_ = serverops.Error(w, r, fmt.Errorf("missing folder ID in path"), serverops.DeleteOperation)
+		return
+	}
+
+	err := f.service.DeleteFolder(ctx, id)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.DeleteOperation)
+		return
+	}
+
+	_ = serverops.Encode(w, r, http.StatusOK, map[string]string{"message": "folder removed"})
 }

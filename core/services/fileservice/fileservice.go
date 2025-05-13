@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,7 @@ const MaxUploadSize = 1 * 1024 * 1024
 const MaxFilesRowCount = 50000
 
 var ErrUnknownPath = fmt.Errorf("unable to resolve path")
+var ErrFolderNotEmpty = fmt.Errorf("folder is not empty")
 
 type Service interface {
 	CreateFile(ctx context.Context, file *File) (*File, error)
@@ -35,6 +37,9 @@ type Service interface {
 	CreateFolder(ctx context.Context, parentID, name string) (*Folder, error)
 	RenameFile(ctx context.Context, fileID, newName string) (*File, error)
 	RenameFolder(ctx context.Context, folderID, newName string) (*Folder, error)
+	DeleteFolder(ctx context.Context, folderID string) error
+	MoveFile(ctx context.Context, fileID, newParentID string) (*File, error)
+	MoveFolder(ctx context.Context, folderID, newParentID string) (*Folder, error)
 	serverops.ServiceMeta
 }
 
@@ -258,7 +263,6 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 	}
 	var data []byte
 	if withBlob {
-		// Get associated blob.
 		blob, err := storeInstance.GetBlobByID(ctx, fileRecord.BlobsID)
 		if err != nil {
 			return nil, err
@@ -266,31 +270,33 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 		data = blob.Data
 	}
 	// Reconstruct the File.
-	resolvedPath := ""
-	curID := id
+	var pathSegments []string
+	currentItemID := id
 	for {
-		parentID, err := storeInstance.GetFileParentID(ctx, curID)
+		itemName, err := storeInstance.GetFileNameByID(ctx, currentItemID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve location for id '%s': %w", curID, err)
+			return nil, fmt.Errorf("getFileByID: failed to get name for item ID '%s': %w", currentItemID, err)
 		}
-		if parentID == "" {
-			name, err := storeInstance.GetFileNameByID(ctx, id)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve name for id '%s': %w", curID, err)
-			}
-			resolvedPath = resolvedPath + name
+		// Prepend the current item's name to the list of segments
+		pathSegments = append([]string{itemName}, pathSegments...)
+
+		parentOfCurrentItem, err := storeInstance.GetFileParentID(ctx, currentItemID)
+		if err != nil {
+			return nil, fmt.Errorf("getFileByID: failed to get parent ID for item ID '%s': %w", currentItemID, err)
+		}
+
+		if parentOfCurrentItem == "" {
 			break
 		}
-		name, err := storeInstance.GetFileNameByID(ctx, parentID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve name for id '%s': %w", curID, err)
-		}
-		resolvedPath = name + "/" + resolvedPath
-		curID = parentID
+		currentItemID = parentOfCurrentItem
 	}
-
+	resolvedPath := strings.Join(pathSegments, "/")
 	resolvedPath, _ = strings.CutPrefix(resolvedPath, "/")
 	resolvedPath, _ = strings.CutSuffix(resolvedPath, "/")
+	directParentID, err := storeInstance.GetFileParentID(ctx, id)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("getFileByID: failed to get direct parent ID for item ID '%s' from filestree: %w", id, err)
+	}
 
 	resFile := &File{
 		ID:          fileRecord.ID,
@@ -298,91 +304,86 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 		ContentType: fileRecord.Type,
 		Data:        data,
 		Size:        int64(len(data)),
+		ParentID:    directParentID,
 	}
 
 	return resFile, nil
 }
 
 func (s *service) GetFilesByPath(ctx context.Context, path string) ([]File, error) {
-	// Start a transaction to fetch files and their blobs.
 	tx, commit, rTx, err := s.db.WithTransaction(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("GetFilesByPath: failed to start transaction: %w", err)
+	}
 	defer func() {
 		if err := rTx(); err != nil {
-			log.Println("failed to rollback transaction", err)
+			log.Printf("GetFilesByPath: failed to rollback transaction: %v", err)
 		}
 	}()
-	if err != nil {
+
+	storeInstance := store.New(tx)
+
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return nil, err
-	}
-	parentID := ""
-	segments := strings.FieldsFunc(path, func(r rune) bool { return r == '/' })
-	depth := len(segments)
+
 	var entryIDs []string
-	for curDepth := range depth {
-		curName := segments[curDepth]
-		if curDepth == depth {
-			break
-		}
-		entryIDs, err = store.New(tx).ListFileIDsByName(ctx, parentID, curName)
+	parentIDForListing := ""
+
+	if path == "" {
+		entryIDs, err = storeInstance.ListFileIDsByParentID(ctx, "")
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve filestree %w", err)
+			return nil, fmt.Errorf("GetFilesByPath: failed to fetch root dir contents: %w", err)
 		}
-		found := false
-		for _, entryID := range entryIDs {
-			name, err := store.New(tx).GetFileNameByID(ctx, entryID)
+	} else {
+		segments := strings.FieldsFunc(path, func(r rune) bool { return r == '/' })
+		currentParentID := ""
+		var lastResolvedItemID string
+		for _, segmentName := range segments {
+			idsInSegment, err := storeInstance.ListFileIDsByName(ctx, currentParentID, segmentName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to revolve name from tree %w", err)
+				return nil, fmt.Errorf("GetFilesByPath: failed to resolve path segment '%s' under parent '%s': %w", segmentName, currentParentID, err)
 			}
-			if segments[curDepth] == name {
-				curName = name
-				parentID = entryID
-				found = true
-				break
+			if len(idsInSegment) == 0 {
+				return nil, ErrUnknownPath
 			}
+			if len(idsInSegment) > 1 {
+				// This case (multiple items with same name in same parent) should ideally be prevented by DB constraints.
+				// If it occurs, it's ambiguous. For now, take the first one or error.
+				return nil, fmt.Errorf("GetFilesByPath: ambiguous path, multiple items named '%s' found under parent '%s'", segmentName, currentParentID)
+			}
+			lastResolvedItemID = idsInSegment[0]
+			currentParentID = lastResolvedItemID
 		}
-		if !found {
-			return nil, ErrUnknownPath
-		}
-	}
-	if depth == 0 {
-		entryIDs, err = store.New(tx).ListFileIDsByParentID(ctx, "")
+
+		finalItemRecord, err := storeInstance.GetFileByID(ctx, lastResolvedItemID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch root dir %w", err)
+			return nil, fmt.Errorf("GetFilesByPath: failed to get details for resolved path item '%s': %w", lastResolvedItemID, err)
+		}
+
+		if finalItemRecord.IsFolder {
+			parentIDForListing = lastResolvedItemID
+			entryIDs, err = storeInstance.ListFileIDsByParentID(ctx, parentIDForListing)
+			if err != nil {
+				return nil, fmt.Errorf("GetFilesByPath: failed to list contents of folder '%s': %w", path, err)
+			}
+		} else {
+			entryIDs = []string{lastResolvedItemID}
 		}
 	}
-	var fileRecords []*store.File
-	for _, entryID := range entryIDs {
-		file, err := store.New(tx).GetFileByID(ctx, entryID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch file %w", err)
-		}
-		fileRecords = append(fileRecords, file)
-	}
+
 	var files []File
-	for _, fr := range fileRecords {
-		// blob, err := store.New(tx).GetBlobByID(ctx, fr.BlobsID)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		name, err := store.New(tx).GetFileNameByID(ctx, fr.ID)
+	for _, entryID := range entryIDs {
+		fileData, err := s.getFileByID(ctx, tx, entryID, false)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch the filename %w", err)
+			log.Printf("GetFilesByPath: error getting details for item ID %s: %v", entryID, err)
+			continue
 		}
-		cleanedPath, _ := strings.CutPrefix(path+"/"+name, "/")
-		files = append(files, File{
-			ID:          fr.ID,
-			Path:        cleanedPath,
-			ContentType: fr.Type,
-			//Data:        blob.Data, // Don't include data in response without permission check
-			// Size: int64(len(blob.Data)),
-		})
+		files = append(files, *fileData)
 	}
 
 	if err := commit(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetFilesByPath: failed to commit transaction: %w", err)
 	}
 	return files, nil
 }
@@ -651,6 +652,299 @@ func (s *service) RenameFolder(ctx context.Context, folderID, newName string) (*
 		ParentID: n.ParentID,
 		Path:     n.Path,
 	}, nil
+}
+
+func (s *service) DeleteFolder(ctx context.Context, folderID string) error {
+	tx, commit, rTx, err := s.db.WithTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer func() {
+		if err := rTx(); err != nil {
+			log.Println("failed to rollback transaction", err)
+		}
+	}()
+	storeInstance := store.New(tx)
+
+	if err = serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return err
+	}
+	if err = serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+		Resource:           folderID,
+		ResourceType:       store.ResourceTypeFiles,
+		RequiredPermission: store.PermissionManage,
+	}); err != nil {
+		return err
+	}
+	folderRecord, err := storeInstance.GetFileByID(ctx, folderID)
+	if err != nil {
+		return fmt.Errorf("failed to get folder details for ID '%s': %w", folderID, err)
+	}
+	if !folderRecord.IsFolder {
+		return fmt.Errorf("resource with ID '%s' is not a folder", folderID)
+	}
+	children, err := storeInstance.ListFileIDsByParentID(ctx, folderID)
+	if err != nil {
+		return fmt.Errorf("failed to check if folder '%s' is empty: %w", folderID, err)
+	}
+	if len(children) > 0 {
+		return ErrFolderNotEmpty
+	}
+	if err = storeInstance.DeleteFile(ctx, folderID); err != nil {
+		return fmt.Errorf("failed to delete folder record for ID '%s': %w", folderID, err)
+	}
+	if err = storeInstance.DeleteFileNameID(ctx, folderID); err != nil {
+		return fmt.Errorf("failed to delete folder name mapping for ID '%s': %w", folderID, err)
+	}
+	if err = storeInstance.DeleteAccessEntriesByResource(ctx, folderID); err != nil {
+		return fmt.Errorf("failed to delete access entries for folder ID '%s': %w", folderID, err)
+	}
+	err = commit(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction for deleting folder ID '%s': %w", folderID, err)
+	}
+
+	return nil
+}
+
+func (s *service) MoveFile(ctx context.Context, fileID, newParentID string) (*File, error) {
+	tx, commit, rTx, err := s.db.WithTransaction(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFile: failed to start transaction: %w", err)
+	}
+	defer func() {
+		if err := rTx(); err != nil {
+			log.Printf("MoveFile: failed to rollback transaction: %v", err)
+		}
+	}()
+
+	storeInstance := store.New(tx)
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
+	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+		Resource:           fileID,
+		ResourceType:       store.ResourceTypeFiles,
+		RequiredPermission: store.PermissionEdit,
+	}); err != nil {
+		return nil, fmt.Errorf("MoveFile: authorization failed for file %s: %w", fileID, err)
+	}
+	fileRecord, err := storeInstance.GetFileByID(ctx, fileID)
+	if err != nil {
+		if errors.Is(err, libdb.ErrNotFound) {
+			return nil, fmt.Errorf("MoveFile: file with ID %s not found", fileID)
+		}
+		return nil, fmt.Errorf("MoveFile: failed to get file %s: %w", fileID, err)
+	}
+	if fileRecord.IsFolder {
+		return nil, fmt.Errorf("MoveFile: item with ID %s is a folder, use MoveFolder instead", fileID)
+	}
+	if newParentID != "" {
+		parentFolderRecord, err := storeInstance.GetFileByID(ctx, newParentID)
+		if err != nil {
+			if errors.Is(err, libdb.ErrNotFound) {
+				return nil, fmt.Errorf("MoveFile: target parent folder with ID %s not found", newParentID)
+			}
+			return nil, fmt.Errorf("MoveFile: failed to get target parent folder %s: %w", newParentID, err)
+		}
+		if !parentFolderRecord.IsFolder {
+			return nil, fmt.Errorf("MoveFile: target parent with ID %s is not a folder", newParentID)
+		}
+		if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+			Resource:           newParentID,
+			ResourceType:       store.ResourceTypeFiles,
+			RequiredPermission: store.PermissionEdit, // Assuming Edit on folder allows adding children
+		}); err != nil {
+			return nil, fmt.Errorf("MoveFile: authorization failed for target parent folder %s: %w", newParentID, err)
+		}
+	}
+	currentFileName, err := storeInstance.GetFileNameByID(ctx, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFile: failed to get current name for file %s: %w", fileID, err)
+	}
+	originalParentID, err := storeInstance.GetFileParentID(ctx, fileID)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("MoveFile: failed to get original parent for file %s: %w", fileID, err)
+	}
+	if errors.Is(err, libdb.ErrNotFound) {
+		originalParentID = ""
+	}
+
+	if originalParentID != newParentID {
+		existingIDsInNewParent, err := storeInstance.ListFileIDsByName(ctx, newParentID, currentFileName)
+		if err != nil {
+			return nil, fmt.Errorf("MoveFile: failed to check for existing items in target folder: %w", err)
+		}
+		for _, existingID := range existingIDsInNewParent {
+			if existingID != fileID {
+				return nil, fmt.Errorf("MoveFile: an item named '%s' already exists in the target folder", currentFileName)
+			}
+		}
+	}
+	if originalParentID != newParentID {
+		err = storeInstance.UpdateFileParentID(ctx, fileID, newParentID)
+		if err != nil {
+			return nil, fmt.Errorf("MoveFile: failed to move file %s to parent %s: %w", fileID, newParentID, err)
+		}
+	}
+	updatedFile, err := s.getFileByID(ctx, tx, fileID, true)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFile: failed to retrieve updated file details for %s: %w", fileID, err)
+	}
+
+	if err := commit(ctx); err != nil {
+		return nil, fmt.Errorf("MoveFile: failed to commit transaction: %w", err)
+	}
+
+	return updatedFile, nil
+}
+
+func (s *service) MoveFolder(ctx context.Context, folderID, newParentID string) (*Folder, error) {
+	tx, commit, rTx, err := s.db.WithTransaction(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFolder: failed to start transaction: %w", err)
+	}
+	defer func() {
+		if err := rTx(); err != nil {
+			log.Printf("MoveFolder: failed to rollback transaction: %v", err)
+		}
+	}()
+
+	storeInstance := store.New(tx)
+
+	// 1. Authorization
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
+	if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+		Resource:           folderID,
+		ResourceType:       store.ResourceTypeFiles,
+		RequiredPermission: store.PermissionEdit,
+	}); err != nil {
+		return nil, fmt.Errorf("MoveFolder: authorization failed for folder %s: %w", folderID, err)
+	}
+
+	// 2. Validate folder
+	folderRecord, err := storeInstance.GetFileByID(ctx, folderID)
+	if err != nil {
+		if errors.Is(err, libdb.ErrNotFound) {
+			return nil, fmt.Errorf("MoveFolder: folder with ID %s not found", folderID)
+		}
+		return nil, fmt.Errorf("MoveFolder: failed to get folder %s: %w", folderID, err)
+	}
+	if !folderRecord.IsFolder {
+		return nil, fmt.Errorf("MoveFolder: item with ID %s is not a folder", folderID)
+	}
+
+	// 3. Validate newParentID, circular dependency, and self-move
+	if newParentID == folderID {
+		return nil, fmt.Errorf("MoveFolder: cannot move a folder into itself (folderID: %s, newParentID: %s)", folderID, newParentID)
+	}
+
+	if newParentID != "" {
+		parentFolderRecord, err := storeInstance.GetFileByID(ctx, newParentID)
+		if err != nil {
+			if errors.Is(err, libdb.ErrNotFound) {
+				return nil, fmt.Errorf("MoveFolder: target parent folder with ID %s not found", newParentID)
+			}
+			return nil, fmt.Errorf("MoveFolder: failed to get target parent folder %s: %w", newParentID, err)
+		}
+		if !parentFolderRecord.IsFolder {
+			return nil, fmt.Errorf("MoveFolder: target parent with ID %s is not a folder", newParentID)
+		}
+		if err := serverops.CheckResourceAuthorization(ctx, storeInstance, serverops.ResourceArgs{
+			Resource:           newParentID,
+			ResourceType:       store.ResourceTypeFiles,
+			RequiredPermission: store.PermissionEdit,
+		}); err != nil {
+			return nil, fmt.Errorf("MoveFolder: authorization failed for target parent folder %s: %w", newParentID, err)
+		}
+
+		isCircular, err := s.isDescendantOrSelf(ctx, tx, newParentID, folderID)
+		if err != nil {
+			return nil, fmt.Errorf("MoveFolder: failed to check for circular dependency: %w", err)
+		}
+		if isCircular {
+			return nil, fmt.Errorf("MoveFolder: cannot move folder %s into itself or one of its subfolders (target %s)", folderID, newParentID)
+		}
+	}
+
+	currentFolderName, err := storeInstance.GetFileNameByID(ctx, folderID)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFolder: failed to get current name for folder %s: %w", folderID, err)
+	}
+
+	originalParentID, err := storeInstance.GetFileParentID(ctx, folderID)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("MoveFolder: failed to get original parent for folder %s: %w", folderID, err)
+	}
+	if errors.Is(err, libdb.ErrNotFound) {
+		originalParentID = ""
+	}
+
+	if originalParentID != newParentID {
+		existingIDsInNewParent, err := storeInstance.ListFileIDsByName(ctx, newParentID, currentFolderName)
+		if err != nil {
+			return nil, fmt.Errorf("MoveFolder: failed to check for existing items in target folder: %w", err)
+		}
+		for _, existingID := range existingIDsInNewParent {
+			if existingID != folderID {
+				return nil, fmt.Errorf("MoveFolder: an item named '%s' already exists in the target folder", currentFolderName)
+			}
+		}
+	}
+
+	if originalParentID != newParentID {
+		err = storeInstance.UpdateFileParentID(ctx, folderID, newParentID)
+		if err != nil {
+			return nil, fmt.Errorf("MoveFolder: failed to move folder %s to parent %s: %w", folderID, newParentID, err)
+		}
+	}
+
+	updatedFolderData, err := s.getFileByID(ctx, tx, folderID, false)
+	if err != nil {
+		return nil, fmt.Errorf("MoveFolder: failed to retrieve updated folder details for %s: %w", folderID, err)
+	}
+
+	if err := commit(ctx); err != nil {
+		return nil, fmt.Errorf("MoveFolder: failed to commit transaction: %w", err)
+	}
+
+	return &Folder{
+		ID:       updatedFolderData.ID,
+		Path:     updatedFolderData.Path,
+		ParentID: updatedFolderData.ParentID,
+	}, nil
+}
+
+func (s *service) isDescendantOrSelf(ctx context.Context, tx libdb.Exec, checkID string, ancestorID string) (bool, error) {
+	if checkID == "" {
+		return false, nil
+	}
+	if checkID == ancestorID {
+		return true, nil
+	}
+
+	storeInstance := store.New(tx)
+	currentParentID := checkID
+
+	for {
+		parentOfCurrent, err := storeInstance.GetFileParentID(ctx, currentParentID)
+		if err != nil {
+			if errors.Is(err, libdb.ErrNotFound) {
+				return false, fmt.Errorf("isDescendantOrSelf: inconsistency, item %s not found while traversing path from %s", currentParentID, checkID)
+			}
+			return false, fmt.Errorf("isDescendantOrSelf: failed to get parent for %s: %w", currentParentID, err)
+		}
+
+		if parentOfCurrent == ancestorID {
+			return true, nil
+		}
+		if parentOfCurrent == "" {
+			return false, nil
+		}
+		currentParentID = parentOfCurrent
+	}
 }
 
 func (s *service) GetServiceName() string {

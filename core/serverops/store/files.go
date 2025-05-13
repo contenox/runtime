@@ -146,6 +146,25 @@ func (s *store) UpdateFileNameByID(ctx context.Context, id string, name string) 
 	return checkRowsAffected(result)
 }
 
+func (s *store) UpdateFileParentID(ctx context.Context, id string, newParentID string) error {
+	updatedAt := time.Now().UTC()
+
+	result, err := s.Exec.ExecContext(ctx, `
+		UPDATE filestree
+		SET parent_id = $2,
+			updated_at = $3
+		WHERE id = $1`,
+		id,
+		newParentID,
+		updatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update file parent in filestree: %w", err)
+	}
+	return checkRowsAffected(result)
+}
+
 func (s *store) CreateFile(ctx context.Context, file *File) error {
 	now := time.Now().UTC()
 	file.CreatedAt = now

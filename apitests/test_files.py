@@ -121,7 +121,7 @@ def test_list_files(base_url, admin_session, create_test_file):
 def test_create_folder(base_url, admin_session):
     """Test that an admin can create a folder."""
     headers = admin_session
-    data = {'path': 'test/folder'}
+    data = {'name': 'test/folder'}
 
     response = requests.post(
         f"{base_url}/folders",
@@ -138,7 +138,7 @@ def test_create_folder(base_url, admin_session):
 def test_rename_folder(base_url, admin_session):
     """Test that an admin can rename a folder."""
     # Create a folder to rename
-    create_data = {'path': 'old/folder/path'}
+    create_data = {'name': 'old'}
     create_response = requests.post(
         f"{base_url}/folders",
         json=create_data,
@@ -148,10 +148,10 @@ def test_rename_folder(base_url, admin_session):
     folder_id = create_response.json()['id']
 
     # Rename the folder
-    new_path = 'new/folder/path'
-    update_data = {'path': new_path}
+    new_path = 'new'
+    update_data = {'name': new_path}
     update_response = requests.put(
-        f"{base_url}/folders/{folder_id}/path",
+        f"{base_url}/folders/{folder_id}/name",
         json=update_data,
         headers=admin_session
     )
@@ -165,10 +165,10 @@ def test_rename_file(base_url, admin_session, create_test_file):
     """Test that an admin can rename a file's path."""
     test_file = create_test_file()
     new_path = 'renamed/file.txt'
-    data = {'path': new_path}
+    data = {'name': new_path}
 
     response = requests.put(
-        f"{base_url}/files/{test_file['id']}/path",
+        f"{base_url}/files/{test_file['id']}/name",
         json=data,
         headers=admin_session
     )
@@ -336,10 +336,9 @@ def test_rename_file_name_includes_slashes(base_url, admin_session, create_test_
     headers = admin_session
 
     new_name_with_slashes = 'folder_level/renamed_with_slash.txt'
-    data = {'path': new_name_with_slashes} # pathUpdateRequest uses 'path' field for the new name
-
+    data = {'name': new_name_with_slashes}
     response = requests.put(
-        f"{base_url}/files/{test_file['id']}/path",
+        f"{base_url}/files/{test_file['id']}/name",
         json=data,
         headers=headers
     )
@@ -347,11 +346,6 @@ def test_rename_file_name_includes_slashes(base_url, admin_session, create_test_
     updated_file = response.json()
     assert updated_file['id'] == test_file['id']
 
-    # The critical assertion: how is the path field constructed by the service?
-    # If RenameFile only changes the basename, and the file is at root:
-    # The `fileservice.getFileByID` path reconstruction logic is key here.
-    # If the `store.UpdateFileNameByID` simply changes the name record, and the file had no parent,
-    # the reconstructed path would be `new_name_with_slashes`.
     assert updated_file['path'] == new_name_with_slashes
 
     # Verify with a direct GET

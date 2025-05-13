@@ -285,12 +285,13 @@ type Store interface {
 	EnforceMaxFileCount(ctx context.Context, maxCount int64) error
 
 	ListFileIDsByParentID(ctx context.Context, parentID string) ([]string, error)
-	ListFileIDsByName(ctx context.Context, parentID, name string) ([]string, error)
-	GetFileNameByID(ctx context.Context, id string) (string, error)
 	CreateFileNameID(ctx context.Context, id, parentID, name string) error
 	UpdateFileNameByID(ctx context.Context, id string, name string) error
 	GetFileParentID(ctx context.Context, id string) (string, error)
 	DeleteFileNameID(ctx context.Context, id string) error
+	GetFileNameByID(ctx context.Context, id string) (string, error)
+	ListFileIDsByName(ctx context.Context, parentID, name string) ([]string, error)
+	UpdateFileParentID(ctx context.Context, id string, newParentID string) error
 
 	CreateBlob(ctx context.Context, blob *Blob) error
 	GetBlobByID(ctx context.Context, id string) (*Blob, error)
