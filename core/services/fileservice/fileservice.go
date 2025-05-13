@@ -59,6 +59,7 @@ func New(db libdb.DBManager, config *serverops.Config) Service {
 type File struct {
 	ID          string `json:"id"`
 	Path        string `json:"path"`
+	Name        string `json:"name"`
 	ParentID    string `json:"ParentId"`
 	Size        int64  `json:"size"`
 	ContentType string `json:"contentType"`
@@ -68,6 +69,7 @@ type File struct {
 type Folder struct {
 	ID       string `json:"id"`
 	Path     string `json:"path"`
+	Name     string `json:"name"`
 	ParentID string `json:"ParentId"`
 }
 
@@ -85,12 +87,8 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if file.Path == "" {
-		return nil, fmt.Errorf("path is required for files")
-	}
-	cleanedPath, err := sanitizePath(file.Path)
-	if err != nil {
-		return nil, fmt.Errorf("invalid path: %w", err)
+	if file.Name == "" {
+		return nil, fmt.Errorf("name is required for files")
 	}
 
 	// Generate IDs.
@@ -141,10 +139,10 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 		fmt.Printf("SERVER ERROR: file creation blocked: limit reached (%d max) %v", err, MaxFilesRowCount)
 		return nil, err
 	}
-	segments := strings.Split(cleanedPath, "/")
+	segments := strings.Split(file.Name, "/")
 	fileName := segments[len(segments)-1]
-	if len(segments) > 1 && file.ParentID == "" {
-		return nil, fmt.Errorf("parentId parameter is required")
+	if len(segments) > 1 {
+		return nil, fmt.Errorf("filename is not allowed to contain /")
 	}
 	err = storeInstance.CreateFileNameID(ctx, fileID, file.ParentID, fileName)
 	if err != nil {
@@ -153,7 +151,6 @@ func (s *service) CreateFile(ctx context.Context, file *File) (*File, error) {
 	if err = storeInstance.CreateBlob(ctx, blob); err != nil {
 		return nil, fmt.Errorf("failed to create blob: %w", err)
 	}
-	file.Path, _ = strings.CutPrefix(cleanedPath, "/")
 	// Create file record.
 	fileRecord := &store.File{
 		ID:      fileID,
@@ -217,6 +214,7 @@ func (s *service) GetFolderByID(ctx context.Context, id string) (*Folder, error)
 	}
 	return &Folder{
 		ID:       resFile.ID,
+		Name:     resFile.Name,
 		ParentID: resFile.ParentID,
 		Path:     resFile.Path,
 	}, nil
@@ -272,10 +270,14 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 	// Reconstruct the File.
 	var pathSegments []string
 	currentItemID := id
+	fileName := ""
 	for {
 		itemName, err := storeInstance.GetFileNameByID(ctx, currentItemID)
 		if err != nil {
 			return nil, fmt.Errorf("getFileByID: failed to get name for item ID '%s': %w", currentItemID, err)
+		}
+		if fileName == "" {
+			fileName = itemName
 		}
 		// Prepend the current item's name to the list of segments
 		pathSegments = append([]string{itemName}, pathSegments...)
@@ -301,6 +303,7 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 	resFile := &File{
 		ID:          fileRecord.ID,
 		Path:        resolvedPath,
+		Name:        fileName,
 		ContentType: fileRecord.Type,
 		Data:        data,
 		Size:        int64(len(data)),
@@ -570,6 +573,7 @@ func (s *service) CreateFolder(ctx context.Context, parentID string, name string
 
 	return &Folder{
 		ID:       folderID,
+		Name:     name,
 		Path:     folder.Path,
 		ParentID: parentID,
 	}, nil
@@ -650,6 +654,7 @@ func (s *service) RenameFolder(ctx context.Context, folderID, newName string) (*
 	return &Folder{
 		ID:       folderID,
 		ParentID: n.ParentID,
+		Name:     newName,
 		Path:     n.Path,
 	}, nil
 }
@@ -812,7 +817,6 @@ func (s *service) MoveFolder(ctx context.Context, folderID, newParentID string) 
 
 	storeInstance := store.New(tx)
 
-	// 1. Authorization
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionManage); err != nil {
 		return nil, err
 	}
@@ -824,7 +828,6 @@ func (s *service) MoveFolder(ctx context.Context, folderID, newParentID string) 
 		return nil, fmt.Errorf("MoveFolder: authorization failed for folder %s: %w", folderID, err)
 	}
 
-	// 2. Validate folder
 	folderRecord, err := storeInstance.GetFileByID(ctx, folderID)
 	if err != nil {
 		if errors.Is(err, libdb.ErrNotFound) {
@@ -836,7 +839,6 @@ func (s *service) MoveFolder(ctx context.Context, folderID, newParentID string) 
 		return nil, fmt.Errorf("MoveFolder: item with ID %s is not a folder", folderID)
 	}
 
-	// 3. Validate newParentID, circular dependency, and self-move
 	if newParentID == folderID {
 		return nil, fmt.Errorf("MoveFolder: cannot move a folder into itself (folderID: %s, newParentID: %s)", folderID, newParentID)
 	}
@@ -912,6 +914,7 @@ func (s *service) MoveFolder(ctx context.Context, folderID, newParentID string) 
 
 	return &Folder{
 		ID:       updatedFolderData.ID,
+		Name:     currentFolderName,
 		Path:     updatedFolderData.Path,
 		ParentID: updatedFolderData.ParentID,
 	}, nil

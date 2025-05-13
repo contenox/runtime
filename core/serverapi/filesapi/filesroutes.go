@@ -32,17 +32,17 @@ func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fil
 	// File operations
 	mux.HandleFunc("POST /files", f.create)                // Create a new file
 	mux.HandleFunc("GET /files/{id}", f.getMetadata)       // Get file metadata
-	mux.HandleFunc("PUT /files/{id}", f.update)            // Update file content/metadata (potentially path if CreateFile logic allows)
+	mux.HandleFunc("PUT /files/{id}", f.update)            // Update file
 	mux.HandleFunc("DELETE /files/{id}", f.deleteFile)     // Delete a file
 	mux.HandleFunc("GET /files/{id}/download", f.download) // Download file content
 	mux.HandleFunc("PUT /files/{id}/name", f.renameFile)   // Rename a file
-	mux.HandleFunc("PUT /files/{id}/move", f.moveFile)     // Move a file (New)
+	mux.HandleFunc("PUT /files/{id}/move", f.moveFile)     // Move a file
 
 	// Folder operations
 	mux.HandleFunc("POST /folders", f.createFolder)          // Create a new folder
 	mux.HandleFunc("PUT /folders/{id}/name", f.renameFolder) // Rename a folder
 	mux.HandleFunc("DELETE /folders/{id}", f.deleteFolder)   // Delete a folder
-	mux.HandleFunc("PUT /folders/{id}/move", f.moveFolder)   // Move a folder (New)
+	mux.HandleFunc("PUT /folders/{id}/move", f.moveFolder)   // Move a folder
 
 	// Listing operations (can list both files and folders)
 	mux.HandleFunc("GET /files", f.listFiles) // List files/folders by path
@@ -55,6 +55,7 @@ type fileManager struct {
 type fileResponse struct {
 	ID          string `json:"id"`
 	Path        string `json:"path"`
+	Name        string `json:"name"`
 	ContentType string `json:"contentType,omitempty"` // omitempty for folders
 	Size        int64  `json:"size"`                  // Will be 0 for folders if mapped directly
 }
@@ -63,6 +64,7 @@ func mapFileToResponse(f *fileservice.File) fileResponse {
 	return fileResponse{
 		ID:          f.ID,
 		Path:        f.Path,
+		Name:        f.Name,
 		ContentType: f.ContentType,
 		Size:        f.Size,
 	}
@@ -143,14 +145,14 @@ func (f *fileManager) processAndReadFileUpload(w http.ResponseWriter, r *http.Re
 func (f *fileManager) create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	header, fileData, path, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
+	header, fileData, name, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 
 	req := fileservice.File{
-		Path:        path,
+		Name:        name,
 		ParentID:    parentID,
 		ContentType: mimeType,
 		Data:        fileData,
@@ -184,7 +186,7 @@ func (f *fileManager) update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 
-	header, fileData, path, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
+	header, fileData, _, parentID, mimeType, err := f.processAndReadFileUpload(w, r)
 	if err != nil {
 		// Pass the raw error to serverops.Error
 		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
@@ -193,7 +195,6 @@ func (f *fileManager) update(w http.ResponseWriter, r *http.Request) {
 
 	req := fileservice.File{
 		ID:          id,
-		Path:        path,
 		ParentID:    parentID,
 		ContentType: mimeType,
 		Data:        fileData,
@@ -223,6 +224,7 @@ func (f *fileManager) deleteFile(w http.ResponseWriter, r *http.Request) {
 type folderResponse struct {
 	ID       string `json:"id"`
 	Path     string `json:"path"`
+	Name     string `json:"name"`
 	ParentID string `json:"parentId,omitempty"`
 }
 
@@ -230,6 +232,7 @@ func mapServiceFileToFileResponse(f *fileservice.File) fileResponse {
 	return fileResponse{
 		ID:          f.ID,
 		Path:        f.Path,
+		Name:        f.Name,
 		ContentType: f.ContentType,
 		Size:        f.Size,
 	}
@@ -239,6 +242,7 @@ func mapFolderToResponse(f *fileservice.Folder) folderResponse {
 	return folderResponse{
 		ID:       f.ID,
 		Path:     f.Path,
+		Name:     f.Name,
 		ParentID: f.ParentID,
 	}
 }

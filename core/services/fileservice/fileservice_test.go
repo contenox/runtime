@@ -33,7 +33,7 @@ func TestFileService(t *testing.T) {
 
 	t.Run("CreateFile", func(t *testing.T) {
 		testFile := &fileservice.File{
-			Path:        "test.txt", // This will be the name at root
+			Name:        "test.txt", // This will be the name at root
 			ContentType: "text/plain",
 			Data:        []byte("test data"),
 		}
@@ -72,7 +72,7 @@ func TestFileService(t *testing.T) {
 
 	t.Run("UpdateFile", func(t *testing.T) {
 		originalFile := &fileservice.File{
-			Path:        "update.txt",
+			Name:        "update.txt",
 			ContentType: "text/plain",
 			Data:        []byte("original data"),
 		}
@@ -120,7 +120,7 @@ func TestFileService(t *testing.T) {
 	t.Run("DeleteFile", func(t *testing.T) {
 		fileName := "delete_" + uuid.NewString()[:4] + ".txt"
 		testFile := &fileservice.File{
-			Path:        fileName,
+			Name:        fileName,
 			ContentType: "text/plain",
 			Data:        []byte("data to delete"),
 		}
@@ -165,7 +165,7 @@ func TestFileService(t *testing.T) {
 	t.Run("RenameFile", func(t *testing.T) {
 		oldName := "oldname_" + uuid.NewString()[:4] + ".txt"
 		testFile := &fileservice.File{
-			Path:        oldName,
+			Name:        oldName,
 			ContentType: "text/plain",
 			Data:        []byte("data"),
 		}
@@ -256,7 +256,7 @@ func TestFileService(t *testing.T) {
 		file1Name := "file1.txt"
 		// For CreateFile, Path is treated as the name if ParentID is given.
 		createdFile1, err := fileService.CreateFile(testRunCtx, &fileservice.File{
-			Path:        file1Name,
+			Name:        file1Name,
 			ParentID:    folder.ID,
 			ContentType: "text/plain",
 			Data:        []byte("data1"),
@@ -273,7 +273,7 @@ func TestFileService(t *testing.T) {
 
 		file2Name := "file2.txt"
 		createdFile2, err := fileService.CreateFile(testRunCtx, &fileservice.File{
-			Path:        file2Name,
+			Name:        file2Name,
 			ParentID:    subFolder.ID,
 			ContentType: "text/plain",
 			Data:        []byte("data2"),
@@ -342,19 +342,19 @@ func TestFileService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ListAllPaths: CreateFolder '%s' in '%s' failed: %v", folder2Name, folder1Name, err)
 		}
-		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Path: file1Name, ParentID: folder2.ID, ContentType: "text/plain", Data: []byte("data1")})
+		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Name: file1Name, ParentID: folder2.ID, ContentType: "text/plain", Data: []byte("data1")})
 		if err != nil {
 			t.Fatalf("ListAllPaths: CreateFile '%s' in '%s' failed: %v", file1Name, folder2.Path, err)
 		}
-		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Path: file2InFolder1Name, ParentID: folder1.ID, ContentType: "text/plain", Data: []byte("data_in_folder1")})
+		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Name: file2InFolder1Name, ParentID: folder1.ID, ContentType: "text/plain", Data: []byte("data_in_folder1")})
 		if err != nil {
 			t.Fatalf("ListAllPaths: CreateFile '%s' in '%s' failed: %v", file2InFolder1Name, folder1Name, err)
 		}
-		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Path: rootFile1Name, ContentType: "text/plain", Data: []byte("data_root1")})
+		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Name: rootFile1Name, ContentType: "text/plain", Data: []byte("data_root1")})
 		if err != nil {
 			t.Fatalf("ListAllPaths: CreateFile '%s' failed: %v", rootFile1Name, err)
 		}
-		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Path: rootFile2Name, ContentType: "text/plain", Data: []byte("data_root2")})
+		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Name: rootFile2Name, ContentType: "text/plain", Data: []byte("data_root2")})
 		if err != nil {
 			t.Fatalf("ListAllPaths: CreateFile '%s' failed: %v", rootFile2Name, err)
 		}
@@ -421,13 +421,13 @@ func TestFileService(t *testing.T) {
 
 	t.Run("RenameFile_ConflictWithExistingFile", func(t *testing.T) {
 		conflictName := "conflict_file_" + uuid.NewString()[:4] + ".txt"
-		_, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: conflictName, ContentType: "text/plain", Data: []byte("existing")})
+		_, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: conflictName, ContentType: "text/plain", Data: []byte("existing")})
 		if err != nil {
 			t.Fatalf("CreateFile failed for existing file: %v", err)
 		}
 
 		originalName := "original_for_conflict_" + uuid.NewString()[:4] + ".txt"
-		createdFile, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: originalName, ContentType: "text/plain", Data: []byte("to be renamed")})
+		createdFile, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: originalName, ContentType: "text/plain", Data: []byte("to be renamed")})
 		if err != nil {
 			t.Fatalf("CreateFile failed for file to rename: %v", err)
 		}
@@ -472,7 +472,7 @@ func TestFileService(t *testing.T) {
 		}
 
 		fileName := "move_me_" + uuid.NewString()[:4] + ".txt"
-		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: fileName, ContentType: "text/plain", Data: []byte("move data")})
+		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: fileName, ContentType: "text/plain", Data: []byte("move data")})
 		if err != nil {
 			t.Fatalf("Failed to create file to move: %v", err)
 		}
@@ -513,7 +513,7 @@ func TestFileService(t *testing.T) {
 		}
 
 		fileName := "move_me_to_root_" + uuid.NewString()[:4] + ".txt"
-		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: fileName, ParentID: sourceFolder.ID, ContentType: "text/plain", Data: []byte("to root")})
+		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: fileName, ParentID: sourceFolder.ID, ContentType: "text/plain", Data: []byte("to root")})
 		if err != nil {
 			t.Fatalf("Failed to create file in subfolder: %v", err)
 		}
@@ -546,13 +546,13 @@ func TestFileService(t *testing.T) {
 		}
 
 		collidingFileName := "iamhere_" + uuid.NewString()[:4] + ".txt" // Unique name for this test
-		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Path: collidingFileName, ParentID: targetFolder.ID, ContentType: "text/plain", Data: []byte("existing")})
+		_, err = fileService.CreateFile(testRunCtx, &fileservice.File{Name: collidingFileName, ParentID: targetFolder.ID, ContentType: "text/plain", Data: []byte("existing")})
 		if err != nil {
 			t.Fatalf("Failed to create existing file in target: %v", err)
 		}
 
 		// File to move, created at root with the same name as the one in targetFolder
-		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: collidingFileName, ContentType: "text/plain", Data: []byte("original")})
+		fileToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: collidingFileName, ContentType: "text/plain", Data: []byte("original")})
 		if err != nil {
 			t.Fatalf("Failed to create file to move: %v", err)
 		}
@@ -578,7 +578,7 @@ func TestFileService(t *testing.T) {
 			t.Fatalf("Failed to create folder to move: %v", err)
 		}
 		childFileName := "child_" + uuid.NewString()[:4] + ".txt"
-		childFileInFolderToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Path: childFileName, ParentID: folderToMove.ID, ContentType: "text/plain", Data: []byte("child data")})
+		childFileInFolderToMove, err := fileService.CreateFile(testRunCtx, &fileservice.File{Name: childFileName, ParentID: folderToMove.ID, ContentType: "text/plain", Data: []byte("child data")})
 		if err != nil {
 			t.Fatalf("Failed to create child file in folder to move: %v", err)
 		}
