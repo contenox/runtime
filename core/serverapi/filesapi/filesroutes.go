@@ -23,22 +23,29 @@ const (
 	formFieldParent     = "parentid"
 )
 
+// AddFileRoutes sets up the routes for file and folder operations.
 func AddFileRoutes(mux *http.ServeMux, config *serverops.Config, fileService fileservice.Service) {
 	f := &fileManager{
 		service: fileService,
 	}
 
-	mux.HandleFunc("POST /files", f.create)
-	mux.HandleFunc("GET /files/{id}", f.getMetadata)
-	mux.HandleFunc("PUT /files/{id}", f.update)
-	mux.HandleFunc("DELETE /files/{id}", f.deleteFile)
-	mux.HandleFunc("GET /files/{id}/download", f.download)
-	mux.HandleFunc("GET /files", f.listFiles)
+	// File operations
+	mux.HandleFunc("POST /files", f.create)                // Create a new file
+	mux.HandleFunc("GET /files/{id}", f.getMetadata)       // Get file metadata
+	mux.HandleFunc("PUT /files/{id}", f.update)            // Update file content/metadata (potentially path if CreateFile logic allows)
+	mux.HandleFunc("DELETE /files/{id}", f.deleteFile)     // Delete a file
+	mux.HandleFunc("GET /files/{id}/download", f.download) // Download file content
+	mux.HandleFunc("PUT /files/{id}/name", f.renameFile)   // Rename a file
+	mux.HandleFunc("PUT /files/{id}/move", f.moveFile)     // Move a file (New)
 
-	mux.HandleFunc("POST /folders", f.createFolder)
-	mux.HandleFunc("PUT /files/{id}/name", f.renameFile)
-	mux.HandleFunc("PUT /folders/{id}/name", f.renameFolder)
-	mux.HandleFunc("DELETE /folders/{id}", f.deleteFolder)
+	// Folder operations
+	mux.HandleFunc("POST /folders", f.createFolder)          // Create a new folder
+	mux.HandleFunc("PUT /folders/{id}/name", f.renameFolder) // Rename a folder
+	mux.HandleFunc("DELETE /folders/{id}", f.deleteFolder)   // Delete a folder
+	mux.HandleFunc("PUT /folders/{id}/move", f.moveFolder)   // Move a folder (New)
+
+	// Listing operations (can list both files and folders)
+	mux.HandleFunc("GET /files", f.listFiles) // List files/folders by path
 }
 
 type fileManager struct {
@@ -378,4 +385,53 @@ func (f *fileManager) deleteFolder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = serverops.Encode(w, r, http.StatusOK, map[string]string{"message": "folder removed"})
+}
+
+type moveRequest struct {
+	NewParentID string `json:"newParentId"`
+}
+
+func (f *fileManager) moveFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fileID := r.PathValue("id")
+	if fileID == "" {
+		_ = serverops.Error(w, r, errors.New("missing file ID in path"), serverops.UpdateOperation)
+		return
+	}
+
+	var req moveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = serverops.Error(w, r, fmt.Errorf("invalid request body: %w", err), serverops.UpdateOperation)
+		return
+	}
+	movedFile, err := f.service.MoveFile(ctx, fileID, req.NewParentID)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.UpdateOperation)
+		return
+	}
+
+	_ = serverops.Encode(w, r, http.StatusOK, mapServiceFileToFileResponse(movedFile))
+}
+
+func (f *fileManager) moveFolder(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	folderID := r.PathValue("id")
+	if folderID == "" {
+		_ = serverops.Error(w, r, errors.New("missing folder ID in path"), serverops.UpdateOperation)
+		return
+	}
+
+	var req moveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		_ = serverops.Error(w, r, fmt.Errorf("invalid request body: %w", err), serverops.UpdateOperation)
+		return
+	}
+
+	movedFolder, err := f.service.MoveFolder(ctx, folderID, req.NewParentID)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.UpdateOperation) // Or a more specific "MoveOperation"
+		return
+	}
+
+	_ = serverops.Encode(w, r, http.StatusOK, mapFolderToResponse(movedFolder))
 }

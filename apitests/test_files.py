@@ -353,3 +353,148 @@ def test_rename_file_name_includes_slashes(base_url, admin_session, create_test_
     assert_status_code(get_response, 200)
     metadata = get_response.json()
     assert metadata['path'] == new_name_with_slashes
+    def test_move_file_to_folder(base_url, admin_session, create_test_file, create_test_folder):
+        """Test moving a file from root into a folder."""
+        target_folder = create_test_folder(name="target_for_file_move")
+        file_to_move = create_test_file(path="file_to_move.txt", content="move me")
+
+        move_payload = {'newParentId': target_folder['id']}
+        response = requests.put(
+            f"{base_url}/files/{file_to_move['id']}/move",
+            json=move_payload,
+            headers=admin_session
+        )
+        assert_status_code(response, 200)
+        moved_file_data = response.json()
+
+        assert moved_file_data['id'] == file_to_move['id']
+        assert moved_file_data['parentId'] == target_folder['id']
+        assert moved_file_data['path'] == f"{target_folder['path']}/{file_to_move['path']}"
+
+        # Verify with a GET request
+        get_response = requests.get(f"{base_url}/files/{file_to_move['id']}", headers=admin_session)
+        assert_status_code(get_response, 200)
+        verified_file_data = get_response.json()
+        assert verified_file_data['parentId'] == target_folder['id']
+        assert verified_file_data['path'] == f"{target_folder['path']}/{file_to_move['path']}"
+
+    def test_move_file_to_root(base_url, admin_session, create_test_file, create_test_folder):
+        """Test moving a file from a folder to the root."""
+        source_folder = create_test_folder(name="source_folder_for_file")
+        # Create file inside the source_folder using its parentId
+        file_in_folder = create_test_file(
+            path="file_in_folder.txt",
+            content="data in folder",
+            parent_id=source_folder['id']
+        )
+        # Verify initial state
+        assert file_in_folder['parentId'] == source_folder['id']
+        assert file_in_folder['path'] == f"{source_folder['path']}/file_in_folder.txt"
+
+
+        move_payload = {'newParentId': ""} # Empty string for root
+        response = requests.put(
+            f"{base_url}/files/{file_in_folder['id']}/move",
+            json=move_payload,
+            headers=admin_session
+        )
+        assert_status_code(response, 200)
+        moved_file_data = response.json()
+
+        assert moved_file_data['id'] == file_in_folder['id']
+        assert moved_file_data.get('parentId', '') == "" # Should be at root
+        assert moved_file_data['path'] == "file_in_folder.txt" # Path at root is just the name
+
+    # --- Tests for Folder Move Endpoint ---
+
+    def test_move_folder_to_another_folder(base_url, admin_session, create_test_folder, create_test_file):
+        """Test moving a folder (with content) into another folder."""
+        destination_parent_folder = create_test_folder(name="dest_parent_for_folder")
+        folder_to_move = create_test_folder(name="folder_being_moved")
+
+        # Create a file inside the folder_to_move to check its path update
+        child_file_name = "child_in_moved_folder.txt"
+        child_file = create_test_file(
+            path=child_file_name,
+            parent_id=folder_to_move['id'],
+            content="child content"
+        )
+        original_child_path = f"{folder_to_move['path']}/{child_file_name}"
+        assert child_file['path'] == original_child_path
+
+        move_payload = {'newParentId': destination_parent_folder['id']}
+        response = requests.put(
+            f"{base_url}/folders/{folder_to_move['id']}/move",
+            json=move_payload,
+            headers=admin_session
+        )
+        assert_status_code(response, 200)
+        moved_folder_data = response.json()
+
+        assert moved_folder_data['id'] == folder_to_move['id']
+        assert moved_folder_data['parentId'] == destination_parent_folder['id']
+        expected_moved_folder_path = f"{destination_parent_folder['path']}/{folder_to_move['original_name']}"
+        assert moved_folder_data['path'] == expected_moved_folder_path
+
+        # Verify child file's path has updated
+        get_child_response = requests.get(f"{base_url}/files/{child_file['id']}", headers=admin_session)
+        assert_status_code(get_child_response, 200)
+        updated_child_file_data = get_child_response.json()
+
+        assert updated_child_file_data['parentId'] == folder_to_move['id'] # Parent ID of child is still the moved folder
+        expected_updated_child_path = f"{expected_moved_folder_path}/{child_file_name}"
+        assert updated_child_file_data['path'] == expected_updated_child_path
+
+    def test_move_folder_to_root(base_url, admin_session, create_test_folder):
+        """Test moving a folder from a subfolder to the root."""
+        parent_of_source = create_test_folder(name="parent_of_source_folder")
+        folder_to_move = create_test_folder(name="folder_moving_to_root", parent_id=parent_of_source['id'])
+
+        # Verify initial state
+        assert folder_to_move['parentId'] == parent_of_source['id']
+        assert folder_to_move['path'] == f"{parent_of_source['path']}/{folder_to_move['original_name']}"
+
+        move_payload = {'newParentId': ""} # Empty string for root
+        response = requests.put(
+            f"{base_url}/folders/{folder_to_move['id']}/move",
+            json=move_payload,
+            headers=admin_session
+        )
+        assert_status_code(response, 200)
+        moved_folder_data = response.json()
+
+        assert moved_folder_data['id'] == folder_to_move['id']
+        assert moved_folder_data.get('parentId', '') == "" # Should be at root
+        assert moved_folder_data['path'] == folder_to_move['original_name'] # Path at root is its original name
+
+    def test_move_folder_circular_into_itself(base_url, admin_session, create_test_folder):
+        """Test attempting to move a folder into itself (should fail)."""
+        folder = create_test_folder(name="self_move_folder")
+
+        move_payload = {'newParentId': folder['id']}
+        response = requests.put(
+            f"{base_url}/folders/{folder['id']}/move",
+            json=move_payload,
+            headers=admin_session
+        )
+        # Expecting a client error (e.g., 400 Bad Request)
+        assert response.status_code == 400, f"Expected 400, got {response.status_code}. Response: {response.text}"
+        error_data = response.json()
+        assert "cannot move a folder into itself" in error_data.get("error", "").lower()
+
+
+    def test_move_folder_circular_into_child(base_url, admin_session, create_test_folder):
+        """Test attempting to move a folder into one of its own children (should fail)."""
+        parent_folder = create_test_folder(name="circ_parent_folder")
+        child_folder = create_test_folder(name="circ_child_folder", parent_id=parent_folder['id'])
+
+        move_payload = {'newParentId': child_folder['id']}
+        response = requests.put(
+            f"{base_url}/folders/{parent_folder['id']}/move", # Attempt to move parent into child
+            json=move_payload,
+            headers=admin_session
+        )
+        assert response.status_code == 400, f"Expected 400, got {response.status_code}. Response: {response.text}"
+        error_data = response.json()
+        assert "cannot move folder" in error_data.get("error", "").lower()
+        assert "into itself or one of its subfolders" in error_data.get("error", "").lower()
