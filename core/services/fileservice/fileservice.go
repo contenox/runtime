@@ -23,6 +23,8 @@ import (
 const MaxUploadSize = 1 * 1024 * 1024
 const MaxFilesRowCount = 50000
 
+var ErrUnknownPath = fmt.Errorf("unable to resolve path")
+
 type Service interface {
 	CreateFile(ctx context.Context, file *File) (*File, error)
 	GetFileByID(ctx context.Context, id string) (*File, error)
@@ -342,7 +344,7 @@ func (s *service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("unable to resolve path")
+			return nil, ErrUnknownPath
 		}
 	}
 	if depth == 0 {
