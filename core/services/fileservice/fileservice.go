@@ -351,8 +351,6 @@ func (s *service) GetFilesByPath(ctx context.Context, path string) ([]File, erro
 				return nil, ErrUnknownPath
 			}
 			if len(idsInSegment) > 1 {
-				// This case (multiple items with same name in same parent) should ideally be prevented by DB constraints.
-				// If it occurs, it's ambiguous. For now, take the first one or error.
 				return nil, fmt.Errorf("GetFilesByPath: ambiguous path, multiple items named '%s' found under parent '%s'", segmentName, currentParentID)
 			}
 			lastResolvedItemID = idsInSegment[0]
