@@ -19,7 +19,7 @@ func TestFileVectorizationJob(t *testing.T) {
 
 	t.Run("CreateFile_TriggersVectorizationJob", func(t *testing.T) {
 		testFile := &fileservice.File{
-			Path:        "vectorize_me.txt",
+			Name:        "vectorize_me.txt",
 			ContentType: "text/plain",
 			Data:        []byte("some data to vectorize"),
 		}
@@ -51,7 +51,7 @@ func TestFileVectorizationJob(t *testing.T) {
 
 	t.Run("CreateFile_EmptyContentType_ReportsError", func(t *testing.T) {
 		testFile := &fileservice.File{
-			Path:        "empty_content_type.txt",
+			Name:        "empty_content_type.txt",
 			ContentType: "", // This should not create a Job
 			Data:        []byte("data"),
 		}

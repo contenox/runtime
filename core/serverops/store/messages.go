@@ -17,7 +17,9 @@ func (s *store) AppendMessages(ctx context.Context, messages ...*Message) error 
 	valueArgs := make([]any, 0, len(messages)*4)
 
 	for i, msg := range messages {
-		msg.AddedAt = now
+		if msg.AddedAt.IsZero() {
+			msg.AddedAt = now
+		}
 		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
 		valueArgs = append(valueArgs, msg.ID, msg.IDX, msg.Payload, msg.AddedAt)
 	}

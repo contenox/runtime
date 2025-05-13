@@ -97,6 +97,7 @@ func (s *Service) AddInstruction(ctx context.Context, id string, message string)
 }
 
 func (s *Service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
+	now := time.Now().UTC()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
@@ -159,11 +160,13 @@ func (s *Service) Chat(ctx context.Context, subjectID string, message string, pr
 			ID:      uuid.NewString(),
 			IDX:     subjectID,
 			Payload: payload,
+			AddedAt: now,
 		},
 		&store.Message{
 			ID:      uuid.New().String(),
 			IDX:     subjectID,
 			Payload: jsonData,
+			AddedAt: time.Now().UTC(),
 		})
 	if err != nil {
 		return "", err

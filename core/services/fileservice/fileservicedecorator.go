@@ -12,14 +12,43 @@ type activityTrackerDecorator struct {
 	tracker     serverops.ActivityTracker
 }
 
-// MoveFile implements Service.
 func (d *activityTrackerDecorator) MoveFile(ctx context.Context, fileID string, newParentID string) (*File, error) {
-	panic("unimplemented")
+	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
+		ctx,
+		"move",
+		"file",
+		"fileID", fileID,
+		"newParentID", newParentID,
+	)
+	defer endFn()
+
+	movedFile, opErr := d.fileservice.MoveFile(ctx, fileID, newParentID)
+	if opErr != nil {
+		reportErrFn(opErr)
+	} else {
+		reportChangeFn(movedFile.ID, movedFile)
+	}
+	return movedFile, opErr
 }
 
 // MoveFolder implements Service.
 func (d *activityTrackerDecorator) MoveFolder(ctx context.Context, folderID string, newParentID string) (*Folder, error) {
-	panic("unimplemented")
+	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
+		ctx,
+		"move",
+		"folder",
+		"folderID", folderID,
+		"newParentID", newParentID,
+	)
+	defer endFn()
+
+	movedFolder, opErr := d.fileservice.MoveFolder(ctx, folderID, newParentID)
+	if opErr != nil {
+		reportErrFn(opErr)
+	} else {
+		reportChangeFn(movedFolder.ID, movedFolder)
+	}
+	return movedFolder, opErr
 }
 
 // WithActivityTracker decorates a FileService implementation with an ActivityTracker.
