@@ -20,6 +20,9 @@ import (
 	"github.com/js402/cate/libs/libroutine"
 )
 
+var cliSetAdminUser string
+var cliSetCoreVersion string
+
 func initDatabase(ctx context.Context, cfg *serverops.Config) (libdb.DBManager, error) {
 	dbURL := cfg.DatabaseURL
 	var err error
@@ -55,6 +58,14 @@ func initPubSub(ctx context.Context, cfg *serverops.Config) (libbus.Messenger, e
 }
 
 func main() {
+	serverops.DefaultAdminUser = cliSetAdminUser
+	if serverops.DefaultAdminUser == "" {
+		log.Fatalf("corrupted build! cliSetAdminUser was not injected")
+	}
+	if cliSetCoreVersion == "" {
+		log.Fatalf("corrupted build! cliSetCoreVersion was not injected")
+	}
+	serverops.CoreVersion = cliSetCoreVersion
 	config := &serverops.Config{}
 	if err := serverops.LoadConfig(config); err != nil {
 		log.Fatalf("failed to load configuration: %v", err)

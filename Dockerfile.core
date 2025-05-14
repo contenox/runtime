@@ -1,5 +1,10 @@
 FROM golang:1.24-alpine AS builder
+
+ARG DEFAULT_ADMIN_USER=admin@admin.com
+ARG CORE_VERSION=unset
+
 WORKDIR /app
+# Copy modules
 COPY core/go.mod core/go.sum ./core/
 COPY libs/libauth/go.mod libs/libauth/go.sum ./libs/libauth/
 COPY libs/libbus/go.mod libs/libbus/go.sum ./libs/libbus/
@@ -10,12 +15,18 @@ COPY libs/libroutine/go.mod libs/libroutine/go.sum ./libs/libroutine/
 COPY libs/libtestenv/go.mod libs/libtestenv/go.sum ./libs/libtestenv/
 COPY libs/ ./libs/
 COPY core/ ./core/
+
 WORKDIR /app/core
 RUN go mod tidy && go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/cate .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s \
+    -X 'main.cliSetAdminUser=${DEFAULT_ADMIN_USER}' \
+    -X 'main.cliSetCoreVersion=${CORE_VERSION}'" \
+  -o /app/cate .
+
 FROM alpine:3.19
-RUN apk add --no-cache curl # for healthcheck
+RUN apk add --no-cache curl
 WORKDIR /app
 COPY --from=builder /app/cate /app/cate
 

@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var CoreVersion = "CORE-UNSET-dev"
+
 const EmbedPoolID = "internal_embed_pool"
 const EmbedPoolName = "Embedder"
 const TasksPoolID = "internal_tasks_pool"

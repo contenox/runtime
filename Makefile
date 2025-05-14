@@ -1,4 +1,6 @@
 .PHONY: core-test core-smoketest libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+DEFAULT_ADMIN_USER ?= admin@admin.com
+DEFAULT_CORE_VERSION ?= dev-demo
 
 core-test:
 	go test -C ./core/ ./...
@@ -18,7 +20,7 @@ core-benchmark:
 	go test -C ./core -bench=. -run=^$ -benchmem ./...
 
 build:
-	docker compose build
+	docker compose build --build-arg DEFAULT_ADMIN_USER=$(DEFAULT_ADMIN_USER) --build-arg CORE_VERSION=$(DEFAULT_CORE_VERSION)
 
 down:
 	docker compose down

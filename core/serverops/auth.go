@@ -15,7 +15,8 @@ import (
 
 const DefaultServerGroup = "server"
 const DefaultDefaultServiceGroup = "admin_panel"
-const DefaultAdminUser = "admin@admin.com"
+
+var DefaultAdminUser string = "admin@admin.com"
 
 func accessListFromStore(ctx context.Context, storeInstance store.Store, identity string, resource string) (store.AccessList, error) {
 	var al store.AccessList
