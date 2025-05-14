@@ -1,4 +1,4 @@
-import { Button, Container, Panel, Scrollable, SidebarToggle, UserMenu } from '@cate/ui';
+import { Button, Panel, SidebarToggle, UserMenu } from '@cate/ui'; // Added Section, removed Scrollable if no longer needed elsewhere
 import { ConstructionIcon } from 'lucide-react';
 import React, { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +58,6 @@ export function Layout({
           <div className="flex items-center gap-2"></div>
         )}
         <ConstructionIcon />
-
         <div className="flex flex-row">
           {user ? (
             <UserMenu
@@ -78,7 +77,8 @@ export function Layout({
       </Panel>
 
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1">
+        {' '}
         {/* Sidebar */}
         <Sidebar
           disabled={sidebarDisabled}
@@ -86,14 +86,9 @@ export function Layout({
           setIsOpen={setSidebarIsOpen}
           items={nav}
         />
-
         {/* Main Content */}
-        <Panel
-          variant="flat"
-          className={cn('min-h-full flex-1 bg-inherit text-inherit', mainContentClassName)}>
-          <Scrollable orientation="vertical" className="h-full">
-            <Container>{mainContent}</Container>
-          </Scrollable>
+        <Panel className={cn('min-h-0 flex-1 bg-inherit text-inherit', mainContentClassName)}>
+          {mainContent}
         </Panel>
       </div>
     </div>

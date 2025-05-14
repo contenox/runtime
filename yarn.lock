@@ -230,7 +230,7 @@ __metadata:
 
 "@cate/ui@file:../packages/ui::locator=frontend%40workspace%3Afrontend":
   version: 0.1.0
-  resolution: "@cate/ui@file:../packages/ui#../packages/ui::hash=4f27c1&locator=frontend%40workspace%3Afrontend"
+  resolution: "@cate/ui@file:../packages/ui#../packages/ui::hash=9c836b&locator=frontend%40workspace%3Afrontend"
   dependencies:
     "@tailwindcss/postcss": "npm:^4.1.3"
     "@types/react": "npm:^19.0.10"
@@ -251,7 +251,7 @@ __metadata:
     react-dom: ^19.0.0
     tailwind-merge: ^3.0.2
     tailwindcss: ^4.0.0
-  checksum: 10c0/264eb282b4e0dcc349fd62ef42c30316e5ec670c360a983f5c51b1f62ee553656e3a8c8c7f072e18d9a90839f65580d75ecd5aa6719a5a768b8965f8f346a330
+  checksum: 10c0/6c0dc0d6a639fdb67a4bf61a60190b3dbbe9ff6ed7a09f871103cc68233890b394450d0419d0f9f7eb9394459b879d6b51c39a05f0417a0b44e29fa764e4118e
   languageName: node
   linkType: hard
 

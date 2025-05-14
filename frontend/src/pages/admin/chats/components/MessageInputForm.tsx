@@ -1,4 +1,4 @@
-import { Button, Spinner, Textarea } from '@cate/ui';
+import { Button, Form, Spinner, Textarea } from '@cate/ui';
 import { t } from 'i18next';
 import { FormEvent } from 'react';
 
@@ -9,6 +9,7 @@ type MessageInputFormProps = {
   placeholder?: string;
   isPending: boolean;
   buttonLabel?: string;
+  title: string;
   className?: string;
 };
 
@@ -19,10 +20,11 @@ export const MessageInputForm = ({
   placeholder = t('chat.input_placeholder'),
   isPending,
   buttonLabel = t('chat.send_button'),
+  title,
   className,
 }: MessageInputFormProps) => {
   return (
-    <form onSubmit={onSubmit} className={className}>
+    <Form onSubmit={onSubmit} title={title} className={className}>
       <div className="flex gap-2">
         <Textarea
           placeholder={placeholder}
@@ -42,6 +44,6 @@ export const MessageInputForm = ({
           )}
         </Button>
       </div>
-    </form>
+    </Form>
   );
 };

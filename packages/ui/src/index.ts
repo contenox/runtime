@@ -19,7 +19,6 @@ export * from "./components/Label";
 export * from "./components/Pagination";
 export * from "./components/Panel";
 export * from "./components/ProgressBar";
-export * from "./components/Scrollable";
 export * from "./components/SearchBar";
 export * from "./components/Select";
 export * from "./components/SidebarToggle";

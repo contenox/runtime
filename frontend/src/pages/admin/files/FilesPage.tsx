@@ -7,7 +7,6 @@ import {
   H2,
   Input,
   Panel,
-  Scrollable,
   Section,
   Spinner,
   Table,
@@ -163,7 +162,7 @@ export default function FilesPage() {
             {deleteError}
           </Panel>
         )}
-        <Scrollable orientation="vertical">{renderFileList()}</Scrollable>
+        <Panel className="overflow-auto">{renderFileList()}</Panel>
       </Section>
 
       <Section>

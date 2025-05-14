@@ -459,5 +459,13 @@
     @apply bg-[var(--background)] text-[var(--foreground)];
     font-family: var(--font-body);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    color-scheme: light dark;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 }

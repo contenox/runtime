@@ -1,17 +1,28 @@
 import { H1 } from "./Typography";
 import { cn } from "../utils";
+import React from "react";
 
-interface ContainerProps {
+interface ContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   title?: string;
-  className?: string;
-  children: React.ReactNode;
+  padding?: string;
+  innerPadding?: string;
 }
 
-export function Container({ title, className, children }: ContainerProps) {
+export function Container({
+  title,
+  className,
+  children,
+  padding = "p-6",
+  innerPadding = "p-4",
+  ...rest
+}: ContainerProps) {
   return (
-    <div className={cn(`container mx-auto space-y-6 p-6`, className)}>
+    <div
+      className={cn(`container mx-auto space-y-6`, padding, className)}
+      {...rest}
+    >
       {title && <H1>{title}</H1>}
-      <div className="bg-inherit p-4">{children}</div>
+      <div className={cn("bg-inherit", innerPadding)}>{children}</div>
     </div>
   );
 }

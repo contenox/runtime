@@ -1,4 +1,4 @@
-import { Button, P, Panel } from '@cate/ui';
+import { Button, P, Panel, Section } from '@cate/ui';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -65,50 +65,40 @@ export default function ChatPage() {
   const handleCreateChat = () => createChat({});
 
   return (
-    <>
+    <Section>
+      <MessageInputForm
+        title={t('chat.system_input')}
+        value={instruction}
+        onChange={setInstruction}
+        onSubmit={handleSendInstruction}
+        placeholder={t('chat.system_input_placeholder')}
+        isPending={isSendingInstruction}
+        buttonLabel={t('chat.send_button')}
+      />
       {chatId ? (
-        <>
-          <MessageInputForm
-            value={instruction}
-            onChange={setInstruction}
-            onSubmit={handleSendInstruction}
-            placeholder={t('chat.input_placeholder')}
-            isPending={isSendingInstruction}
-            buttonLabel={t('chat.send_button')}
-          />
-
-          {operationError && (
-            <Panel variant="error" className="mb-4">
-              {operationError}
-            </Panel>
-          )}
-
+        <Panel className="max-h-55 overflow-auto">
+          {operationError && <Panel variant="error"> {operationError}</Panel>}
           {chatHistory && Array.isArray(chatHistory) && (
-            <ChatInterface
-              chatHistory={chatHistory}
-              isLoading={isLoading}
-              error={error}
-              className="min-h-full"
-            />
+            <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />
           )}
-
-          <MessageInputForm
-            value={message}
-            onChange={setMessage}
-            onSubmit={handleSendMessage}
-            isPending={isSending}
-          />
-        </>
+        </Panel>
       ) : (
-        <div className="flex h-full flex-col items-center justify-center">
+        <div className="flex flex-grow flex-col items-center justify-center">
+          {' '}
           <P className="mb-4">{t('chat.no_chat_selected')}</P>
           <Button onClick={handleCreateChat}>{t('chat.create_chat')}</Button>
         </div>
       )}
-
+      <MessageInputForm
+        value={message}
+        onChange={setMessage}
+        onSubmit={handleSendMessage}
+        isPending={isSending}
+        title={t('chat.chat_input')}
+      />
       {isError && (
-        <Panel variant="error">{createError?.message || t('chat.error_create_chat')}</Panel>
+        <Panel variant="error"> {createError?.message || t('chat.error_create_chat')}</Panel>
       )}
-    </>
+    </Section>
   );
 }
