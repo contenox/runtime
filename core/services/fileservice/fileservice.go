@@ -299,14 +299,18 @@ func (s *service) getFileByID(ctx context.Context, tx libdb.Exec, id string, wit
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return nil, fmt.Errorf("getFileByID: failed to get direct parent ID for item ID '%s' from filestree: %w", id, err)
 	}
-
+	var metaData Metadata
+	err = json.Unmarshal(fileRecord.Meta, &metaData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconstruct metadata %w", err)
+	}
 	resFile := &File{
 		ID:          fileRecord.ID,
 		Path:        resolvedPath,
 		Name:        fileName,
 		ContentType: fileRecord.Type,
 		Data:        data,
-		Size:        int64(len(data)),
+		Size:        metaData.Size,
 		ParentID:    directParentID,
 	}
 
