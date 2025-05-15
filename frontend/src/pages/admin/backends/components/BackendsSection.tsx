@@ -1,4 +1,4 @@
-import { GridLayout, Panel, Scrollable, Section, Span } from '@cate/ui';
+import { GridLayout, Panel, Section, Span } from '@cate/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import {
@@ -75,21 +75,15 @@ export default function BackendsSection({ statusMap }: BackendsSectionProps) {
 
   return (
     <GridLayout variant="body">
-      <Section>
-        <Scrollable orientation="vertical">
-          {isLoading && (
-            <Section className="flex justify-center">
-              <Span>{t('backends.list_loading')}</Span>
-            </Section>
-          )}
-          {error && <Panel variant="error">{t('backends.list_error')}</Panel>}
-          {backends && backends.length > 0 ? (
-            Backends()
-          ) : (
-            <Section>{t('backends.list_404')}</Section>
-          )}
-          <ModelsSection />
-        </Scrollable>
+      <Section className="overflow-auto">
+        {isLoading && (
+          <Section className="flex justify-center">
+            <Span>{t('backends.list_loading')}</Span>
+          </Section>
+        )}
+        {error && <Panel variant="error">{t('backends.list_error')}</Panel>}
+        {backends && backends.length > 0 ? Backends() : <Section>{t('backends.list_404')}</Section>}
+        <ModelsSection />
       </Section>
       <Section>
         <BackendForm

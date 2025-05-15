@@ -1,4 +1,4 @@
-import { GridLayout, Panel, Scrollable, Section, Span } from '@cate/ui';
+import { GridLayout, Panel, Section, Span } from '@cate/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import { useCreatePool, useDeletePool, usePools, useUpdatePool } from '../../../../hooks/usePool';
@@ -46,28 +46,26 @@ export default function PoolsSection() {
 
   return (
     <GridLayout variant="body">
-      <Section>
-        <Scrollable orientation="vertical">
-          {isLoading && (
-            <Section className="flex justify-center">
-              <Span>{t('pools.list_loading')}</Span>
-            </Section>
-          )}
-          {error && <Panel variant="error">{t('pools.list_error')}</Panel>}
-          {pools && pools.length > 0 ? (
-            pools.map(pool => (
-              <PoolCard
-                key={pool.id}
-                pool={pool}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                isDeleting={deletePoolMutation.isPending}
-              />
-            ))
-          ) : (
-            <Section>{t('pools.list_404')}</Section>
-          )}
-        </Scrollable>
+      <Section className="overflow-auto">
+        {isLoading && (
+          <Section className="flex justify-center">
+            <Span>{t('pools.list_loading')}</Span>
+          </Section>
+        )}
+        {error && <Panel variant="error">{t('pools.list_error')}</Panel>}
+        {pools && pools.length > 0 ? (
+          pools.map(pool => (
+            <PoolCard
+              key={pool.id}
+              pool={pool}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              isDeleting={deletePoolMutation.isPending}
+            />
+          ))
+        ) : (
+          <Section>{t('pools.list_404')}</Section>
+        )}
       </Section>
       <Section>
         <PoolForm
