@@ -3,29 +3,41 @@ package taskengine
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/llmresolver"
+	"github.com/js402/cate/core/serverops"
 )
 
-type Executor interface {
-	Exec(ctx context.Context, chain *ChainDefinition, input string) (any, error)
+type EnvExecutor interface {
+	ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error)
 }
 
-type SimpleExecutor struct {
-	promptExec llmrepo.ModelRepo
+var ErrUnsupportedTaskType = errors.New("executor does not support the task type")
+
+type HookProvider any
+
+type SimpleEnv struct {
+	exec    TaskExecutor
+	tracker serverops.ActivityTracker
 }
 
-func New(_ context.Context, promptExec llmrepo.ModelRepo) (Executor, error) {
-	return SimpleExecutor{promptExec: promptExec}, nil
+func NewEnv(
+	_ context.Context,
+	tracker serverops.ActivityTracker,
+	exec TaskExecutor,
+) (EnvExecutor, error) {
+	return &SimpleEnv{
+		exec:    exec,
+		tracker: tracker,
+	}, nil
 }
 
-func (exe SimpleExecutor) Exec(ctx context.Context, chain *ChainDefinition, input string) (any, error) {
+func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error) {
 	vars := map[string]any{
 		"input": input,
 	}
@@ -48,13 +60,12 @@ func (exe SimpleExecutor) Exec(ctx context.Context, chain *ChainDefinition, inpu
 		var output any
 		var taskErr error
 
-		// Execute task with retries
 		maxRetries := max(currentTask.RetryOnError, 0)
 
 	retryLoop:
 		for retry := 0; retry <= maxRetries; retry++ {
-			// Handle timeout if specified
-			var taskCtx context.Context
+			// Track task attempt start
+			taskCtx := ctx
 			var cancel context.CancelFunc
 			if currentTask.Timeout != "" {
 				timeout, err := time.ParseDuration(currentTask.Timeout)
@@ -63,67 +74,44 @@ func (exe SimpleExecutor) Exec(ctx context.Context, chain *ChainDefinition, inpu
 				}
 				taskCtx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
-			} else {
-				taskCtx = ctx
 			}
 
-			switch currentTask.Type {
-			case PromptToString:
-				rawResponse, taskErr = exe.Prompt(taskCtx, renderedPrompt)
-				if taskErr != nil {
-					continue retryLoop
-				}
-				output = rawResponse
-			case PromptToCondition:
-				var hit bool
-				hit, taskErr = exe.condition(taskCtx, currentTask.ConditionMapping, renderedPrompt)
-				if taskErr != nil {
-					continue retryLoop
-				}
-				output = hit
-				rawResponse = strconv.FormatBool(hit)
-			case PromptToNumber:
-				var number int
-				number, taskErr = exe.number(taskCtx, renderedPrompt)
-				if taskErr != nil {
-					continue retryLoop
-				}
-				output = number
-				rawResponse = strconv.FormatInt(int64(number), 10)
-			case PromptToScore:
-				var score float64
-				score, taskErr = exe.score(taskCtx, renderedPrompt)
-				if taskErr != nil {
-					continue retryLoop
-				}
-				output = score
-				rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
-			case Hook:
-				if currentTask.Hook == nil {
-					taskErr = fmt.Errorf("hook task missing hook definition")
-					continue retryLoop
-				}
-				output, taskErr = exe.hookengine(taskCtx, *currentTask.Hook)
-				if taskErr != nil {
-					continue retryLoop
-				}
-				rawResponse = fmt.Sprintf("%v", output)
-
-			default:
-				taskErr = fmt.Errorf("unknown task type: %s", currentTask.Type)
+			reportErrAttempt, reportChangeAttempt, endAttempt := exe.tracker.Start(
+				taskCtx,
+				"task_attempt",
+				currentTask.ID,
+				"retry", retry,
+				"task_type", currentTask.Type,
+			)
+			defer endAttempt()
+			output, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, currentTask, renderedPrompt)
+			if taskErr != nil {
+				reportErrAttempt(taskErr)
 				continue retryLoop
 			}
 
-			// If we get here, execution succeeded
+			// Report successful attempt
+			reportChangeAttempt(currentTask.ID, output)
 			break retryLoop
 		}
 
 		if taskErr != nil {
 			if currentTask.Transition.OnError != "" {
+				previousTaskID := currentTask.ID
 				currentTask, err = findTaskByID(chain.Tasks, currentTask.Transition.OnError)
 				if err != nil {
 					return nil, fmt.Errorf("error transition target not found: %v", err)
 				}
+				// Track error-based transition
+				_, reportChangeErrTransition, endErrTransition := exe.tracker.Start(
+					ctx,
+					"transition",
+					previousTaskID,
+					"next_task", currentTask.ID,
+					"reason", "error",
+				)
+				defer endErrTransition()
+				reportChangeErrTransition(currentTask.ID, taskErr)
 				continue
 			}
 			return nil, fmt.Errorf("task %s failed after %d retries: %v",
@@ -151,8 +139,27 @@ func (exe SimpleExecutor) Exec(ctx context.Context, chain *ChainDefinition, inpu
 
 		if nextTaskID == "" || nextTaskID == "end" {
 			finalOutput = output
+			// Track final output
+			_, reportChangeFinal, endFinal := exe.tracker.Start(
+				ctx,
+				"chain_complete",
+				"chain",
+				"final_output", finalOutput,
+			)
+			defer endFinal()
+			reportChangeFinal("chain", finalOutput)
 			break
 		}
+
+		// Track normal transition to next task
+		_, reportChangeTransition, endTransition := exe.tracker.Start(
+			ctx,
+			"transition",
+			currentTask.ID,
+			"next_task", nextTaskID,
+		)
+		defer endTransition()
+		reportChangeTransition(nextTaskID, nil)
 
 		// Find next task
 		currentTask, err = findTaskByID(chain.Tasks, nextTaskID)
@@ -244,70 +251,4 @@ func findTaskByID(tasks []ChainTask, id string) (*ChainTask, error) {
 		}
 	}
 	return nil, fmt.Errorf("task not found: %s", id)
-}
-
-func (exe *SimpleExecutor) Prompt(ctx context.Context, prompt string) (string, error) {
-	provider, err := exe.promptExec.GetProvider(ctx)
-	if err != nil {
-		return "", fmt.Errorf("provider resolution failed: %w", err)
-	}
-
-	client, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
-		ModelName: provider.ModelName(),
-	}, exe.promptExec.GetRuntime(ctx), llmresolver.ResolveRandomly)
-	if err != nil {
-		return "", fmt.Errorf("client resolution failed: %w", err)
-	}
-
-	response, err := client.Prompt(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("prompt execution failed: %w", err)
-	}
-
-	return strings.TrimSpace(response), nil
-}
-
-func (exe *SimpleExecutor) number(ctx context.Context, prompt string) (int, error) {
-	response, err := exe.Prompt(ctx, prompt)
-	if err != nil {
-		return 0, err
-	}
-	i, err := strconv.Atoi(response)
-	if err != nil {
-		return 0, err
-	}
-	return i, nil
-}
-
-func (exe *SimpleExecutor) score(ctx context.Context, prompt string) (float64, error) {
-	response, err := exe.Prompt(ctx, prompt)
-	if err != nil {
-		return 0, err
-	}
-	f, err := strconv.ParseFloat(response, 10)
-	if err != nil {
-		return 0, err
-	}
-	return f, nil
-}
-
-func (exe *SimpleExecutor) hookengine(_ context.Context, _ HookCall) (any, error) {
-	return nil, fmt.Errorf("unimplemented")
-}
-
-func (exe *SimpleExecutor) condition(ctx context.Context, conditionMapping map[string]bool, prompt string) (bool, error) {
-	response, err := exe.Prompt(ctx, prompt)
-	if err != nil {
-		return false, err
-	}
-	for key, val := range conditionMapping {
-		if strings.EqualFold(response, key) {
-			if val {
-				return strings.EqualFold(strings.TrimSpace(response), key), nil
-			}
-			return !strings.EqualFold(strings.TrimSpace(response), key), nil
-		}
-	}
-
-	return strings.EqualFold(strings.TrimSpace(response), "yes"), nil
 }
