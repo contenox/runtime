@@ -50,6 +50,7 @@ type ChainTask struct {
 	Type             TaskType        `yaml:"type" json:"type"`
 	ConditionMapping map[string]bool `yaml:"condition_mapping,omitempty" json:"conditionMapping,omitempty"`
 	Hook             *HookCall       `yaml:"hook,omitempty" json:"hook,omitempty"`
+	Print            string          `yaml:"print,omitempty" json:"print,omitempty"`
 	PromptTemplate   string          `yaml:"prompt_template" json:"prompt_template"`
 	Transition       Transition      `yaml:"transition" json:"transition"`
 	Timeout          string          `yaml:"timeout,omitempty" json:"timeout,omitempty"`

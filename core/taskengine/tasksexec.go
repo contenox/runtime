@@ -1,6 +1,8 @@
 package taskengine
 
-import "context"
+import (
+	"context"
+)
 
 type StringExec interface {
 	Generate(ctx context.Context, input string) (string, error)
@@ -17,3 +19,15 @@ type ScoreExec interface {
 type ConditionExec interface {
 	Contidion(ctx context.Context, input string) (bool, error)
 }
+
+// func somename(chain ChainDefinition) error {
+// 	for step, task := range chain.Tasks {
+// 		_ = step
+// 		switch task.Type {
+// 		case PromptToCondition:
+
+// 		}
+
+// 	}
+// 	return fmt.Errorf("unimplemented")
+// }
