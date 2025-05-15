@@ -43,6 +43,10 @@ Provides shared utilities, interfaces, and implementations for operational conce
 │   │   ├── fromruntimestate.go
 │   │   ├── fromruntimestate_test.go
 │   │   ├── mockmodelprovider.go
+│   ├── taskengine
+│   │   ├── taskenv.go
+│   │   ├── taskexec.go
+│   │   └── tasktype.go
 ```
 
 ### Transport Layer (`serverapi`)
@@ -170,6 +174,17 @@ Manages reconciling the ollama backend to match the desired state, including mod
 │   │   ├── state.go
 │   │   └── state_test.go
 ```
+
+## Task Engine (`taskengine`)
+
+```bash
+│   ├── taskengine
+│   │   ├── taskenv.go
+│   │   ├── taskexec.go
+│   │   └── tasktype.go
+```
+
+The Task Engine provides the core capability to define, manage, and execute complex, chained sequences of operations (workflows). It is designed to enable automation, including multi-step interactions with Large Language Models (LLMs), conditional logic, and integration with other internal or external systems via hooks.
 
 ## Dockerfile (`Dockerfile.core`)
 
