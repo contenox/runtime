@@ -31,7 +31,6 @@ type Transition struct {
 }
 
 type ConditionalTransition struct {
-	Match    string `yaml:"match" json:"match"`
 	Operator string `yaml:"operator,omitempty" json:"operator,omitempty"`
 	Value    string `yaml:"value,omitempty" json:"value,omitempty"`
 	ID       string `yaml:"id" json:"id"`
@@ -56,6 +55,11 @@ type ChainTask struct {
 	Timeout          string          `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 	PreferredModels  []string        `yaml:"preferred_models,omitempty" json:"preferredModels,omitempty"`
 	RetryOnError     int             `yaml:"retry_on_error,omitempty" json:"retryOnError,omitempty"`
+}
+
+type ChainWithTrigger struct {
+	Triggers []Trigger `yaml:"triggers,omitempty" json:"triggers,omitempty"`
+	ChainDefinition
 }
 
 type ChainDefinition struct {
