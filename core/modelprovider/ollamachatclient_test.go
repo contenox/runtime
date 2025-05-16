@@ -2,6 +2,7 @@ package modelprovider_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/js402/cate/core/modelprovider"
@@ -135,6 +136,9 @@ func TestOllamaChatClient_ChatWithNonExistentModel(t *testing.T) {
 }
 
 func TestOllamaChatClient_LargeInput(t *testing.T) {
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	ctx, backendState, _, cleanup := chatservice.SetupTestEnvironment(t)
 	defer cleanup()
 
