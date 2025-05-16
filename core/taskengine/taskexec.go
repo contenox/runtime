@@ -50,6 +50,39 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 
 	return strings.TrimSpace(response), nil
 }
+func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
+	response, err := exe.Prompt(ctx, resolver, prompt)
+	if err != nil {
+		return "", err
+	}
+	rangeStr := strings.TrimSpace(response)
+	clean := strings.ReplaceAll(rangeStr, " ", "")
+
+	// Check for a range format like "6-8"
+	if strings.Contains(clean, "-") {
+		parts := strings.Split(clean, "-")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid range format: %s", rangeStr)
+		}
+		_, err = strconv.Atoi(parts[0])
+		if err != nil {
+			return "", err
+		}
+		_, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return "", err
+		}
+		return strings.Join(parts, "-"), nil
+	}
+
+	// Fallback: try parsing as a single number
+	if _, err := strconv.Atoi(clean); err != nil {
+		return "", fmt.Errorf("invalid number format: %s", rangeStr)
+	}
+
+	// Treat a single number as a degenerate range like "6-6"
+	return clean + "-" + clean, nil
+}
 
 func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, prompt string) (int, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
@@ -98,6 +131,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 		score, taskErr = exe.score(taskCtx, resolver, renderedPrompt)
 		output = score
 		rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
+	case PromptToRange:
+		rawResponse, taskErr = exe.rang(taskCtx, resolver, renderedPrompt)
+		output = rawResponse
 	case Hook:
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")

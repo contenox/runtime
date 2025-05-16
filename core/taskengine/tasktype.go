@@ -6,6 +6,7 @@ const (
 	PromptToCondition TaskType = "condition"
 	PromptToNumber    TaskType = "number"
 	PromptToScore     TaskType = "score"
+	PromptToRange     TaskType = "PromptToRange"
 	PromptToString    TaskType = "string"
 	Hook              TaskType = "hook"
 )

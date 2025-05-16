@@ -218,6 +218,15 @@ func evaluateTransitions(transition Transition, rawResponse string) (string, err
 	return "", fmt.Errorf("no matching transition found")
 }
 
+func parseNumber(s string) (float64, error) {
+	// Try int first
+	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return float64(i), nil
+	}
+	// Fallback to float
+	return strconv.ParseFloat(s, 64)
+}
+
 func compare(operator, response, value string) (bool, error) {
 	switch operator {
 	case "equals":
@@ -229,25 +238,43 @@ func compare(operator, response, value string) (bool, error) {
 	case "endsWith":
 		return strings.HasSuffix(response, value), nil
 	case ">", "gt":
-		resNum, err := strconv.ParseFloat(response, 64)
+		resNum, err := parseNumber(response)
 		if err != nil {
 			return false, err
 		}
-		targetNum, err := strconv.ParseFloat(value, 64)
+		targetNum, err := parseNumber(value)
 		if err != nil {
 			return false, err
 		}
 		return resNum > targetNum, nil
 	case "<", "lt":
-		resNum, err := strconv.ParseFloat(response, 64)
+		resNum, err := parseNumber(response)
 		if err != nil {
 			return false, err
 		}
-		targetNum, err := strconv.ParseFloat(value, 64)
+		targetNum, err := parseNumber(value)
 		if err != nil {
 			return false, err
 		}
 		return resNum < targetNum, nil
+	case "between":
+		parts := strings.Split(value, "-")
+		if len(parts) != 2 {
+			return false, fmt.Errorf("invalid between range format: %s", value)
+		}
+		lower, err := parseNumber(strings.TrimSpace(parts[0]))
+		if err != nil {
+			return false, fmt.Errorf("invalid lower bound: %v", err)
+		}
+		upper, err := parseNumber(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return false, fmt.Errorf("invalid upper bound: %v", err)
+		}
+		resNum, err := parseNumber(response)
+		if err != nil {
+			return false, err
+		}
+		return resNum >= lower && resNum <= upper, nil
 	default:
 		return false, fmt.Errorf("unsupported operator: %s", operator)
 	}

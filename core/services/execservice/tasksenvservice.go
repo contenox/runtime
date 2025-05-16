@@ -21,7 +21,7 @@ func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, db
 	}
 }
 
-func (s *TasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, prompt string) (any, error) {
+func (s *TasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
@@ -30,7 +30,7 @@ func (s *TasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDe
 		return nil, err
 	}
 
-	return s.environmentExec.ExecEnv(ctx, chain, prompt)
+	return s.environmentExec.ExecEnv(ctx, chain, input)
 }
 
 func (s *TasksEnvService) GetServiceName() string {
