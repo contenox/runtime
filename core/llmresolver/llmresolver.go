@@ -119,7 +119,7 @@ func PolicyFromString(name string) (Policy, error) {
 	case StrategyLowLatency, StrategyAuto:
 		return HighestContext, nil
 	// case StrategyLowPriority:
-	// 	return ResolveLowestPriority, nil // You'll need to define this
+	// 	return ResolveLowestPriority, nil
 	default:
 		return nil, fmt.Errorf("unknown resolver strategy: %s", name)
 	}
