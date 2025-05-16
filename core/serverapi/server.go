@@ -31,6 +31,7 @@ import (
 	"github.com/js402/cate/core/services/poolservice"
 	"github.com/js402/cate/core/services/tokenizerservice"
 	"github.com/js402/cate/core/services/userservice"
+	"github.com/js402/cate/core/taskengine"
 	"github.com/js402/cate/libs/libauth"
 	"github.com/js402/cate/libs/libbus"
 	"github.com/js402/cate/libs/libdb"
@@ -44,6 +45,7 @@ func New(
 	pubsub libbus.Messenger,
 	embedder llmrepo.ModelRepo,
 	execmodelrepo llmrepo.ModelRepo,
+	environmentExec taskengine.EnvExecutor,
 	state *runtimestate.State,
 	vectorStore vectors.Store,
 ) (http.Handler, func() error, error) {
@@ -108,8 +110,9 @@ func New(
 	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	execService := execservice.New(ctx, execmodelrepo, dbInstance)
-	execapi.AddExecRoutes(mux, config, execService)
+	execService := execservice.NewExec(ctx, execmodelrepo, dbInstance)
+	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance)
+	execapi.AddExecRoutes(mux, config, execService, taskService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)

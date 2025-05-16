@@ -119,6 +119,16 @@ func mapErrorToStatus(op Operation, err error) int {
 	if errors.Is(err, ErrDecodeInvalidJSON) {
 		return http.StatusBadRequest // 400
 	}
+	if errors.Is(err, ErrUnsupportedContentType) {
+		return http.StatusUnsupportedMediaType // 415
+	}
+	if errors.Is(err, ErrMalformedContentType) {
+		return http.StatusBadRequest // 400 (Malformed header)
+	}
+	if errors.Is(err, ErrReadingRequestBody) {
+		// it can also represent server-side I/O problems unrelated to client input
+		return http.StatusBadRequest // 400
+	}
 	if errors.Is(err, ErrInvalidParameterValue) || errors.Is(err, ErrBadPathValue) {
 		return http.StatusBadRequest // 400
 	}

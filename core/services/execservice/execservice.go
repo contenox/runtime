@@ -13,13 +13,13 @@ import (
 	"github.com/js402/cate/libs/libdb"
 )
 
-type Service struct {
+type ExecService struct {
 	promptRepo llmrepo.ModelRepo
 	db         libdb.DBManager
 }
 
-func New(ctx context.Context, promptRepo llmrepo.ModelRepo, dbInstance libdb.DBManager) *Service {
-	return &Service{
+func NewExec(ctx context.Context, promptRepo llmrepo.ModelRepo, dbInstance libdb.DBManager) *ExecService {
+	return &ExecService{
 		promptRepo: promptRepo,
 		db:         dbInstance,
 	}
@@ -34,7 +34,7 @@ type TaskResponse struct {
 	Response string `json:"response"`
 }
 
-func (s *Service) Execute(ctx context.Context, request *TaskRequest) (*TaskResponse, error) {
+func (s *ExecService) Execute(ctx context.Context, request *TaskRequest) (*TaskResponse, error) {
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
@@ -70,10 +70,10 @@ func (s *Service) Execute(ctx context.Context, request *TaskRequest) (*TaskRespo
 	}, nil
 }
 
-func (s *Service) GetServiceName() string {
-	return "tasksservice"
+func (s *ExecService) GetServiceName() string {
+	return "promptexecservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *ExecService) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

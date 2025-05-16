@@ -15,6 +15,7 @@ import (
 	"github.com/js402/cate/core/serverops"
 	"github.com/js402/cate/core/serverops/store"
 	"github.com/js402/cate/core/serverops/vectors"
+	"github.com/js402/cate/core/taskengine"
 	"github.com/js402/cate/libs/libbus"
 	"github.com/js402/cate/libs/libdb"
 	"github.com/js402/cate/libs/libroutine"
@@ -110,6 +111,14 @@ func main() {
 	}
 	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	if err != nil {
+		log.Fatalf("initializing promptexec failed: %v", err)
+	}
+	exec, err := taskengine.NewExec(ctx, execRepo, nil) // TODO
+	if err != nil {
+		log.Fatalf("initializing task engine engine failed: %v", err)
+	}
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec)
+	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
 	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
@@ -123,7 +132,7 @@ func main() {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, state, vectorStore)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
