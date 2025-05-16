@@ -158,6 +158,15 @@ func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Polic
 	if err != nil {
 		return false, err
 	}
+	found := false
+	for k, _ := range conditionMapping {
+		if k == prompt {
+			found = true
+		}
+	}
+	if !found {
+		return false, fmt.Errorf("failed to parse into valid condition output was %s", prompt)
+	}
 	for key, val := range conditionMapping {
 		if strings.EqualFold(response, key) {
 			if val {

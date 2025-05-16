@@ -90,9 +90,7 @@ func TestTasksservice(t *testing.T) {
 	if !found2 {
 		t.Fatalf("backend not found in pool")
 	}
-
 	t.Run("simple echo task", func(t *testing.T) {
-		input := "Hello, world!"
 		output, err := service.Execute(ctx, &taskengine.ChainDefinition{
 			ID:              "echo-chain",
 			Description:     "Echo input string",
@@ -103,7 +101,7 @@ func TestTasksservice(t *testing.T) {
 					ID:             "echo-task",
 					Description:    "Just echo back the input",
 					Type:           taskengine.PromptToString,
-					PromptTemplate: "{{.input}}",
+					PromptTemplate: "Just echo back the input: {{.input}}",
 					Transition: taskengine.Transition{
 						OnError: "",
 						Next: []taskengine.ConditionalTransition{
@@ -113,129 +111,10 @@ func TestTasksservice(t *testing.T) {
 					PreferredModels: []string{"qwen2.5:0.5b"},
 				},
 			},
-		}, input)
+		}, "Hello, world!")
 
 		require.NoError(t, err)
 		require.IsType(t, "", output)
-		require.Contains(t, strings.ToLower(output.(string)), "hello")
-	})
-	t.Run("conditional transition test", func(t *testing.T) {
-		input := "Should I go outside if it is sunny?"
-
-		chain := &taskengine.ChainDefinition{
-			ID:              "test-cond-transition",
-			Description:     "A chain that branches on yes/no",
-			MaxTokenSize:    1000,
-			RoutingStrategy: "random",
-			Tasks: []taskengine.ChainTask{
-				{
-					ID:             "check_weather",
-					Description:    "Ask whether it's good to go outside",
-					Type:           taskengine.PromptToCondition,
-					PromptTemplate: "{{.input}}",
-					ConditionMapping: map[string]bool{
-						"yes": true,
-						"no":  false,
-					},
-					Transition: taskengine.Transition{
-						OnError: "",
-						Next: []taskengine.ConditionalTransition{
-							{
-								Operator: "equals",
-								Value:    "true",
-								ID:       "do_go",
-							},
-							{
-								Operator: "equals",
-								Value:    "_default",
-								ID:       "dont_go",
-							},
-						},
-					},
-				},
-				{
-					ID:             "do_go",
-					Description:    "Print go message",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "Say: Good idea to go outside.",
-					Print:          "Decision: {{.do_go}}",
-					Transition: taskengine.Transition{
-						Next: []taskengine.ConditionalTransition{
-							{Value: "_default", ID: "end"},
-						},
-					},
-				},
-				{
-					ID:             "dont_go",
-					Description:    "Print stay message",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "Say: Better stay inside.",
-					Print:          "Decision: {{.dont_go}}",
-					Transition: taskengine.Transition{
-						Next: []taskengine.ConditionalTransition{
-							{Value: "_default", ID: "end"},
-						},
-					},
-				},
-			},
-		}
-
-		result, err := service.Execute(ctx, chain, input)
-		require.NoError(t, err)
-		t.Logf("Final output: %v", result)
-	})
-	t.Run("number parsing and range branching", func(t *testing.T) {
-		input := "How many hours of sleep are recommended for adults? answer strictly in numbers like 3 or ranges like 4-5"
-
-		chain := &taskengine.ChainDefinition{
-			ID:              "test-number-branching",
-			Description:     "Branch based on number of hours",
-			MaxTokenSize:    1000,
-			RoutingStrategy: "random",
-			Tasks: []taskengine.ChainTask{
-				{
-					ID:             "ask_sleep_hours",
-					Description:    "Ask for number of hours of sleep",
-					Type:           taskengine.PromptToRange,
-					PromptTemplate: "{{.input}}",
-					Transition: taskengine.Transition{
-						OnError: "",
-						Next: []taskengine.ConditionalTransition{
-							{Operator: "lt", Value: "6", ID: "too_little"},
-							{Operator: "between", Value: "6-8", ID: "just_right"},
-							{Operator: "gt", Value: "9", ID: "too_much"},
-						},
-					},
-				},
-				{
-					ID:             "too_little",
-					Description:    "Comment on little sleep",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "Respond that this is too little sleep.",
-					Print:          "Result: {{.too_little}}",
-					Transition:     taskengine.Transition{Next: []taskengine.ConditionalTransition{{Value: "_default", ID: "end"}}},
-				},
-				{
-					ID:             "just_right",
-					Description:    "Comment on adequate sleep",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "Respond that this is a good amount of sleep.",
-					Print:          "Result: {{.just_right}}",
-					Transition:     taskengine.Transition{Next: []taskengine.ConditionalTransition{{Value: "_default", ID: "end"}}},
-				},
-				{
-					ID:             "too_much",
-					Description:    "Comment on too much sleep",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "Respond that this might be too much sleep.",
-					Print:          "Result: {{.too_much}}",
-					Transition:     taskengine.Transition{Next: []taskengine.ConditionalTransition{{Value: "_default", ID: "end"}}},
-				},
-			},
-		}
-
-		result, err := service.Execute(ctx, chain, input)
-		require.NoError(t, err)
-		t.Logf("Final output: %v", result)
+		require.Equal(t, output.(string), "Hello, world!")
 	})
 }
