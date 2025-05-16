@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/serverops"
 )
 
@@ -40,6 +41,14 @@ func NewEnv(
 func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error) {
 	vars := map[string]any{
 		"input": input,
+	}
+	resolver := llmresolver.Randomly
+	var err error
+	if len(chain.RoutingStrategy) > 0 {
+		resolver, err = llmresolver.PolicyFromString(chain.RoutingStrategy)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	currentTask, err := findTaskByID(chain.Tasks, chain.Tasks[0].ID)
@@ -84,7 +93,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, currentTask, renderedPrompt)
+			output, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, resolver, currentTask, renderedPrompt)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop

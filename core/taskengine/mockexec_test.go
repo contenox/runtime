@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +20,7 @@ func TestTaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.PromptToString,
 	}
 
-	output, rawResp, err := mockExec.TaskExec(context.Background(), task, "What is 2+2?")
+	output, rawResp, err := mockExec.TaskExec(context.Background(), llmresolver.Randomly, task, "What is 2+2?")
 	require.NoError(t, err)
 	require.Equal(t, "mock-result", output)
 	require.Equal(t, "mock-response", rawResp)

@@ -13,14 +13,14 @@ import (
 func TestResolveCommon(t *testing.T) {
 	tests := []struct {
 		name        string
-		req         llmresolver.ResolveRequest
+		req         llmresolver.Request
 		providers   []modelprovider.Provider
 		wantErr     error
 		wantModelID string
 	}{
 		{
 			name: "happy path - exact model match",
-			req: llmresolver.ResolveRequest{
+			req: llmresolver.Request{
 				ModelNames:    []string{"llama2:latest"},
 				ContextLength: 4096,
 			},
@@ -37,13 +37,13 @@ func TestResolveCommon(t *testing.T) {
 		},
 		{
 			name:      "no models available",
-			req:       llmresolver.ResolveRequest{},
+			req:       llmresolver.Request{},
 			providers: []modelprovider.Provider{},
 			wantErr:   llmresolver.ErrNoAvailableModels,
 		},
 		{
 			name: "insufficient context length",
-			req: llmresolver.ResolveRequest{
+			req: llmresolver.Request{
 				ContextLength: 8000,
 			},
 			providers: []modelprovider.Provider{
@@ -56,7 +56,7 @@ func TestResolveCommon(t *testing.T) {
 		},
 		{
 			name: "model exists but name mismatch",
-			req: llmresolver.ResolveRequest{
+			req: llmresolver.Request{
 				ModelNames: []string{"smollm2:135m"},
 			},
 			providers: []modelprovider.Provider{
@@ -77,7 +77,7 @@ func TestResolveCommon(t *testing.T) {
 				return tt.providers, nil
 			}
 
-			_, err := llmresolver.ResolveChat(context.Background(), tt.req, getModels, llmresolver.ResolveRandomly)
+			_, err := llmresolver.Chat(context.Background(), tt.req, getModels, llmresolver.Randomly)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got error %v, want %v", err, tt.wantErr)
 			}
@@ -108,66 +108,66 @@ func TestResolveEmbed(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		embedReq  llmresolver.ResolveEmbedRequest
+		embedReq  llmresolver.EmbedRequest
 		providers []modelprovider.Provider
-		resolver  llmresolver.Resolver
+		resolver  llmresolver.Policy
 		wantErr   error
 		wantMsg   string
 	}{
 		{
 			name:      "happy path - exact model match",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
 			providers: []modelprovider.Provider{providerEmbedOK},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   nil,
 		},
 		{
 			name:      "error - model name required",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: ""},
+			embedReq:  llmresolver.EmbedRequest{ModelName: ""},
 			providers: []modelprovider.Provider{providerEmbedOK},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   fmt.Errorf("model name is required"),
 			wantMsg:   "model name is required",
 		},
 		{
 			name:      "error - no models available",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
 			providers: []modelprovider.Provider{},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoAvailableModels,
 		},
 		{
 			name:      "error - no satisfactory model (name mismatch)",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "non-existent-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "non-existent-model"},
 			providers: []modelprovider.Provider{providerEmbedOK},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoSatisfactoryModel,
 		},
 		{
 			name:      "error - no satisfactory model (capability mismatch)",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
 			providers: []modelprovider.Provider{providerEmbedCannotEmbed},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoSatisfactoryModel,
 		},
 		{
 			name:      "error - selected provider has no backends",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
 			providers: []modelprovider.Provider{providerEmbedNoBackends},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			// Error comes from selectRandomBackend called by ResolveRandomly
 			wantErr: llmresolver.ErrNoSatisfactoryModel,
 		},
 		{
 			name:      "multiple candidates - resolver selects one",
-			embedReq:  llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model"},
+			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
 			providers: []modelprovider.Provider{providerEmbedOK, &modelprovider.MockProvider{ID: "p6", Name: "text-embed-model", CanEmbedFlag: true, Backends: []string{"b6"}}},
-			resolver:  llmresolver.ResolveRandomly,
+			resolver:  llmresolver.Randomly,
 			wantErr:   nil,
 		},
 		{
 			name:     "model name with tag matches base",
-			embedReq: llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model:33m"},
+			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model:33m"},
 			providers: []modelprovider.Provider{
 				&modelprovider.MockProvider{
 					ID:           "p3",
@@ -176,12 +176,12 @@ func TestResolveEmbed(t *testing.T) {
 					Backends:     []string{"b3"},
 				},
 			},
-			resolver: llmresolver.ResolveRandomly,
+			resolver: llmresolver.Randomly,
 			wantErr:  nil,
 		},
 		{
 			name:     "exact model match with tag",
-			embedReq: llmresolver.ResolveEmbedRequest{ModelName: "text-embed-model:33m"},
+			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model:33m"},
 			providers: []modelprovider.Provider{
 				&modelprovider.MockProvider{
 					ID:           "p4",
@@ -190,7 +190,7 @@ func TestResolveEmbed(t *testing.T) {
 					Backends:     []string{"b4"},
 				},
 			},
-			resolver: llmresolver.ResolveRandomly,
+			resolver: llmresolver.Randomly,
 			wantErr:  nil,
 		},
 	}
@@ -201,7 +201,7 @@ func TestResolveEmbed(t *testing.T) {
 				return tt.providers, nil
 			}
 
-			client, err := llmresolver.ResolveEmbed(context.Background(), tt.embedReq, getModels, tt.resolver)
+			client, err := llmresolver.Embed(context.Background(), tt.embedReq, getModels, tt.resolver)
 
 			// Assertions
 			if tt.wantErr != nil {

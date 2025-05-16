@@ -165,9 +165,9 @@ func TestWorkerPipe(t *testing.T) {
 		t.Fatalf("failed to assign backend to pool: %v", err)
 	}
 	// sanity check
-	client, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 		ModelName: "nomic-embed-text:latest",
-	}, modelprovider.ModelProviderAdapter(ctx, state.Get(ctx)), llmresolver.ResolveRandomly)
+	}, modelprovider.ModelProviderAdapter(ctx, state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
 	}

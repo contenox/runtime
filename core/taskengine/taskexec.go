@@ -11,7 +11,7 @@ import (
 )
 
 type TaskExecutor interface {
-	TaskExec(ctx context.Context, currentTask *ChainTask, renderedPrompt string) (any, string, error)
+	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error)
 }
 
 type SimpleExec struct {
@@ -30,15 +30,15 @@ func NewExec(
 	}, nil
 }
 
-func (exe *SimpleExec) Prompt(ctx context.Context, prompt string) (string, error) {
+func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
 	provider, err := exe.promptExec.GetProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)
 	}
 
-	client, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
+	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
 		ModelName: provider.ModelName(),
-	}, exe.promptExec.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	}, exe.promptExec.GetRuntime(ctx), resolver)
 	if err != nil {
 		return "", fmt.Errorf("client resolution failed: %w", err)
 	}
@@ -51,8 +51,8 @@ func (exe *SimpleExec) Prompt(ctx context.Context, prompt string) (string, error
 	return strings.TrimSpace(response), nil
 }
 
-func (exe *SimpleExec) number(ctx context.Context, prompt string) (int, error) {
-	response, err := exe.Prompt(ctx, prompt)
+func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, prompt string) (int, error) {
+	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
 		return 0, err
 	}
@@ -63,8 +63,8 @@ func (exe *SimpleExec) number(ctx context.Context, prompt string) (int, error) {
 	return i, nil
 }
 
-func (exe *SimpleExec) score(ctx context.Context, prompt string) (float64, error) {
-	response, err := exe.Prompt(ctx, prompt)
+func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, prompt string) (float64, error) {
+	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
 		return 0, err
 	}
@@ -75,27 +75,27 @@ func (exe *SimpleExec) score(ctx context.Context, prompt string) (float64, error
 	return f, nil
 }
 
-func (exe *SimpleExec) TaskExec(taskCtx context.Context, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
+func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
 	var rawResponse string
 	var taskErr error
 	var output any
 	switch currentTask.Type {
 	case PromptToString:
-		rawResponse, taskErr = exe.Prompt(taskCtx, renderedPrompt)
+		rawResponse, taskErr = exe.Prompt(taskCtx, resolver, renderedPrompt)
 		output = rawResponse
 	case PromptToCondition:
 		var hit bool
-		hit, taskErr = exe.condition(taskCtx, currentTask.ConditionMapping, renderedPrompt)
+		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, renderedPrompt)
 		output = hit
 		rawResponse = strconv.FormatBool(hit)
 	case PromptToNumber:
 		var number int
-		number, taskErr = exe.number(taskCtx, renderedPrompt)
+		number, taskErr = exe.number(taskCtx, resolver, renderedPrompt)
 		output = number
 		rawResponse = strconv.FormatInt(int64(number), 10)
 	case PromptToScore:
 		var score float64
-		score, taskErr = exe.score(taskCtx, renderedPrompt)
+		score, taskErr = exe.score(taskCtx, resolver, renderedPrompt)
 		output = score
 		rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
 	case Hook:
@@ -117,8 +117,8 @@ func (exe *SimpleExec) hookengine(_ context.Context, _ HookCall) (any, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (exe *SimpleExec) condition(ctx context.Context, conditionMapping map[string]bool, prompt string) (bool, error) {
-	response, err := exe.Prompt(ctx, prompt)
+func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, conditionMapping map[string]bool, prompt string) (bool, error) {
+	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
 		return false, err
 	}

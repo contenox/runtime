@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/js402/cate/core/llmrepo"
+	"github.com/js402/cate/core/llmresolver"
 	"github.com/js402/cate/core/modelprovider"
 	"github.com/js402/cate/core/taskengine"
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,7 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.PromptToString,
 	}
 
-	output, raw, err := exec.TaskExec(context.Background(), task, "hello")
+	output, raw, err := exec.TaskExec(context.Background(), llmresolver.Randomly, task, "hello")
 	require.NoError(t, err)
 	require.Equal(t, "prompted response for: hello", output)
 	require.Equal(t, "prompted response for: hello", raw)

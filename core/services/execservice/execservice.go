@@ -48,9 +48,9 @@ func (s *Service) Execute(ctx context.Context, request *TaskRequest) (*TaskRespo
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
 
-	promptClient, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
+	promptClient, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
 		ModelName: provider.ModelName(),
-	}, s.promptRepo.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	}, s.promptRepo.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve prompt client: %w", err)
 	}

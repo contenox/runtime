@@ -18,8 +18,8 @@ var (
 	ErrUnknownModelCapabilities = errors.New("capabilities not known for this model")
 )
 
-// ResolveRequest contains requirements for selecting a model provider.
-type ResolveRequest struct {
+// Request contains requirements for selecting a model provider.
+type Request struct {
 	Provider      string   // Optional: if empty, uses default provider
 	ModelNames    []string // Optional: if empty, any model is considered
 	ContextLength int      // Minimum required context length; 0 means no requirement
@@ -27,7 +27,7 @@ type ResolveRequest struct {
 
 func filterCandidates(
 	ctx context.Context,
-	req ResolveRequest,
+	req Request,
 	getModels modelprovider.RuntimeState,
 	capCheck func(modelprovider.Provider) bool,
 ) ([]modelprovider.Provider, error) {
@@ -102,9 +102,30 @@ func filterCandidates(
 	return candidates, nil
 }
 
-type Resolver func(candidates []modelprovider.Provider) (modelprovider.Provider, string, error)
+type Policy func(candidates []modelprovider.Provider) (modelprovider.Provider, string, error)
 
-func ResolveRandomly(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+const (
+	StrategyRandom      = "random"
+	StrategyAuto        = "auto"
+	StrategyLowLatency  = "low-latency"
+	StrategyLowPriority = "low-prio"
+)
+
+// PolicyFromString maps string names to resolver policies
+func PolicyFromString(name string) (Policy, error) {
+	switch strings.ToLower(name) {
+	case StrategyRandom:
+		return Randomly, nil
+	case StrategyLowLatency, StrategyAuto:
+		return HighestContext, nil
+	// case StrategyLowPriority:
+	// 	return ResolveLowestPriority, nil // You'll need to define this
+	default:
+		return nil, fmt.Errorf("unknown resolver strategy: %s", name)
+	}
+}
+
+func Randomly(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
 	provider, err := selectRandomProvider(candidates)
 	if err != nil {
 		return nil, "", err
@@ -139,7 +160,7 @@ func selectRandomBackend(provider modelprovider.Provider) (string, error) {
 	return backendIDs[rand.Intn(len(backendIDs))], nil
 }
 
-func ResolveHighestContext(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+func HighestContext(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
 	if len(candidates) == 0 {
 		return nil, "", ErrNoSatisfactoryModel
 	}
@@ -184,11 +205,11 @@ func parseModelName(modelName string) string {
 	return modelName
 }
 
-func ResolveChat(
+func Chat(
 	ctx context.Context,
-	req ResolveRequest,
+	req Request,
 	getModels modelprovider.RuntimeState,
-	resolver Resolver,
+	resolver Policy,
 ) (serverops.LLMChatClient, error) {
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
 	if err != nil {
@@ -201,22 +222,22 @@ func ResolveChat(
 	return provider.GetChatConnection(backend)
 }
 
-type ResolveEmbedRequest struct {
+type EmbedRequest struct {
 	ModelName string
 	Provider  string // Optional. Empty uses default.
 }
 
-// ResolveEmbed finds a provider supporting embeddings
-func ResolveEmbed(
+// Embed finds a provider supporting embeddings
+func Embed(
 	ctx context.Context,
-	embedReq ResolveEmbedRequest,
+	embedReq EmbedRequest,
 	getModels modelprovider.RuntimeState,
-	resolver Resolver,
+	resolver Policy,
 ) (serverops.LLMEmbedClient, error) {
 	if embedReq.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
-	req := ResolveRequest{
+	req := Request{
 		ModelNames: []string{embedReq.ModelName},
 		Provider:   embedReq.Provider,
 	}
@@ -231,12 +252,12 @@ func ResolveEmbed(
 	return provider.GetEmbedConnection(backend)
 }
 
-// ResolveStream finds a provider supporting streaming
-func ResolveStream(
+// Stream finds a provider supporting streaming
+func Stream(
 	ctx context.Context,
-	req ResolveRequest,
+	req Request,
 	getModels modelprovider.RuntimeState,
-	resolver Resolver,
+	resolver Policy,
 ) (serverops.LLMStreamClient, error) {
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanStream)
 	if err != nil {
@@ -249,21 +270,21 @@ func ResolveStream(
 	return provider.GetStreamConnection(backend)
 }
 
-type ResolvePromptRequest struct {
+type PromptRequest struct {
 	ModelName string
 	Provider  string // Optional. Empty uses default.
 }
 
-func ResolvePromptExecute(
+func PromptExecute(
 	ctx context.Context,
-	reqExec ResolvePromptRequest,
+	reqExec PromptRequest,
 	getModels modelprovider.RuntimeState,
-	resolver Resolver,
+	resolver Policy,
 ) (serverops.LLMPromptExecClient, error) {
 	if reqExec.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
-	req := ResolveRequest{
+	req := Request{
 		ModelNames: []string{reqExec.ModelName},
 		Provider:   reqExec.Provider,
 	}

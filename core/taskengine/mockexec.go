@@ -1,6 +1,10 @@
 package taskengine
 
-import "context"
+import (
+	"context"
+
+	"github.com/js402/cate/core/llmresolver"
+)
 
 // MockTaskExecutor is a mock implementation of taskengine.TaskExecutor.
 type MockTaskExecutor struct {
@@ -16,7 +20,7 @@ type MockTaskExecutor struct {
 }
 
 // TaskExec is the mock implementation of the TaskExec method.
-func (m *MockTaskExecutor) TaskExec(ctx context.Context, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
+func (m *MockTaskExecutor) TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
 	m.CalledWithTask = currentTask
 	m.CalledWithPrompt = renderedPrompt
 

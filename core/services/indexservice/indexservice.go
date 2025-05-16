@@ -71,9 +71,9 @@ func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}
-	embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+	embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 		ModelName: provider.ModelName(),
-	}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	}, s.embedder.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve embed client: %w", err)
 	}
@@ -202,9 +202,9 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 			return nil, err
 		}
 
-		embedClient, err := llmresolver.ResolveEmbed(ctx, llmresolver.ResolveEmbedRequest{
+		embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 			ModelName: provider.ModelName(),
-		}, s.embedder.GetRuntime(ctx), llmresolver.ResolveRandomly)
+		}, s.embedder.GetRuntime(ctx), llmresolver.Randomly)
 		if err != nil {
 			return nil, err
 		}
@@ -296,9 +296,9 @@ func (s *Service) findKeywords(ctx context.Context, chunk string) (string, error
 		return "", fmt.Errorf("failed to get provider: %w", err)
 	}
 
-	promptClient, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
+	promptClient, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
 		ModelName: provider.ModelName(),
-	}, s.promptExec.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve prompt client for model %s: %w", provider.ModelName(), err)
 	}
@@ -339,9 +339,9 @@ func (s *Service) executePrompt(ctx context.Context, prompt string) (string, err
 		return "", fmt.Errorf("provider resolution failed: %w", err)
 	}
 
-	client, err := llmresolver.ResolvePromptExecute(ctx, llmresolver.ResolvePromptRequest{
+	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
 		ModelName: provider.ModelName(),
-	}, s.promptExec.GetRuntime(ctx), llmresolver.ResolveRandomly)
+	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return "", fmt.Errorf("client resolution failed: %w", err)
 	}

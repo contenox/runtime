@@ -63,9 +63,10 @@ type ChainWithTrigger struct {
 }
 
 type ChainDefinition struct {
-	ID           string      `yaml:"id" json:"id"`
-	Description  string      `yaml:"description" json:"description"`
-	Triggers     []Trigger   `yaml:"triggers,omitempty" json:"triggers,omitempty"`
-	Tasks        []ChainTask `yaml:"tasks" json:"tasks"`
-	MaxTokenSize int64       `yaml:"max_token_size" json:"maxTokenSize"`
+	ID              string      `yaml:"id" json:"id"`
+	Description     string      `yaml:"description" json:"description"`
+	Triggers        []Trigger   `yaml:"triggers,omitempty" json:"triggers,omitempty"`
+	Tasks           []ChainTask `yaml:"tasks" json:"tasks"`
+	MaxTokenSize    int64       `yaml:"max_token_size" json:"maxTokenSize"`
+	RoutingStrategy string      `yaml:"routing_strategy" json:"routingStrategy"`
 }
