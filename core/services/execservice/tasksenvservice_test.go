@@ -24,7 +24,7 @@ func TestTasksservice(t *testing.T) {
 	}
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
-		TasksModel: "qwen2.5:0.5b",
+		TasksModel: "qwen2.5:3b",
 	}
 
 	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
@@ -55,7 +55,7 @@ func TestTasksservice(t *testing.T) {
 			t.Logf("error compacting JSON: %v", err)
 			return false
 		}
-		return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
+		return strings.Contains(string(r), `"name":"qwen2.5:3b"`)
 	}, 2*time.Minute, 100*time.Millisecond)
 	runtime := state.Get(ctx)
 	backendID := ""
@@ -63,13 +63,13 @@ func TestTasksservice(t *testing.T) {
 	for _, runtimeState := range runtime {
 		backendID = runtimeState.Backend.ID
 		for _, lmr := range runtimeState.PulledModels {
-			if lmr.Model == "qwen2.5:0.5b" {
+			if lmr.Model == "qwen2.5:3b" {
 				foundExecModel = true
 			}
 		}
 	}
 	if !foundExecModel {
-		t.Fatalf("qwen2.5:0.5b not found")
+		t.Fatalf("qwen2.5:3b not found")
 	}
 	err = store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backendID)
 	if err != nil {
@@ -108,7 +108,7 @@ func TestTasksservice(t *testing.T) {
 							{ID: "end", Value: "_default"},
 						},
 					},
-					PreferredModels: []string{"qwen2.5:0.5b"},
+					PreferredModels: []string{"qwen2.5:3b"},
 				},
 			},
 		}, "Hello, world!")

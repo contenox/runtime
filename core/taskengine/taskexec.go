@@ -101,7 +101,8 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 	if err != nil {
 		return 0, err
 	}
-	f, err := strconv.ParseFloat(response, 10)
+	cleaned := strings.ReplaceAll(response, " ", "")
+	f, err := strconv.ParseFloat(cleaned, 10)
 	if err != nil {
 		return 0, err
 	}
@@ -160,12 +161,12 @@ func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Polic
 	}
 	found := false
 	for k, _ := range conditionMapping {
-		if k == prompt {
+		if k == response {
 			found = true
 		}
 	}
 	if !found {
-		return false, fmt.Errorf("failed to parse into valid condition output was %s", prompt)
+		return false, fmt.Errorf("failed to parse into valid condition output was %s", response)
 	}
 	for key, val := range conditionMapping {
 		if strings.EqualFold(response, key) {
