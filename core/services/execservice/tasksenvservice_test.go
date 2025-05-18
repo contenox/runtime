@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,9 +18,9 @@ import (
 )
 
 func TestTasksservice(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
+	// if os.Getenv("SMOKETESTS") == "" {
+	// 	t.Skip("Set env SMOKETESTS to true to run this test")
+	// }
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:3b",

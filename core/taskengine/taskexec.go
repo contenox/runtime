@@ -31,6 +31,9 @@ func NewExec(
 }
 
 func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
+	if prompt == "" {
+		return "", fmt.Errorf("unprocessable empty prompt")
+	}
 	provider, err := exe.promptExec.GetProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)

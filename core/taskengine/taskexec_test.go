@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -48,9 +49,9 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 }
 
 func TestSimpleExec_TaskExec(t *testing.T) {
-	// if os.Getenv("SMOKETESTS") == "" {
-	// 	t.Skip("Set env SMOKETESTS to true to run this test")
-	// }
+	if os.Getenv("SMOKETESTS") == "" {
+		t.Skip("Set env SMOKETESTS to true to run this test")
+	}
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:1.5b",
@@ -176,5 +177,104 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "4-4", response)
 		require.Equal(t, "4-4", formatted)
+	})
+
+	t.Run("ConditionCaseSensitive", func(t *testing.T) {
+		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "condition-case-insensitive",
+			Type: taskengine.PromptToCondition,
+			ConditionMapping: map[string]bool{
+				"yes": true,
+				"no":  false,
+			},
+		}, "Respond with only the uppercase word 'YES'")
+		require.Error(t, err)
+	})
+
+	t.Run("ConditionInvalidResponse", func(t *testing.T) {
+		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "condition-invalid",
+			Type: taskengine.PromptToCondition,
+			ConditionMapping: map[string]bool{
+				"yes": true,
+				"no":  false,
+			},
+		}, "Respond with 'maybe'")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to parse into valid condition")
+	})
+
+	t.Run("RangeReverseNumbers", func(t *testing.T) {
+		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "range-reverse-test",
+			Type: taskengine.PromptToRange,
+		}, "Echo the Input. Input: 5-3")
+		require.NoError(t, err)
+		require.Equal(t, "5-3", response)
+		require.Equal(t, "5-3", formatted)
+	})
+
+	t.Run("ScoreIntegerValue", func(t *testing.T) {
+		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "score-integer-test",
+			Type: taskengine.PromptToScore,
+		}, "Respond with exactly the number 7, no decimal places or other text.")
+		require.NoError(t, err)
+		require.Equal(t, 7.0, response)
+		require.Equal(t, "7.00", formatted)
+	})
+
+	t.Run("NumberInvalidFloat", func(t *testing.T) {
+		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "number-invalid-test",
+			Type: taskengine.PromptToNumber,
+		}, "Respond with '10.5'")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid syntax")
+	})
+
+	t.Run("HookTaskError", func(t *testing.T) {
+		// Test with missing hook definition
+		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "hook-missing-def",
+			Type: taskengine.Hook,
+		}, "")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "hook task missing hook definition")
+
+		// Test with unimplemented hook
+		_, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "hook-unimplemented",
+			Type: taskengine.Hook,
+			Hook: &taskengine.HookCall{Name: "test-hook"},
+		}, "")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unimplemented")
+	})
+
+	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
+		// Empty input
+		output, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			Type: taskengine.PromptToString,
+		}, "")
+		require.Error(t, err)
+
+		// Long input
+		longInput := strings.Repeat("repeat this ", 10)
+		output, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			Type: taskengine.PromptToString,
+		}, "Echo exactly this including the repetition: "+longInput)
+		require.NoError(t, err)
+		require.Contains(t, longInput, output)
+	})
+
+	t.Run("NumberWithSpaces", func(t *testing.T) {
+		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "number-space-test",
+			Type: taskengine.PromptToNumber,
+		}, "Respond with ' 42 ' including spaces")
+		require.NoError(t, err)
+		require.Equal(t, 42, response)
+		require.Equal(t, "42", formatted)
 	})
 }
