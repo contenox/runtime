@@ -1,4 +1,4 @@
-import { Span } from '@cate/ui';
+import { Span } from '@contenox/ui';
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { MenuItem } from './Sidebar';

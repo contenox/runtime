@@ -1,4 +1,4 @@
-import { Button, Form, Input, Label, P, Panel } from '@cate/ui';
+import { Button, Form, Input, Label, P, Panel } from '@contenox/ui';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { User } from '../../../../lib/types';

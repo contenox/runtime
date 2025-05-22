@@ -1,4 +1,4 @@
-import { TabbedPage } from '@cate/ui';
+import { TabbedPage } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';

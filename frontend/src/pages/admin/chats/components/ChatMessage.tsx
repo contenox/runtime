@@ -1,4 +1,4 @@
-import { Card, P, Span } from '@cate/ui';
+import { Card, P, Span } from '@contenox/ui';
 import { t } from 'i18next';
 import { cn } from '../../../../lib/utils';
 

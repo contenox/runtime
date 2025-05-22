@@ -23,11 +23,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-w -s \
     -X 'main.cliSetAdminUser=${DEFAULT_ADMIN_USER}' \
     -X 'main.cliSetCoreVersion=${CORE_VERSION}'" \
-  -o /app/cate .
+  -o /app/contenox .
 
 FROM alpine:3.19
 RUN apk add --no-cache curl
 WORKDIR /app
-COPY --from=builder /app/cate /app/cate
+COPY --from=builder /app/contenox /app/contenox
 
-ENTRYPOINT ["/app/cate"]
+ENTRYPOINT ["/app/contenox"]

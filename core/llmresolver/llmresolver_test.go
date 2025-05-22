@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/modelprovider"
+	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/modelprovider"
 )
 
 func TestResolveCommon(t *testing.T) {

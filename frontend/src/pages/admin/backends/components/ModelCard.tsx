@@ -1,4 +1,4 @@
-import { Button, Label, P, Panel, Section, Select, Spinner } from '@cate/ui';
+import { Button, Label, P, Panel, Section, Select, Spinner } from '@contenox/ui';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 import {

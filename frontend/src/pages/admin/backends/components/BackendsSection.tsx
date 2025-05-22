@@ -1,4 +1,4 @@
-import { GridLayout, Panel, Section, Span } from '@cate/ui';
+import { GridLayout, Panel, Section, Span } from '@contenox/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import {

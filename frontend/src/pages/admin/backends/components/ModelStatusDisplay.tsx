@@ -1,4 +1,4 @@
-import { P, Span } from '@cate/ui';
+import { P, Span } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { DownloadStatus } from '../../../../lib/types';
 

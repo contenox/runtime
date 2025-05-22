@@ -1,4 +1,4 @@
-import { P } from '@cate/ui';
+import { P } from '@contenox/ui';
 import {
   ChevronsRight,
   Database,

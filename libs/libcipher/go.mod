@@ -1,4 +1,4 @@
-module github.com/js402/cate/libs/libcipher
+module github.com/contenox/contenox/libs/libcipher
 
 go 1.24.1
 

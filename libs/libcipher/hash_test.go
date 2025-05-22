@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/libs/libcipher"
+	"github.com/contenox/contenox/libs/libcipher"
 )
 
 func TestNewHash(t *testing.T) {

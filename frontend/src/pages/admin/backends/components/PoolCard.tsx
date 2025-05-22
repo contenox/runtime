@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, P, Section } from '@cate/ui';
+import { Button, ButtonGroup, P, Section } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { Pool } from '../../../../lib/types';
 

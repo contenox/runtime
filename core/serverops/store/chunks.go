@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 func (s *store) CreateChunkIndex(ctx context.Context, chunk *ChunkIndex) error {

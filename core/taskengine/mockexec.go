@@ -3,7 +3,7 @@ package taskengine
 import (
 	"context"
 
-	"github.com/js402/cate/core/llmresolver"
+	"github.com/contenox/contenox/core/llmresolver"
 )
 
 // MockTaskExecutor is a mock implementation of taskengine.TaskExecutor.

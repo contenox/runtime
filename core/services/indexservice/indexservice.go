@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/serverops/vectors"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/llmrepo"
+	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/serverops/vectors"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 type Service struct {

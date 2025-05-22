@@ -10,8 +10,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/serverops"
+	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/serverops"
 )
 
 type EnvExecutor interface {

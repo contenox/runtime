@@ -1,4 +1,4 @@
-import { Button, Form, Input, Label, P, Panel, Select, Spinner } from '@cate/ui';
+import { Button, Form, Input, Label, P, Panel, Select, Spinner } from '@contenox/ui';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../../../../hooks/useAccess';

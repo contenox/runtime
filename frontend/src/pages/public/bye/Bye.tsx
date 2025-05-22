@@ -1,4 +1,4 @@
-import { H1 } from '@cate/ui';
+import { H1 } from '@contenox/ui';
 
 export default function ByePage() {
   return (

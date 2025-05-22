@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/execservice"
-	"github.com/js402/cate/core/services/testingsetup"
-	"github.com/js402/cate/core/taskengine"
+	"github.com/contenox/contenox/core/llmrepo"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/execservice"
+	"github.com/contenox/contenox/core/services/testingsetup"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

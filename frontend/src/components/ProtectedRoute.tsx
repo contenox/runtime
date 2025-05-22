@@ -1,4 +1,4 @@
-import { Spinner } from '@cate/ui';
+import { Spinner } from '@contenox/ui';
 import { JSX, useContext } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LOGIN_ROUTE } from '../config/routeConstants';

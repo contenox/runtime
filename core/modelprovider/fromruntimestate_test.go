@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/runtimestate"
-	"github.com/js402/cate/core/serverops/store"
+	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/runtimestate"
+	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/ollama/ollama/api"
 	"github.com/stretchr/testify/require"
 )

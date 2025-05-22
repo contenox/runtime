@@ -1,4 +1,4 @@
-import { P, Panel } from '@cate/ui';
+import { P, Panel } from '@contenox/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import { useDeleteModel, useModels } from '../../../../hooks/useModels';

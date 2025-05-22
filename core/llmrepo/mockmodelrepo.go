@@ -3,7 +3,7 @@ package llmrepo
 import (
 	"context"
 
-	"github.com/js402/cate/core/modelprovider"
+	"github.com/contenox/contenox/core/modelprovider"
 )
 
 type MockModelRepo struct {

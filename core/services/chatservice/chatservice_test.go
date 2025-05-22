@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/chatservice"
-	"github.com/js402/cate/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/chatservice"
+	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/stretchr/testify/require"
 )
 

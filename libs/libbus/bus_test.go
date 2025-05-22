@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/libs/libbus"
+	"github.com/contenox/contenox/libs/libbus"
 	"github.com/stretchr/testify/require"
 )
 

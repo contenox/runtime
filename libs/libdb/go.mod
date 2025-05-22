@@ -1,4 +1,4 @@
-module github.com/js402/cate/libs/libdb
+module github.com/contenox/contenox/libs/libdb
 
 go 1.24.1
 

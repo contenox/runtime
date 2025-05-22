@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/js402/cate/libs/libtestenv"
+	"github.com/contenox/contenox/libs/libtestenv"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,4 +1,4 @@
-import { Button, Form, Spinner, Textarea } from '@cate/ui';
+import { Button, Form, Spinner, Textarea } from '@contenox/ui';
 import { t } from 'i18next';
 import { FormEvent } from 'react';
 

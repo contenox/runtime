@@ -8,7 +8,7 @@ import {
   Section,
   Span,
   Spinner,
-} from '@cate/ui';
+} from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearch } from '../../../hooks/useSearch';

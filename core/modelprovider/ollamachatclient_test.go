@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/chatservice"
+	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/chatservice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

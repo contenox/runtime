@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/runtimestate"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/runtimestate"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 type ModelRepo interface {

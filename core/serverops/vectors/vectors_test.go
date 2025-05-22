@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/core/serverops/vectors"
+	"github.com/contenox/contenox/core/serverops/vectors"
 )
 
 func TestLocalInstance(t *testing.T) {

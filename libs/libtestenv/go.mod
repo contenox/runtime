@@ -1,4 +1,4 @@
-module github.com/js402/cate/libs/libtestenv
+module github.com/contenox/contenox/libs/libtestenv
 
 go 1.24.1
 

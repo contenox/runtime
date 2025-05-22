@@ -1,4 +1,4 @@
-import { Button, Dropdown, Section, Span } from '@cate/ui';
+import { Button, Dropdown, Section, Span } from '@contenox/ui';
 import { t } from 'i18next';
 import { ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';

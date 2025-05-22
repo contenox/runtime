@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/testingsetup"
-	"github.com/js402/cate/core/taskengine"
+	"github.com/contenox/contenox/core/llmrepo"
+	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/testingsetup"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

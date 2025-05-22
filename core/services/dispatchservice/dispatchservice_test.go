@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/dispatchservice"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/dispatchservice"
+	"github.com/contenox/contenox/libs/libdb"
 	"github.com/stretchr/testify/require"
 )
 

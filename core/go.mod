@@ -1,31 +1,31 @@
-module github.com/js402/cate/core
+module github.com/contenox/contenox/core
 
 go 1.24.1
 
 // libauth libbus  libcipher  libdb  libkv  libollama  libroutine libtestenv
-replace github.com/js402/cate/libs/libauth => ../libs/libauth
+replace github.com/contenox/contenox/libs/libauth => ../libs/libauth
 
-replace github.com/js402/cate/libs/libbus => ../libs/libbus
+replace github.com/contenox/contenox/libs/libbus => ../libs/libbus
 
-replace github.com/js402/cate/libs/libcipher => ../libs/libcipher
+replace github.com/contenox/contenox/libs/libcipher => ../libs/libcipher
 
-replace github.com/js402/cate/libs/libdb => ../libs/libdb
+replace github.com/contenox/contenox/libs/libdb => ../libs/libdb
 
-replace github.com/js402/cate/libs/libkv => ../libs/libkv
+replace github.com/contenox/contenox/libs/libkv => ../libs/libkv
 
-replace github.com/js402/cate/libs/libroutine => ../libs/libroutine
+replace github.com/contenox/contenox/libs/libroutine => ../libs/libroutine
 
-replace github.com/js402/cate/libs/libtestenv => ../libs/libtestenv
+replace github.com/contenox/contenox/libs/libtestenv => ../libs/libtestenv
 
 require (
 	dario.cat/mergo v1.0.1
+	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libbus v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libroutine v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
-	github.com/js402/cate/libs/libauth v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libbus v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libcipher v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libdb v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libroutine v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/lib/pq v1.10.9
 	github.com/ollama/ollama v0.6.7
 	github.com/stretchr/testify v1.10.0

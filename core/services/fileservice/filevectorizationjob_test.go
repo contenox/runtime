@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/fileservice"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/fileservice"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/runtimestate"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/chatservice"
+	"github.com/contenox/contenox/core/runtimestate"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/chatservice"
 )
 
 func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager *chatservice.Service, stateService *runtimestate.State) {

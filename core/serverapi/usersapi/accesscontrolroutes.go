@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/accessservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/accessservice"
 )
 
 func AddAccessRoutes(mux *http.ServeMux, _ *serverops.Config, accessService *accessservice.Service) {

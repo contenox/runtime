@@ -1,4 +1,4 @@
-import '@cate/ui/styles.css';
+import '@contenox/ui/styles.css';
 import { useMemo } from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import './app.css';

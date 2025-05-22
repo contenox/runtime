@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/taskengine"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

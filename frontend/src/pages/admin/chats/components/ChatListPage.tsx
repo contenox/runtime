@@ -1,4 +1,4 @@
-import { Section } from '@cate/ui';
+import { Section } from '@contenox/ui';
 import { t } from 'i18next';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

@@ -354,8 +354,8 @@ func (c *ollamatokenizer) CountTokens(modelName, prompt string) (int, error) {
 // Tokenize tokenizes the given text using the specified model.
 func (c *ollamatokenizer) Tokenize(modelName, prompt string) ([]int, error) {
 	promptLen := len(prompt)
-	if promptLen > MaxPromptBytes {
-		return []int{}, fmt.Errorf("input prompt size (%d bytes) exceeds maximum allowed size (%d bytes)", promptLen, MaxPromptBytes)
+	if promptLen > maxPromptBytes {
+		return []int{}, fmt.Errorf("input prompt size (%d bytes) exceeds maximum allowed size (%d bytes)", promptLen, maxPromptBytes)
 	}
 	model, err := c.loadModel(modelName)
 	if err != nil {

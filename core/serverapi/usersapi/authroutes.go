@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/userservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/userservice"
 )
 
 const (

@@ -12,7 +12,7 @@ import {
   Table,
   TableCell,
   TableRow,
-} from '@cate/ui';
+} from '@contenox/ui';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateFile, useDeleteFile, useListFiles } from '../../../hooks/useFiles';

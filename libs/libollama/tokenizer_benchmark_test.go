@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/js402/cate/libs/libollama"
+	"github.com/contenox/contenox/libs/libollama"
 )
 
 // Helper function to report operations per second

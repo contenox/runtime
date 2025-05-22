@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/js402/cate/libs/libtestenv"
+	"github.com/contenox/contenox/libs/libtestenv"
 	"github.com/ollama/ollama/api"
 	"github.com/stretchr/testify/require"
 )

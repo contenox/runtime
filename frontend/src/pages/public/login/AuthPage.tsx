@@ -1,4 +1,4 @@
-import { Card } from '@cate/ui';
+import { Card } from '@contenox/ui';
 import { useState } from 'react';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
