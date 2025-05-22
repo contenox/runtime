@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/tokenizerservice"
-	"github.com/js402/cate/libs/libollama"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/libs/libollama"
 )
 
 type localService struct {

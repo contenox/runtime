@@ -3,7 +3,7 @@ package modelprovider
 import (
 	"context"
 
-	"github.com/js402/cate/core/serverops"
+	"github.com/contenox/contenox/core/serverops"
 )
 
 var _ Provider = (*MockProvider)(nil)

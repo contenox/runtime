@@ -1,4 +1,4 @@
-import { Button, P, Panel, Span } from '@cate/ui';
+import { Button, P, Panel, Span } from '@contenox/ui';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { AccessEntry } from '../../../../lib/types';

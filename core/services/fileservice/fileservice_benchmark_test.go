@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/services/fileservice"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/services/fileservice"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 const benchmarkFileSize = 1024 * 1024

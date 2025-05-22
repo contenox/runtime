@@ -8,7 +8,7 @@ import {
   Span,
   Spinner,
   Textarea,
-} from '@cate/ui';
+} from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useExecPrompt } from '../../../hooks/useExec';

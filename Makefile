@@ -43,10 +43,10 @@ yarn-wipe:
 	yarn install
 
 ui-install:
-	yarn workspaces focus @cate/ui frontend
+	yarn workspaces focus @contenox/ui frontend
 
 ui-package: ui-install
-	yarn workspace @cate/ui build
+	yarn workspace @contenox/ui build
 
 ui-build: ui-package
 	yarn install

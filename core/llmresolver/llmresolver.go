@@ -8,8 +8,8 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/js402/cate/core/modelprovider"
-	"github.com/js402/cate/core/serverops"
+	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/serverops"
 )
 
 var (

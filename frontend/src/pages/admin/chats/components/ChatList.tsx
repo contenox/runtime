@@ -1,4 +1,4 @@
-import { Button, Card, P, Span, Spinner } from '@cate/ui';
+import { Button, Card, P, Span, Spinner } from '@contenox/ui';
 import { t } from 'i18next';
 import { ChatSession } from '../../../../lib/types';
 

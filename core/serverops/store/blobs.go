@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 func (s *store) CreateBlob(ctx context.Context, blob *Blob) error {

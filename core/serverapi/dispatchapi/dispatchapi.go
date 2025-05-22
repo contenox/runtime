@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/dispatchservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/dispatchservice"
 )
 
 func AddDispatchRoutes(mux *http.ServeMux, _ *serverops.Config, dispatchService dispatchservice.Service) {

@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/fileservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/fileservice"
 )
 
 const (

@@ -1,4 +1,4 @@
-module github.com/js402/cate/libs/libollama
+module github.com/contenox/contenox/libs/libollama
 
 go 1.24.1
 

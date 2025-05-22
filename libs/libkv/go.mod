@@ -1,4 +1,4 @@
-module github.com/js402/cate/libs/libkv
+module github.com/contenox/contenox/libs/libkv
 
 go 1.24.1
 

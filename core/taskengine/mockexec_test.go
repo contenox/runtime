@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/js402/cate/core/llmresolver"
-	"github.com/js402/cate/core/taskengine"
+	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

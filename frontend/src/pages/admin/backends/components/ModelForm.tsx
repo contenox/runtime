@@ -1,4 +1,4 @@
-import { Button, Form, Input } from '@cate/ui';
+import { Button, Form, Input } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 
 type ModelFormProps = {

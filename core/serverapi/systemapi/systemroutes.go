@@ -3,8 +3,8 @@ package systemapi
 import (
 	"net/http"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
 )
 
 type systemRoutes struct {

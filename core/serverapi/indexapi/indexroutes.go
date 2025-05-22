@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/indexservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/indexservice"
 )
 
 func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService *indexservice.Service) {

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/js402/cate/core/llmrepo"
-	"github.com/js402/cate/core/llmresolver"
+	"github.com/contenox/contenox/core/llmrepo"
+	"github.com/contenox/contenox/core/llmresolver"
 )
 
 type TaskExecutor interface {

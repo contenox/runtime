@@ -1,4 +1,4 @@
-import { H1, P } from '@cate/ui';
+import { H1, P } from '@contenox/ui';
 
 export default function About() {
   return (

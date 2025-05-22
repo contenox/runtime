@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libauth"
-	"github.com/js402/cate/libs/libcipher"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/libs/libauth"
+	"github.com/contenox/contenox/libs/libcipher"
 )
 
 const DefaultServerGroup = "server"

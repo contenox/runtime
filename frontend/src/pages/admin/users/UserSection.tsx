@@ -1,4 +1,4 @@
-import { GridLayout, Panel, Section } from '@cate/ui';
+import { GridLayout, Panel, Section } from '@contenox/ui';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from '../../../hooks/useUsers';

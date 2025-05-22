@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/libs/libdb"
 
 	"github.com/ollama/ollama/api"
 )

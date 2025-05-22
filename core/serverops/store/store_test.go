@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/libs/libdb"
 	"github.com/stretchr/testify/require"
 )
 

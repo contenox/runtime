@@ -1,21 +1,22 @@
-module github.com/js402/cate/tokenizer
+module github.com/contenox/contenox/tokenizer
 
 go 1.24.1
 
-replace github.com/js402/cate/core => ../core
+replace github.com/contenox/contenox/core => ../core
 
 replace (
-	github.com/js402/cate/libs/libauth => ../libs/libauth
-	github.com/js402/cate/libs/libcipher => ../libs/libcipher
-	github.com/js402/cate/libs/libdb => ../libs/libdb
+	github.com/contenox/contenox/libs/libauth => ../libs/libauth
+	github.com/contenox/contenox/libs/libcipher => ../libs/libcipher
+	github.com/contenox/contenox/libs/libdb => ../libs/libdb
+	github.com/contenox/contenox/libs/libollama => ../libs/libollama
 )
 
 // go why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/js402/cate/core v0.0.0-00010101000000-000000000000
-	github.com/js402/cate/libs/libollama v0.0.0-20250415134247-d9ea7c0520f3
+	github.com/contenox/contenox/core v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libollama v0.0.0-20250415134247-d9ea7c0520f3
 	google.golang.org/grpc v1.72.0
 )
 
@@ -34,6 +35,9 @@ require (
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
+	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000 // indirect
+	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
+	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/d4l3k/go-bfloat16 v0.0.0-20211005043715-690c3bdd05f1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -61,9 +65,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/js402/cate/libs/libauth v0.0.0-00010101000000-000000000000 // indirect
-	github.com/js402/cate/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
-	github.com/js402/cate/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect

@@ -1,4 +1,4 @@
-import { Button, Form } from '@cate/ui';
+import { Button, Form } from '@contenox/ui';
 import { t } from 'i18next';
 
 type ChatsFormProps = {

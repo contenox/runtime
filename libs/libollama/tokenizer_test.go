@@ -10,7 +10,7 @@ import (
 
 	"slices"
 
-	"github.com/js402/cate/libs/libollama"
+	"github.com/contenox/contenox/libs/libollama"
 )
 
 func TestTokenize(t *testing.T) {

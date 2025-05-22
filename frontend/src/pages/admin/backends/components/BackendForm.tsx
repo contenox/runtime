@@ -1,4 +1,4 @@
-import { Button, Form, FormField, Input, Select } from '@cate/ui';
+import { Button, Form, FormField, Input, Select } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { Backend } from '../../../../lib/types';
 

@@ -1,4 +1,4 @@
-import { Button, Form, FormField, Input, PasswordInput } from '@cate/ui';
+import { Button, Form, FormField, Input, PasswordInput } from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLogin } from '../../../hooks/useLogin';

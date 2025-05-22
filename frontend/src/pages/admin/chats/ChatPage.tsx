@@ -1,4 +1,4 @@
-import { Button, P, Panel, Section } from '@cate/ui';
+import { Button, P, Panel, Section } from '@contenox/ui';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';

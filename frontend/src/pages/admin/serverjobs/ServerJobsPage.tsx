@@ -1,4 +1,4 @@
-import { EmptyState, Panel, Section, Spinner, Table, TableCell, TableRow } from '@cate/ui';
+import { EmptyState, Panel, Section, Spinner, Table, TableCell, TableRow } from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInProgressJobs, usePendingJobs } from '../../../hooks/useServerJobs';

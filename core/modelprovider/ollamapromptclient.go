@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/js402/cate/core/serverops"
+	"github.com/contenox/contenox/core/serverops"
 	"github.com/ollama/ollama/api"
 )
 

@@ -3,8 +3,8 @@ package execapi
 import (
 	"net/http"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/services/execservice"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/services/execservice"
 )
 
 func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService *execservice.ExecService, taskService *execservice.TasksEnvService) {

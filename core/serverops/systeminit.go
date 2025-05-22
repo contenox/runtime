@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 func InitEmbedPool(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Pool, error) {

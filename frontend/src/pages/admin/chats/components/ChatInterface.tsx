@@ -1,4 +1,4 @@
-import { Panel, Span, Spinner } from '@cate/ui';
+import { Panel, Span, Spinner } from '@contenox/ui';
 import { t } from 'i18next';
 import { ChatMessage } from './ChatMessage';
 

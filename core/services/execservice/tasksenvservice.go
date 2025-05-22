@@ -3,10 +3,10 @@ package execservice
 import (
 	"context"
 
-	"github.com/js402/cate/core/serverops"
-	"github.com/js402/cate/core/serverops/store"
-	"github.com/js402/cate/core/taskengine"
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
 type TasksEnvService struct {

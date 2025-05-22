@@ -1,4 +1,4 @@
-import { TabbedPage } from '@cate/ui';
+import { TabbedPage } from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';

@@ -1,10 +1,10 @@
-# cate
+# contenox
 
 A modular platform for building context-aware agents, semantic search, and task automation — grounded in your data.
 
 ## 🚀 Project Vision
 
-cate (cognitive AI/Agent transformation engine/environment) aims to become a platform for semantic search and user-defined AI agents that operate within specific contexts.
+contenox (cognitive AI/Agent transformation engine/environment) aims to become a platform for semantic search and user-defined AI agents that operate within specific contexts.
 
 The project's vision is focused on delivering these core features:
 
@@ -17,7 +17,7 @@ The project's vision is focused on delivering these core features:
 
 ## 🔧 What's Under the Hood
 
-cate combines several technologies to deliver its features:
+contenox combines several technologies to deliver its features:
 
 - **Core Logic**: The main backend service and LLM Gateway, built in **Go**, provides the primary API and orchestration.
 - **User Interface**: Dashboards and user interactions are handled by a **React** frontend.
@@ -30,11 +30,11 @@ cate combines several technologies to deliver its features:
 - **Deployment**:
   - The system is designed to run **containerized** (e.g., using Docker).
   - Users are expected to provide external dependencies like **PostgreSQL**, **Valkey**, and **Vald**.
-  - A `docker-compose.yml` file is provided for convenience, but operators typically deploy the cate container image(s) directly and manage configuration externally.
+  - A `docker-compose.yml` file is provided for convenience, but operators typically deploy the contenox container image(s) directly and manage configuration externally.
 
 ## 📊 Current State (As of May 2025)
 
-cate is in **active development**. Building upon the foundational components, the recent focus on semantic search has integrated several key capabilities, resulting in the following established implementations:
+contenox is in **active development**. Building upon the foundational components, the recent focus on semantic search has integrated several key capabilities, resulting in the following established implementations:
 
 * **Core Backend Services:** Modular Go services provide the backbone, including model management (`backendservice`), chat (`chatservice`), files (`fileservice`), users/access control (`userservice`, `accessservice`), **job dispatching (`dispatchservice`)**, **indexing (`indexservice`)**, and **backend pooling (`poolservice`)**.
 * **Persistence & State:** Core data (users, files, jobs, etc.) is stored in **PostgreSQL** (`core/serverops/store`). **Vald** is integrated as the **vector store** for embeddings (`core/vectors`). **Valkey** (via `libkv`) is available for key-value storage/caching needs (not integrated yet). State synchronization for Ollama backends (`runtimestate`) is operational.

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/js402/cate/libs/libdb"
+	"github.com/contenox/contenox/libs/libdb"
 	_ "github.com/lib/pq"
 )
 
