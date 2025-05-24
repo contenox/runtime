@@ -5,6 +5,7 @@ import (
 
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/execservice"
+	"github.com/contenox/contenox/core/taskengine"
 )
 
 func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService *execservice.ExecService, taskService *execservice.TasksEnvService) {
@@ -36,14 +37,19 @@ func (tm *taskManager) execute(w http.ResponseWriter, r *http.Request) {
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }
 
+type taskExec struct {
+	Input string                      `json:"input"`
+	Chain *taskengine.ChainDefinition `json:"chain"`
+}
+
 func (tm *taskManager) tasks(w http.ResponseWriter, r *http.Request) {
-	req, err := serverops.Decode[execservice.TaskRequest](r)
+	req, err := serverops.Decode[taskExec](r)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
 		return
 	}
 
-	resp, err := tm.promptService.Execute(r.Context(), &req)
+	resp, err := tm.taskService.Execute(r.Context(), req.Chain, req.Input)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
 		return
