@@ -70,7 +70,7 @@ Notes from the devslice:
 
   Steps needed:
     * [x] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
-    * [ ] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
+    * [x] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
     * [x] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
     * [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
     * [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
