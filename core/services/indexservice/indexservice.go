@@ -175,6 +175,89 @@ type SearchResponse struct {
 	TriedQueries []string       `json:"TriedQuery"`
 }
 
+func executeVectorSearch(
+	ctx context.Context,
+	embedder llmrepo.ModelRepo,
+	vectorsStore vectors.Store,
+	db libdb.DBManager,
+	queries []string,
+	topK int,
+	searchArgs *SearchRequestArgs,
+) ([]SearchResult, []string, error) {
+	storeInstance := store.New(db.WithoutTransaction())
+	searchResults := make([]SearchResult, 0)
+
+	for _, query := range queries {
+		provider, err := embedder.GetProvider(ctx)
+		if err != nil {
+			return nil, queries, fmt.Errorf("failed to get embedder provider: %w", err)
+		}
+
+		embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
+			ModelName: provider.ModelName(),
+		}, embedder.GetRuntime(ctx), llmresolver.Randomly)
+		if err != nil {
+			return nil, queries, fmt.Errorf("failed to resolve embed client: %w", err)
+		}
+
+		vectorData, err := embedClient.Embed(ctx, query)
+		if err != nil {
+			return nil, queries, fmt.Errorf("failed to embed query: %w", err)
+		}
+
+		vectorData32 := make([]float32, len(vectorData))
+		for i, v := range vectorData {
+			vectorData32[i] = float32(v)
+		}
+
+		var args *vectors.SearchArgs
+		if searchArgs != nil {
+			args = &vectors.SearchArgs{
+				Epsilon: searchArgs.Epsilon,
+				Radius:  searchArgs.Radius,
+			}
+		}
+
+		results, err := vectorsStore.Search(ctx, vectorData32, topK, 1, args)
+		if err != nil {
+			return nil, queries, fmt.Errorf("vector search failed for query %s: %w", query, err)
+		}
+
+		for _, res := range results {
+			chunkIndex, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
+			if errors.Is(err, libdb.ErrNotFound) {
+				if delErr := vectorsStore.Delete(ctx, res.ID); delErr != nil {
+					fmt.Printf("failed to clean orphaned vector %s: %v\n", res.ID, delErr)
+				}
+				continue
+			}
+			if err != nil {
+				return nil, queries, fmt.Errorf("failed to get chunk index: %w", err)
+			}
+
+			searchResults = append(searchResults, SearchResult{
+				ID:           chunkIndex.ResourceID,
+				ResourceType: chunkIndex.ResourceType,
+				Distance:     res.Distance,
+			})
+		}
+	}
+
+	// Deduplicate results
+	deduplicate := make(map[string]SearchResult)
+	for _, sr := range searchResults {
+		deduplicate[sr.ID] = sr
+	}
+
+	// Convert map back to slice
+	deduplicatedResults := make([]SearchResult, 0, len(deduplicate))
+	for _, sr := range deduplicate {
+		deduplicatedResults = append(deduplicatedResults, sr)
+	}
+
+	return deduplicatedResults, queries, nil
+}
+
 func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
 	storeInstance := store.New(s.db.WithoutTransaction())
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
@@ -193,83 +276,25 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 		}
 		tryQuery = append(tryQuery, stripedQuery)
 	}
-	searchResults := make([]SearchResult, 0)
-	for _, query := range tryQuery {
 
-		// Generate enhanced query embedding
-		provider, err := s.embedder.GetProvider(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-			ModelName: provider.ModelName(),
-		}, s.embedder.GetRuntime(ctx), llmresolver.Randomly)
-		if err != nil {
-			return nil, err
-		}
-
-		vectorData, err := embedClient.Embed(ctx, query)
-		if err != nil {
-			return nil, fmt.Errorf("failed to embed query: %w", err)
-		}
-
-		vectorData32 := make([]float32, len(vectorData))
-		for i, v := range vectorData {
-			vectorData32[i] = float32(v)
-		}
-
-		// Handle TopK default
-		topK := request.TopK
-		if topK <= 0 {
-			topK = 10
-		}
-
-		// Perform vector search
-		var args *vectors.SearchArgs
-		if request.SearchRequestArgs != nil {
-			args = &vectors.SearchArgs{
-				Epsilon: request.Epsilon,
-				Radius:  request.Radius,
-			}
-		}
-
-		results, err := s.vectors.Search(ctx, vectorData32, topK, 1, args)
-		if err != nil {
-			return nil, fmt.Errorf("vector search failed: %w for query %s", err, query)
-		}
-
-		// Process results and verify chunk indices
-		for _, res := range results {
-			chunkIndex, err := storeInstance.GetChunkIndexByID(ctx, res.ID)
-			if errors.Is(err, libdb.ErrNotFound) {
-				if delErr := s.vectors.Delete(ctx, res.ID); delErr != nil {
-					fmt.Printf("failed to clean orphaned vector %s: %v\n", res.ID, delErr)
-				}
-				continue
-			}
-			if err != nil {
-				return nil, fmt.Errorf("failed to get chunk index: %w", err)
-			}
-
-			searchResults = append(searchResults, SearchResult{
-				ID:           chunkIndex.ResourceID,
-				ResourceType: chunkIndex.ResourceType,
-				Distance:     res.Distance,
-			})
-		}
+	topK := request.TopK
+	if topK <= 0 {
+		topK = 10
 	}
-	deduplicate := map[string]SearchResult{}
-	for _, sr := range searchResults {
-		deduplicate[sr.ID] = sr
-	}
-	searchResults = searchResults[:len(deduplicate)]
 
-	i := 0
-	for _, sr := range deduplicate {
-		searchResults[i] = sr
-		i++
+	searchResults, triedQueries, err := executeVectorSearch(
+		ctx,
+		s.embedder,
+		s.vectors,
+		s.db,
+		tryQuery,
+		topK,
+		request.SearchRequestArgs,
+	)
+	if err != nil {
+		return nil, err
 	}
+
 	if request.ExpandFiles {
 		for i, sr := range searchResults {
 			if sr.ResourceType == store.ResourceTypeFile {
@@ -281,7 +306,11 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 			}
 		}
 	}
-	return &SearchResponse{Results: searchResults, TriedQueries: tryQuery}, nil
+
+	return &SearchResponse{
+		Results:      searchResults,
+		TriedQueries: triedQueries,
+	}, nil
 }
 
 func (s *Service) findKeywords(ctx context.Context, chunk string) (string, error) {
