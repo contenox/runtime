@@ -50,8 +50,11 @@ func TestWorkerPipe(t *testing.T) {
 		SecurityEnabled: "true",
 	}
 
-	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
 	defer cleanup()
+	if err != nil {
+		t.Fatal(err)
+	}
 	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)

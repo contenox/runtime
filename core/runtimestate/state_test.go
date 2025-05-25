@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/contenox/contenox/libs/libtestenv"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,8 +53,11 @@ func TestStateLogic(t *testing.T) {
 		Model: "granite-embedding:30m",
 	})
 	require.NoError(t, err)
-	ps, cleanup2 := libbus.NewTestPubSub(t)
+	ps, cleanup2, err := libbus.NewTestPubSub()
 	defer cleanup2()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	backendState, err := runtimestate.New(ctx, dbInstance, ps)
 	require.NoError(t, err)
@@ -123,8 +126,9 @@ func TestBackendDeletion(t *testing.T) {
 	require.NoError(t, err)
 
 	dbStore := store.New(dbInstance.WithoutTransaction())
-	ps, cleanup2 := libbus.NewTestPubSub(t)
+	ps, cleanup2, err := libbus.NewTestPubSub()
 	defer cleanup2()
+	require.NoError(t, err)
 
 	backendState, err := runtimestate.New(ctx, dbInstance, ps)
 	require.NoError(t, err)
@@ -182,8 +186,9 @@ func TestPoolBasedModelAssignment(t *testing.T) {
 	require.NoError(t, err)
 
 	dbStore := store.New(dbInstance.WithoutTransaction())
-	ps, cleanup2 := libbus.NewTestPubSub(t)
+	ps, cleanup2, err := libbus.NewTestPubSub()
 	defer cleanup2()
+	require.NoError(t, err)
 
 	// Create backend and pool
 	backendID := uuid.NewString()

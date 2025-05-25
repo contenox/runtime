@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"strings"
-	"testing"
+	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -16,15 +14,17 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/contenox/contenox/libs/libtestenv"
-	"github.com/stretchr/testify/require"
+	"github.com/google/uuid"
 )
 
-func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Context, *runtimestate.State, libdb.DBManager, func()) {
+func SetupTestEnvironment(config *serverops.Config) (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
 	ctx := context.TODO()
-	err := serverops.NewServiceManager(config)
-	require.NoError(t, err)
-	// We'll collect cleanup functions as we go.
 	var cleanups []func()
+	err := serverops.NewServiceManager(config)
+	if err != nil {
+		return nil, nil, nil, func() {}, err
+	}
+	// We'll collect cleanup functions as we go.
 	addCleanup := func(fn func()) {
 		cleanups = append(cleanups, fn)
 	}
@@ -32,7 +32,7 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 	// Start local Ollama instance.
 	ollamaURI, _, ollamaCleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	if err != nil {
-		t.Fatalf("failed to start local Ollama instance: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to start local Ollama instance: %v", err)
 	}
 	addCleanup(ollamaCleanup)
 
@@ -42,7 +42,7 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 		for _, fn := range cleanups {
 			fn()
 		}
-		t.Fatalf("failed to setup local database: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to setup local database: %v", err)
 	}
 	addCleanup(dbCleanup)
 
@@ -51,18 +51,20 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 		for _, fn := range cleanups {
 			fn()
 		}
-		t.Fatalf("failed to create new Postgres DB Manager: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to create new Postgres DB Manager: %v", err)
 	}
-	ps, cleanup2 := libbus.NewTestPubSub(t)
+	ps, cleanup2, err := libbus.NewTestPubSub()
 	addCleanup(cleanup2)
-
+	if err != nil {
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to init pubsub: %v", err)
+	}
 	// Initialize backend service state.
 	backendState, err := runtimestate.New(ctx, dbInstance, ps)
 	if err != nil {
 		for _, fn := range cleanups {
 			fn()
 		}
-		t.Fatalf("failed to create new backend state: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to create new backend state: %v", err)
 	}
 
 	triggerChan := make(chan struct{})
@@ -87,7 +89,7 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 		for _, fn := range cleanups {
 			fn()
 		}
-		t.Fatalf("failed to create backend: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to create backend: %v", err)
 	}
 	// Append model to the global model store.
 	err = dbStore.AppendModel(ctx, &store.Model{
@@ -98,31 +100,47 @@ func SetupTestEnvironment(t *testing.T, config *serverops.Config) (context.Conte
 		for _, fn := range cleanups {
 			fn()
 		}
-		t.Fatalf("failed to append model: %v", err)
+		return nil, nil, nil, func() {}, fmt.Errorf("failed to append model: %v", err)
 	}
-
 	// Trigger sync and wait for model pull.
 	triggerChan <- struct{}{}
-	require.Eventually(t, func() bool {
+	if err := waitForCondition(ctx, func() bool {
 		currentState := backendState.Get(ctx)
-		r, err := json.Marshal(currentState)
+		data, err := json.Marshal(currentState)
 		if err != nil {
-			t.Logf("error marshaling state: %v", err)
 			return false
 		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
+		return bytes.Contains(data, []byte(`"pulledModels":[{"name":"smollm2:135m"`))
+	}, 2*time.Minute, 100*time.Millisecond); err != nil {
+		for _, fn := range cleanups {
+			fn()
 		}
-		return strings.Contains(string(r), `"pulledModels":[{"name":"smollm2:135m"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-
+		return nil, nil, nil, nil, fmt.Errorf("timeout waiting for condition: %v", err)
+	}
 	// Return a cleanup function that calls all cleanup functions.
 	cleanupAll := func() {
 		for _, fn := range cleanups {
 			fn()
 		}
 	}
-	return ctx, backendState, dbInstance, cleanupAll
+	return ctx, backendState, dbInstance, cleanupAll, nil
+}
+
+func waitForCondition(ctx context.Context, condition func() bool, timeout, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if condition() {
+				return nil
+			}
+		}
+	}
 }

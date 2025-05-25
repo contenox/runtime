@@ -4,9 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
-	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/nats"
 )
@@ -47,10 +45,12 @@ func SetupNatsInstance(ctx context.Context) (string, testcontainers.Container, f
 
 // NewTestPubSub starts a NATS container using SetupNatsInstance,
 // creates a new PubSub instance, and returns it along with a cleanup function.
-func NewTestPubSub(t *testing.T) (Messenger, func()) {
+func NewTestPubSub() (Messenger, func(), error) {
 	ctx := context.Background()
 	cons, container, cleanup, err := SetupNatsInstance(ctx)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, func() {}, err
+	}
 	// Optionally log container status if needed.
 	log.Printf("NATS container running: %v", container)
 
@@ -58,11 +58,12 @@ func NewTestPubSub(t *testing.T) (Messenger, func()) {
 		NATSURL: cons,
 	}
 	ps, err := NewPubSub(ctx, cfg)
-	require.NoError(t, err)
-
+	if err != nil {
+		return nil, func() {}, err
+	}
 	// Return a cleanup function that closes PubSub and terminates the container.
 	return ps, func() {
 		_ = ps.Close()
 		cleanup()
-	}
+	}, nil
 }

@@ -26,7 +26,10 @@ func TestTasksservice(t *testing.T) {
 		TasksModel: "qwen2.5:3b",
 	}
 
-	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	if err != nil {
+		log.Fatalf("failed to init test %s", err)
+	}
 	defer cleanup()
 	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	if err != nil {

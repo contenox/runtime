@@ -13,8 +13,11 @@ func TestStream(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	ps, cleanup := libbus.NewTestPubSub(t)
+	ps, cleanup, err := libbus.NewTestPubSub()
 	defer cleanup()
+	if err != nil {
+		t.Fatalf("failed to init test stream %s", err)
+	}
 
 	subject := "test.stream"
 	message := []byte("streamed message")
@@ -41,11 +44,13 @@ func TestStream(t *testing.T) {
 func TestPublishWithClosedConnection(t *testing.T) {
 	ctx := context.Background()
 
-	ps, cleanup := libbus.NewTestPubSub(t)
+	ps, cleanup, err := libbus.NewTestPubSub()
 	defer cleanup()
-
+	if err != nil {
+		t.Fatalf("failed to init test stream %s", err)
+	}
 	// Close the connection.
-	err := ps.Close()
+	err = ps.Close()
 	require.NoError(t, err)
 
 	// Attempt to publish after closing.

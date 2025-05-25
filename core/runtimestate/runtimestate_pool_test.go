@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/contenox/contenox/libs/libtestenv"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,7 +32,8 @@ func setupPoolTest(t *testing.T) (context.Context, string, *runtimestate.State, 
 	require.NoError(t, err)
 
 	// Create pubsub
-	ps, cleanupPS := libbus.NewTestPubSub(t)
+	ps, cleanupPS, err := libbus.NewTestPubSub()
+	require.NoError(t, err)
 
 	// Create state with pool feature enabled
 	backendState, err := runtimestate.New(ctx, dbInstance, ps, runtimestate.WithPools())

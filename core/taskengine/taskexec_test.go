@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/modelprovider"
@@ -18,6 +17,7 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/taskengine"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,8 +56,11 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:1.5b",
 	}
-	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
 	defer cleanup()
+	if err != nil {
+		t.Fatalf("failed to init test %s", err)
+	}
 	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)

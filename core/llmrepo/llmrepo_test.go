@@ -10,17 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestEnvironment(t *testing.T) (context.Context, *serverops.Config, libdb.DBManager, *runtimestate.State, func()) {
+func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager, *runtimestate.State, func(), error) {
 	ctx := context.Background()
 	config := &serverops.Config{
 		EmbedModel:          "all-minilm:33m",
@@ -31,13 +31,19 @@ func setupTestEnvironment(t *testing.T) (context.Context, *serverops.Config, lib
 		SigningKey:          "test-signing-key",
 	}
 
-	ctx, state, dbInstance, cleanup := testingsetup.SetupTestEnvironment(t, config)
-	return ctx, config, dbInstance, state, cleanup
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	if err != nil {
+		return nil, nil, nil, nil, cleanup, err
+	}
+	return ctx, config, dbInstance, state, cleanup, nil
 }
 
 func TestNew_InitializesPoolAndModel(t *testing.T) {
 
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	ctx, config, dbInstance, state, cleanup, err := setupTestEnvironment()
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer cleanup()
 
 	// Test initialization
@@ -188,8 +194,11 @@ func TestGetProvider_NoBackends(t *testing.T) {
 	if os.Getenv("SMOKETESTS") == "" {
 		t.Skip("Set env SMOKETESTS to true to run this test")
 	}
-	ctx, config, dbInstance, state, cleanup := setupTestEnvironment(t)
+	ctx, config, dbInstance, state, cleanup, err := setupTestEnvironment()
 	defer cleanup()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
 	require.NoError(t, err)

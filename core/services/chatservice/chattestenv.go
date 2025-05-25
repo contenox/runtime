@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -16,6 +15,7 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/contenox/contenox/libs/libtestenv"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,7 +55,13 @@ func SetupTestEnvironment(t *testing.T) (context.Context, *runtimestate.State, l
 		}
 		t.Fatalf("failed to create new Postgres DB Manager: %v", err)
 	}
-	ps, cleanup2 := libbus.NewTestPubSub(t)
+	ps, cleanup2, err := libbus.NewTestPubSub()
+	if err != nil {
+		for _, fn := range cleanups {
+			fn()
+		}
+		t.Fatalf("failed to create new Postgres DB Manager: %v", err)
+	}
 	addCleanup(cleanup2)
 
 	// Initialize backend service state.
