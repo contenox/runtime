@@ -14,19 +14,30 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 )
 
+// EnvExecutor defines an environment that can execute a ChainDefinition with input.
+//
+// It handles task transitions, error recovery, retry logic, and output tracking.
 type EnvExecutor interface {
 	ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error)
 }
 
+// ErrUnsupportedTaskType is returned when a TaskExecutor does not recognize the task type.
 var ErrUnsupportedTaskType = errors.New("executor does not support the task type")
 
+// HookProvider defines an interface for external system integrations.
+// TODO: implement a HookProvider.
 type HookProvider any
 
+// SimpleEnv is the default implementation of EnvExecutor.
+//
+// It executes tasks in order, using retry and timeout policies, and tracks execution
+// progress using an ActivityTracker.
 type SimpleEnv struct {
 	exec    TaskExecutor
 	tracker serverops.ActivityTracker
 }
 
+// NewEnv creates a new SimpleEnv with the given tracker and task executor.
 func NewEnv(
 	_ context.Context,
 	tracker serverops.ActivityTracker,
@@ -38,6 +49,10 @@ func NewEnv(
 	}, nil
 }
 
+// ExecEnv executes the given chain with the provided input.
+//
+// It manages the full lifecycle of task execution: rendering prompts, calling the
+// TaskExecutor, handling timeouts, retries, transitions, and collecting final output.
 func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error) {
 	vars := map[string]any{
 		"input": input,
@@ -218,6 +233,7 @@ func evaluateTransitions(transition Transition, rawResponse string) (string, err
 	return "", fmt.Errorf("no matching transition found")
 }
 
+// parseNumber attempts to parse a string as either an integer or float.
 func parseNumber(s string) (float64, error) {
 	// Try int first
 	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
@@ -227,6 +243,10 @@ func parseNumber(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
+// compare applies a logical operator to a model response and a target value.
+//
+// Supported operators include equality, string containment, numeric comparisons,
+// and range checks using "between".
 func compare(operator, response, value string) (bool, error) {
 	switch operator {
 	case "equals":
@@ -280,6 +300,7 @@ func compare(operator, response, value string) (bool, error) {
 	}
 }
 
+// findTaskByID returns the task with the given ID from the task list.
 func findTaskByID(tasks []ChainTask, id string) (*ChainTask, error) {
 	for _, task := range tasks {
 		if task.ID == id {

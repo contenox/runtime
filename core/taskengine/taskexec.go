@@ -10,15 +10,22 @@ import (
 	"github.com/contenox/contenox/core/llmresolver"
 )
 
+// TaskExecutor defines the interface for executing a single task step.
+// It consumes a prompt and resolver policy, and returns structured output
+// alongside the raw LLM response.
 type TaskExecutor interface {
 	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error)
 }
 
+// SimpleExec is a basic implementation of TaskExecutor.
+// It supports prompt-to-string, number, score, range, boolean condition evaluation,
+// and delegation to registered hooks.
 type SimpleExec struct {
 	promptExec   llmrepo.ModelRepo
 	hookProvider HookProvider
 }
 
+// NewExec creates a new instance of SimpleExec.
 func NewExec(
 	_ context.Context,
 	promptExec llmrepo.ModelRepo,
@@ -30,6 +37,8 @@ func NewExec(
 	}, nil
 }
 
+// Prompt resolves a model client using the resolver policy and sends the prompt
+// to be executed. Returns the trimmed response string or an error.
 func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
 	if prompt == "" {
 		return "", fmt.Errorf("unprocessable empty prompt")
@@ -53,6 +62,9 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 
 	return strings.TrimSpace(response), nil
 }
+
+// rang executes the prompt and attempts to parse the response as a range string (e.g. "6-8").
+// If the response is a single number, it returns a degenerate range like "6-6".
 func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
@@ -87,6 +99,7 @@ func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, pr
 	return clean + "-" + clean, nil
 }
 
+// number executes the prompt and parses the response as an integer.
 func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, prompt string) (int, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
@@ -99,6 +112,7 @@ func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, 
 	return i, nil
 }
 
+// score executes the prompt and parses the response as a floating-point score.
 func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, prompt string) (float64, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
@@ -112,6 +126,9 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 	return f, nil
 }
 
+// TaskExec dispatches task execution based on the task type.
+// It handles prompt-based task types like string, number, score, condition, and range,
+// as well as custom hook invocations.
 func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
 	var rawResponse string
 	var taskErr error
@@ -152,11 +169,15 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 	return output, rawResponse, taskErr
 }
 
+// hookengine is a placeholder for future hook execution support using the hookProvider.
+// Currently unimplemented.
 func (exe *SimpleExec) hookengine(_ context.Context, _ HookCall) (any, error) {
 	// TODO: exe.hookProvider
 	return nil, fmt.Errorf("unimplemented")
 }
 
+// condition executes a prompt and evaluates its result against a provided condition mapping.
+// It returns true/false based on the resolved condition value or fallback heuristics.
 func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, conditionMapping map[string]bool, prompt string) (bool, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
