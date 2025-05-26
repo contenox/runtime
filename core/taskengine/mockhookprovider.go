@@ -1,0 +1,33 @@
+package taskengine
+
+import (
+	"context"
+	"fmt"
+)
+
+// MockHookProvider is a mock implementation of the HookProvider interface.
+type MockHookProvider struct {
+	Calls       []HookCall
+	ResponseMap map[string]any
+}
+
+// NewMockHookProvider returns a new instance of MockHookProvider.
+func NewMockHookProvider() *MockHookProvider {
+	return &MockHookProvider{
+		ResponseMap: make(map[string]any),
+	}
+}
+
+// Exec simulates execution of a hook call.
+func (m *MockHookProvider) Exec(ctx context.Context, args *HookCall) (int, any, error) {
+	// Record call
+	m.Calls = append(m.Calls, *args)
+
+	// Simulate response
+	if resp, ok := m.ResponseMap[args.Name]; ok {
+		return StatusSuccess, resp, nil
+	}
+
+	// Default behavior
+	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Name), nil
+}

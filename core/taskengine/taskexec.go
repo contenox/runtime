@@ -31,6 +31,12 @@ func NewExec(
 	promptExec llmrepo.ModelRepo,
 	hookProvider HookProvider,
 ) (TaskExecutor, error) {
+	if hookProvider == nil {
+		return nil, fmt.Errorf("hook provider is nil")
+	}
+	if promptExec == nil {
+		return nil, fmt.Errorf("prompt executor is nil")
+	}
 	return &SimpleExec{
 		hookProvider: hookProvider,
 		promptExec:   promptExec,
@@ -171,9 +177,15 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 
 // hookengine is a placeholder for future hook execution support using the hookProvider.
 // Currently unimplemented.
-func (exe *SimpleExec) hookengine(_ context.Context, _ HookCall) (any, error) {
-	// TODO: exe.hookProvider
-	return nil, fmt.Errorf("unimplemented")
+func (exe *SimpleExec) hookengine(ctx context.Context, hook HookCall) (any, error) {
+	status, res, err := exe.hookProvider.Exec(ctx, &hook)
+	if err != nil {
+		return nil, err
+	}
+	if status != StatusSuccess {
+		return nil, fmt.Errorf("hook execution failed")
+	}
+	return res, nil
 }
 
 // condition executes a prompt and evaluates its result against a provided condition mapping.

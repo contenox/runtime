@@ -14,6 +14,8 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 )
 
+const StatusSuccess = 0
+
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.
 //
 // It handles task transitions, error recovery, retry logic, and output tracking.
@@ -25,8 +27,9 @@ type EnvExecutor interface {
 var ErrUnsupportedTaskType = errors.New("executor does not support the task type")
 
 // HookProvider defines an interface for external system integrations.
-// TODO: implement a HookProvider.
-type HookProvider any
+type HookProvider interface {
+	Exec(ctx context.Context, args *HookCall) (int, any, error)
+}
 
 // SimpleEnv is the default implementation of EnvExecutor.
 //

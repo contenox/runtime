@@ -35,7 +35,7 @@ func TestTasksservice(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, nil) // TODO:
+	exec, err := taskengine.NewExec(ctx, execRepo, taskengine.NewMockHookProvider())
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
