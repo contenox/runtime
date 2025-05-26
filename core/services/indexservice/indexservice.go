@@ -170,7 +170,8 @@ type SearchResponse struct {
 }
 
 func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
-	storeInstance := store.New(s.db.WithoutTransaction())
+	tx := s.db.WithoutTransaction()
+	storeInstance := store.New(tx)
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
 		return nil, err
 	}
@@ -203,7 +204,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 		ctx,
 		s.embedder,
 		s.vectors,
-		s.db,
+		tx,
 		tryQuery,
 		topK,
 		args,

@@ -28,12 +28,12 @@ func ExecuteVectorSearch(
 	ctx context.Context,
 	embedder llmrepo.ModelRepo,
 	vectorsStore vectors.Store,
-	db libdb.DBManager,
+	dbExec libdb.Exec,
 	queries []string,
 	topK int,
 	searchArgs *Args,
 ) ([]SearchResult, []string, error) {
-	storeInstance := store.New(db.WithoutTransaction())
+	storeInstance := store.New(dbExec)
 	searchResults := make([]SearchResult, 0)
 
 	for _, query := range queries {
