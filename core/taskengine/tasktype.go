@@ -80,8 +80,8 @@ type ConditionalTransition struct {
 // HookCall represents an external integration or side-effect triggered during a task.
 // Hooks allow tasks to interact with external systems (e.g., send email, update DB).
 type HookCall struct {
-	// Name is the registered hook name to invoke (e.g., "send_email").
-	Name string `yaml:"name" json:"name"`
+	// Type is the registered hook name to invoke (e.g., "send_email").
+	Type string `yaml:"name" json:"name"`
 
 	// Input is an optional prompt input to pass through before invoking the hook.
 	Input string `yaml:"input,omitempty" json:"input,omitempty"`

@@ -24,10 +24,10 @@ func (m *MockHookProvider) Exec(ctx context.Context, args *HookCall) (int, any, 
 	m.Calls = append(m.Calls, *args)
 
 	// Simulate response
-	if resp, ok := m.ResponseMap[args.Name]; ok {
+	if resp, ok := m.ResponseMap[args.Type]; ok {
 		return StatusSuccess, resp, nil
 	}
 
 	// Default behavior
-	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Name), nil
+	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Type), nil
 }

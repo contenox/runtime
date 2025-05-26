@@ -249,7 +249,7 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 		_, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "hook-unimplemented",
 			Type: taskengine.Hook,
-			Hook: &taskengine.HookCall{Name: "test-hook"},
+			Hook: &taskengine.HookCall{Type: "test-hook"},
 		}, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unimplemented")
