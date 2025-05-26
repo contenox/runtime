@@ -5,21 +5,21 @@ import (
 	"fmt"
 )
 
-// MockHookProvider is a mock implementation of the HookProvider interface.
-type MockHookProvider struct {
+// MockHookRepo is a mock implementation of the HookProvider interface.
+type MockHookRepo struct {
 	Calls       []HookCall
 	ResponseMap map[string]any
 }
 
 // NewMockHookProvider returns a new instance of MockHookProvider.
-func NewMockHookProvider() *MockHookProvider {
-	return &MockHookProvider{
+func NewMockHookProvider() *MockHookRepo {
+	return &MockHookRepo{
 		ResponseMap: make(map[string]any),
 	}
 }
 
 // Exec simulates execution of a hook call.
-func (m *MockHookProvider) Exec(ctx context.Context, args *HookCall) (int, any, error) {
+func (m *MockHookRepo) Exec(ctx context.Context, args *HookCall) (int, any, error) {
 	// Record call
 	m.Calls = append(m.Calls, *args)
 

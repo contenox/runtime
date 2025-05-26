@@ -22,14 +22,14 @@ type TaskExecutor interface {
 // and delegation to registered hooks.
 type SimpleExec struct {
 	promptExec   llmrepo.ModelRepo
-	hookProvider HookProvider
+	hookProvider HookRepo
 }
 
 // NewExec creates a new instance of SimpleExec.
 func NewExec(
 	_ context.Context,
 	promptExec llmrepo.ModelRepo,
-	hookProvider HookProvider,
+	hookProvider HookRepo,
 ) (TaskExecutor, error) {
 	if hookProvider == nil {
 		return nil, fmt.Errorf("hook provider is nil")

@@ -26,8 +26,9 @@ type EnvExecutor interface {
 // ErrUnsupportedTaskType is returned when a TaskExecutor does not recognize the task type.
 var ErrUnsupportedTaskType = errors.New("executor does not support the task type")
 
-// HookProvider defines an interface for external system integrations.
-type HookProvider interface {
+// HookRepo defines an interface for external system integrations
+// and to conduct side effects on internal state.
+type HookRepo interface {
 	Exec(ctx context.Context, args *HookCall) (int, any, error)
 }
 
