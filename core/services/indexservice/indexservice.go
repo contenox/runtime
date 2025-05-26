@@ -166,7 +166,7 @@ type SearchRequestArgs struct {
 
 type SearchResponse struct {
 	Results      []indexrepo.SearchResult `json:"results"`
-	TriedQueries []string                 `json:"TriedQuery"`
+	TriedQueries []string                 `json:"triedQuery"`
 }
 
 func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
