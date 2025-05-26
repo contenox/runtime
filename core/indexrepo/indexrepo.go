@@ -32,26 +32,26 @@ func ExecuteVectorSearch(
 	queries []string,
 	topK int,
 	searchArgs *Args,
-) ([]SearchResult, []string, error) {
+) ([]SearchResult, error) {
 	storeInstance := store.New(dbExec)
 	searchResults := make([]SearchResult, 0)
 
 	for _, query := range queries {
 		provider, err := embedder.GetProvider(ctx)
 		if err != nil {
-			return nil, queries, fmt.Errorf("failed to get embedder provider: %w", err)
+			return nil, fmt.Errorf("failed to get embedder provider: %w", err)
 		}
 
 		embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 			ModelName: provider.ModelName(),
 		}, embedder.GetRuntime(ctx), llmresolver.Randomly)
 		if err != nil {
-			return nil, queries, fmt.Errorf("failed to resolve embed client: %w", err)
+			return nil, fmt.Errorf("failed to resolve embed client: %w", err)
 		}
 
 		vectorData, err := embedClient.Embed(ctx, query)
 		if err != nil {
-			return nil, queries, fmt.Errorf("failed to embed query: %w", err)
+			return nil, fmt.Errorf("failed to embed query: %w", err)
 		}
 
 		vectorData32 := make([]float32, len(vectorData))
@@ -69,7 +69,7 @@ func ExecuteVectorSearch(
 
 		results, err := vectorsStore.Search(ctx, vectorData32, topK, 1, args)
 		if err != nil {
-			return nil, queries, fmt.Errorf("vector search failed for query %s: %w", query, err)
+			return nil, fmt.Errorf("vector search failed for query %s: %w", query, err)
 		}
 
 		for _, res := range results {
@@ -81,7 +81,7 @@ func ExecuteVectorSearch(
 				continue
 			}
 			if err != nil {
-				return nil, queries, fmt.Errorf("failed to get chunk index: %w", err)
+				return nil, fmt.Errorf("failed to get chunk index: %w", err)
 			}
 
 			searchResults = append(searchResults, SearchResult{
@@ -104,5 +104,37 @@ func ExecuteVectorSearch(
 		deduplicatedResults = append(deduplicatedResults, sr)
 	}
 
-	return deduplicatedResults, queries, nil
+	return deduplicatedResults, nil
+}
+
+func ResolveBlobFromQuery(
+	ctx context.Context,
+	embedder llmrepo.ModelRepo,
+	vectorsStore vectors.Store,
+	dbExec libdb.Exec,
+	query string,
+	topK int,
+) ([]byte, error) {
+	results, err := ExecuteVectorSearch(ctx, embedder, vectorsStore, dbExec, []string{query}, topK, nil)
+	if err != nil || len(results) == 0 {
+		return nil, err
+	}
+
+	storeInstance := store.New(dbExec)
+	top := results[0]
+
+	if top.ResourceType != store.ResourceTypeFile {
+		return nil, fmt.Errorf("unsupported resource type: %s", top.ResourceType)
+	}
+
+	file, err := storeInstance.GetFileByID(ctx, top.ID)
+	if err != nil {
+		return nil, err
+	}
+	blob, err := storeInstance.GetBlobByID(ctx, file.BlobsID)
+	if err != nil {
+		return nil, err
+	}
+
+	return blob.Data, nil
 }

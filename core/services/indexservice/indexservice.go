@@ -200,7 +200,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 			Radius:  request.SearchRequestArgs.Radius,
 		}
 	}
-	searchResults, triedQueries, err := indexrepo.ExecuteVectorSearch(
+	searchResults, err := indexrepo.ExecuteVectorSearch(
 		ctx,
 		s.embedder,
 		s.vectors,
@@ -227,7 +227,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 
 	return &SearchResponse{
 		Results:      searchResults,
-		TriedQueries: triedQueries,
+		TriedQueries: tryQuery,
 	}, nil
 }
 

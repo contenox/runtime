@@ -14,7 +14,7 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 )
 
-const StatusSuccess = 0
+const StatusSuccess = 1
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.
 //
