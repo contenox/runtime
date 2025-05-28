@@ -2,8 +2,8 @@ package docgenerator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"reflect"
 
@@ -11,9 +11,23 @@ import (
 	"github.com/getkin/kin-openapi/openapi3gen"
 )
 
+var fileHeaderType = reflect.TypeOf(multipart.FileHeader{})
+
+func fileHeaderHook(name string, t reflect.Type, tag reflect.StructTag, schema *openapi3.Schema) error {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if t == fileHeaderType {
+		schema.Type = openapi3.NewStringSchema().Type
+		schema.Format = "binary"
+	}
+	return nil
+}
+
 type DocGenerator struct {
 	swagger             *openapi3.T
 	processedSchemaRefs map[reflect.Type]*openapi3.SchemaRef
+	typeToSchemaName    map[reflect.Type]string
 }
 
 // DocContributor is the interface each API module implements to provide its documentation.
@@ -52,14 +66,13 @@ type DocOperation struct {
 	Parameters  []DocParameter
 	RequestBody DocSchema         // Request body schema (nil if no body)
 	Responses   map[int]DocSchema // Map HTTP status code to response schema
-	// You might add specific error responses here, or have a common way to register them
-	// e.g., CommonErrors []int // 400, 404, 500
 }
 
 type DocSchema struct {
 	Name        string       // Unique name for the schema in components (e.g., "FileResponse")
 	GoType      reflect.Type // The Go struct type (e.g., reflect.TypeOf(filesapi.FileResponse{}))
 	Description string
+	ContentType string
 	Example     interface{} // Optional: An example struct instance for better examples in docs
 }
 
@@ -97,14 +110,28 @@ func (dg *DocGenerator) AddCommonSchema(docSchema DocSchema) error {
 	if _, exists := dg.swagger.Components.Schemas[docSchema.Name]; exists {
 		return fmt.Errorf("common schema '%s' already exists", docSchema.Name)
 	}
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(reflect.New(docSchema.GoType).Interface(), dg.swagger.Components.Schemas)
+
+	generator := openapi3gen.NewGenerator(
+		openapi3gen.CreateTypeNameGenerator(func(t reflect.Type) string {
+			if t == docSchema.GoType {
+				return docSchema.Name
+			}
+			return t.Name()
+		}),
+	)
+
+	val := reflect.New(docSchema.GoType).Interface()
+	schemaRef, err := generator.NewSchemaRefForValue(val, dg.swagger.Components.Schemas)
 	if err != nil {
 		return fmt.Errorf("failed to generate schema for %s: %w", docSchema.Name, err)
 	}
-	if docSchema.Example != nil {
-		schemaRef.Value.Example = docSchema.Example
+	if name, ok := dg.typeToSchemaName[docSchema.GoType]; ok && name != docSchema.Name {
+		return fmt.Errorf("GoType %v already registered under name '%s', cannot reuse with name '%s'",
+			docSchema.GoType, name, docSchema.Name)
 	}
-	dg.swagger.Components.Schemas[docSchema.Name] = schemaRef
+	dg.swagger.Components.Schemas[docSchema.Name] = &openapi3.SchemaRef{
+		Value: schemaRef.Value,
+	}
 	dg.processedSchemaRefs[docSchema.GoType] = schemaRef
 	return nil
 }
@@ -116,21 +143,38 @@ func (dg *DocGenerator) AddContributor(contributor DocContributor) error {
 		return fmt.Errorf("failed to get documentation from contributor: %w", err)
 	}
 
-	// First, add all schemas provided by this contributor
 	for _, docSchema := range schemas {
-		if _, exists := dg.swagger.Components.Schemas[docSchema.Name]; exists {
-			// Handle potential naming conflicts across modules or re-use existing
-			// For simplicity here, we assume unique names or that duplicates are identical
+		if _, processed := dg.processedSchemaRefs[docSchema.GoType]; processed {
 			continue
 		}
-		schemaRef, err := openapi3gen.NewSchemaRefForValue(reflect.New(docSchema.GoType).Interface(), dg.swagger.Components.Schemas)
+
+		// Check name collision
+		if _, exists := dg.swagger.Components.Schemas[docSchema.Name]; exists {
+			return fmt.Errorf("schema name conflict: schema with name '%s' already exists but for a different Go type", docSchema.Name)
+		}
+
+		generator := openapi3gen.NewGenerator(
+			openapi3gen.CreateTypeNameGenerator(func(t reflect.Type) string {
+				if t == docSchema.GoType {
+					return docSchema.Name
+				}
+				return t.Name()
+			}),
+			openapi3gen.SchemaCustomizer(fileHeaderHook),
+		)
+
+		val := reflect.New(docSchema.GoType).Interface()
+
+		schemaRef, err := generator.NewSchemaRefForValue(val, dg.swagger.Components.Schemas)
 		if err != nil {
 			return fmt.Errorf("failed to generate schema for %s: %w", docSchema.Name, err)
 		}
-		if docSchema.Example != nil {
-			schemaRef.Value.Example = docSchema.Example
+		if schemaRef == nil {
+			return fmt.Errorf("failed to generate schema")
 		}
-		dg.swagger.Components.Schemas[docSchema.Name] = schemaRef
+		dg.swagger.Components.Schemas[docSchema.Name] = &openapi3.SchemaRef{
+			Value: schemaRef.Value,
+		}
 		dg.processedSchemaRefs[docSchema.GoType] = schemaRef
 	}
 
@@ -169,66 +213,27 @@ func (dg *DocGenerator) AddContributor(contributor DocContributor) error {
 		}
 
 		// Convert RequestBody
-		if docOp.RequestBody.Name != "" { // Check if a request body is defined
+		if docOp.RequestBody.Name != "" {
 			requestBodyRef, err := dg.getSchemaRef(docOp.RequestBody)
 			if err != nil {
 				return fmt.Errorf("failed to get request body ref for %s %s: %w", docOp.Method, docOp.Path, err)
 			}
+
+			contentType := "application/json"
+			if docOp.RequestBody.ContentType != "" {
+				contentType = docOp.RequestBody.ContentType
+			}
+
 			op.RequestBody = &openapi3.RequestBodyRef{
-				Value: openapi3.NewRequestBody().
-					WithDescription(docOp.RequestBody.Description).
-					WithRequired(true). // Or infer from DocSchema field
-					WithJSONSchemaRef(requestBodyRef),
+				Value: &openapi3.RequestBody{
+					Description: docOp.RequestBody.Description,
+					Required:    true,
+					Content: openapi3.NewContentWithSchemaRef(
+						requestBodyRef,
+						[]string{contentType},
+					),
+				},
 			}
-			// Special handling for multipart/form-data if you have it
-			if docOp.RequestBody.Name == "FileCreateRequest_Multipart" {
-				fileSchema := openapi3.NewSchema()
-				fileSchema.Description = "The file content"
-				fileSchema.Format = "binary"
-				fileSchema.Title = "File"
-
-				nameSchema := openapi3.NewStringSchema()
-				nameSchema.Description = "Optional new name for the file"
-
-				parentidSchema := openapi3.NewStringSchema()
-				parentidSchema.Description = "Optional parent folder ID"
-
-				multipartSchema := openapi3.NewObjectSchema().
-					WithProperty("file", fileSchema). // fileSchema is *Schema
-					WithProperty("name", nameSchema).
-					WithProperty("parentid", parentidSchema)
-
-				mediaType := &openapi3.MediaType{
-					Schema: &openapi3.SchemaRef{Value: multipartSchema},
-				}
-
-				op.RequestBody = &openapi3.RequestBodyRef{
-					Value: openapi3.NewRequestBody().
-						WithDescription("File upload and metadata").
-						WithRequired(true).
-						WithContent(openapi3.Content{
-							"multipart/form-data": mediaType,
-						}),
-				}
-			}
-
-			// Convert Responses
-			for statusCode, docSchema := range docOp.Responses {
-				responseRef, err := dg.getSchemaRef(docSchema)
-				if err != nil {
-					return fmt.Errorf("failed to get response schema ref: %w", err)
-				}
-				description := docSchema.Description
-				if description == "" {
-					description = fmt.Sprintf("Response for %s %s", docOp.Method, docOp.Path)
-				}
-				op.Responses.Set(fmt.Sprintf("%d", statusCode), &openapi3.ResponseRef{
-					Value: openapi3.NewResponse().
-						WithDescription(description).
-						WithJSONSchemaRef(responseRef),
-				})
-			}
-
 		}
 
 		// Convert Responses
@@ -284,27 +289,51 @@ func (dg *DocGenerator) getSchemaRef(docSchema DocSchema) (*openapi3.SchemaRef, 
 	if docSchema.Name == "" {
 		return nil, fmt.Errorf("DocSchema must have a Name for reference")
 	}
-
-	if _, ok := dg.swagger.Components.Schemas[docSchema.Name]; ok {
-		return openapi3.NewSchemaRef(fmt.Sprintf("#/components/schemas/%s", docSchema.Name), nil), nil
+	// If schema already exists, return ref WITH value
+	if existingRef, ok := dg.swagger.Components.Schemas[docSchema.Name]; ok {
+		return &openapi3.SchemaRef{
+			Value: existingRef.Value,
+		}, nil
 	}
 
-	// If schema not found, try to generate it and add to components
+	if existingRef, ok := dg.processedSchemaRefs[docSchema.GoType]; ok {
+		return &openapi3.SchemaRef{
+			Ref:   fmt.Sprintf("#/components/schemas/%s", docSchema.Name),
+			Value: existingRef.Value,
+		}, nil
+	}
+
+	// If not found, generate and add it
 	if docSchema.GoType == nil {
 		return nil, fmt.Errorf("schema '%s' not found in components and GoType is nil", docSchema.Name)
 	}
 
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(reflect.New(docSchema.GoType).Interface(), dg.swagger.Components.Schemas)
+	defer func() {
+		if r := recover(); r != nil {
+			panic(fmt.Errorf("cannot instantiate type %v for schema generation: %v", docSchema.GoType, r))
+		}
+	}()
+
+	val := reflect.New(docSchema.GoType).Interface()
+	schemaRef, err := openapi3gen.NewSchemaRefForValue(val, dg.swagger.Components.Schemas)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate schema for %s: %w", docSchema.Name, err)
 	}
+	if schemaRef.Value == nil || reflect.DeepEqual(schemaRef.Value, &openapi3.Schema{}) {
+		return nil, fmt.Errorf("schema %s was resolved but is empty", docSchema.Name)
+	}
+
 	if docSchema.Example != nil {
 		schemaRef.Value.Example = docSchema.Example
 	}
+
 	dg.swagger.Components.Schemas[docSchema.Name] = schemaRef
 	dg.processedSchemaRefs[docSchema.GoType] = schemaRef
 
-	return openapi3.NewSchemaRef(fmt.Sprintf("#/components/schemas/%s", docSchema.Name), nil), nil
+	return &openapi3.SchemaRef{
+		Ref:   fmt.Sprintf("#/components/schemas/%s", docSchema.Name),
+		Value: schemaRef.Value,
+	}, nil
 }
 
 func convertGoTypeToOpenAPIType(t reflect.Type) string {
@@ -343,5 +372,9 @@ func (dg *DocGenerator) GetSpec() ([]byte, error) {
 	if err := dg.swagger.Validate(context.Background()); err != nil {
 		return nil, fmt.Errorf("generated OpenAPI spec is invalid: %w", err)
 	}
-	return json.MarshalIndent(dg.swagger, "", "  ")
+	data, err := dg.swagger.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal OpenAPI spec: %w", err)
+	}
+	return data, nil
 }
