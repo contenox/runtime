@@ -113,7 +113,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing promptexec failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, nil) // TODO
+	exec, err := taskengine.NewExec(ctx, execRepo, &taskengine.MockHookRepo{}) // TODO
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
