@@ -72,11 +72,10 @@ Notes from the devslice:
     * [x] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
     * [x] **Prompt Chains** Implement a prompt chain service that can be used to execute a sequence of prompts, for the QA page.
     * [x] **Improve Filesystem Performance:** Renaming files is currently slow, this is a nice to have task for this slice.
-    * [ ] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
-    * [ ] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
+    * [x] **OpenAPI spec:** Review the endpoints and start establishing how to document APIs and how to serve the specifications.
+    * [x] **Cleaning & wiring:** Ensure everything works as expected and tests are passing.
 
-
-## 🗺️ Roadmap (Near-Term Focus)
+    ** Note: currently providing api documentation is not feasible.
 
 Development is dynamic, but the immediate priorities are centered on bringing the core features online:
 
