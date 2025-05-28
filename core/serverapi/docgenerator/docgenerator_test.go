@@ -105,7 +105,7 @@ func TestParametersConversion(t *testing.T) {
 			return []docgenerator.DocOperation{op}, []docgenerator.DocSchema{
 				{
 					Name:   "TestSchema",
-					GoType: reflect.TypeOf(TestStruct{}), // ← now a named struct
+					GoType: reflect.TypeOf(TestStruct{}),
 				},
 			}, nil
 		},
