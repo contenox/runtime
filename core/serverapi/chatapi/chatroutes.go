@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/chatservice"
+	"github.com/google/uuid"
 )
 
-func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager *chatservice.Service, stateService *runtimestate.State) {
+func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatservice.Service, stateService *runtimestate.State) {
 	h := &chatManagerHandler{manager: chatManager, stateService: stateService}
 
 	mux.HandleFunc("POST /chats", h.createChat)
@@ -22,7 +22,7 @@ func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager *chatser
 }
 
 type chatManagerHandler struct {
-	manager      *chatservice.Service
+	manager      chatservice.Service
 	stateService *runtimestate.State
 }
 

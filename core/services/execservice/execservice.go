@@ -5,21 +5,26 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
-type ExecService struct {
+type ExecService interface {
+	Execute(ctx context.Context, request *TaskRequest) (*TaskResponse, error)
+	serverops.ServiceMeta
+}
+
+type execService struct {
 	promptRepo llmrepo.ModelRepo
 	db         libdb.DBManager
 }
 
-func NewExec(ctx context.Context, promptRepo llmrepo.ModelRepo, dbInstance libdb.DBManager) *ExecService {
-	return &ExecService{
+func NewExec(ctx context.Context, promptRepo llmrepo.ModelRepo, dbInstance libdb.DBManager) ExecService {
+	return &execService{
 		promptRepo: promptRepo,
 		db:         dbInstance,
 	}
@@ -34,7 +39,7 @@ type TaskResponse struct {
 	Response string `json:"response"`
 }
 
-func (s *ExecService) Execute(ctx context.Context, request *TaskRequest) (*TaskResponse, error) {
+func (s *execService) Execute(ctx context.Context, request *TaskRequest) (*TaskResponse, error) {
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
@@ -70,10 +75,10 @@ func (s *ExecService) Execute(ctx context.Context, request *TaskRequest) (*TaskR
 	}, nil
 }
 
-func (s *ExecService) GetServiceName() string {
+func (s *execService) GetServiceName() string {
 	return "promptexecservice"
 }
 
-func (s *ExecService) GetServiceGroup() string {
+func (s *execService) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

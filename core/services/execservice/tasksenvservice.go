@@ -9,19 +9,24 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 )
 
-type TasksEnvService struct {
+type TasksEnvService interface {
+	Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error)
+	serverops.ServiceMeta
+}
+
+type tasksEnvService struct {
 	environmentExec taskengine.EnvExecutor
 	db              libdb.DBManager
 }
 
-func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, dbInstance libdb.DBManager) *TasksEnvService {
-	return &TasksEnvService{
+func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, dbInstance libdb.DBManager) TasksEnvService {
+	return &tasksEnvService{
 		environmentExec: environmentExec,
 		db:              dbInstance,
 	}
 }
 
-func (s *TasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
+func (s *tasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
@@ -33,10 +38,10 @@ func (s *TasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDe
 	return s.environmentExec.ExecEnv(ctx, chain, input)
 }
 
-func (s *TasksEnvService) GetServiceName() string {
+func (s *tasksEnvService) GetServiceName() string {
 	return "taskenviromentservice"
 }
 
-func (s *TasksEnvService) GetServiceGroup() string {
+func (s *tasksEnvService) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

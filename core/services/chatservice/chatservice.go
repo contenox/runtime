@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
@@ -14,12 +13,23 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
 )
 
 const tokenizerMaxPromptBytes = 16 * 1024 // 16 KiB
 
-type Service struct {
+type Service interface {
+	GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error)
+	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error)
+	ListChats(ctx context.Context) ([]ChatSession, error)
+	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
+	AddInstruction(ctx context.Context, id string, message string) error
+	CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error)
+	serverops.ServiceMeta
+}
+
+type service struct {
 	state      *runtimestate.State
 	dbInstance libdb.DBManager
 	tokenizer  tokenizerservice.Tokenizer
@@ -28,8 +38,8 @@ type Service struct {
 func New(
 	state *runtimestate.State,
 	dbInstance libdb.DBManager,
-	tokenizer tokenizerservice.Tokenizer) *Service {
-	return &Service{
+	tokenizer tokenizerservice.Tokenizer) Service {
+	return &service{
 		state:      state,
 		dbInstance: dbInstance,
 		tokenizer:  tokenizer,
@@ -50,7 +60,7 @@ type ChatSession struct {
 }
 
 // NewInstance creates a new chat instance after verifying that the user is authorized to start a chat for the given model.
-func (s *Service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
+func (s *service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
@@ -71,7 +81,7 @@ func (s *Service) NewInstance(ctx context.Context, subject string, preferredMode
 
 // AddInstruction adds a system instruction to an existing chat instance.
 // This method requires admin panel permissions.
-func (s *Service) AddInstruction(ctx context.Context, id string, message string) error {
+func (s *service) AddInstruction(ctx context.Context, id string, message string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -96,7 +106,7 @@ func (s *Service) AddInstruction(ctx context.Context, id string, message string)
 	return nil
 }
 
-func (s *Service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
+func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
 	now := time.Now().UTC()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
@@ -186,7 +196,7 @@ type ChatMessage struct {
 
 // GetChatHistory retrieves the chat history for a specific chat instance.
 // It checks that the caller is authorized to view the chat instance.
-func (s *Service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error) {
+func (s *service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -223,7 +233,7 @@ func (s *Service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage,
 
 // ListChats returns all chat sessions.
 // This operation requires admin panel view permission.
-func (s *Service) ListChats(ctx context.Context) ([]ChatSession, error) {
+func (s *service) ListChats(ctx context.Context) ([]ChatSession, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -253,7 +263,7 @@ type ModelResult struct {
 	MaxTokens  int // Max token length for the model.
 }
 
-func (s *Service) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
+func (s *service) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
 	var prompt string
 	for _, m := range messages {
 		if m.Role == "user" {
@@ -288,10 +298,10 @@ func (s *Service) CalculateContextSize(ctx context.Context, messages []serverops
 	return count, nil
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "chatservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }
