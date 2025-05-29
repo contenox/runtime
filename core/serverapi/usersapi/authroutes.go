@@ -13,7 +13,7 @@ const (
 	authCookieName = "auth_token"
 )
 
-func AddAuthRoutes(mux *http.ServeMux, userService *userservice.Service) {
+func AddAuthRoutes(mux *http.ServeMux, userService userservice.Service) {
 	a := &authManager{
 		userService: userService,
 	}
@@ -31,7 +31,7 @@ func AddAuthRoutes(mux *http.ServeMux, userService *userservice.Service) {
 }
 
 type authManager struct {
-	userService *userservice.Service
+	userService userservice.Service
 }
 
 type loginRequest struct {

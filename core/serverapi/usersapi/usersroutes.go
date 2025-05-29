@@ -9,7 +9,7 @@ import (
 	"github.com/contenox/contenox/core/services/userservice"
 )
 
-func AddUserRoutes(mux *http.ServeMux, config *serverops.Config, userService *userservice.Service) {
+func AddUserRoutes(mux *http.ServeMux, config *serverops.Config, userService userservice.Service) {
 	u := &userManager{service: userService}
 
 	mux.HandleFunc("POST /users", u.create)
@@ -20,7 +20,7 @@ func AddUserRoutes(mux *http.ServeMux, config *serverops.Config, userService *us
 }
 
 type userManager struct {
-	service *userservice.Service
+	service userservice.Service
 }
 
 type userResponse struct {

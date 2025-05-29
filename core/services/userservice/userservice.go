@@ -8,36 +8,49 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
 var ErrUserAlreadyExists = errors.New("user already exists")
 var ErrTokenGenerationFailed = errors.New("failed to generate token")
 
-type Service struct {
+type Service interface {
+	GetUserFromContext(ctx context.Context) (*store.User, error)
+	Login(ctx context.Context, email, password string) (*Result, error)
+	Register(ctx context.Context, req CreateUserRequest) (*Result, error)
+	CreateUser(ctx context.Context, req CreateUserRequest) (*store.User, error)
+	DeleteUser(ctx context.Context, id string) error
+	UpdateUserFields(ctx context.Context, id string, req UpdateUserRequest) (*store.User, error)
+	ListUsers(ctx context.Context, cursorCreatedAt time.Time) ([]*store.User, error)
+	GetUserByID(ctx context.Context, id string) (*store.User, error)
+
+	serverops.ServiceMeta
+}
+
+type service struct {
 	dbInstance      libdb.DBManager
 	securityEnabled bool
 	serverSecret    string
 	signingKey      string
 }
 
-func New(db libdb.DBManager, config *serverops.Config) *Service {
+func New(db libdb.DBManager, config *serverops.Config) Service {
 	var securityEnabledFlag bool
 	if config.SecurityEnabled == "true" {
 		securityEnabledFlag = true
 	}
 
-	return &Service{dbInstance: db,
+	return &service{dbInstance: db,
 		securityEnabled: securityEnabledFlag,
 		serverSecret:    config.JWTSecret,
 		signingKey:      config.SigningKey,
 	}
 }
 
-func (s *Service) GetUserFromContext(ctx context.Context) (*store.User, error) {
+func (s *service) GetUserFromContext(ctx context.Context) (*store.User, error) {
 	identity, err := serverops.GetIdentity(ctx)
 	if err != nil {
 		return nil, err
@@ -57,7 +70,7 @@ func (s *Service) GetUserFromContext(ctx context.Context) (*store.User, error) {
 
 // Login authenticates a user given an email and password, and returns a JWT on success.
 // It verifies the password, loads permissions, and generates a JWT token.
-func (s *Service) Login(ctx context.Context, email, password string) (*Result, error) {
+func (s *service) Login(ctx context.Context, email, password string) (*Result, error) {
 	tx := s.dbInstance.WithoutTransaction()
 
 	// Retrieve user by email.
@@ -94,7 +107,7 @@ type Result struct {
 }
 
 // Register creates a new user and returns a JWT token for that user.
-func (s *Service) Register(ctx context.Context, req CreateUserRequest) (*Result, error) {
+func (s *service) Register(ctx context.Context, req CreateUserRequest) (*Result, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	req.AllowedResources = []CreateUserRequestAllowedResources{
 		{Name: serverops.DefaultServerGroup, Permission: store.PermissionNone.String(), ResourceType: store.ResourceTypeSystem},
@@ -142,7 +155,7 @@ type CreateUserRequestAllowedResources struct {
 	ResourceType string `json:"resourceType"`
 }
 
-func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*store.User, error) {
+func (s *service) CreateUser(ctx context.Context, req CreateUserRequest) (*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -155,7 +168,7 @@ func (s *Service) CreateUser(ctx context.Context, req CreateUserRequest) (*store
 	return user, nil
 }
 
-func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserRequest) (*store.User, error) {
+func (s *service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserRequest) (*store.User, error) {
 	id := uuid.NewString()
 	user := &store.User{
 		ID:           id,
@@ -200,7 +213,7 @@ func (s *Service) createUser(ctx context.Context, tx libdb.Exec, req CreateUserR
 	return user, nil
 }
 
-func (s *Service) GetUserByID(ctx context.Context, id string) (*store.User, error) {
+func (s *service) GetUserByID(ctx context.Context, id string) (*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -209,7 +222,7 @@ func (s *Service) GetUserByID(ctx context.Context, id string) (*store.User, erro
 	return s.getUserByID(ctx, tx, id)
 }
 
-func (s *Service) getUserByID(ctx context.Context, tx libdb.Exec, id string) (*store.User, error) {
+func (s *service) getUserByID(ctx context.Context, tx libdb.Exec, id string) (*store.User, error) {
 	user, err := store.New(tx).GetUserByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -217,7 +230,7 @@ func (s *Service) getUserByID(ctx context.Context, tx libdb.Exec, id string) (*s
 	return user, err
 }
 
-func (s *Service) getUserByEmail(ctx context.Context, tx libdb.Exec, email string) (*store.User, error) {
+func (s *service) getUserByEmail(ctx context.Context, tx libdb.Exec, email string) (*store.User, error) {
 	user, err := store.New(tx).GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -225,7 +238,7 @@ func (s *Service) getUserByEmail(ctx context.Context, tx libdb.Exec, email strin
 	return user, nil
 }
 
-func (s *Service) GetUserBySubject(ctx context.Context, subject string) (*store.User, error) {
+func (s *service) GetUserBySubject(ctx context.Context, subject string) (*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -233,7 +246,7 @@ func (s *Service) GetUserBySubject(ctx context.Context, subject string) (*store.
 	return s.getUserBySubject(ctx, subject)
 }
 
-func (s *Service) getUserBySubject(ctx context.Context, subject string) (*store.User, error) {
+func (s *service) getUserBySubject(ctx context.Context, subject string) (*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	user, err := store.New(tx).GetUserBySubject(ctx, subject)
 	if err != nil {
@@ -249,7 +262,7 @@ type UpdateUserRequest struct {
 }
 
 // UpdateUserFields fetches the user, applies allowed updates, and persists the changes.
-func (s *Service) UpdateUserFields(ctx context.Context, id string, req UpdateUserRequest) (*store.User, error) {
+func (s *service) UpdateUserFields(ctx context.Context, id string, req UpdateUserRequest) (*store.User, error) {
 	tx, commit, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -296,7 +309,7 @@ func (s *Service) UpdateUserFields(ctx context.Context, id string, req UpdateUse
 	return user, nil
 }
 
-func (s *Service) updateUser(ctx context.Context, tx libdb.Exec, user *store.User) error {
+func (s *service) updateUser(ctx context.Context, tx libdb.Exec, user *store.User) error {
 	userDst, err := store.New(tx).GetUserByID(ctx, user.ID)
 	if err != nil {
 		return err
@@ -315,7 +328,7 @@ func (s *Service) updateUser(ctx context.Context, tx libdb.Exec, user *store.Use
 	return nil
 }
 
-func (s *Service) DeleteUser(ctx context.Context, id string) error {
+func (s *service) DeleteUser(ctx context.Context, id string) error {
 	tx, commit, rTx, err := s.dbInstance.WithTransaction(ctx)
 	defer func() {
 		if err := rTx(); err != nil {
@@ -339,7 +352,7 @@ func (s *Service) DeleteUser(ctx context.Context, id string) error {
 	return commit(ctx)
 }
 
-func (s *Service) ListUsers(ctx context.Context, cursorCreatedAt time.Time) ([]*store.User, error) {
+func (s *service) ListUsers(ctx context.Context, cursorCreatedAt time.Time) ([]*store.User, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -347,10 +360,10 @@ func (s *Service) ListUsers(ctx context.Context, cursorCreatedAt time.Time) ([]*
 	return store.New(tx).ListUsers(ctx, cursorCreatedAt)
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "userservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }
