@@ -7,7 +7,6 @@ import (
 
 // MockTokenizer is a mock implementation of the Tokenizer interface.
 type MockTokenizer struct {
-	// Optionally configure behavior for tests
 	FixedTokenCount int
 	FixedModel      string
 	CustomTokens    map[string][]int
