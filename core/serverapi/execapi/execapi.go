@@ -8,7 +8,7 @@ import (
 	"github.com/contenox/contenox/core/taskengine"
 )
 
-func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService *execservice.ExecService, taskService *execservice.TasksEnvService) {
+func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService execservice.ExecService, taskService execservice.TasksEnvService) {
 	f := &taskManager{
 		promptService: promptService,
 		taskService:   taskService,
@@ -18,8 +18,8 @@ func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService *execs
 }
 
 type taskManager struct {
-	promptService *execservice.ExecService
-	taskService   *execservice.TasksEnvService
+	promptService execservice.ExecService
+	taskService   execservice.TasksEnvService
 }
 
 func (tm *taskManager) execute(w http.ResponseWriter, r *http.Request) {
