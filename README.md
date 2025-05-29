@@ -46,7 +46,7 @@ contenox is in **active development**. Building upon the foundational components
 * **API & UI Structure:** A **React frontend (`frontend/`)** provides the user interface, built using Vite. Key features include routing (`src/config/routes.tsx`), foundational pages (Login, Chat, Admin views for Users, Backends, Files, **Semantic Search**, Server Jobs), and secure **JWT authentication managed via a Backend-for-Frontend (BFF)** pattern (`src/lib/AuthProvider.tsx`, `src/hooks/`). A basic UI component library (`packages/ui`) is used.
 * **Basic Operations & CI:** The system is fully **containerized** (`Dockerfile.core`, `Dockerfile.tokenizer`, `Dockerfile.worker`, `compose.yaml`) with `make` targets for building, running (`make run`, `make ui-run`), and testing (`make api-test`). Basic Continuous Integration checks are operational.
 
-## 🛠️ Last Development Slice
+## 🛠️ Prior Development Slice
 
 -> Semantic Search
 * [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
@@ -66,7 +66,7 @@ Notes from the devslice:
 ## 🛠️ Current Development Slice
 
 -> Documents QA
-* [ ] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
+* [x] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
 
   Steps needed:
     * [x] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
