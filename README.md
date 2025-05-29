@@ -46,7 +46,7 @@ contenox is in **active development**. Building upon the foundational components
 * **API & UI Structure:** A **React frontend (`frontend/`)** provides the user interface, built using Vite. Key features include routing (`src/config/routes.tsx`), foundational pages (Login, Chat, Admin views for Users, Backends, Files, **Semantic Search**, Server Jobs), and secure **JWT authentication managed via a Backend-for-Frontend (BFF)** pattern (`src/lib/AuthProvider.tsx`, `src/hooks/`). A basic UI component library (`packages/ui`) is used.
 * **Basic Operations & CI:** The system is fully **containerized** (`Dockerfile.core`, `Dockerfile.tokenizer`, `Dockerfile.worker`, `compose.yaml`) with `make` targets for building, running (`make run`, `make ui-run`), and testing (`make api-test`). Basic Continuous Integration checks are operational.
 
-## 🛠️ Prior Development Slice
+## 🛠️ April Development Slice
 
 -> Semantic Search
 * [x] **UI-Search:** Develop a UI-Search page to demo semantic search.
@@ -63,10 +63,10 @@ contenox is in **active development**. Building upon the foundational components
 Notes from the devslice:
 - *Rationale for Vald:* Vald was selected over OpenSearch due to its specialized focus on high-performance/scalable vector search, resulting in simpler integration as a core engine component compared to OpenSearch's broad feature set. Additional benefits included its suitable gRPC API, improved type-safety within the Go ecosystem, and faster spin-up times for development environments.
 
-## 🛠️ Current Development Slice
+## 🛠️ May Development Slice
 
 -> Documents QA
-* [x] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents and maybe a brief summary why.
+* [x] **Build UI-Documents QA Page:** This is about a UI page where a user can ask a question in a natural language format and gets a response with the most relevant documents.
 
   Steps needed:
     * [x] **Expose Prompt via a Service:** Create a service that can be used to execute a prompt, for workers to chunk text using semantic understanding.
@@ -77,11 +77,17 @@ Notes from the devslice:
 
     ** Note: currently providing api documentation is not feasible.
 
-Development is dynamic, but the immediate priorities are centered on bringing the core features online:
+## 🛠️ Current Development Slice
 
-1. **Semantic Search:** Implementing search capabilities over ingested documents using vector embeddings.
-2. **Contextual Chat (RAG):** Enhancing chat sessions to utilize retrieved document context for grounded responses.
-3. **Task Handling (Templates):** Building the UI and backend logic for defining and executing simple user task templates.
+-> Packaging a Chat Application
+
+* [ ] **Integrate Observability**
+* [ ] **Prepare release infrastructure**
+* [ ] **RAG-enhanced chat interface:**
+* [ ] **Chat with support for execution of tasks as commands**
+* [ ] **Package a Persona-Chat Application**
+* [ ] **Registration route for new Persona-Chat-Users**
+* [ ] **Add API Rate Limiting middleware**
 
 ## ⚙️ Starting the Development Environment
 
