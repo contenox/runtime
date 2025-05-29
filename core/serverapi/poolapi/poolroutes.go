@@ -10,7 +10,7 @@ import (
 	"github.com/contenox/contenox/core/services/poolservice"
 )
 
-func AddPoolRoutes(mux *http.ServeMux, _ *serverops.Config, poolService *poolservice.Service) {
+func AddPoolRoutes(mux *http.ServeMux, _ *serverops.Config, poolService poolservice.Service) {
 	s := &poolHandler{service: poolService}
 
 	mux.HandleFunc("POST /pools", s.create)
@@ -35,7 +35,7 @@ func AddPoolRoutes(mux *http.ServeMux, _ *serverops.Config, poolService *poolser
 }
 
 type poolHandler struct {
-	service *poolservice.Service
+	service poolservice.Service
 }
 
 func (h *poolHandler) create(w http.ResponseWriter, r *http.Request) {

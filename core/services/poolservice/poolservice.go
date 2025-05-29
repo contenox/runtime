@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
 var (
@@ -15,15 +15,34 @@ var (
 	ErrNotFound    = libdb.ErrNotFound
 )
 
-type Service struct {
+type service struct {
 	dbInstance libdb.DBManager
 }
 
-func New(db libdb.DBManager) *Service {
-	return &Service{dbInstance: db}
+func New(db libdb.DBManager) Service {
+	return &service{dbInstance: db}
 }
 
-func (s *Service) Create(ctx context.Context, pool *store.Pool) error {
+type Service interface {
+	Create(ctx context.Context, pool *store.Pool) error
+	GetByID(ctx context.Context, id string) (*store.Pool, error)
+	GetByName(ctx context.Context, name string) (*store.Pool, error)
+	Update(ctx context.Context, pool *store.Pool) error
+	Delete(ctx context.Context, id string) error
+	ListAll(ctx context.Context) ([]*store.Pool, error)
+	ListByPurpose(ctx context.Context, purpose string) ([]*store.Pool, error)
+	AssignBackend(ctx context.Context, poolID, backendID string) error
+	RemoveBackend(ctx context.Context, poolID, backendID string) error
+	ListBackends(ctx context.Context, poolID string) ([]*store.Backend, error)
+	ListPoolsForBackend(ctx context.Context, backendID string) ([]*store.Pool, error)
+	AssignModel(ctx context.Context, poolID, modelID string) error
+	RemoveModel(ctx context.Context, poolID, modelID string) error
+	ListModels(ctx context.Context, poolID string) ([]*store.Model, error)
+	ListPoolsForModel(ctx context.Context, modelID string) ([]*store.Pool, error)
+	serverops.ServiceMeta
+}
+
+func (s *service) Create(ctx context.Context, pool *store.Pool) error {
 	pool.ID = uuid.New().String()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
@@ -32,7 +51,7 @@ func (s *Service) Create(ctx context.Context, pool *store.Pool) error {
 	return store.New(tx).CreatePool(ctx, pool)
 }
 
-func (s *Service) GetByID(ctx context.Context, id string) (*store.Pool, error) {
+func (s *service) GetByID(ctx context.Context, id string) (*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -40,7 +59,7 @@ func (s *Service) GetByID(ctx context.Context, id string) (*store.Pool, error) {
 	return store.New(tx).GetPool(ctx, id)
 }
 
-func (s *Service) GetByName(ctx context.Context, name string) (*store.Pool, error) {
+func (s *service) GetByName(ctx context.Context, name string) (*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -48,7 +67,7 @@ func (s *Service) GetByName(ctx context.Context, name string) (*store.Pool, erro
 	return store.New(tx).GetPoolByName(ctx, name)
 }
 
-func (s *Service) Update(ctx context.Context, pool *store.Pool) error {
+func (s *service) Update(ctx context.Context, pool *store.Pool) error {
 	if pool.ID == serverops.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
@@ -59,7 +78,7 @@ func (s *Service) Update(ctx context.Context, pool *store.Pool) error {
 	return store.New(tx).UpdatePool(ctx, pool)
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (s *service) Delete(ctx context.Context, id string) error {
 	if id == serverops.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
@@ -70,7 +89,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return store.New(tx).DeletePool(ctx, id)
 }
 
-func (s *Service) ListAll(ctx context.Context) ([]*store.Pool, error) {
+func (s *service) ListAll(ctx context.Context) ([]*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -78,7 +97,7 @@ func (s *Service) ListAll(ctx context.Context) ([]*store.Pool, error) {
 	return store.New(tx).ListPools(ctx)
 }
 
-func (s *Service) ListByPurpose(ctx context.Context, purpose string) ([]*store.Pool, error) {
+func (s *service) ListByPurpose(ctx context.Context, purpose string) ([]*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -86,7 +105,7 @@ func (s *Service) ListByPurpose(ctx context.Context, purpose string) ([]*store.P
 	return store.New(tx).ListPoolsByPurpose(ctx, purpose)
 }
 
-func (s *Service) AssignBackend(ctx context.Context, poolID, backendID string) error {
+func (s *service) AssignBackend(ctx context.Context, poolID, backendID string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -94,7 +113,7 @@ func (s *Service) AssignBackend(ctx context.Context, poolID, backendID string) e
 	return store.New(tx).AssignBackendToPool(ctx, poolID, backendID)
 }
 
-func (s *Service) RemoveBackend(ctx context.Context, poolID, backendID string) error {
+func (s *service) RemoveBackend(ctx context.Context, poolID, backendID string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -102,7 +121,7 @@ func (s *Service) RemoveBackend(ctx context.Context, poolID, backendID string) e
 	return store.New(tx).RemoveBackendFromPool(ctx, poolID, backendID)
 }
 
-func (s *Service) ListBackends(ctx context.Context, poolID string) ([]*store.Backend, error) {
+func (s *service) ListBackends(ctx context.Context, poolID string) ([]*store.Backend, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -110,7 +129,7 @@ func (s *Service) ListBackends(ctx context.Context, poolID string) ([]*store.Bac
 	return store.New(tx).ListBackendsForPool(ctx, poolID)
 }
 
-func (s *Service) ListPoolsForBackend(ctx context.Context, backendID string) ([]*store.Pool, error) {
+func (s *service) ListPoolsForBackend(ctx context.Context, backendID string) ([]*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -118,7 +137,7 @@ func (s *Service) ListPoolsForBackend(ctx context.Context, backendID string) ([]
 	return store.New(tx).ListPoolsForBackend(ctx, backendID)
 }
 
-func (s *Service) AssignModel(ctx context.Context, poolID, modelID string) error {
+func (s *service) AssignModel(ctx context.Context, poolID, modelID string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -126,7 +145,7 @@ func (s *Service) AssignModel(ctx context.Context, poolID, modelID string) error
 	return store.New(tx).AssignModelToPool(ctx, poolID, modelID)
 }
 
-func (s *Service) RemoveModel(ctx context.Context, poolID, modelID string) error {
+func (s *service) RemoveModel(ctx context.Context, poolID, modelID string) error {
 	if poolID == serverops.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
@@ -137,7 +156,7 @@ func (s *Service) RemoveModel(ctx context.Context, poolID, modelID string) error
 	return store.New(tx).RemoveModelFromPool(ctx, poolID, modelID)
 }
 
-func (s *Service) ListModels(ctx context.Context, poolID string) ([]*store.Model, error) {
+func (s *service) ListModels(ctx context.Context, poolID string) ([]*store.Model, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -145,7 +164,7 @@ func (s *Service) ListModels(ctx context.Context, poolID string) ([]*store.Model
 	return store.New(tx).ListModelsForPool(ctx, poolID)
 }
 
-func (s *Service) ListPoolsForModel(ctx context.Context, modelID string) ([]*store.Pool, error) {
+func (s *service) ListPoolsForModel(ctx context.Context, modelID string) ([]*store.Pool, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -153,10 +172,10 @@ func (s *Service) ListPoolsForModel(ctx context.Context, modelID string) ([]*sto
 	return store.New(tx).ListPoolsForModel(ctx, modelID)
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "poolservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }
