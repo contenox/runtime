@@ -4,20 +4,30 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
-type Service struct {
+type service struct {
 	dbInstance      libdb.DBManager
 	securityEnabled bool
 	jwtSecret       string
 }
 
-func New(db libdb.DBManager) *Service {
-	return &Service{dbInstance: db}
+func New(db libdb.DBManager) Service {
+	return &service{dbInstance: db}
+}
+
+type Service interface {
+	serverops.ServiceMeta
+	Create(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error)
+	GetByID(ctx context.Context, entry AccessEntryRequest) (*AccessEntryRequest, error)
+	Update(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error)
+	Delete(ctx context.Context, id string) error
+	ListAll(ctx context.Context, starting time.Time, withDetails bool) ([]AccessEntryRequest, error)
+	ListByIdentity(ctx context.Context, identity string, withDetails bool) ([]AccessEntryRequest, error)
 }
 
 type AccessEntryRequest struct {
@@ -48,7 +58,7 @@ type UserMetadata struct {
 	Subject      string `json:"subject"`
 }
 
-func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
+func (s *service) Create(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -84,7 +94,7 @@ func (s *Service) Create(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	return s.getByID(ctx, tx, id, withDetails)
 }
 
-func (s *Service) GetByID(ctx context.Context, entry AccessEntryRequest) (*AccessEntryRequest, error) {
+func (s *service) GetByID(ctx context.Context, entry AccessEntryRequest) (*AccessEntryRequest, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -96,7 +106,7 @@ func (s *Service) GetByID(ctx context.Context, entry AccessEntryRequest) (*Acces
 	return s.getByID(ctx, tx, entry.ID, withDetails)
 }
 
-func (s *Service) getByID(ctx context.Context, tx libdb.Exec, id string, withUser bool) (*AccessEntryRequest, error) {
+func (s *service) getByID(ctx context.Context, tx libdb.Exec, id string, withUser bool) (*AccessEntryRequest, error) {
 	entry, err := store.New(tx).GetAccessEntryByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -124,7 +134,7 @@ func (s *Service) getByID(ctx context.Context, tx libdb.Exec, id string, withUse
 	return res, err
 }
 
-func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
+func (s *service) Update(ctx context.Context, entry *AccessEntryRequest) (*AccessEntryRequest, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -156,7 +166,7 @@ func (s *Service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 	return s.getByID(ctx, tx, entry.ID, withDetails)
 }
 
-func (s *Service) Delete(ctx context.Context, id string) error {
+func (s *service) Delete(ctx context.Context, id string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -165,7 +175,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails bool) ([]AccessEntryRequest, error) {
+func (s *service) ListAll(ctx context.Context, starting time.Time, withDetails bool) ([]AccessEntryRequest, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -214,7 +224,7 @@ func (s *Service) ListAll(ctx context.Context, starting time.Time, withDetails b
 	return cE, err
 }
 
-func (s *Service) ListByIdentity(ctx context.Context, identity string, withDetails bool) ([]AccessEntryRequest, error) {
+func (s *service) ListByIdentity(ctx context.Context, identity string, withDetails bool) ([]AccessEntryRequest, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
@@ -260,10 +270,10 @@ type LoginArgs struct {
 	JWTExpiry  string
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "accessservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/contenox/contenox/core/services/accessservice"
 )
 
-func AddAccessRoutes(mux *http.ServeMux, _ *serverops.Config, accessService *accessservice.Service) {
+func AddAccessRoutes(mux *http.ServeMux, _ *serverops.Config, accessService accessservice.Service) {
 	a := &accessManager{service: accessService}
 
 	mux.HandleFunc("POST /access-control", a.create)
@@ -22,7 +22,7 @@ func AddAccessRoutes(mux *http.ServeMux, _ *serverops.Config, accessService *acc
 }
 
 type accessManager struct {
-	service *accessservice.Service
+	service accessservice.Service
 }
 
 func (a *accessManager) create(w http.ResponseWriter, r *http.Request) {

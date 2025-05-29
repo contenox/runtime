@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/backendservice"
+	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
 )
 
-func AddBackendRoutes(mux *http.ServeMux, _ *serverops.Config, backendService *backendservice.Service, stateService *runtimestate.State) {
+func AddBackendRoutes(mux *http.ServeMux, _ *serverops.Config, backendService backendservice.Service, stateService *runtimestate.State) {
 	b := &backendManager{service: backendService, stateService: stateService}
 
 	mux.HandleFunc("POST /backends", b.create)
@@ -38,7 +38,7 @@ type respBackendList struct {
 }
 
 type backendManager struct {
-	service      *backendservice.Service
+	service      backendservice.Service
 	stateService *runtimestate.State
 }
 
