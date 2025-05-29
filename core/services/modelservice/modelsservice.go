@@ -14,19 +14,29 @@ var (
 	ErrInvalidModel = errors.New("invalid model data")
 )
 
-type Service struct {
+type service struct {
 	dbInstance              libdb.DBManager
 	immutableEmbedModelName string
 }
 
-func New(db libdb.DBManager, config *serverops.Config) *Service {
-	return &Service{
+type Service interface {
+	serverops.ServiceMeta
+
+	serverops.ServiceMeta
+
+	Append(ctx context.Context, model *store.Model) error
+	List(ctx context.Context) ([]*store.Model, error)
+	Delete(ctx context.Context, modelName string) error
+}
+
+func New(db libdb.DBManager, config *serverops.Config) Service {
+	return &service{
 		dbInstance:              db,
 		immutableEmbedModelName: config.EmbedModel,
 	}
 }
 
-func (s *Service) Append(ctx context.Context, model *store.Model) error {
+func (s *service) Append(ctx context.Context, model *store.Model) error {
 	if err := validate(model); err != nil {
 		return err
 	}
@@ -37,7 +47,7 @@ func (s *Service) Append(ctx context.Context, model *store.Model) error {
 	return store.New(tx).AppendModel(ctx, model)
 }
 
-func (s *Service) List(ctx context.Context) ([]*store.Model, error) {
+func (s *service) List(ctx context.Context) ([]*store.Model, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
@@ -45,7 +55,7 @@ func (s *Service) List(ctx context.Context) ([]*store.Model, error) {
 	return store.New(tx).ListModels(ctx)
 }
 
-func (s *Service) Delete(ctx context.Context, modelName string) error {
+func (s *service) Delete(ctx context.Context, modelName string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if modelName == s.immutableEmbedModelName {
 		return serverops.ErrImmutableModel
@@ -63,10 +73,10 @@ func validate(model *store.Model) error {
 	return nil
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "modelservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
 }

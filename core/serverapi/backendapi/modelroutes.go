@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/downloadservice"
 	"github.com/contenox/contenox/core/services/modelservice"
+	"github.com/google/uuid"
 )
 
-func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService *modelservice.Service, dwService downloadservice.Service) {
+func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService modelservice.Service, dwService downloadservice.Service) {
 	s := &service{service: modelService, dwService: dwService}
 
 	mux.HandleFunc("POST /models", s.append)
@@ -21,7 +21,7 @@ func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService *model
 }
 
 type service struct {
-	service   *modelservice.Service
+	service   modelservice.Service
 	dwService downloadservice.Service
 }
 
