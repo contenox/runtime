@@ -17,6 +17,15 @@ type RagHook struct {
 	topK         int
 }
 
+func NewRagHook(embedder llmrepo.ModelRepo, vectorsStore vectors.Store, dbInstance libdb.DBManager, topK int) *RagHook {
+	return &RagHook{
+		embedder:     embedder,
+		vectorsStore: vectorsStore,
+		dbInstance:   dbInstance,
+		topK:         topK,
+	}
+}
+
 var _ taskengine.HookRepo = (*RagHook)(nil)
 
 func (h *RagHook) Exec(ctx context.Context, hook *taskengine.HookCall) (int, any, error) {

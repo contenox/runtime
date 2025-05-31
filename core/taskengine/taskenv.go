@@ -15,6 +15,8 @@ import (
 )
 
 const StatusSuccess = 1
+const StatusUnknownHookProvider = 2
+const StatusError = 3
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.
 //
