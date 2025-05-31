@@ -9,7 +9,7 @@ import (
 	"github.com/contenox/contenox/core/services/indexservice"
 )
 
-func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService *indexservice.Service) {
+func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService indexservice.Service) {
 	f := &indexManager{
 		service: indexService,
 	}
@@ -18,7 +18,7 @@ func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService *index
 }
 
 type indexManager struct {
-	service *indexservice.Service
+	service indexservice.Service
 }
 
 func (im *indexManager) index(w http.ResponseWriter, r *http.Request) {

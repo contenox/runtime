@@ -15,15 +15,21 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 )
 
-type Service struct {
+type Service interface {
+	Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error)
+	Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error)
+	serverops.ServiceMeta
+}
+
+type service struct {
 	embedder   llmrepo.ModelRepo
 	promptExec llmrepo.ModelRepo
 	vectors    vectors.Store
 	db         libdb.DBManager
 }
 
-func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) *Service {
-	return &Service{
+func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) Service {
+	return &service{
 		embedder:   embedder,
 		promptExec: promptExec,
 		vectors:    vectors,
@@ -45,7 +51,7 @@ type IndexResponse struct {
 	AugmentedMetadata []string `json:"augmentedMetadata"`
 }
 
-func (s *Service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
+func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
 	if request.LeaserID == "" {
 		return nil, serverops.ErrMissingParameter
 	}
@@ -169,7 +175,7 @@ type SearchResponse struct {
 	TriedQueries []string                 `json:"triedQuery"`
 }
 
-func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
+func (s *service) Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error) {
 	tx := s.db.WithoutTransaction()
 	storeInstance := store.New(tx)
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
@@ -231,7 +237,7 @@ func (s *Service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	}, nil
 }
 
-func (s *Service) findKeywords(ctx context.Context, chunk string) (string, error) {
+func (s *service) findKeywords(ctx context.Context, chunk string) (string, error) {
 	prompt := fmt.Sprintf(`Extract 5-7 keywords from the following text:
 
 	%s
@@ -256,7 +262,7 @@ func (s *Service) findKeywords(ctx context.Context, chunk string) (string, error
 	return response, nil
 }
 
-func (s *Service) classifyQuestion(ctx context.Context, input string) (bool, error) {
+func (s *service) classifyQuestion(ctx context.Context, input string) (bool, error) {
 	prompt := fmt.Sprintf(`Analyze if the following input is a question? Answer strictly with "yes" or "no".
 
 	Input: %s`, input)
@@ -269,7 +275,7 @@ func (s *Service) classifyQuestion(ctx context.Context, input string) (bool, err
 	return strings.EqualFold(strings.TrimSpace(response), "yes"), nil
 }
 
-func (s *Service) convertQuestionQuery(ctx context.Context, query string) (string, error) {
+func (s *service) convertQuestionQuery(ctx context.Context, query string) (string, error) {
 	promptTemplate := `Convert the following question into a search query using exactly the original keywords by removing question words.
 
 	Input: %s
@@ -280,7 +286,7 @@ func (s *Service) convertQuestionQuery(ctx context.Context, query string) (strin
 	return s.executePrompt(ctx, prompt)
 }
 
-func (s *Service) executePrompt(ctx context.Context, prompt string) (string, error) {
+func (s *service) executePrompt(ctx context.Context, prompt string) (string, error) {
 	provider, err := s.promptExec.GetProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)
@@ -301,10 +307,10 @@ func (s *Service) executePrompt(ctx context.Context, prompt string) (string, err
 	return strings.TrimSpace(response), nil
 }
 
-func (s *Service) GetServiceName() string {
+func (s *service) GetServiceName() string {
 	return "indexservice"
 }
 
-func (s *Service) GetServiceGroup() string {
+func (s *service) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup // TODO: is that accurate?
 }
