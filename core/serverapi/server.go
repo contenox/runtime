@@ -48,6 +48,7 @@ func New(
 	environmentExec taskengine.EnvExecutor,
 	state *runtimestate.State,
 	vectorStore vectors.Store,
+	hookRegistry taskengine.HookRegistry,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -111,7 +112,7 @@ func New(
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	execService := execservice.NewExec(ctx, execmodelrepo, dbInstance)
-	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance)
+	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance, hookRegistry)
 	execapi.AddExecRoutes(mux, config, execService, taskService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)

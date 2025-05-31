@@ -16,6 +16,7 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
 	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/contenox/core/taskengine/hooks"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
@@ -113,14 +114,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing promptexec failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, &taskengine.MockHookRepo{}) // TODO
-	if err != nil {
-		log.Fatalf("initializing task engine engine failed: %v", err)
-	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec)
-	if err != nil {
-		log.Fatalf("initializing task engine failed: %v", err)
-	}
+
 	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: time.Second * 10, // TODO: Make this configurable
 		SearchArgs: vectors.SearchArgs{
@@ -131,8 +125,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
+	rag := hooks.NewRagHook(embedder, vectorStore, dbInstance, 5)
+	webcall := hooks.NewWebhookCaller()
+	hookrepo := taskengine.NewSimpleHookProvider(map[string]taskengine.HookRepo{
+		"rag":     rag,
+		"webhook": webcall,
+	})
+	exec, err := taskengine.NewExec(ctx, execRepo, hookrepo)
+	if err != nil {
+		log.Fatalf("initializing task engine engine failed: %v", err)
+	}
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec)
+	if err != nil {
+		log.Fatalf("initializing task engine failed: %v", err)
+	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hookrepo)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

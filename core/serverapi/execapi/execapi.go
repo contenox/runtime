@@ -15,6 +15,7 @@ func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService execse
 	}
 	mux.HandleFunc("POST /execute", f.execute)
 	mux.HandleFunc("POST /tasks", f.tasks)
+	mux.HandleFunc("GET /supported", f.supported)
 }
 
 type taskManager struct {
@@ -54,5 +55,15 @@ func (tm *taskManager) tasks(w http.ResponseWriter, r *http.Request) {
 		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
 		return
 	}
+	_ = serverops.Encode(w, r, http.StatusOK, resp)
+}
+
+func (tm *taskManager) supported(w http.ResponseWriter, r *http.Request) {
+	resp, err := tm.taskService.Supports(r.Context())
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
+	}
+
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }

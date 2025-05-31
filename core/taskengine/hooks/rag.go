@@ -36,3 +36,7 @@ func (h *RagHook) Exec(ctx context.Context, hook *taskengine.HookCall) (int, any
 
 	return taskengine.StatusSuccess, data, nil
 }
+
+func (h *RagHook) Supports(ctx context.Context) ([]string, error) {
+	return []string{"rag"}, nil
+}

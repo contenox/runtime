@@ -35,7 +35,7 @@ func TestTasksservice(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, taskengine.NewMockHookProvider())
+	exec, err := taskengine.NewExec(ctx, execRepo, taskengine.NewMockHookRegistry())
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestTasksservice(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}
-	service := execservice.NewTasksEnv(ctx, env, dbInstance)
+	service := execservice.NewTasksEnv(ctx, env, dbInstance, taskengine.NewMockHookRegistry())
 
 	require.Eventually(t, func() bool {
 		currentState := state.Get(ctx)

@@ -35,7 +35,7 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Provider: mockProvider,
 	}
 
-	exec, err := taskengine.NewExec(context.Background(), mockRepo, taskengine.NewMockHookProvider())
+	exec, err := taskengine.NewExec(context.Background(), mockRepo, taskengine.NewMockHookRegistry())
 	require.NoError(t, err)
 
 	task := &taskengine.ChainTask{

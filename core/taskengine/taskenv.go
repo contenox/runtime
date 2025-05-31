@@ -32,6 +32,11 @@ var ErrUnsupportedTaskType = errors.New("executor does not support the task type
 // and to conduct side effects on internal state.
 type HookRepo interface {
 	Exec(ctx context.Context, args *HookCall) (int, any, error)
+	HookRegistry
+}
+
+type HookRegistry interface {
+	Supports(ctx context.Context) ([]string, error)
 }
 
 // SimpleEnv is the default implementation of EnvExecutor.

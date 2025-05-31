@@ -11,8 +11,8 @@ type MockHookRepo struct {
 	ResponseMap map[string]any
 }
 
-// NewMockHookProvider returns a new instance of MockHookProvider.
-func NewMockHookProvider() *MockHookRepo {
+// NewMockHookRegistry returns a new instance of MockHookProvider.
+func NewMockHookRegistry() *MockHookRepo {
 	return &MockHookRepo{
 		ResponseMap: make(map[string]any),
 	}
@@ -31,3 +31,9 @@ func (m *MockHookRepo) Exec(ctx context.Context, args *HookCall) (int, any, erro
 	// Default behavior
 	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Type), nil
 }
+
+func (m *MockHookRepo) Supports(ctx context.Context) ([]string, error) {
+	return []string{"mock"}, nil
+}
+
+var _ HookRegistry = (*MockHookRepo)(nil)

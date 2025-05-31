@@ -148,4 +148,8 @@ func (h *WebhookCaller) Exec(ctx context.Context, hook *taskengine.HookCall) (in
 	return taskengine.StatusError, nil, fmt.Errorf("webhook failed with status %d: %s", resp.StatusCode, string(respBody))
 }
 
+func (h *WebhookCaller) Supports(ctx context.Context) ([]string, error) {
+	return []string{"webhook"}, nil
+}
+
 var _ taskengine.HookRepo = (*WebhookCaller)(nil)

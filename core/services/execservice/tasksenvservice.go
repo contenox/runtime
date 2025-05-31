@@ -12,17 +12,20 @@ import (
 type TasksEnvService interface {
 	Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error)
 	serverops.ServiceMeta
+	taskengine.HookRegistry
 }
 
 type tasksEnvService struct {
 	environmentExec taskengine.EnvExecutor
 	db              libdb.DBManager
+	hookRegistry    taskengine.HookRegistry
 }
 
-func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, dbInstance libdb.DBManager) TasksEnvService {
+func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, dbInstance libdb.DBManager, hookRegistry taskengine.HookRegistry) TasksEnvService {
 	return &tasksEnvService{
 		environmentExec: environmentExec,
 		db:              dbInstance,
+		hookRegistry:    hookRegistry,
 	}
 }
 
@@ -44,4 +47,8 @@ func (s *tasksEnvService) GetServiceName() string {
 
 func (s *tasksEnvService) GetServiceGroup() string {
 	return serverops.DefaultDefaultServiceGroup
+}
+
+func (s *tasksEnvService) Supports(ctx context.Context) ([]string, error) {
+	return s.hookRegistry.Supports(ctx)
 }

@@ -52,6 +52,10 @@ func (d *activityTrackerTaskEnvDecorator) GetServiceGroup() string {
 	return d.service.GetServiceGroup()
 }
 
+func (d *activityTrackerTaskEnvDecorator) Supports(ctx context.Context) ([]string, error) {
+	return d.service.Supports(ctx)
+}
+
 func EnvWithActivityTracker(service TasksEnvService, tracker serverops.ActivityTracker) TasksEnvService {
 	return &activityTrackerTaskEnvDecorator{
 		service: service,
