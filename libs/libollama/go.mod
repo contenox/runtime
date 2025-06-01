@@ -5,7 +5,10 @@ go 1.24.1
 // why? that's why: github.com/apache/arrow/go/arrow -> github.com/ollama/ollama/server
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
-require github.com/ollama/ollama v0.6.5
+require (
+	github.com/ollama/ollama v0.6.5
+	github.com/stretchr/testify v1.10.0
+)
 
 require (
 	github.com/agnivade/levenshtein v1.1.1 // indirect
@@ -17,6 +20,7 @@ require (
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/d4l3k/go-bfloat16 v0.0.0-20211005043715-690c3bdd05f1 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/emirpasic/gods/v2 v2.0.0-alpha // indirect
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
@@ -42,6 +46,7 @@ require (
 	github.com/pdevine/tensor v0.0.0-20240510204454-f88f4562727c // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

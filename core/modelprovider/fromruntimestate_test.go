@@ -65,7 +65,7 @@ func TestModelProviderAdapter_SetsChatCapabilityNotEmbed(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	chatModelName := "llama3:latest"           // A model known to support chat by default
-	embedModelName := "all-minilm:33m"         // A model *not* known to support embed by default
+	embedModelName := "granite-embedding:30m"  // A model known to support embed by default
 	unknownModelName := "some-random-model:v1" // A model not in default maps
 	backendID := "backend-test"
 	backendURL := "http://host:1234"

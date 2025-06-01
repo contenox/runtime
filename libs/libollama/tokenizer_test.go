@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	"github.com/contenox/contenox/libs/libollama"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTokenize(t *testing.T) {
@@ -289,4 +290,20 @@ func TestConcurrentTokenization(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestTokenCount(t *testing.T) {
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	tokenizer, err := libollama.NewTokenizer(
+		libollama.TokenizerWithHTTPClient(httpClient),
+		libollama.TokenizerWithFallbackModel("granite-embedding-30m"),
+	)
+	require.NoError(t, err)
+
+	testText := "This is a benchmark test string for measuring embedding performance"
+	tokenCount, err := tokenizer.CountTokens("granite-embedding-30m", testText)
+	require.NoError(t, err)
+
+	t.Logf("Token count for benchmark text: %d", tokenCount)
+	require.Equal(t, 13, tokenCount)
 }

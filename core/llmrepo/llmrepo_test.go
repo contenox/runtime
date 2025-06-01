@@ -23,7 +23,7 @@ import (
 func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager, *runtimestate.State, func(), error) {
 	ctx := context.Background()
 	config := &serverops.Config{
-		EmbedModel:          "all-minilm:33m",
+		EmbedModel:          "granite-embedding:30m",
 		JWTExpiry:           "1h",
 		WorkerUserEmail:     "worker@internal",
 		WorkerUserPassword:  "securepassword",
@@ -92,7 +92,7 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 			t.Logf("error compacting JSON: %v", err)
 			return false
 		}
-		return strings.Contains(string(r), `"name":"all-minilm:33m"`)
+		return strings.Contains(string(r), `"name":"granite-embedding:30m"`)
 	}, 1*time.Minute, 100*time.Millisecond)
 	// reuse state for other testcases.
 	t.Run("test get runtime", func(t *testing.T) {

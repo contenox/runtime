@@ -214,7 +214,7 @@ func TestPoolBasedModelAssignment(t *testing.T) {
 	require.NoError(t, err)
 
 	// 3. Create model and assign to pool
-	modelName := "all-minilm:33m"
+	modelName := "granite-embedding:30m"
 	modelID := uuid.NewString()
 	err = dbStore.AppendModel(ctx, &store.Model{
 		ID:    modelID,

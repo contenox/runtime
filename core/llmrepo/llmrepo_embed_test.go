@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ func BenchmarkEmbedding(b *testing.B) {
 	}
 	require.NoError(b, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
 	time.Sleep(time.Second * 10)
+
 	// Ensure the model is downloaded and ready
 	require.Eventually(b, func() bool {
 		currentState := state.Get(ctx)
@@ -41,7 +43,7 @@ func BenchmarkEmbedding(b *testing.B) {
 			b.Logf("error compacting JSON: %v", err)
 			return false
 		}
-		return strings.Contains(dst.String(), `"name":"all-minilm:33m"`)
+		return strings.Contains(dst.String(), `"name":"granite-embedding:30m"`)
 	}, 1*time.Minute, 1*time.Second)
 
 	provider, err := embedder.GetProvider(ctx)
@@ -49,13 +51,36 @@ func BenchmarkEmbedding(b *testing.B) {
 
 	embedClient, err := provider.GetEmbedConnection(backend.BaseURL)
 	require.NoError(b, err)
-
 	testText := "This is a benchmark test string for measuring embedding performance"
+	tokenCount := 13
+	require.NoError(b, err)
 
-	// Only measure the loop, not setup
+	var totalTokens int64
+	var totalLatency time.Duration
+
+	// Warmup the embedding client
+	_, err = embedClient.Embed(ctx, testText)
+	require.NoError(b, err)
+
+	// Reset timer after all setup
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
+		start := time.Now().UTC()
 		_, err := embedClient.Embed(ctx, testText)
 		require.NoError(b, err)
+		elapsed := time.Since(start)
+
+		atomic.AddInt64(&totalTokens, int64(tokenCount))
+		atomic.AddInt64((*int64)(&totalLatency), elapsed.Nanoseconds())
 	}
+
+	// Compute and report additional metrics
+	totalLatencySeconds := float64(totalLatency) / float64(time.Second)
+	tokensPerSecond := float64(totalTokens) / totalLatencySeconds
+	reqsPerSecond := float64(b.N) / totalLatencySeconds
+
+	b.ReportMetric(totalLatencySeconds, "avg-sec/request")
+	b.ReportMetric(tokensPerSecond, "tokens/sec")
+	b.ReportMetric(reqsPerSecond, "reqs/sec")
 }

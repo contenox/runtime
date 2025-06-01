@@ -19,7 +19,7 @@ func (c *OllamaEmbedClient) Embed(ctx context.Context, text string) ([]float64, 
 		Prompt: text,
 	}
 
-	resp, err := c.ollamaClient.Embeddings(context.Background(), req)
+	resp, err := c.ollamaClient.Embeddings(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("embedding request failed: %w", err)
 	}

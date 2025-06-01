@@ -207,11 +207,11 @@ var (
 	}
 
 	canEmbed = map[string]bool{
-		"deepseek":         true,
-		"qwen":             true,
-		"all-minilm":       true,
-		"all-minilm:33m":   true,
-		"nomic-embed-text": true,
+		"deepseek":              true,
+		"qwen":                  true,
+		"all-minilm":            true,
+		"granite-embedding:30m": true,
+		"nomic-embed-text":      true,
 	}
 
 	canPrompt = map[string]bool{
