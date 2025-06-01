@@ -100,7 +100,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, err := h.manager.Chat(ctx, chatID.String(), req.Message)
+	reply, _, err := h.manager.Chat(ctx, chatID.String(), req.Message)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

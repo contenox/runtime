@@ -21,7 +21,7 @@ const tokenizerMaxPromptBytes = 16 * 1024 // 16 KiB
 
 type Service interface {
 	GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error)
-	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error)
+	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, error)
 	ListChats(ctx context.Context) ([]ChatSession, error)
 	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
@@ -106,23 +106,23 @@ func (s *service) AddInstruction(ctx context.Context, id string, message string)
 	return nil
 }
 
-func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, error) {
+func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
 	now := time.Now().UTC()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	// TODO: check authorization for the chat instance.
 	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	// Convert stored messages into the api.Message slice.
 	var messages []serverops.Message
 	for _, msg := range conversation {
 		var parsedMsg serverops.Message
 		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
-			return "", fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
+			return "", 0, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
 		}
 		messages = append(messages, parsedMsg)
 	}
@@ -133,7 +133,7 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 	messages = append(messages, msg)
 	contextLength, err := s.CalculateContextSize(ctx, messages)
 	if err != nil {
-		return "", fmt.Errorf("could not estimate context size %w", err)
+		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
 	}
 	convertedMessage := make([]api.Message, len(messages))
 	for i, m := range messages {
@@ -147,11 +147,11 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 		ModelNames:    preferredModelNames,
 	}, modelprovider.ModelProviderAdapter(ctx, s.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve backend %w", err)
+		return "", contextLength, fmt.Errorf("failed to resolve backend %w", err)
 	}
 	responseMessage, err := chatClient.Chat(ctx, messages)
 	if err != nil {
-		return "", fmt.Errorf("failed to chat %w", err)
+		return "", contextLength, fmt.Errorf("failed to chat %w", err)
 	}
 	assistantMsgData := serverops.Message{
 		Role:    responseMessage.Role,
@@ -159,11 +159,11 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 	}
 	jsonData, err := json.Marshal(assistantMsgData)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal assistant message data: %w", err)
+		return "", contextLength, fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
 	payload, err := json.Marshal(&msg)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal user message %w", err)
+		return "", contextLength, fmt.Errorf("failed to marshal user message %w", err)
 	}
 	err = store.New(tx).AppendMessages(ctx,
 		&store.Message{
@@ -179,10 +179,10 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 			AddedAt: time.Now().UTC(),
 		})
 	if err != nil {
-		return "", err
+		return "", contextLength, err
 	}
 
-	return responseMessage.Content, nil
+	return responseMessage.Content, contextLength, nil
 }
 
 // ChatMessage is the public representation of a message in a chat.
