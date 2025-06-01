@@ -169,19 +169,24 @@ func TestLongConversation(t *testing.T) {
 			"How does working in a prompt affect the output of an LLM?",
 			"Why do same prompts produce different outputs?",
 		}
-
+		startTime := time.Now().UTC()
+		tokens := 0
 		for i, userMsg := range userMessages {
 			t.Logf("====================================================================================\n")
 			t.Logf("Sending message %d: %s \n", i+1, userMsg)
-			response, _, err := manager.Chat(ctx, instanceID, userMsg, model)
-
+			response, tokenCount, err := manager.Chat(ctx, instanceID, userMsg, model)
+			tokens += tokenCount
 			require.NoError(t, err, "Chat interaction failed for message %d", i+1)
 			require.NotEmpty(t, response, "Assistant response should not be empty for message %d", i+1)
 			require.Greater(t, len(response), 5)
 			t.Logf("Received response %d: %s \n", i+1, response)
 			t.Logf("====================================================================================\n")
 		}
-
+		finishTime := time.Now().UTC()
+		duration := finishTime.Sub(startTime)
+		tokenPerSecond := float64(tokens) / duration.Seconds()
+		t.Logf("tokens/second %v", tokenPerSecond)
+		require.GreaterOrEqual(t, tokenPerSecond, 1, "Token rate should be at least 1 tokens per second was %v", tokenPerSecond)
 		history, err := manager.GetChatHistory(ctx, instanceID)
 		require.NoError(t, err, "Failed to get chat history")
 
