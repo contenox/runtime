@@ -112,23 +112,6 @@ func (d *activityTrackerDecorator) ListChats(ctx context.Context) ([]ChatSession
 	return sessions, err
 }
 
-func (d *activityTrackerDecorator) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
-	reportErrFn, _, endFn := d.tracker.Start(
-		ctx,
-		"calculate",
-		"context-size",
-		"model", baseModels[0],
-	)
-	defer endFn()
-
-	size, err := d.service.CalculateContextSize(ctx, messages, baseModels...)
-	if err != nil {
-		reportErrFn(err)
-	}
-
-	return size, err
-}
-
 func (d *activityTrackerDecorator) GetServiceName() string {
 	return d.service.GetServiceName()
 }

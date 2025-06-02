@@ -25,7 +25,6 @@ type Service interface {
 	ListChats(ctx context.Context) ([]ChatSession, error)
 	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
-	CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error)
 	serverops.ServiceMeta
 }
 
@@ -139,7 +138,7 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 		Content: message,
 	}
 	messages = append(messages, msg)
-	contextLength, err := s.CalculateContextSize(ctx, messages)
+	contextLength, err := s.calculateContextSize(ctx, messages)
 	if err != nil {
 		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
 	}
@@ -271,7 +270,7 @@ type ModelResult struct {
 	MaxTokens  int // Max token length for the model.
 }
 
-func (s *service) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
+func (s *service) calculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
 	var prompt string
 	for _, m := range messages {
 		if m.Role == "user" {
