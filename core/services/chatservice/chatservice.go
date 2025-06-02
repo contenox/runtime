@@ -112,6 +112,14 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", 0, err
 	}
+	response, tokenCount, err := s.chat(ctx, tx, now, subjectID, message, preferredModelNames...)
+	if err != nil {
+		return "", 0, err
+	}
+	return response, tokenCount, nil
+}
+
+func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
 	// TODO: check authorization for the chat instance.
 	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
@@ -170,7 +178,7 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 			ID:      uuid.NewString(),
 			IDX:     subjectID,
 			Payload: payload,
-			AddedAt: now,
+			AddedAt: beginTime,
 		},
 		&store.Message{
 			ID:      uuid.New().String(),
