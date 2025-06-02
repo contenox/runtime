@@ -91,6 +91,7 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", 0, err
 	}
+
 	response, tokenCount, err := s.manager.Chat(ctx, tx, now, subjectID, message, preferredModelNames...)
 	if err != nil {
 		return "", 0, err

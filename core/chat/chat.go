@@ -75,9 +75,12 @@ func (m *Manager) Chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 		Content: message,
 	}
 	messages = append(messages, userMsg)
-
+	contextLength, err := m.CalculateContextSize(ctx, messages)
+	if err != nil {
+		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
+	}
 	// Use chatExec to handle the chat logic
-	responseMessage, contextLength, err := m.ChatExec(ctx, messages, preferredModelNames...)
+	responseMessage, contextLength, err := m.ChatExec(ctx, messages, contextLength, preferredModelNames...)
 	if err != nil {
 		return "", contextLength, err
 	}
@@ -122,17 +125,14 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 	return nil
 }
 
-func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, preferredModelNames ...string) (*serverops.Message, int, error) {
+func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, error) {
 	if len(messages) == 0 {
 		return nil, 0, errors.New("no messages provided")
 	}
 	if messages[len(messages)-1].Role != "user" {
 		return nil, 0, errors.New("last message must be from user")
 	}
-	contextLength, err := m.calculateContextSize(ctx, messages)
-	if err != nil {
-		return nil, contextLength, fmt.Errorf("could not estimate context size %w", err)
-	}
+
 	convertedMessage := make([]api.Message, len(messages))
 	for i, m := range messages {
 		convertedMessage[i] = api.Message{
@@ -158,7 +158,8 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, pr
 
 	return &assistantMsgData, contextLength, nil
 }
-func (m *Manager) calculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
+
+func (m *Manager) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
 	var prompt string
 	for _, m := range messages {
 		if m.Role == "user" {
