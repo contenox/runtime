@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverapi/backendapi"
@@ -101,7 +102,9 @@ func New(
 	if err != nil {
 		return nil, cleanup, err
 	}
-	chatService := chatservice.New(state, dbInstance, tokenizerSvc)
+	manager := chat.New(state, tokenizerSvc)
+
+	chatService := chatservice.New(dbInstance, tokenizerSvc, manager)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
 	usersapi.AddUserRoutes(mux, config, userService)

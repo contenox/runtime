@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/chatservice"
@@ -29,8 +30,9 @@ func TestChat(t *testing.T) {
 	})
 	require.NoError(t, err)
 	tokenizer := tokenizerservice.MockTokenizer{}
+	manager := chat.New(backendState, tokenizer)
 	t.Run("creating new chat instance", func(t *testing.T) {
-		manager := chatservice.New(backendState, dbInstance, tokenizer)
+		manager := chatservice.New(dbInstance, tokenizer, manager)
 
 		// Test valid model
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
@@ -39,7 +41,7 @@ func TestChat(t *testing.T) {
 	})
 
 	t.Run("simple chat interaction tests", func(t *testing.T) {
-		manager := chatservice.New(backendState, dbInstance, tokenizer)
+		manager := chatservice.New(dbInstance, tokenizer, manager)
 
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
 		require.NoError(t, err)
@@ -51,7 +53,7 @@ func TestChat(t *testing.T) {
 	})
 
 	t.Run("test chat history via interactions", func(t *testing.T) {
-		manager := chatservice.New(backendState, dbInstance, tokenizer)
+		manager := chatservice.New(dbInstance, tokenizer, manager)
 
 		// Create new chat instance
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
@@ -144,8 +146,10 @@ func TestLongConversation(t *testing.T) {
 		Subject:      userSubjectID,
 	})
 	require.NoError(t, err)
+	manager := chat.New(backendState, tokenizer)
+
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
-		manager := chatservice.New(backendState, dbInstance, tokenizer)
+		manager := chatservice.New(dbInstance, tokenizer, manager)
 
 		model := "smollm2:135m"
 		subject := "user-long-convo"
