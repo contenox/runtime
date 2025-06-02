@@ -134,45 +134,38 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 		}
 		messages = append(messages, parsedMsg)
 	}
-	msg := serverops.Message{
+	userMsg := serverops.Message{
 		Role:    "user",
 		Content: message,
 	}
-	messages = append(messages, msg)
-	contextLength, err := s.calculateContextSize(ctx, messages)
+	messages = append(messages, userMsg)
+
+	// Use chatExec to handle the chat logic
+	responseMessage, contextLength, err := s.chatExec(ctx, messages, preferredModelNames...)
 	if err != nil {
-		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
+		return "", contextLength, err
 	}
-	payload, err := json.Marshal(&msg)
+
+	// Use appendMessages to handle message storage
+	err = s.appendMessages(ctx, tx, beginTime, subjectID, &userMsg, responseMessage)
 	if err != nil {
-		return "", contextLength, fmt.Errorf("failed to marshal user message %w", err)
+		return "", contextLength, err
 	}
-	convertedMessage := make([]api.Message, len(messages))
-	for i, m := range messages {
-		convertedMessage[i] = api.Message{
-			Role:    m.Role,
-			Content: m.Content,
-		}
-	}
-	chatClient, err := llmresolver.Chat(ctx, llmresolver.Request{
-		ContextLength: contextLength,
-		ModelNames:    preferredModelNames,
-	}, modelprovider.ModelProviderAdapter(ctx, s.state.Get(ctx)), llmresolver.Randomly)
+
+	return responseMessage.Content, contextLength, nil
+}
+
+func (s *service) appendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *serverops.Message, responseMessage *serverops.Message) error {
+	payload, err := json.Marshal(inputMessage)
 	if err != nil {
-		return "", contextLength, fmt.Errorf("failed to resolve backend %w", err)
+		return fmt.Errorf("failed to marshal user message %w", err)
 	}
-	responseMessage, err := chatClient.Chat(ctx, messages)
+
+	jsonData, err := json.Marshal(responseMessage)
 	if err != nil {
-		return "", contextLength, fmt.Errorf("failed to chat %w", err)
+		return fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
-	assistantMsgData := serverops.Message{
-		Role:    responseMessage.Role,
-		Content: responseMessage.Content,
-	}
-	jsonData, err := json.Marshal(assistantMsgData)
-	if err != nil {
-		return "", contextLength, fmt.Errorf("failed to marshal assistant message data: %w", err)
-	}
+
 	err = store.New(tx).AppendMessages(ctx,
 		&store.Message{
 			ID:      uuid.NewString(),
@@ -187,10 +180,10 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 			AddedAt: time.Now().UTC(),
 		})
 	if err != nil {
-		return "", contextLength, err
+		return err
 	}
 
-	return responseMessage.Content, contextLength, nil
+	return nil
 }
 
 func (s *service) chatExec(ctx context.Context, messages []serverops.Message, preferredModelNames ...string) (*serverops.Message, int, error) {
