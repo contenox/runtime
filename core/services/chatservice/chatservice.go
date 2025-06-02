@@ -3,6 +3,7 @@ package chatservice
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -190,6 +191,43 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 	}
 
 	return responseMessage.Content, contextLength, nil
+}
+
+func (s *service) chatExec(ctx context.Context, messages []serverops.Message, preferredModelNames ...string) (*serverops.Message, int, error) {
+	if len(messages) == 0 {
+		return nil, 0, errors.New("no messages provided")
+	}
+	if messages[len(messages)-1].Role != "user" {
+		return nil, 0, errors.New("last message must be from user")
+	}
+	contextLength, err := s.calculateContextSize(ctx, messages)
+	if err != nil {
+		return nil, contextLength, fmt.Errorf("could not estimate context size %w", err)
+	}
+	convertedMessage := make([]api.Message, len(messages))
+	for i, m := range messages {
+		convertedMessage[i] = api.Message{
+			Role:    m.Role,
+			Content: m.Content,
+		}
+	}
+	chatClient, err := llmresolver.Chat(ctx, llmresolver.Request{
+		ContextLength: contextLength,
+		ModelNames:    preferredModelNames,
+	}, modelprovider.ModelProviderAdapter(ctx, s.state.Get(ctx)), llmresolver.Randomly)
+	if err != nil {
+		return nil, contextLength, fmt.Errorf("failed to resolve backend %w", err)
+	}
+	responseMessage, err := chatClient.Chat(ctx, messages)
+	if err != nil {
+		return nil, contextLength, fmt.Errorf("failed to chat %w", err)
+	}
+	assistantMsgData := serverops.Message{
+		Role:    responseMessage.Role,
+		Content: responseMessage.Content,
+	}
+
+	return &assistantMsgData, contextLength, nil
 }
 
 // ChatMessage is the public representation of a message in a chat.
