@@ -142,6 +142,10 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 	if err != nil {
 		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
 	}
+	payload, err := json.Marshal(&msg)
+	if err != nil {
+		return "", contextLength, fmt.Errorf("failed to marshal user message %w", err)
+	}
 	convertedMessage := make([]api.Message, len(messages))
 	for i, m := range messages {
 		convertedMessage[i] = api.Message{
@@ -167,10 +171,6 @@ func (s *service) chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 	jsonData, err := json.Marshal(assistantMsgData)
 	if err != nil {
 		return "", contextLength, fmt.Errorf("failed to marshal assistant message data: %w", err)
-	}
-	payload, err := json.Marshal(&msg)
-	if err != nil {
-		return "", contextLength, fmt.Errorf("failed to marshal user message %w", err)
 	}
 	err = store.New(tx).AppendMessages(ctx,
 		&store.Message{
