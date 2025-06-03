@@ -22,7 +22,7 @@ const StatusError = 3
 //
 // It handles task transitions, error recovery, retry logic, and output tracking.
 type EnvExecutor interface {
-	ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error)
+	ExecEnv(ctx context.Context, chain *ChainDefinition, input any) (any, error)
 }
 
 // ErrUnsupportedTaskType is returned when a TaskExecutor does not recognize the task type.
@@ -64,7 +64,7 @@ func NewEnv(
 //
 // It manages the full lifecycle of task execution: rendering prompts, calling the
 // TaskExecutor, handling timeouts, retries, transitions, and collecting final output.
-func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input string) (any, error) {
+func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any) (any, error) {
 	vars := map[string]any{
 		"input": input,
 	}

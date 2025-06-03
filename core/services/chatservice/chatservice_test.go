@@ -190,7 +190,7 @@ func TestLongConversation(t *testing.T) {
 		duration := finishTime.Sub(startTime)
 		tokenPerSecond := float64(tokens) / duration.Seconds()
 		t.Logf("tokens/second %v", tokenPerSecond)
-		require.GreaterOrEqual(t, tokenPerSecond, 1, "Token rate should be at least 1 tokens per second was %v", tokenPerSecond)
+		require.GreaterOrEqual(t, tokenPerSecond, float64(1), "Token rate should be at least 1 tokens per second was %v", tokenPerSecond)
 		history, err := manager.GetChatHistory(ctx, instanceID)
 		require.NoError(t, err, "Failed to get chat history")
 

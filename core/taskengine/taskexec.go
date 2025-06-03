@@ -14,7 +14,7 @@ import (
 // It consumes a prompt and resolver policy, and returns structured output
 // alongside the raw LLM response.
 type TaskExecutor interface {
-	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error)
+	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any) (any, string, error)
 }
 
 // SimpleExec is a basic implementation of TaskExecutor.
@@ -135,31 +135,51 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 // TaskExec dispatches task execution based on the task type.
 // It handles prompt-based task types like string, number, score, condition, and range,
 // as well as custom hook invocations.
-func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, renderedPrompt string) (any, string, error) {
+func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any) (any, string, error) {
 	var rawResponse string
 	var taskErr error
 	var output any
 	switch currentTask.Type {
 	case PromptToString:
-		rawResponse, taskErr = exe.Prompt(taskCtx, resolver, renderedPrompt)
+		prompt, ok := input.(string)
+		if !ok {
+			return nil, "", fmt.Errorf("input is not a string")
+		}
+		rawResponse, taskErr = exe.Prompt(taskCtx, resolver, prompt)
 		output = rawResponse
 	case PromptToCondition:
 		var hit bool
-		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, renderedPrompt)
+		prompt, ok := input.(string)
+		if !ok {
+			return nil, "", fmt.Errorf("input is not a string")
+		}
+		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, prompt)
 		output = hit
 		rawResponse = strconv.FormatBool(hit)
 	case PromptToNumber:
 		var number int
-		number, taskErr = exe.number(taskCtx, resolver, renderedPrompt)
+		prompt, ok := input.(string)
+		if !ok {
+			return nil, "", fmt.Errorf("input is not a string")
+		}
+		number, taskErr = exe.number(taskCtx, resolver, prompt)
 		output = number
 		rawResponse = strconv.FormatInt(int64(number), 10)
 	case PromptToScore:
 		var score float64
-		score, taskErr = exe.score(taskCtx, resolver, renderedPrompt)
+		prompt, ok := input.(string)
+		if !ok {
+			return nil, "", fmt.Errorf("input is not a string")
+		}
+		score, taskErr = exe.score(taskCtx, resolver, prompt)
 		output = score
 		rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
 	case PromptToRange:
-		rawResponse, taskErr = exe.rang(taskCtx, resolver, renderedPrompt)
+		prompt, ok := input.(string)
+		if !ok {
+			return nil, "", fmt.Errorf("input is not a string")
+		}
+		rawResponse, taskErr = exe.rang(taskCtx, resolver, prompt)
 		output = rawResponse
 	case Hook:
 		if currentTask.Hook == nil {

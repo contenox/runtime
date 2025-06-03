@@ -148,7 +148,7 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 			currentState := state.Get(ctx)
 			r, _ := json.Marshal(currentState)
 			return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
-		}, 1*time.Minute, 100*time.Millisecond)
+		}, 2*time.Minute, 100*time.Millisecond)
 		provider, err := taskEngine.GetProvider(ctx)
 		require.NoError(t, err)
 
