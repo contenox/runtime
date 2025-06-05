@@ -16,7 +16,7 @@ const (
 	PromptToScore TaskType = "score"
 
 	// PromptToRange expects a numeric range like "5-7", or defaults to N-N for single numbers.
-	PromptToRange TaskType = "PromptToRange"
+	PromptToRange TaskType = "range"
 
 	// PromptToString returns the raw string result from the LLM.
 	PromptToString TaskType = "string"
