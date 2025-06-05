@@ -57,24 +57,14 @@ func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, 
 
 func (m *Manager) Chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
 	// TODO: check authorization for the chat instance.
-	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
+	messages, err := m.ListMessages(ctx, tx, subjectID)
 	if err != nil {
 		return "", 0, err
 	}
-	// Convert stored messages into the api.Message slice.
-	var messages []serverops.Message
-	for _, msg := range conversation {
-		var parsedMsg serverops.Message
-		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
-			return "", 0, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
-		}
-		messages = append(messages, parsedMsg)
+	messages, err = m.AppendMessage(ctx, messages, message, "user")
+	if err != nil {
+		return "", 0, err
 	}
-	userMsg := serverops.Message{
-		Role:    "user",
-		Content: message,
-	}
-	messages = append(messages, userMsg)
 	contextLength, err := m.CalculateContextSize(ctx, messages)
 	if err != nil {
 		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
@@ -85,13 +75,45 @@ func (m *Manager) Chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, 
 		return "", contextLength, err
 	}
 
-	// Use appendMessages to handle message storage
-	err = m.AppendMessages(ctx, tx, beginTime, subjectID, &userMsg, responseMessage)
+	err = m.AppendMessages(ctx, tx, beginTime, subjectID, &serverops.Message{
+		Role:    "user",
+		Content: message,
+	},
+		responseMessage,
+	)
 	if err != nil {
 		return "", contextLength, err
 	}
 
 	return responseMessage.Content, contextLength, nil
+}
+
+func (m *Manager) AppendMessage(ctx context.Context, messages []serverops.Message, message string, role string) ([]serverops.Message, error) {
+	userMsg := serverops.Message{
+		Role:    role,
+		Content: message,
+	}
+	messages = append(messages, userMsg)
+
+	return messages, nil
+}
+
+func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID string) ([]serverops.Message, error) {
+	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
+	if err != nil {
+		return nil, err
+	}
+	// Convert stored messages into the api.Message slice.
+	var messages []serverops.Message
+	for _, msg := range conversation {
+		var parsedMsg serverops.Message
+		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
+			return nil, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
+		}
+		messages = append(messages, parsedMsg)
+	}
+
+	return messages, nil
 }
 
 func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *serverops.Message, responseMessage *serverops.Message) error {
