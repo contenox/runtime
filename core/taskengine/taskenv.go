@@ -31,7 +31,7 @@ var ErrUnsupportedTaskType = errors.New("executor does not support the task type
 // HookRepo defines an interface for external system integrations
 // and to conduct side effects on internal state.
 type HookRepo interface {
-	Exec(ctx context.Context, args *HookCall) (int, any, error)
+	Exec(ctx context.Context, input any, args *HookCall) (int, any, error)
 	HookRegistry
 }
 

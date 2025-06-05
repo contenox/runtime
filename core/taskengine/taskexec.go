@@ -185,7 +185,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
 		} else {
-			output, taskErr = exe.hookengine(taskCtx, *currentTask.Hook)
+			output, taskErr = exe.hookengine(taskCtx, output, *currentTask.Hook)
 			rawResponse = fmt.Sprintf("%v", output)
 		}
 	default:
@@ -197,8 +197,8 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 
 // hookengine is a placeholder for future hook execution support using the hookProvider.
 // Currently unimplemented.
-func (exe *SimpleExec) hookengine(ctx context.Context, hook HookCall) (any, error) {
-	status, res, err := exe.hookProvider.Exec(ctx, &hook)
+func (exe *SimpleExec) hookengine(ctx context.Context, input any, hook HookCall) (any, error) {
+	status, res, err := exe.hookProvider.Exec(ctx, input, &hook)
 	if err != nil {
 		return nil, err
 	}

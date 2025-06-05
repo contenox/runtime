@@ -83,9 +83,6 @@ type HookCall struct {
 	// Type is the registered hook name to invoke (e.g., "send_email").
 	Type string `yaml:"name" json:"name"`
 
-	// Input is an optional prompt input to pass through before invoking the hook.
-	Input string `yaml:"input,omitempty" json:"input,omitempty"`
-
 	// Args are key-value pairs to parameterize the hook call.
 	Args map[string]string `yaml:"args,omitempty" json:"args"`
 

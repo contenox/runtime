@@ -15,9 +15,9 @@ func NewSimpleHookProvider(hooks map[string]HookRepo) *SimpleHookRepo {
 	}
 }
 
-func (m *SimpleHookRepo) Exec(ctx context.Context, args *HookCall) (int, any, error) {
+func (m *SimpleHookRepo) Exec(ctx context.Context, input any, args *HookCall) (int, any, error) {
 	if hook, ok := m.hooks[args.Type]; ok {
-		return hook.Exec(ctx, args)
+		return hook.Exec(ctx, input, args)
 	}
 	return StatusUnknownHookProvider, nil, fmt.Errorf("unknown hook type: %s", args.Type)
 }

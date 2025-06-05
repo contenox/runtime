@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"context"
+	"errors"
 
 	"github.com/contenox/contenox/core/indexrepo"
 	"github.com/contenox/contenox/core/llmrepo"
@@ -28,8 +29,12 @@ func NewRagHook(embedder llmrepo.ModelRepo, vectorsStore vectors.Store, dbInstan
 
 var _ taskengine.HookRepo = (*RagHook)(nil)
 
-func (h *RagHook) Exec(ctx context.Context, hook *taskengine.HookCall) (int, any, error) {
-	data, err := indexrepo.ResolveBlobFromQuery(ctx, h.embedder, h.vectorsStore, h.dbInstance.WithoutTransaction(), hook.Input, h.topK)
+func (h *RagHook) Exec(ctx context.Context, input any, hook *taskengine.HookCall) (int, any, error) {
+	in, ok := input.(string)
+	if !ok {
+		return taskengine.StatusError, nil, errors.New("input must be a string")
+	}
+	data, err := indexrepo.ResolveBlobFromQuery(ctx, h.embedder, h.vectorsStore, h.dbInstance.WithoutTransaction(), in, h.topK)
 	if err != nil {
 		return 0, nil, err
 	}

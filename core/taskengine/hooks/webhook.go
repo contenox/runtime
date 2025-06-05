@@ -56,7 +56,7 @@ func WithDefaultHeader(key, value string) WebhookOption {
 }
 
 // Exec implements the HookRepo interface
-func (h *WebhookCaller) Exec(ctx context.Context, hook *taskengine.HookCall) (int, any, error) {
+func (h *WebhookCaller) Exec(ctx context.Context, input any, hook *taskengine.HookCall) (int, any, error) {
 	// Get URL from args
 	rawURL, ok := hook.Args["url"]
 	if !ok {
@@ -83,17 +83,24 @@ func (h *WebhookCaller) Exec(ctx context.Context, hook *taskengine.HookCall) (in
 	if m, ok := hook.Args["method"]; ok {
 		method = m
 	}
+	if method == "POST" && input == nil {
+		return taskengine.StatusError, nil, fmt.Errorf("missing input for POST request")
+	}
 
 	// Prepare request body
 	var body io.Reader
-	if hook.Input != "" {
+	if method == "POST" {
+		in, ok := input.(string)
+		if !ok {
+			return taskengine.StatusError, nil, fmt.Errorf("invalid input type for POST request")
+		}
 		// If input is JSON, send as-is
-		if json.Valid([]byte(hook.Input)) {
-			body = bytes.NewBufferString(hook.Input)
+		if json.Valid([]byte(in)) {
+			body = bytes.NewBufferString(in)
 		} else {
 			// Otherwise wrap in JSON
 			payload := map[string]interface{}{
-				"message": hook.Input,
+				"message": in,
 				"data":    hook.Args,
 			}
 			jsonData, err := json.Marshal(payload)

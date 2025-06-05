@@ -19,7 +19,7 @@ func NewMockHookRegistry() *MockHookRepo {
 }
 
 // Exec simulates execution of a hook call.
-func (m *MockHookRepo) Exec(ctx context.Context, args *HookCall) (int, any, error) {
+func (m *MockHookRepo) Exec(ctx context.Context, _ any, args *HookCall) (int, any, error) {
 	// Record call
 	m.Calls = append(m.Calls, *args)
 
