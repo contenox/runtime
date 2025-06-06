@@ -1,20 +1,15 @@
 package serverapi_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/serverapi"
@@ -23,9 +18,7 @@ import (
 	"github.com/contenox/contenox/core/serverapi/indexapi"
 	"github.com/contenox/contenox/core/serverapi/usersapi"
 	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
-	"github.com/contenox/contenox/core/services/dispatchservice"
 	"github.com/contenox/contenox/core/services/fileservice"
 	"github.com/contenox/contenox/core/services/indexservice"
 	"github.com/contenox/contenox/core/services/testingsetup"
@@ -35,10 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkerPipe(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
+func TestWorkerPipeSmoketest(t *testing.T) {
 	port := rand.Intn(16383) + 49152
 	config := &serverops.Config{
 		JWTExpiry:       "1h",
@@ -50,33 +40,44 @@ func TestWorkerPipe(t *testing.T) {
 		SecurityEnabled: "true",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
+		WithServiceManager(config).
 		WithDBConn("test").
 		WithDBManager().
 		WithPubSub().
 		WithOllama().
 		WithState().
 		WithBackend().
-		WithModel("smollm2:135m").
 		RunState().
 		RunDownloadManager().
 		WithDefaultUser().
-		WaitForModel("smollm2:135m").
-		Build().Unzip()
-	defer cleanup()
-	if err != nil {
-		t.Fatal(err)
+		Build()
+	defer testenv.Cleanup()
+	if testenv.Err != nil {
+		t.Fatal(testenv.Err)
 	}
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
+	embedder, err := testenv.NewEmbedder(config)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+	tastexec, err := testenv.NewExecRepo(config)
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	uri, _, cleanup2, err := vectors.SetupLocalInstance(ctx, "../../")
+	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
+	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
+
+	provider, err := embedder.GetProvider(testenv.Ctx)
+	if err != nil {
+		log.Fatalf("initializing embedding provider failed: %v", err)
+	}
+	_, err = testenv.GetEmbedConnection(provider)
+	if err != nil {
+		log.Fatalf("initializing exec repo failed: %v", err)
+	}
+	uri, _, cleanup2, err := vectors.SetupLocalInstance(testenv.Ctx, "../../")
 	defer cleanup2()
 	if err != nil {
 		t.Fatal(err)
@@ -90,10 +91,17 @@ func TestWorkerPipe(t *testing.T) {
 		// OK
 	})
 
-	fileService := fileservice.New(dbInstance, config)
-	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
+	fileService, err := testenv.NewFileservice(config)
+	if err != nil {
+		log.Fatalf("initializing file service failed: %v", err)
+	}
+	fileVectorizationJobCreator, err := testenv.NewFileVectorizationJobCreator(config)
+	if err != nil {
+		log.Fatalf("initializing file vectorization job creator failed: %v", err)
+	}
+	fileService = fileservice.WithActivityTracker(fileService, fileVectorizationJobCreator)
 	filesapi.AddFileRoutes(mux, config, fileService)
-
+	ctx := testenv.Ctx
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
@@ -105,10 +113,16 @@ func TestWorkerPipe(t *testing.T) {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	defer cleanup4()
-	indexService := indexservice.New(ctx, embedder, execRepo, vectorStore, dbInstance)
+	indexService, err := testenv.NewIndexService(config, vectorStore, embedder, tastexec)
+	if err != nil {
+		log.Fatalf("initializing index service failed: %v", err)
+	}
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	userService := userservice.New(dbInstance, config)
+	userService, err := testenv.NewUserservice(config)
+	if err != nil {
+		log.Fatalf("initializing user service failed: %v", err)
+	}
 	res, err := userService.Register(ctx, userservice.CreateUserRequest{
 		Email:        serverops.DefaultAdminUser,
 		FriendlyName: "Admin",
@@ -120,89 +134,18 @@ func TestWorkerPipe(t *testing.T) {
 	usersapi.AddAuthRoutes(mux, userService)
 	ctx = context.WithValue(ctx, libauth.ContextTokenKey, res.Token)
 
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, err := json.Marshal(currentState)
-		if err != nil {
-			t.Logf("error marshaling state: %v", err)
-			return false
-		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
-		}
-		return strings.Contains(string(r), `"name":"nomic-embed-text:latest"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, err := json.Marshal(currentState)
-		if err != nil {
-			t.Logf("error marshaling state: %v", err)
-			return false
-		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
-		}
-		return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
-	}, 2*time.Minute, 100*time.Millisecond)
-	runtime := state.Get(ctx)
-	url := ""
-	backendID := ""
-	found := false
-	foundExecModel := false
-	for _, runtimeState := range runtime {
-		url = runtimeState.Backend.BaseURL
-		backendID = runtimeState.Backend.ID
-		for _, lmr := range runtimeState.PulledModels {
-			if lmr.Model == "nomic-embed-text:latest" {
-				found = true
-			}
-			if lmr.Model == "qwen2.5:0.5b" {
-				foundExecModel = true
-			}
-		}
-		if found && foundExecModel {
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("nomic-embed-text:latest not found")
-	}
-	if !foundExecModel {
-		t.Fatalf("qwen2.5:0.5b not found")
-	}
-	_ = url
-	err = store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backendID)
-	if err != nil {
-		t.Fatalf("failed to assign backend to pool: %v", err)
-	}
 	// sanity check
 	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 		ModelName: "nomic-embed-text:latest",
-	}, modelprovider.ModelProviderAdapter(ctx, state.Get(ctx)), llmresolver.Randomly)
+	}, modelprovider.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
 	}
-	// sanity-check 2
-	backends, err := store.New(dbInstance.WithoutTransaction()).ListBackendsForPool(ctx, serverops.EmbedPoolID)
+
+	dispatcher, err := testenv.NewDispatchService(config)
 	if err != nil {
-		t.Fatalf("failed to list backends for pool: %v", err)
+		t.Fatal(err)
 	}
-	found2 := false
-	for _, backend2 := range backends {
-		found2 = backend2.ID == backendID
-		if found2 {
-			break
-		}
-	}
-	if !found2 {
-		t.Fatalf("backend not found in pool")
-	}
-	dispatcher := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatcher)
 	handler := serverapi.JWTMiddleware(config, mux)
 	go func() {
@@ -297,7 +240,7 @@ func TestWorkerPipe(t *testing.T) {
 		if len(results) < 1 {
 			t.Fatalf("expected at least one vector, got %d", len(results))
 		}
-		chunk, err := store.New(dbInstance.WithoutTransaction()).GetChunkIndexByID(ctx, results[0].ID)
+		chunk, err := testenv.Store().GetChunkIndexByID(ctx, results[0].ID)
 		if err != nil {
 			t.Fatalf("failed to get chunk index by ID: %v", err)
 		}

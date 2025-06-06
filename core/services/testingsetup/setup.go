@@ -13,6 +13,11 @@ import (
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/contenox/core/serverops/vectors"
+	"github.com/contenox/contenox/core/services/dispatchservice"
+	"github.com/contenox/contenox/core/services/fileservice"
+	"github.com/contenox/contenox/core/services/indexservice"
+	"github.com/contenox/contenox/core/services/userservice"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
@@ -49,7 +54,7 @@ func New(ctx context.Context, tracker serverops.ActivityTracker) *Builder {
 	}
 }
 
-func (builder *Builder) WithServiceManager(expiry string) *Builder {
+func (builder *Builder) WithServiceManager(config *serverops.Config) *Builder {
 	if builder.Err != nil {
 		return builder
 	}
@@ -58,9 +63,7 @@ func (builder *Builder) WithServiceManager(expiry string) *Builder {
 	reportErr, _, end := builder.tracker.Start(builder.ctx, "setup", "service_manager")
 	defer end()
 
-	err := serverops.NewServiceManager(&serverops.Config{
-		JWTExpiry: expiry,
-	})
+	err := serverops.NewServiceManager(config)
 	if err != nil {
 		builder.Err = fmt.Errorf("failed to create new service manager: %v", err)
 		reportErr(err)
@@ -739,4 +742,106 @@ func (env *Environment) WaitForModel(model string) *Environment {
 	})
 
 	return env
+}
+
+func (env *Environment) NewFileservice(config *serverops.Config) (fileservice.Service, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if env.dbManager == nil {
+		return nil, fmt.Errorf("dbManager is nil")
+	}
+
+	if env.state == nil {
+		return nil, fmt.Errorf("state is nil")
+	}
+
+	if env.backends == nil {
+		return nil, fmt.Errorf("backends is nil")
+	}
+
+	return fileservice.New(env.dbManager, config), nil
+}
+
+func (env *Environment) NewFileVectorizationJobCreator(config *serverops.Config) (serverops.ActivityTracker, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if env.dbManager == nil {
+		return nil, fmt.Errorf("dbManager is nil")
+	}
+
+	if env.state == nil {
+		return nil, fmt.Errorf("state is nil")
+	}
+
+	if env.backends == nil {
+		return nil, fmt.Errorf("backends is nil")
+	}
+
+	return fileservice.NewFileVectorizationJobCreator(env.dbManager), nil
+}
+
+func (env *Environment) NewIndexService(config *serverops.Config, vectorstore vectors.Store, embedder llmrepo.ModelRepo, promptExec llmrepo.ModelRepo) (indexservice.Service, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if env.dbManager == nil {
+		return nil, fmt.Errorf("dbManager is nil")
+	}
+
+	if env.state == nil {
+		return nil, fmt.Errorf("state is nil")
+	}
+
+	if env.backends == nil {
+		return nil, fmt.Errorf("backends is nil")
+	}
+
+	return indexservice.New(env.Ctx, embedder, promptExec, vectorstore, env.dbManager), nil
+}
+
+func (env *Environment) NewUserservice(config *serverops.Config) (userservice.Service, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if env.dbManager == nil {
+		return nil, fmt.Errorf("dbManager is nil")
+	}
+
+	return userservice.New(env.dbManager, config), nil
+}
+
+func (env *Environment) NewDispatchService(config *serverops.Config) (dispatchservice.Service, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if env.dbManager == nil {
+		return nil, fmt.Errorf("dbManager is nil")
+	}
+
+	if env.state == nil {
+		return nil, fmt.Errorf("state is nil")
+	}
+
+	if env.backends == nil {
+		return nil, fmt.Errorf("backends is nil")
+	}
+
+	return dispatchservice.New(env.dbManager, config), nil
 }
