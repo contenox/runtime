@@ -127,29 +127,6 @@ func TestChatSmoketest(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, hist, 0)
 	})
-}
-
-// TestLongConversation simulates a more extended interaction with the chat service.
-func TestLongConversationSmoketest(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
-		WithTriggerChan().
-		WithDBConn("test").
-		WithDBManager().
-		WithPubSub().
-		WithOllama().
-		WithState().
-		WithBackend().
-		WithModel("smollm2:135m").
-		RunState().
-		RunDownloadManager().
-		WithDefaultUser().
-		WaitForModel("smollm2:135m").
-		Build()
-	defer cleanup()
-	require.NoError(t, err)
-
-	tokenizer := tokenizerservice.MockTokenizer{}
-	manager := chat.New(backendState, tokenizer)
 
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
 		manager := chatservice.New(dbInstance, tokenizer, manager)

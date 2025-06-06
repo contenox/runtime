@@ -171,6 +171,7 @@ func (builder *Builder) WithState() *Builder {
 	builder.state = backendState
 	return builder
 }
+
 func (builder *Builder) WithOllama() *Builder {
 	if builder.Err != nil {
 		return builder
