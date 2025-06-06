@@ -2,6 +2,7 @@ package execservice_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log"
 	"strings"
@@ -26,11 +27,22 @@ func TestTasksservice(t *testing.T) {
 		TasksModel: "qwen2.5:3b",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
-	if err != nil {
-		log.Fatalf("failed to init test %s", err)
-	}
+	ctx, state, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+		WithTriggerChan().
+		WithDBConn("test").
+		WithDBManager().
+		WithPubSub().
+		WithOllama().
+		WithState().
+		WithBackend().
+		WithModel("smollm2:135m").
+		RunState().
+		RunDownloadManager().
+		WithDefaultUser().
+		WaitForModel("smollm2:135m").
+		Build()
 	defer cleanup()
+	require.NoError(t, err)
 	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)

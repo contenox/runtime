@@ -192,6 +192,10 @@ func (builder *Builder) WithOllama() *Builder {
 	return builder
 }
 
+func (builder *Builder) WithDefaultUser() *Builder {
+	return builder.WithUser("John Doe", "string@strings.com", serverops.DefaultAdminUser)
+}
+
 func (builder *Builder) WithBackend() *Builder {
 	if builder.Err != nil {
 		return builder
@@ -259,6 +263,44 @@ func (builder *Builder) WithModel(model string) *Builder {
 	return builder
 }
 
+func (builder *Builder) WithUser(email string, friendlyName string, subjectID string) *Builder {
+	if builder.Err != nil {
+		return builder
+	}
+
+	if email == "" || friendlyName == "" {
+		builder.Err = fmt.Errorf("email and friendlyName cannot be empty")
+		return builder
+	}
+
+	// Track this operation
+	reportErr, reportChange, end := builder.tracker.Start(builder.ctx, "create", "user")
+	defer end()
+
+	storeInstance := store.New(builder.dbManager.WithoutTransaction())
+	userID := uuid.NewString()
+
+	err := storeInstance.CreateUser(builder.ctx, &store.User{
+		ID:           userID,
+		FriendlyName: friendlyName,
+		Email:        email,
+		Subject:      subjectID,
+	})
+	if err != nil {
+		builder.Err = fmt.Errorf("failed to create user: %v", err)
+		reportErr(err)
+		return builder
+	}
+
+	reportChange(userID, map[string]interface{}{
+		"email":  email,
+		"name":   friendlyName,
+		"status": "created",
+	})
+
+	return builder
+}
+
 func (builder *Builder) WaitForModel(model string) *Builder {
 	if builder.Err != nil {
 		return builder
@@ -303,19 +345,19 @@ func (builder *Builder) WaitForModel(model string) *Builder {
 	return builder
 }
 
-func (builder *Builder) Build(ctx context.Context) (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
+func (builder *Builder) Build() (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
 	if builder.Err != nil {
-		return ctx, nil, nil, nil, builder.Err
+		return builder.ctx, nil, nil, nil, builder.Err
 	}
 	if builder.state == nil {
 		builder.Err = fmt.Errorf("state is nil")
-		return ctx, nil, nil, nil, builder.Err
+		return builder.ctx, nil, nil, nil, builder.Err
 	}
 	if builder.dbManager == nil {
 		builder.Err = fmt.Errorf("dbManager is nil")
-		return ctx, nil, nil, nil, builder.Err
+		return builder.ctx, nil, nil, nil, builder.Err
 	}
-	return ctx, builder.state, builder.dbManager, func() {
+	return builder.ctx, builder.state, builder.dbManager, func() {
 		for _, v := range builder.cleanups {
 			v()
 		}
@@ -387,75 +429,4 @@ func DefaultConfig() *serverops.Config {
 	return &serverops.Config{
 		JWTExpiry: "1h",
 	}
-}
-
-// Modified SetupTestEnvironment to optionally accept an activity tracker
-func SetupTestEnvironment(config *serverops.Config, tracker serverops.ActivityTracker) (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
-	ctx := context.TODO()
-	if config == nil {
-		config = DefaultConfig()
-	}
-
-	// Use noop tracker if none provided
-	if tracker == nil {
-		tracker = serverops.NoopTracker{}
-	}
-
-	// Initialize the builder with the tracker
-	builder := New(ctx, tracker)
-	wait := true
-	// Track the overall test environment setup
-	reportErr, reportChange, end := tracker.Start(ctx, "setup", "test_environment")
-	defer end()
-
-	// Initialize serverops service manager
-	err := serverops.NewServiceManager(config)
-	if err != nil {
-		reportErr(err)
-		return nil, nil, nil, func() {}, err
-	}
-
-	// Setup the test environment using the builder
-	builder = builder.WithTriggerChan().
-		WithDBConn("test").
-		WithDBManager().
-		WithPubSub().
-		WithOllama().
-		WithState().
-		WithBackend().
-		WithModel("smollm2:135m").
-		RunState().
-		RunDownloadManager()
-
-	if config.JWTExpiry != "" {
-		builder = builder.WithServiceManager(config.JWTExpiry)
-	}
-
-	if wait {
-		builder = builder.WaitForModel("smollm2:135m")
-	}
-
-	// If we have any errors during setup, return them
-	if builder.Err != nil {
-		reportErr(builder.Err)
-		return nil, nil, nil, func() {}, builder.Err
-	}
-
-	reportChange("test_environment", map[string]interface{}{
-		"status": "completed",
-		"components": []string{
-			"trigger_chan",
-			"db_conn",
-			"db_manager",
-			"pubsub",
-			"ollama",
-			"state",
-			"backend",
-			"model",
-			"state_runner",
-		},
-	})
-
-	// Build and return the components
-	return builder.Build(ctx)
 }

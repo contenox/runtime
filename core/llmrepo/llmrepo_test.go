@@ -31,11 +31,21 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		SigningKey:          "test-signing-key",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
-	if err != nil {
-		return nil, nil, nil, nil, cleanup, err
-	}
-	return ctx, config, dbInstance, state, cleanup, nil
+	ctx, state, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+		WithTriggerChan().
+		WithDBConn("test").
+		WithDBManager().
+		WithPubSub().
+		WithOllama().
+		WithState().
+		WithBackend().
+		WithModel("smollm2:135m").
+		RunState().
+		RunDownloadManager().
+		WithDefaultUser().
+		WaitForModel("smollm2:135m").
+		Build()
+	return ctx, config, dbInstance, state, cleanup, err
 }
 
 func TestNew_InitializesPoolAndModel(t *testing.T) {

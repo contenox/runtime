@@ -1,34 +1,38 @@
 package chatservice_test
 
 import (
-	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/chatservice"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/context"
 )
 
 func TestChatSmoketest(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(testingsetup.DefaultConfig(), serverops.NewLogActivityTracker(slog.Default()))
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+		WithTriggerChan().
+		WithDBConn("test").
+		WithDBManager().
+		WithPubSub().
+		WithOllama().
+		WithState().
+		WithBackend().
+		WithModel("smollm2:135m").
+		RunState().
+		RunDownloadManager().
+		WithDefaultUser().
+		WaitForModel("smollm2:135m").
+		Build()
 	defer cleanup()
 	require.NoError(t, err)
 
-	userSubjectID := serverops.DefaultAdminUser
-	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
-		ID:           uuid.NewString(),
-		FriendlyName: "John Doe",
-		Email:        "string@strings.com",
-		Subject:      userSubjectID,
-	})
-	require.NoError(t, err)
 	tokenizer := tokenizerservice.MockTokenizer{}
 	manager := chat.New(backendState, tokenizer)
 	t.Run("creating new chat instance", func(t *testing.T) {
@@ -127,23 +131,24 @@ func TestChatSmoketest(t *testing.T) {
 
 // TestLongConversation simulates a more extended interaction with the chat service.
 func TestLongConversationSmoketest(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(testingsetup.DefaultConfig(), nil)
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+		WithTriggerChan().
+		WithDBConn("test").
+		WithDBManager().
+		WithPubSub().
+		WithOllama().
+		WithState().
+		WithBackend().
+		WithModel("smollm2:135m").
+		RunState().
+		RunDownloadManager().
+		WithDefaultUser().
+		WaitForModel("smollm2:135m").
+		Build()
 	defer cleanup()
 	require.NoError(t, err)
 
-	// repo, cleanup2, err := messagerepo.NewTestStore(t)
-	// require.NoError(t, err, "failed to initialize test repository")
-	// defer cleanup2()
-
 	tokenizer := tokenizerservice.MockTokenizer{}
-	userSubjectID := serverops.DefaultAdminUser
-	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
-		ID:           uuid.NewString(),
-		FriendlyName: "John Doe",
-		Email:        "string@strings.com",
-		Subject:      userSubjectID,
-	})
-	require.NoError(t, err)
 	manager := chat.New(backendState, tokenizer)
 
 	t.Run("simulate extended chat conversation", func(t *testing.T) {

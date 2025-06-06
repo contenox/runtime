@@ -50,7 +50,20 @@ func TestWorkerPipe(t *testing.T) {
 		SecurityEnabled: "true",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
+	ctx, state, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+		WithTriggerChan().
+		WithDBConn("test").
+		WithDBManager().
+		WithPubSub().
+		WithOllama().
+		WithState().
+		WithBackend().
+		WithModel("smollm2:135m").
+		RunState().
+		RunDownloadManager().
+		WithDefaultUser().
+		WaitForModel("smollm2:135m").
+		Build()
 	defer cleanup()
 	if err != nil {
 		t.Fatal(err)
