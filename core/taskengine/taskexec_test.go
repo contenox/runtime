@@ -70,7 +70,7 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 		RunDownloadManager().
 		WithDefaultUser().
 		WaitForModel("smollm2:135m").
-		Build()
+		Build().Unzip()
 	defer cleanup()
 	require.NoError(t, err)
 	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
