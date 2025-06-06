@@ -1,12 +1,9 @@
-.PHONY: core-test core-smoketest libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+.PHONY: core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
 DEFAULT_ADMIN_USER ?= admin@admin.com
 DEFAULT_CORE_VERSION ?= dev-demo
 
 core-test:
-	go test -C ./core/ ./...
-
-core-smoketest:
-	GOMAXPROCS=4 SMOKETESTS=true go test -C ./core/ ./...
+	GOMAXPROCS=4 go test -C ./core/ ./...
 
 libs-test:
 	for d in libs/*; do \
