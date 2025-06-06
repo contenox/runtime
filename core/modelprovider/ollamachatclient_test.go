@@ -62,15 +62,15 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 	})
 	t.Run("conversation", func(t *testing.T) {
 		userMessages := []serverops.Message{
-			serverops.Message{Content: "Hello, world!", Role: "user"},
-			serverops.Message{Content: "How are you?", Role: "user"},
-			serverops.Message{Content: "How old are you?", Role: "user"},
-			serverops.Message{Content: "Hey", Role: "user"},
-			serverops.Message{Content: "Where are you from?", Role: "user"},
-			serverops.Message{Content: "What is your favorite color?", Role: "user"},
-			serverops.Message{Content: "What is your favorite food?", Role: "user"},
-			serverops.Message{Content: "What is your favorite movie?", Role: "user"},
-			serverops.Message{Content: "What is your favorite sport?", Role: "user"},
+			{Content: "Hello, world!", Role: "user"},
+			{Content: "How are you?", Role: "user"},
+			{Content: "How old are you?", Role: "user"},
+			{Content: "Hey", Role: "user"},
+			{Content: "Where are you from?", Role: "user"},
+			{Content: "What is your favorite color?", Role: "user"},
+			{Content: "What is your favorite food?", Role: "user"},
+			{Content: "What is your favorite movie?", Role: "user"},
+			{Content: "What is your favorite sport?", Role: "user"},
 		}
 		conversation := func(chat []serverops.Message, prompt string) []serverops.Message {
 			chat = append(chat, serverops.Message{Role: "user", Content: prompt})
