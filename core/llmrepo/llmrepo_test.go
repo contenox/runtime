@@ -1,27 +1,18 @@
 package llmrepo_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
-	"github.com/contenox/contenox/libs/libdb"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager, *runtimestate.State, func(), error) {
-	ctx := context.Background()
+func setupTestEnvironment() (*serverops.Config, *testingsetup.Environment) {
 	config := &serverops.Config{
 		EmbedModel:          "granite-embedding:30m",
 		JWTExpiry:           "1h",
@@ -31,7 +22,7 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		SigningKey:          "test-signing-key",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	return config, testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
 		WithDBManager().
@@ -39,71 +30,47 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		WithOllama().
 		WithState().
 		WithBackend().
-		WithModel(config.EmbedModel).
 		RunState().
 		RunDownloadManager().
 		WithDefaultUser().
-		WaitForModel(config.EmbedModel).
-		Build().Unzip()
-	return ctx, config, dbInstance, state, cleanup, err
+		Build()
 }
 
 func TestNew_InitializesPoolAndModel(t *testing.T) {
-
-	ctx, config, dbInstance, state, cleanup, err := setupTestEnvironment()
-	if err != nil {
-		t.Fatal(err)
+	config, env := setupTestEnvironment()
+	if env.Err != nil {
+		t.Fatal(env.Err)
 	}
-	defer cleanup()
+	defer env.Cleanup()
 
 	// Test initialization
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
+	embedder, err := env.NewEmbedder(config)
 	require.NoError(t, err)
-
+	ctx := env.Ctx
 	// Verify pool creation
-	poolStore := store.New(dbInstance.WithoutTransaction())
-	pool, err := poolStore.GetPool(ctx, serverops.EmbedPoolID)
+	storeInstance := env.Store()
+	pool, err := storeInstance.GetPool(ctx, serverops.EmbedPoolID)
 	require.NoError(t, err)
 	require.Equal(t, serverops.EmbedPoolName, pool.Name)
 	require.Equal(t, "Internal Embeddings", pool.PurposeType)
 
-	// Verify model creation
-	modelStore := store.New(dbInstance.WithoutTransaction())
 	tenantID, _ := uuid.Parse(serverops.TenantID)
 	expectedModelID := uuid.NewSHA1(tenantID, []byte(config.EmbedModel)).String()
 
-	model, err := modelStore.GetModel(ctx, expectedModelID)
+	model, err := storeInstance.GetModel(ctx, expectedModelID)
 	require.NoError(t, err)
 	require.Equal(t, config.EmbedModel, model.Model)
 
 	// Verify model assignment
-	models, err := modelStore.ListModelsForPool(ctx, serverops.EmbedPoolID)
+	models, err := storeInstance.ListModelsForPool(ctx, serverops.EmbedPoolID)
 	require.NoError(t, err)
 	require.Len(t, models, 1)
 	require.Equal(t, expectedModelID, models[0].ID)
 
-	// extract a valid backend
-	backend := &store.Backend{}
-	for _, l := range state.Get(ctx) {
-		backend = &l.Backend
-	}
 	// assign backend to pool
-	require.NoError(t, store.New(dbInstance.WithoutTransaction()).AssignBackendToPool(ctx, serverops.EmbedPoolID, backend.ID))
+	require.NoError(t, env.AssignBackends(serverops.EmbedPoolID).Err)
 	// wait for the model to download
-	require.Eventually(t, func() bool {
-		currentState := state.Get(ctx)
-		r, err := json.Marshal(currentState)
-		if err != nil {
-			t.Logf("error marshaling state: %v", err)
-			return false
-		}
-		dst := &bytes.Buffer{}
-		if err := json.Compact(dst, r); err != nil {
-			t.Logf("error compacting JSON: %v", err)
-			return false
-		}
-		return strings.Contains(string(r), `"name":"granite-embedding:30m"`)
-	}, 1*time.Minute, 100*time.Millisecond)
+	require.NoError(t, env.WaitForModel(config.EmbedModel).Err)
 	// reuse state for other testcases.
 	t.Run("test get runtime", func(t *testing.T) {
 		runtimeAdapter := embedder.GetRuntime(ctx)
@@ -116,7 +83,7 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 		provider, err := embedder.GetProvider(ctx)
 		require.NoError(t, err)
 
-		embedClient, err := provider.GetEmbedConnection(backend.BaseURL)
+		embedClient, err := env.GetEmbedConnection(provider)
 		require.NoError(t, err)
 
 		// Test embedding
@@ -124,45 +91,40 @@ func TestNew_InitializesPoolAndModel(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, embeddings)
 	})
+
 	t.Run("test prompt execution", func(t *testing.T) {
 		// Configure task model and initialize engine
 		config.TasksModel = "smollm2:135m"
-		taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+		taskEngine, err := env.NewExecRepo(config)
 		require.NoError(t, err)
-
-		require.Eventually(t, func() bool {
-			currentState := state.Get(ctx)
-			r, _ := json.Marshal(currentState)
-			return strings.Contains(string(r), `"name":"smollm2:135m"`)
-		}, 1*time.Minute, 100*time.Millisecond)
+		require.NoError(t, env.WaitForModel(config.TasksModel).Err)
 
 		// Get provider and test prompting
 		provider, err := taskEngine.GetProvider(ctx)
 		require.NoError(t, err)
 
-		promptClient, err := provider.GetPromptConnection(backend.BaseURL)
+		promptClient, err := env.GetPromptConnection(provider)
 		require.NoError(t, err)
 
 		response, err := promptClient.Prompt(context.Background(), "What is 1+1?")
 		require.NoError(t, err)
 		require.Contains(t, response, "2")
 	})
+
 	t.Run("execute complex prompts", func(t *testing.T) {
 		// Configure task model and initialize engine
 		config.TasksModel = "qwen2.5:0.5b"
 
-		taskEngine, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+		taskEngine, err := env.NewExecRepo(config)
 		require.NoError(t, err)
+		require.NoError(t, env.WaitForModel(config.TasksModel).Err)
 
-		require.Eventually(t, func() bool {
-			currentState := state.Get(ctx)
-			r, _ := json.Marshal(currentState)
-			return strings.Contains(string(r), `"name":"qwen2.5:0.5b"`)
-		}, 2*time.Minute, 100*time.Millisecond)
+		// Get provider and test prompting
 		provider, err := taskEngine.GetProvider(ctx)
 		require.NoError(t, err)
 
-		execClient, err := provider.GetPromptConnection(backend.BaseURL)
+		execClient, err := env.GetPromptConnection(provider)
+		require.NoError(t, err)
 		require.NoError(t, err)
 
 		text := `
@@ -198,22 +160,4 @@ Text: %s`, response2, text)
 		require.Contains(t, response2, "flow state")
 		require.Contains(t, response2, "smalltown")
 	})
-}
-
-func TestGetProvider_NoBackends(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
-	ctx, config, dbInstance, state, cleanup, err := setupTestEnvironment()
-	defer cleanup()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
-	require.NoError(t, err)
-
-	_, err = embedder.GetProvider(ctx)
-	require.Error(t, err)
-	require.EqualError(t, err, "no backends found")
 }

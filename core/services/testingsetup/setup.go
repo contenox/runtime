@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/contenox/core/llmrepo"
+	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -32,6 +34,7 @@ type Builder struct {
 	stateErrs    []error
 	downloadErrs []error
 	tracker      serverops.ActivityTracker
+	backends     []string
 }
 
 func New(ctx context.Context, tracker serverops.ActivityTracker) *Builder {
@@ -214,6 +217,7 @@ func (builder *Builder) WithBackend() *Builder {
 		BaseURL: builder.ollamaURI,
 		Type:    "Ollama",
 	})
+	builder.backends = append(builder.backends, backendID)
 	if err != nil {
 		builder.Err = fmt.Errorf("failed to create backend: %v", err)
 		reportErr(err)
@@ -416,49 +420,64 @@ func DefaultConfig() *serverops.Config {
 }
 
 type Environment struct {
-	ctx       context.Context
-	state     *runtimestate.State
-	dbManager libdb.DBManager
-	cleanups  []func()
-	Err       error
+	Ctx         context.Context
+	state       *runtimestate.State
+	dbManager   libdb.DBManager
+	cleanups    []func()
+	Err         error
+	backends    []string
+	triggerChan chan struct{}
+	tracker     serverops.ActivityTracker
 }
 
 func (builder *Builder) Build() *Environment {
 	if builder.Err != nil {
 		return &Environment{
-			ctx:       builder.ctx,
-			state:     nil,
-			dbManager: nil,
-			cleanups:  nil,
-			Err:       builder.Err,
+			Ctx:         builder.ctx,
+			state:       nil,
+			dbManager:   nil,
+			cleanups:    nil,
+			Err:         builder.Err,
+			triggerChan: builder.triggerChan,
+			backends:    builder.backends,
+			tracker:     builder.tracker,
 		}
 	}
 	if builder.state == nil {
 		builder.Err = fmt.Errorf("state is nil")
 		return &Environment{
-			ctx:       builder.ctx,
-			state:     nil,
-			dbManager: nil,
-			cleanups:  nil,
-			Err:       builder.Err,
+			Ctx:         builder.ctx,
+			state:       nil,
+			dbManager:   nil,
+			cleanups:    nil,
+			Err:         builder.Err,
+			triggerChan: builder.triggerChan,
+			backends:    builder.backends,
+			tracker:     builder.tracker,
 		}
 	}
 	if builder.dbManager == nil {
 		builder.Err = fmt.Errorf("dbManager is nil")
 		return &Environment{
-			ctx:       builder.ctx,
-			state:     nil,
-			dbManager: nil,
-			cleanups:  nil,
-			Err:       builder.Err,
+			Ctx:         builder.ctx,
+			state:       nil,
+			dbManager:   nil,
+			cleanups:    nil,
+			Err:         builder.Err,
+			triggerChan: builder.triggerChan,
+			backends:    builder.backends,
+			tracker:     builder.tracker,
 		}
 	}
 	return &Environment{
-		ctx:       builder.ctx,
-		state:     builder.state,
-		dbManager: builder.dbManager,
-		cleanups:  builder.cleanups,
-		Err:       builder.Err,
+		Ctx:         builder.ctx,
+		state:       builder.state,
+		dbManager:   builder.dbManager,
+		cleanups:    builder.cleanups,
+		Err:         builder.Err,
+		triggerChan: builder.triggerChan,
+		backends:    builder.backends,
+		tracker:     builder.tracker,
 	}
 }
 
@@ -480,5 +499,240 @@ func (env *Environment) Unzip() (context.Context, *runtimestate.State, libdb.DBM
 		env.Err = fmt.Errorf("dbManager is nil")
 		return nil, nil, nil, nil, env.Err
 	}
-	return env.ctx, env.state, env.dbManager, env.Cleanup, nil
+	return env.Ctx, env.state, env.dbManager, env.Cleanup, nil
+}
+
+func (env *Environment) Store() store.Store {
+	if env.Err != nil {
+		return nil
+	}
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		return nil
+	}
+	return store.New(env.dbManager.WithoutTransaction())
+}
+
+func (env *Environment) State() map[string]runtimestate.LLMState {
+	if env.Err != nil {
+		return nil
+	}
+	if env.state == nil {
+		env.Err = fmt.Errorf("state is nil")
+		return nil
+	}
+	runtimeState := env.state.Get(env.Ctx)
+	return runtimeState
+}
+
+func (env *Environment) AssignBackends(pool string) *Environment {
+	if env.Err != nil {
+		return env
+	}
+	// Track this operation
+	reportErr, reportChange, end := env.tracker.Start(env.Ctx, "assign", "backends", "pool", pool)
+	defer end()
+
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		reportErr(env.Err)
+		return env
+	}
+	if env.backends == nil {
+		env.Err = fmt.Errorf("backends is nil")
+		reportErr(env.Err)
+		return env
+	}
+
+	store := store.New(env.dbManager.WithoutTransaction())
+	for i, v := range env.backends {
+		err := store.AssignBackendToPool(env.Ctx, pool, v)
+		if err != nil {
+			env.Err = err
+			reportErr(err)
+			return env
+		}
+		// Report each assignment
+		reportChange(v, map[string]interface{}{
+			"pool":   pool,
+			"index":  i,
+			"status": "assigned",
+		})
+	}
+	return env
+}
+
+func (env *Environment) NewEmbedder(config *serverops.Config) (llmrepo.ModelRepo, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	// Track this operation
+	reportErr, _, end := env.tracker.Start(env.Ctx, "create", "embedder")
+	defer end()
+
+	if env.state == nil {
+		err := fmt.Errorf("state is nil")
+		env.Err = err
+		reportErr(err)
+		return nil, err
+	}
+	if env.dbManager == nil {
+		err := fmt.Errorf("dbManager is nil")
+		env.Err = err
+		reportErr(err)
+		return nil, err
+	}
+
+	repo, err := llmrepo.NewEmbedder(env.Ctx, config, env.dbManager, env.state)
+	if err != nil {
+		env.Err = err
+		reportErr(err)
+	}
+	return repo, err
+}
+
+func (env *Environment) GetEmbedConnection(provider modelprovider.Provider) (serverops.LLMEmbedClient, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+
+	if env.state == nil {
+		env.Err = fmt.Errorf("state is nil")
+		return nil, env.Err
+	}
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		return nil, env.Err
+	}
+
+	if provider == nil {
+		return nil, fmt.Errorf("provider is nil")
+	}
+	backends := provider.GetBackendIDs()
+
+	if len(backends) == 0 {
+		return nil, fmt.Errorf("no backends found")
+	}
+	if len(backends) > 1 {
+		return nil, fmt.Errorf("multiple backends found")
+	}
+	baseURL := backends[0]
+
+	if baseURL == "" {
+		return nil, fmt.Errorf("baseURL is empty")
+	}
+
+	return provider.GetEmbedConnection(baseURL)
+}
+
+func (env *Environment) GetPromptConnection(provider modelprovider.Provider) (serverops.LLMPromptExecClient, error) {
+	if env.Err != nil {
+		return nil, env.Err
+	}
+	if env.state == nil {
+		env.Err = fmt.Errorf("state is nil")
+		return nil, env.Err
+	}
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		return nil, env.Err
+	}
+
+	if provider == nil {
+		return nil, fmt.Errorf("provider is nil")
+	}
+	backends := provider.GetBackendIDs()
+
+	if len(backends) == 0 {
+		return nil, fmt.Errorf("no backends found")
+	}
+	if len(backends) > 1 {
+		return nil, fmt.Errorf("multiple backends found")
+	}
+	baseURL := backends[0]
+
+	if baseURL == "" {
+		return nil, fmt.Errorf("baseURL is empty")
+	}
+
+	return provider.GetPromptConnection(baseURL)
+}
+
+func (env *Environment) NewExecRepo(config *serverops.Config) (llmrepo.ModelRepo, error) {
+
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		return nil, env.Err
+	}
+
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+
+	return llmrepo.NewExecRepo(env.Ctx, config, env.dbManager, env.state)
+}
+
+func (env *Environment) WaitForModel(model string) *Environment {
+	if env.Err != nil {
+		return env
+	}
+
+	// Track this operation - include model name in attributes
+	reportErr, reportChange, end := env.tracker.Start(
+		env.Ctx,
+		"wait",
+		"model_pull",
+		"model", model,
+	)
+	defer end()
+
+	// Error checks with reporting
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		reportErr(env.Err)
+		return env
+	}
+	if env.state == nil {
+		env.Err = fmt.Errorf("state is nil")
+		reportErr(env.Err)
+		return env
+	}
+	if env.backends == nil {
+		env.Err = fmt.Errorf("backends is nil")
+		reportErr(env.Err)
+		return env
+	}
+
+	// Trigger a sync to start model pulling
+	select {
+	case env.triggerChan <- struct{}{}:
+		// Successfully triggered
+	default:
+		// Channel full, but not critical
+	}
+
+	// Wait for the condition
+	err := WaitForCondition(env.Ctx, func() bool {
+		currentState := env.state.Get(env.Ctx)
+		data, err := json.Marshal(currentState)
+		if err != nil {
+			return false
+		}
+		return bytes.Contains(data, []byte(fmt.Sprintf(`"pulledModels":[{"name":"%s"`, model)))
+	}, 2*time.Minute, 100*time.Millisecond)
+
+	// Handle wait result
+	if err != nil {
+		env.Err = fmt.Errorf("timeout waiting for model %s: %w", model, err)
+		reportErr(env.Err)
+		return env
+	}
+
+	// Report successful pull
+	reportChange(model, map[string]interface{}{
+		"status": "pulled",
+		"waited": true,
+	})
+
+	return env
 }
