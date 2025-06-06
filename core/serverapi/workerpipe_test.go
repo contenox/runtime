@@ -63,7 +63,7 @@ func TestWorkerPipe(t *testing.T) {
 		RunDownloadManager().
 		WithDefaultUser().
 		WaitForModel("smollm2:135m").
-		Build()
+		Build().Unzip()
 	defer cleanup()
 	if err != nil {
 		t.Fatal(err)

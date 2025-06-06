@@ -44,7 +44,7 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		RunDownloadManager().
 		WithDefaultUser().
 		WaitForModel(config.EmbedModel).
-		Build()
+		Build().Unzip()
 	return ctx, config, dbInstance, state, cleanup, err
 }
 

@@ -346,24 +346,6 @@ func (builder *Builder) WaitForModel(model string) *Builder {
 	return builder
 }
 
-func (builder *Builder) Build() (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
-	if builder.Err != nil {
-		return builder.ctx, nil, nil, nil, builder.Err
-	}
-	if builder.state == nil {
-		builder.Err = fmt.Errorf("state is nil")
-		return builder.ctx, nil, nil, nil, builder.Err
-	}
-	if builder.dbManager == nil {
-		builder.Err = fmt.Errorf("dbManager is nil")
-		return builder.ctx, nil, nil, nil, builder.Err
-	}
-	return builder.ctx, builder.state, builder.dbManager, func() {
-		for _, v := range builder.cleanups {
-			v()
-		}
-	}, builder.Err
-}
 func (builder *Builder) RunState() *Builder {
 	if builder.Err != nil {
 		return builder
@@ -430,4 +412,73 @@ func DefaultConfig() *serverops.Config {
 	return &serverops.Config{
 		JWTExpiry: "1h",
 	}
+
+}
+
+type Environment struct {
+	ctx       context.Context
+	state     *runtimestate.State
+	dbManager libdb.DBManager
+	cleanups  []func()
+	Err       error
+}
+
+func (builder *Builder) Build() *Environment {
+	if builder.Err != nil {
+		return &Environment{
+			ctx:       builder.ctx,
+			state:     nil,
+			dbManager: nil,
+			cleanups:  nil,
+			Err:       builder.Err,
+		}
+	}
+	if builder.state == nil {
+		builder.Err = fmt.Errorf("state is nil")
+		return &Environment{
+			ctx:       builder.ctx,
+			state:     nil,
+			dbManager: nil,
+			cleanups:  nil,
+			Err:       builder.Err,
+		}
+	}
+	if builder.dbManager == nil {
+		builder.Err = fmt.Errorf("dbManager is nil")
+		return &Environment{
+			ctx:       builder.ctx,
+			state:     nil,
+			dbManager: nil,
+			cleanups:  nil,
+			Err:       builder.Err,
+		}
+	}
+	return &Environment{
+		ctx:       builder.ctx,
+		state:     builder.state,
+		dbManager: builder.dbManager,
+		cleanups:  builder.cleanups,
+		Err:       builder.Err,
+	}
+}
+
+func (env *Environment) Cleanup() {
+	for _, cleanup := range env.cleanups {
+		cleanup()
+	}
+}
+
+func (env *Environment) Unzip() (context.Context, *runtimestate.State, libdb.DBManager, func(), error) {
+	if env.Err != nil {
+		return nil, nil, nil, nil, env.Err
+	}
+	if env.state == nil {
+		env.Err = fmt.Errorf("state is nil")
+		return nil, nil, nil, nil, env.Err
+	}
+	if env.dbManager == nil {
+		env.Err = fmt.Errorf("dbManager is nil")
+		return nil, nil, nil, nil, env.Err
+	}
+	return env.ctx, env.state, env.dbManager, env.Cleanup, nil
 }
