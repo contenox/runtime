@@ -39,11 +39,11 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		WithOllama().
 		WithState().
 		WithBackend().
-		WithModel("smollm2:135m").
+		WithModel(config.EmbedModel).
 		RunState().
 		RunDownloadManager().
 		WithDefaultUser().
-		WaitForModel("smollm2:135m").
+		WaitForModel(config.EmbedModel).
 		Build()
 	return ctx, config, dbInstance, state, cleanup, err
 }
