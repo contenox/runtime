@@ -236,18 +236,24 @@ func (rm *Routine) ExecuteWithRetry(ctx context.Context, interval time.Duration,
 //     Use this for logging or custom error handling specific to the loop runner.
 //     Note: `ErrCircuitOpen` will also be passed here when calls are blocked.
 func (rm *Routine) Loop(ctx context.Context, interval time.Duration, triggerChan <-chan struct{}, fn func(ctx context.Context) error, errHandling func(err error)) {
+	var lastErr error
 	for {
-		if err := rm.Execute(ctx, fn); err != nil {
+		err := rm.Execute(ctx, fn)
+		lastErr = err
+		if err != nil {
 			errHandling(err)
 		}
 		select {
 		case <-ctx.Done():
-			// log.Println("Loop exiting due to context cancellation")
+			log.Println("Loop exiting due to context cancellation")
 			return
 		case <-triggerChan:
-		//	log.Println("Trigger received, executing immediately")
+			if lastErr != nil {
+				time.Sleep(interval)
+			}
+			log.Println("Trigger received, executing immediately")
 		case <-time.After(interval):
-			// log.Println("Interval elapsed, executing next cycle")
+			log.Println("Interval elapsed, executing next cycle")
 		}
 	}
 }

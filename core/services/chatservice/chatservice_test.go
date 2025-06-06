@@ -1,7 +1,7 @@
 package chatservice_test
 
 import (
-	"os"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -10,19 +10,19 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/chatservice"
+	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestChat(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
-	ctx, backendState, dbInstance, cleanup := chatservice.SetupTestEnvironment(t)
+func TestChatSmoketest(t *testing.T) {
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(testingsetup.DefaultConfig(), serverops.NewLogActivityTracker(slog.Default()))
 	defer cleanup()
+	require.NoError(t, err)
+
 	userSubjectID := serverops.DefaultAdminUser
-	err := store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
 		ID:           uuid.NewString(),
 		FriendlyName: "John Doe",
 		Email:        "string@strings.com",
@@ -88,7 +88,7 @@ func TestChat(t *testing.T) {
 		require.NotEmpty(t, assistantMsg.Content)
 		require.False(t, assistantMsg.IsUser)
 		require.True(t, assistantMsg.IsLatest)
-		// TODO: require.True(t, assistantMsg.SentAt.After(userMsg.SentAt))
+		require.True(t, assistantMsg.SentAt.After(userMsg.SentAt))
 
 		// Second interaction
 		userMessage2 := "What about Germany?"
@@ -126,12 +126,10 @@ func TestChat(t *testing.T) {
 }
 
 // TestLongConversation simulates a more extended interaction with the chat service.
-func TestLongConversation(t *testing.T) {
-	if os.Getenv("SMOKETESTS") == "" {
-		t.Skip("Set env SMOKETESTS to true to run this test")
-	}
-	ctx, backendState, dbInstance, cleanup := chatservice.SetupTestEnvironment(t)
+func TestLongConversationSmoketest(t *testing.T) {
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(testingsetup.DefaultConfig(), nil)
 	defer cleanup()
+	require.NoError(t, err)
 
 	// repo, cleanup2, err := messagerepo.NewTestStore(t)
 	// require.NoError(t, err, "failed to initialize test repository")
@@ -139,7 +137,7 @@ func TestLongConversation(t *testing.T) {
 
 	tokenizer := tokenizerservice.MockTokenizer{}
 	userSubjectID := serverops.DefaultAdminUser
-	err := store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
+	err = store.New(dbInstance.WithoutTransaction()).CreateUser(ctx, &store.User{
 		ID:           uuid.NewString(),
 		FriendlyName: "John Doe",
 		Email:        "string@strings.com",

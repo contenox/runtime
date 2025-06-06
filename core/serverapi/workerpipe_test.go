@@ -50,7 +50,7 @@ func TestWorkerPipe(t *testing.T) {
 		SecurityEnabled: "true",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
 	defer cleanup()
 	if err != nil {
 		t.Fatal(err)
