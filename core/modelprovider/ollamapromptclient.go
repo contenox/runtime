@@ -20,7 +20,7 @@ func (o *OllamaPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	req := &api.GenerateRequest{
 		Model:  o.modelName,
 		Prompt: prompt,
-		System: "You are a task processing engine talking to other machines. Identify the goal of the task and return the direct answer without explanation to the given task.",
+		System: "You are a task processing engine talking to other machines. Return the direct answer without explanation to the given task.",
 		Stream: &stream, // Disable streaming to get a single response
 		Options: map[string]any{
 			"temperature": 0.0,

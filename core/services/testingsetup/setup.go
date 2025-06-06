@@ -658,6 +658,10 @@ func (env *Environment) GetPromptConnection(provider modelprovider.Provider) (se
 	return provider.GetPromptConnection(baseURL)
 }
 
+func (env *Environment) GetDBInstance() libdb.DBManager {
+	return env.dbManager
+}
+
 func (env *Environment) NewExecRepo(config *serverops.Config) (llmrepo.ModelRepo, error) {
 
 	if env.dbManager == nil {
