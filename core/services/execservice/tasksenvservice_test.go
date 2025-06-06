@@ -26,7 +26,7 @@ func TestTasksservice(t *testing.T) {
 		TasksModel: "qwen2.5:3b",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
 	if err != nil {
 		log.Fatalf("failed to init test %s", err)
 	}

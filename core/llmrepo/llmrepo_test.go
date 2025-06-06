@@ -31,7 +31,7 @@ func setupTestEnvironment() (context.Context, *serverops.Config, libdb.DBManager
 		SigningKey:          "test-signing-key",
 	}
 
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
 	if err != nil {
 		return nil, nil, nil, nil, cleanup, err
 	}
