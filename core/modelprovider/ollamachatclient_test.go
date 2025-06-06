@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOllamaChatClient_HappyPath(t *testing.T) {
+func TestOllamaChatClientSmoketest(t *testing.T) {
 	ctx, backendState, _, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
