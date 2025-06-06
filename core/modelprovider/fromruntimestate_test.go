@@ -47,7 +47,6 @@ func TestModelProviderAdapter_ReturnsCorrectProviders(t *testing.T) {
 		t.Fatalf("expected 3 providers, got %d", len(providers))
 	}
 
-	// Optional: you can check the actual model names returned
 	models := map[string]bool{}
 	for _, provider := range providers {
 		models[provider.ModelName()] = true

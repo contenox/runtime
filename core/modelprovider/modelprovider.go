@@ -35,7 +35,7 @@ type OllamaProvider struct {
 	SupportsEmbed  bool
 	SupportsStream bool
 	SupportsPrompt bool
-	Backends       []string // we assume that Backend IDs are urls to the instance
+	Backends       []string // assuming that Backend IDs are urls to the instance
 }
 
 func (p *OllamaProvider) GetBackendIDs() []string {
