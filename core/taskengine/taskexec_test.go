@@ -56,7 +56,7 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:1.5b",
 	}
-	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config)
+	ctx, state, dbInstance, cleanup, err := testingsetup.SetupTestEnvironment(config, nil)
 	defer cleanup()
 	if err != nil {
 		t.Fatalf("failed to init test %s", err)
