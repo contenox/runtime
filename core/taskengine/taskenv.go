@@ -18,11 +18,21 @@ const StatusSuccess = 1
 const StatusUnknownHookProvider = 2
 const StatusError = 3
 
+type DataType int
+
+const (
+	DataTypeAny DataType = iota
+	DataTypeString
+	DataTypeBool
+	DataTypeInt
+	DataTypeFloat
+)
+
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.
 //
 // It handles task transitions, error recovery, retry logic, and output tracking.
 type EnvExecutor interface {
-	ExecEnv(ctx context.Context, chain *ChainDefinition, input any) (any, error)
+	ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, error)
 }
 
 // ErrUnsupportedTaskType is returned when a TaskExecutor does not recognize the task type.
@@ -64,7 +74,7 @@ func NewEnv(
 //
 // It manages the full lifecycle of task execution: rendering prompts, calling the
 // TaskExecutor, handling timeouts, retries, transitions, and collecting final output.
-func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any) (any, error) {
+func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, error) {
 	vars := map[string]any{
 		"input": input,
 	}
@@ -86,13 +96,19 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 
 	for {
 		// Render prompt template
-		renderedPrompt, err := renderTemplate(currentTask.PromptTemplate, vars)
-		if err != nil {
-			return nil, fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
+		var renderedPrompt any
+		renderedPrompt = input
+		var err error
+		if dataType == DataTypeString {
+			renderedPrompt, err = renderTemplate(currentTask.PromptTemplate, vars)
+			if err != nil {
+				return nil, fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
+			}
 		}
 
 		var rawResponse string
 		var output any
+		var outputType DataType
 		var taskErr error
 
 		maxRetries := max(currentTask.RetryOnError, 0)
@@ -119,7 +135,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, resolver, currentTask, renderedPrompt)
+			output, outputType, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, resolver, currentTask, renderedPrompt, outputType)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop

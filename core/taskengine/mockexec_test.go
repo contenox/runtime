@@ -20,7 +20,7 @@ func TestTaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.PromptToString,
 	}
 
-	output, rawResp, err := mockExec.TaskExec(context.Background(), llmresolver.Randomly, task, "What is 2+2?")
+	output, _, rawResp, err := mockExec.TaskExec(context.Background(), llmresolver.Randomly, task, "What is 2+2?", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "mock-result", output)
 	require.Equal(t, "mock-response", rawResp)

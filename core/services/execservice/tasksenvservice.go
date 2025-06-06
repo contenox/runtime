@@ -38,7 +38,7 @@ func (s *tasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDe
 		return nil, err
 	}
 
-	return s.environmentExec.ExecEnv(ctx, chain, input)
+	return s.environmentExec.ExecEnv(ctx, chain, input, taskengine.DataTypeAny)
 }
 
 func (s *tasksEnvService) GetServiceName() string {

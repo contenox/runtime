@@ -42,7 +42,7 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.PromptToString,
 	}
 
-	output, raw, err := exec.TaskExec(context.Background(), llmresolver.Randomly, task, "hello")
+	output, _, raw, err := exec.TaskExec(context.Background(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "prompted response for: hello", output)
 	require.Equal(t, "prompted response for: hello", raw)
@@ -128,7 +128,7 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(t, resp)
 	t.Run("simple test-case", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "simple",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
@@ -139,143 +139,144 @@ func TestSimpleExec_TaskExec(t *testing.T) {
 			},
 		},
 			"respond with just 'yes'",
+			taskengine.DataTypeString,
 		)
 		require.NoError(t, err)
 		require.Equal(t, true, response)
 		require.Equal(t, "true", formatted)
 	})
 	t.Run("PromptToNumber", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-test",
 			Type: taskengine.PromptToNumber,
-		}, "Respond with only the number 10 as a digit, no other text.")
+		}, "Respond with only the number 10 as a digit, no other text.", taskengine.DataTypeInt)
 		require.NoError(t, err)
 		require.Equal(t, 10, response)
 		require.Equal(t, "10", formatted)
 	})
 	t.Run("PromptToScore", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-test",
 			Type: taskengine.PromptToScore,
-		}, "Respond with exactly the number 7.5, no other text.")
+		}, "Respond with exactly the number 7.5, no other text.", taskengine.DataTypeFloat)
 		require.NoError(t, err)
 		require.Equal(t, 7.5, response)
 		require.Equal(t, "7.50", formatted)
 	})
 
 	t.Run("PromptToRange", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-test",
 			Type: taskengine.PromptToRange,
-		}, "Echo the Input. Input: 3-5")
+		}, "Echo the Input. Input: 3-5", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "3-5", response)
 		require.Equal(t, "3-5", formatted)
 
 		// Test single number to range conversion
-		response, formatted, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-single-test",
 			Type: taskengine.PromptToRange,
-		}, "Respond with the number 4, no other text.")
+		}, "Respond with the number 4, no other text.", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "4-4", response)
 		require.Equal(t, "4-4", formatted)
 	})
 
 	t.Run("ConditionCaseSensitive", func(t *testing.T) {
-		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-case-insensitive",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
 				"yes": true,
 				"no":  false,
 			},
-		}, "Respond with only the uppercase word 'YES'")
+		}, "Respond with only the uppercase word 'YES'", taskengine.DataTypeString)
 		require.Error(t, err)
 	})
 
 	t.Run("ConditionInvalidResponse", func(t *testing.T) {
-		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-invalid",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
 				"yes": true,
 				"no":  false,
 			},
-		}, "Respond with 'maybe'")
+		}, "Respond with 'maybe'", taskengine.DataTypeString)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to parse into valid condition")
 	})
 
 	t.Run("RangeReverseNumbers", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-reverse-test",
 			Type: taskengine.PromptToRange,
-		}, "Echo the Input. Input: 5-3")
+		}, "Echo the Input. Input: 5-3", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "5-3", response)
 		require.Equal(t, "5-3", formatted)
 	})
 
 	t.Run("ScoreIntegerValue", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-integer-test",
 			Type: taskengine.PromptToScore,
-		}, "Respond with exactly the number 7, no decimal places or other text.")
+		}, "Respond with exactly the number 7, no decimal places or other text.", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, 7.0, response)
 		require.Equal(t, "7.00", formatted)
 	})
 
 	t.Run("NumberInvalidFloat", func(t *testing.T) {
-		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-invalid-test",
 			Type: taskengine.PromptToNumber,
-		}, "Respond with '10.5'")
+		}, "Respond with '10.5'", taskengine.DataTypeString)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid syntax")
 	})
 
 	t.Run("HookTaskError", func(t *testing.T) {
 		// Test with missing hook definition
-		_, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "hook-missing-def",
 			Type: taskengine.Hook,
-		}, "")
+		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "hook task missing hook definition")
 
 		// Test with unimplemented hook
-		_, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "hook-unimplemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
-		}, "")
+		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unimplemented")
 	})
 
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
 		// Empty input
-		output, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		output, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
-		}, "")
+		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 
 		// Long input
 		longInput := strings.Repeat("repeat this ", 10)
-		output, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		output, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
-		}, "Echo exactly this including the repetition: "+longInput)
+		}, "Echo exactly this including the repetition: "+longInput, taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Contains(t, longInput, output)
 	})
 
 	t.Run("NumberWithSpaces", func(t *testing.T) {
-		response, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, formatted, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-space-test",
 			Type: taskengine.PromptToNumber,
-		}, "Respond with ' 42 ' including spaces")
+		}, "Respond with ' 42 ' including spaces", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, 42, response)
 		require.Equal(t, "42", formatted)

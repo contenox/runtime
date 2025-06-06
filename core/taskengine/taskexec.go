@@ -14,7 +14,7 @@ import (
 // It consumes a prompt and resolver policy, and returns structured output
 // alongside the raw LLM response.
 type TaskExecutor interface {
-	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any) (any, string, error)
+	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
 }
 
 // SimpleExec is a basic implementation of TaskExecutor.
@@ -135,51 +135,57 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 // TaskExec dispatches task execution based on the task type.
 // It handles prompt-based task types like string, number, score, condition, and range,
 // as well as custom hook invocations.
-func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any) (any, string, error) {
+func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	var rawResponse string
 	var taskErr error
 	var output any
+	var outputType DataType
 	switch currentTask.Type {
 	case PromptToString:
 		prompt, ok := input.(string)
 		if !ok {
-			return nil, "", fmt.Errorf("input is not a string")
+			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
 		rawResponse, taskErr = exe.Prompt(taskCtx, resolver, prompt)
 		output = rawResponse
+		outputType = DataTypeString
 	case PromptToCondition:
 		var hit bool
 		prompt, ok := input.(string)
 		if !ok {
-			return nil, "", fmt.Errorf("input is not a string")
+			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
 		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, prompt)
 		output = hit
+		outputType = DataTypeBool
 		rawResponse = strconv.FormatBool(hit)
 	case PromptToNumber:
 		var number int
 		prompt, ok := input.(string)
 		if !ok {
-			return nil, "", fmt.Errorf("input is not a string")
+			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
 		number, taskErr = exe.number(taskCtx, resolver, prompt)
 		output = number
+		outputType = DataTypeInt
 		rawResponse = strconv.FormatInt(int64(number), 10)
 	case PromptToScore:
 		var score float64
 		prompt, ok := input.(string)
 		if !ok {
-			return nil, "", fmt.Errorf("input is not a string")
+			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
 		score, taskErr = exe.score(taskCtx, resolver, prompt)
 		output = score
+		outputType = DataTypeFloat
 		rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
 	case PromptToRange:
 		prompt, ok := input.(string)
 		if !ok {
-			return nil, "", fmt.Errorf("input is not a string")
+			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
 		rawResponse, taskErr = exe.rang(taskCtx, resolver, prompt)
+		outputType = DataTypeString
 		output = rawResponse
 	case Hook:
 		if currentTask.Hook == nil {
@@ -192,7 +198,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 		taskErr = fmt.Errorf("unknown task type: %w %s", ErrUnsupportedTaskType, currentTask.Type)
 	}
 
-	return output, rawResponse, taskErr
+	return output, outputType, rawResponse, taskErr
 }
 
 // hookengine is a placeholder for future hook execution support using the hookProvider.

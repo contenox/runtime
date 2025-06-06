@@ -40,7 +40,7 @@ func TestSimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "6 * 7")
+	result, err := env.ExecEnv(context.Background(), chain, "6 * 7", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "42", result)
 }
@@ -66,7 +66,7 @@ func TestSimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 		},
 	}
 
-	_, err = env.ExecEnv(context.Background(), chain, "")
+	_, err = env.ExecEnv(context.Background(), chain, "", taskengine.DataTypeString)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed after 1 retries")
 }
@@ -107,7 +107,7 @@ func TestSimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "step one")
+	result, err := env.ExecEnv(context.Background(), chain, "step one", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "intermediate", result)
 }
@@ -146,7 +146,7 @@ func TestSimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "oops")
+	result, err := env.ExecEnv(context.Background(), chain, "oops", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "error recovered", result)
 }
@@ -177,7 +177,7 @@ func TestSimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "user")
+	result, err := env.ExecEnv(context.Background(), chain, "user", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "printed-value", result)
 }

@@ -20,7 +20,7 @@ type MockTaskExecutor struct {
 }
 
 // TaskExec is the mock implementation of the TaskExec method.
-func (m *MockTaskExecutor) TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any) (any, string, error) {
+func (m *MockTaskExecutor) TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	m.CalledWithTask = currentTask
 	m.CalledWithPrompt, _ = input.(string)
 
@@ -32,5 +32,5 @@ func (m *MockTaskExecutor) TaskExec(ctx context.Context, resolver llmresolver.Po
 		err = m.MockError
 	}
 
-	return m.MockOutput, m.MockRawResponse, err
+	return m.MockOutput, dataType, m.MockRawResponse, err
 }
