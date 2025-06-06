@@ -36,7 +36,7 @@ func setupTestEnvironment() (*serverops.Config, *testingsetup.Environment) {
 		Build()
 }
 
-func TestNew_InitializesPoolAndModel(t *testing.T) {
+func TestNew_InitializesPoolAndModelSmoketest(t *testing.T) {
 	config, env := setupTestEnvironment()
 	if env.Err != nil {
 		t.Fatal(env.Err)
