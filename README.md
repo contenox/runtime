@@ -81,6 +81,7 @@ Notes from the devslice:
 
 -> Packaging a Chat Application
 
+* [ ] **Release processes**
 * [ ] **Integrate Observability**
 * [ ] **Prepare release infrastructure**
 * [ ] **RAG-enhanced chat interface:**
