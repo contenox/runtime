@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/dispatchservice"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +39,7 @@ func setupFileServiceTestEnv(ctx context.Context, t *testing.T) (libdb.DBManager
 	return dbInstance, dispatchService, dbCleanup
 }
 
-func TestAssignPendingJob(t *testing.T) {
+func TestUnit_DispatchService_AssignsPendingJobSuccessfully(t *testing.T) {
 	ctx := context.Background()
 	db, service, cleanup := setupFileServiceTestEnv(ctx, t)
 	defer cleanup()
@@ -77,7 +77,7 @@ func TestAssignPendingJob(t *testing.T) {
 	})
 }
 
-func TestMarkJobAsDone(t *testing.T) {
+func TestUnit_DispatchService_MarksJobAsDoneRemovesLease(t *testing.T) {
 	ctx := context.Background()
 	db, service, cleanup := setupFileServiceTestEnv(ctx, t)
 	defer cleanup()
@@ -104,7 +104,7 @@ func TestMarkJobAsDone(t *testing.T) {
 	})
 }
 
-func TestMarkJobAsFailed(t *testing.T) {
+func TestUnit_DispatchService_MarksJobAsFailedRequeuesWithRetry(t *testing.T) {
 	ctx := context.Background()
 	db, service, cleanup := setupFileServiceTestEnv(ctx, t)
 	defer cleanup()
@@ -166,7 +166,7 @@ func TestMarkJobAsFailed(t *testing.T) {
 	})
 }
 
-func TestJobListing(t *testing.T) {
+func TestUnit_DispatchService_ListsPendingAndInProgressJobs(t *testing.T) {
 	ctx := context.Background()
 	db, service, cleanup := setupFileServiceTestEnv(ctx, t)
 	defer cleanup()

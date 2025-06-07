@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
+func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 	// mockClient := &serverops.MockPromptExecClient{}
 	mockProvider := &modelprovider.MockProvider{
 		Name:          "mock-model",
@@ -43,7 +43,7 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 	require.Equal(t, "prompted response for: hello", raw)
 }
 
-func TestSimpleExec_TaskExecSystemTest(t *testing.T) {
+func TestUnit_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:1.5b",

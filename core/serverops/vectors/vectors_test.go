@@ -10,7 +10,7 @@ import (
 	"github.com/contenox/contenox/core/serverops/vectors"
 )
 
-func TestLocalInstance(t *testing.T) {
+func TestSystem_Vectors_SetupLocalInstanceSucceeds(t *testing.T) {
 	_, _, cleanup, err := vectors.SetupLocalInstance(context.Background(), "../../../")
 	if err != nil {
 		t.Fatal(err)
@@ -18,7 +18,7 @@ func TestLocalInstance(t *testing.T) {
 	defer cleanup()
 }
 
-func TestVectors(t *testing.T) {
+func TestSystem_Vectors_CRUDAndSearchOperationsWorkCorrectly(t *testing.T) {
 	uri, _, cleanup, err := vectors.SetupLocalInstance(context.Background(), "../../../")
 	if err != nil {
 		t.Fatal(err)

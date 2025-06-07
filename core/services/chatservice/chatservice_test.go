@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestChatSystemTest(t *testing.T) {
+func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing.T) {
 	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").

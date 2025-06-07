@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFileVectorizationJob(t *testing.T) {
+func TestSystem_FileService_VectorizationJob(t *testing.T) {
 	ctx := context.Background()
 
 	dbInstance, fileService, cleanup := setupFileServiceTestEnv(ctx, t)

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTaskExec_PromptToString(t *testing.T) {
+func TestUnit_TaskExec_PromptToString(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		MockOutput:      "mock-result",
 		MockRawResponse: "mock-response",

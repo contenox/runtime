@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/fileservice"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
-func TestFileService(t *testing.T) {
+func TestUnit_FileService_FullCRUDAndHierarchyOperations(t *testing.T) {
 	var cleanups []func()
 	addCleanup := func(fn func()) {
 		cleanups = append(cleanups, fn)

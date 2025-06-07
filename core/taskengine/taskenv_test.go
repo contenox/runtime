@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSimpleEnv_ExecEnv_SingleTask(t *testing.T) {
+func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		MockOutput:      "42",
 		MockRawResponse: "42",
@@ -45,7 +45,7 @@ func TestSimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 	require.Equal(t, "42", result)
 }
 
-func TestSimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
+func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		MockError: errors.New("permanent failure"),
 	}
@@ -71,7 +71,7 @@ func TestSimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 	require.Contains(t, err.Error(), "failed after 1 retries")
 }
 
-func TestSimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
+func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		MockOutput:      "intermediate",
 		MockRawResponse: "continue",
@@ -112,7 +112,7 @@ func TestSimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 	require.Equal(t, "intermediate", result)
 }
 
-func TestSimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
+func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		ErrorSequence:   []error{errors.New("first failure"), nil},
 		MockOutput:      "error recovered",
@@ -151,7 +151,7 @@ func TestSimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 	require.Equal(t, "error recovered", result)
 }
 
-func TestSimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
+func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{
 		MockOutput:      "printed-value",
 		MockRawResponse: "printed-value",

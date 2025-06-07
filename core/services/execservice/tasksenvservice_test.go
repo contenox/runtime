@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTasksserviceSystemTest(t *testing.T) {
+func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:0.5b",
