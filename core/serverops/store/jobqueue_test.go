@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAppendJobAndPopAll(t *testing.T) {
+func TestUnit_JobQueue_AppendJobAndPopAll(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	job := &store.Job{
@@ -47,7 +47,7 @@ func TestAppendJobAndPopAll(t *testing.T) {
 	require.Equal(t, job.RetryCount, retrieved.RetryCount)
 }
 
-func TestPopAllForType(t *testing.T) {
+func TestUnit_JobQueue_PopAllForType(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	job1 := &store.Job{
@@ -86,7 +86,7 @@ func TestPopAllForType(t *testing.T) {
 	require.Equal(t, job2.TaskType, remainingJobs[0].TaskType)
 }
 
-func TestPopAllEmptyQueue(t *testing.T) {
+func TestUnit_JobQueue_PopAllEmptyQueue(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	jobs, err := s.PopAllJobs(ctx)
@@ -94,7 +94,7 @@ func TestPopAllEmptyQueue(t *testing.T) {
 	require.Empty(t, jobs)
 }
 
-func TestPopAllForTypeEmpty(t *testing.T) {
+func TestUnit_JobQueue_PopAllForTypeEmpty(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	jobs, err := s.PopJobsForType(ctx, "non-existent-type")
@@ -102,7 +102,7 @@ func TestPopAllForTypeEmpty(t *testing.T) {
 	require.Empty(t, jobs)
 }
 
-func TestPopOneForType(t *testing.T) {
+func TestUnit_JobQueue_PopOneForType(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Prepare valid JSON payloads.
@@ -172,7 +172,7 @@ func TestPopOneForType(t *testing.T) {
 	require.Equal(t, job3.ValidUntil, poppedJobB.ValidUntil)
 }
 
-func TestGetAllForType(t *testing.T) {
+func TestUnit_JobQueue_GetAllForType(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Prepare valid JSON payloads.
@@ -239,7 +239,7 @@ func TestGetAllForType(t *testing.T) {
 	require.Equal(t, jobB.ValidUntil, jobsB[0].ValidUntil)
 }
 
-func newTestJob(taskType string) *store.Job {
+func newTestUnit_JobQueue_Job(taskType string) *store.Job {
 	return &store.Job{
 		ID:        uuid.New().String(),
 		TaskType:  taskType,
@@ -250,7 +250,7 @@ func newTestJob(taskType string) *store.Job {
 	}
 }
 
-func TestListJobsPagination(t *testing.T) {
+func TestUnit_JobQueue_ListJobsPagination(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	var jobs []*store.Job
@@ -258,7 +258,7 @@ func TestListJobsPagination(t *testing.T) {
 
 	totalJobs := 5
 	for i := range totalJobs {
-		job := newTestJob("list-paginate-test")
+		job := newTestUnit_JobQueue_Job("list-paginate-test")
 		err := s.AppendJob(ctx, *job)
 		require.NoError(t, err)
 
@@ -347,7 +347,7 @@ func TestListJobsPagination(t *testing.T) {
 	})
 }
 
-func TestLeasedJobLifecycle(t *testing.T) {
+func TestUnit_JobQueue_LeasedJobLifecycle(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Create base job
@@ -361,7 +361,7 @@ func TestLeasedJobLifecycle(t *testing.T) {
 		CreatedAt:    time.Now().UTC(),
 	}
 
-	// Test lease operations
+	// TestUnit_JobQueue_ lease operations
 	t.Run("full_lifecycle", func(t *testing.T) {
 		// Append to leased jobs
 		leaseDuration := 15 * time.Minute
@@ -385,7 +385,7 @@ func TestLeasedJobLifecycle(t *testing.T) {
 	})
 }
 
-func TestRetryCountPersistence(t *testing.T) {
+func TestUnit_JobQueue_RetryCountPersistence(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Create job with retries
@@ -396,20 +396,20 @@ func TestRetryCountPersistence(t *testing.T) {
 		Payload:    []byte("{}"),
 	}
 
-	// Test retry count preservation
+	// TestUnit_JobQueue_ retry count preservation
 	require.NoError(t, s.AppendJob(ctx, *job))
 	popped, err := s.PopJobForType(ctx, "retry-test")
 	require.NoError(t, err)
 	require.Equal(t, 3, popped.RetryCount)
 }
 
-func TestLeaseExpiration(t *testing.T) {
+func TestUnit_JobQueue_LeaseExpiration(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Create test job
 	job := &store.Job{ID: uuid.New().String(), TaskType: "lease-expiration-test", Payload: []byte("{}")}
 
-	// Test lease duration calculation
+	// TestUnit_JobQueue_ lease duration calculation
 	leaseDuration := 30 * time.Minute
 	require.NoError(t, s.AppendLeasedJob(ctx, *job, leaseDuration, "lease-test"))
 
@@ -421,7 +421,7 @@ func TestLeaseExpiration(t *testing.T) {
 		"Lease expiration should be set correctly")
 }
 
-func TestEmptyListOperations(t *testing.T) {
+func TestUnit_JobQueue_EmptyListOperations(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	now := time.Now().UTC()
 

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateAndGetPool(t *testing.T) {
+func TestUnit_Pools_CreateAndGetPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{
@@ -31,7 +31,7 @@ func TestCreateAndGetPool(t *testing.T) {
 	require.WithinDuration(t, pool.UpdatedAt, got.UpdatedAt, time.Second)
 }
 
-func TestUpdatePool(t *testing.T) {
+func TestUnit_Pools_UpdatePool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{
@@ -56,7 +56,7 @@ func TestUpdatePool(t *testing.T) {
 	require.True(t, got.UpdatedAt.After(got.CreatedAt))
 }
 
-func TestDeletePool(t *testing.T) {
+func TestUnit_Pools_DeletePool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{
@@ -75,7 +75,7 @@ func TestDeletePool(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestListPools(t *testing.T) {
+func TestUnit_Pools_ListPools(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pools, err := s.ListPools(ctx)
@@ -98,7 +98,7 @@ func TestListPools(t *testing.T) {
 	require.Equal(t, pool1.ID, pools[1].ID)
 }
 
-func TestGetPoolByName(t *testing.T) {
+func TestUnit_Pools_GetPoolByName(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{
@@ -115,7 +115,7 @@ func TestGetPoolByName(t *testing.T) {
 	require.Equal(t, pool.ID, got.ID)
 }
 
-func TestListPoolsByPurpose(t *testing.T) {
+func TestUnit_Pools_ListPoolsByPurpose(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	purpose := "inference"
@@ -131,7 +131,7 @@ func TestListPoolsByPurpose(t *testing.T) {
 	require.Equal(t, pool1.ID, pools[0].ID)
 }
 
-func TestAssignAndListBackendsForPool(t *testing.T) {
+func TestUnit_Pools_AssignAndListBackendsForPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{ID: uuid.NewString(), Name: "Pool1"}
@@ -154,7 +154,7 @@ func TestAssignAndListBackendsForPool(t *testing.T) {
 	require.Equal(t, backend.ID, backends[0].ID)
 }
 
-func TestRemoveBackendFromPool(t *testing.T) {
+func TestUnit_Pools_RemoveBackendFromPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{ID: uuid.NewString(), Name: "Pool1"}
@@ -173,7 +173,7 @@ func TestRemoveBackendFromPool(t *testing.T) {
 	require.Empty(t, backends)
 }
 
-func TestListPoolsForBackend(t *testing.T) {
+func TestUnit_Pools_ListPoolsForBackend(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	backend := &store.Backend{ID: uuid.NewString(), Name: "Backend1"}
@@ -196,7 +196,7 @@ func TestListPoolsForBackend(t *testing.T) {
 	}
 }
 
-func TestAssignAndListModelsForPool(t *testing.T) {
+func TestUnit_Pools_AssignAndListModelsForPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{Model: "model1"}
@@ -218,7 +218,7 @@ func TestAssignAndListModelsForPool(t *testing.T) {
 	require.Error(t, err, libdb.ErrConstraintViolation)
 }
 
-func TestRemoveModelFromPool(t *testing.T) {
+func TestUnit_Pools_RemoveModelFromPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{Model: "model1"}
@@ -237,7 +237,7 @@ func TestRemoveModelFromPool(t *testing.T) {
 	require.Empty(t, models)
 }
 
-func TestListPoolsForModel(t *testing.T) {
+func TestUnit_Pools_ListPoolsForModel(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{Model: "model1"}
@@ -260,7 +260,7 @@ func TestListPoolsForModel(t *testing.T) {
 	}
 }
 
-func TestGetNonExistentPool(t *testing.T) {
+func TestUnit_Pools_GetNonExistentPool(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	_, err := s.GetPool(ctx, uuid.NewString())
@@ -270,7 +270,7 @@ func TestGetNonExistentPool(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestDuplicatePoolName(t *testing.T) {
+func TestUnit_Pools_DuplicatePoolName(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	pool := &store.Pool{ID: uuid.NewString(), Name: "Duplicate"}

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestAppendAndGetAllModels(t *testing.T) {
+func TestUnit_Models_AppendAndGetAllModels(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	models, err := s.ListModels(ctx)
@@ -35,7 +35,7 @@ func TestAppendAndGetAllModels(t *testing.T) {
 	require.WithinDuration(t, model.UpdatedAt, models[0].UpdatedAt, time.Second)
 }
 
-func TestDeleteModel(t *testing.T) {
+func TestUnit_Models_DeleteModel(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{
@@ -53,14 +53,14 @@ func TestDeleteModel(t *testing.T) {
 	require.Empty(t, models)
 }
 
-func TestDeleteNonExistentModel(t *testing.T) {
+func TestUnit_Models_DeleteNonExistentModel(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	err := s.DeleteModel(ctx, "non-existent-model")
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestGetAllModelsOrder(t *testing.T) {
+func TestUnit_Models_GetAllModelsOrder(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model1 := &store.Model{
@@ -87,7 +87,7 @@ func TestGetAllModelsOrder(t *testing.T) {
 	require.True(t, models[0].CreatedAt.After(models[1].CreatedAt))
 }
 
-func TestAppendDuplicateModel(t *testing.T) {
+func TestUnit_Models_AppendDuplicateModel(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{
@@ -100,7 +100,7 @@ func TestAppendDuplicateModel(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestGetModelByName(t *testing.T) {
+func TestUnit_Models_GetModelByName(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	model := &store.Model{

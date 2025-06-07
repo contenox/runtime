@@ -4,12 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestMessages(t *testing.T) {
+func TestUnitMessages(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	userID := uuid.NewString()
 

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +25,8 @@ func verifyUserEquality(t *testing.T, expected, actual *store.User) {
 	require.WithinDuration(t, expected.UpdatedAt, actual.UpdatedAt, time.Second)
 }
 
-// TestCreateUserAndRetrieve creates a user and then retrieves it via ID, Email, and Subject.
-func TestCreateUserAndRetrieve(t *testing.T) {
+// TestUnit_User_CreateUserAndRetrieve creates a user and then retrieves it via ID, Email, and Subject.
+func TestUnit_User_CreateUserAndRetrieve(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	user := &store.User{
@@ -61,8 +61,8 @@ func TestCreateUserAndRetrieve(t *testing.T) {
 	verifyUserEquality(t, user, retrievedBySubject)
 }
 
-// TestCreateUserDuplicateEmail ensures that trying to create a user with a duplicate email fails.
-func TestCreateUserDuplicateEmail(t *testing.T) {
+// TestUnit_User_CreateUserDuplicateEmail ensures that trying to create a user with a duplicate email fails.
+func TestUnit_User_CreateUserDuplicateEmail(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	user1 := &store.User{
@@ -86,8 +86,8 @@ func TestCreateUserDuplicateEmail(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrUniqueViolation, err)
 }
 
-// TestCreateUserDuplicateSubject ensures that trying to create a user with a duplicate subject fails.
-func TestCreateUserDuplicateSubject(t *testing.T) {
+// TestUnit_User_CreateUserDuplicateSubject ensures that trying to create a user with a duplicate subject fails.
+func TestUnit_User_CreateUserDuplicateSubject(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	user1 := &store.User{
@@ -109,8 +109,8 @@ func TestCreateUserDuplicateSubject(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestGetUserNotFound attempts to retrieve non-existent users.
-func TestGetUserNotFound(t *testing.T) {
+// TestUnit_User_GetUserNotFound attempts to retrieve non-existent users.
+func TestUnit_User_GetUserNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	_, err := s.GetUserByID(ctx, uuid.NewString())
@@ -123,8 +123,8 @@ func TestGetUserNotFound(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-// TestUpdateUser updates an existing user and verifies the changes.
-func TestUpdateUser(t *testing.T) {
+// TestUnit_User_UpdateUser updates an existing user and verifies the changes.
+func TestUnit_User_UpdateUser(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	original := &store.User{
@@ -156,8 +156,8 @@ func TestUpdateUser(t *testing.T) {
 	require.True(t, updated.UpdatedAt.After(updated.CreatedAt))
 }
 
-// TestUpdateUserConflict tests that updates conflicting with existing unique constraints are rejected.
-func TestUpdateUserConflict(t *testing.T) {
+// TestUnit_User_UpdateUserConflict tests that updates conflicting with existing unique constraints are rejected.
+func TestUnit_User_UpdateUserConflict(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	user1 := &store.User{
@@ -187,8 +187,8 @@ func TestUpdateUserConflict(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestDeleteUser deletes a user and then confirms that retrieval fails.
-func TestDeleteUser(t *testing.T) {
+// TestUnit_User_DeleteUser deletes a user and then confirms that retrieval fails.
+func TestUnit_User_DeleteUser(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	user := &store.User{
@@ -207,15 +207,15 @@ func TestDeleteUser(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-// TestDeleteUserNotFound ensures that trying to delete a non-existent user returns ErrNotFound.
-func TestDeleteUserNotFound(t *testing.T) {
+// TestUnit_User_DeleteUserNotFound ensures that trying to delete a non-existent user returns ErrNotFound.
+func TestUnit_User_DeleteUserNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	err := s.DeleteUser(ctx, uuid.NewString())
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-// TestListUsersOrder creates multiple users and checks that ListUsers returns them in descending creation order.
-func TestListUsersOrder(t *testing.T) {
+// TestUnit_User_ListUsersOrder creates multiple users and checks that ListUsers returns them in descending creation order.
+func TestUnit_User_ListUsersOrder(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	beforeCreation := time.Now().UTC()
 
@@ -244,7 +244,7 @@ func TestListUsersOrder(t *testing.T) {
 	require.Len(t, retrieved, 0)
 }
 
-func createTestUser(t *testing.T, ctx context.Context, s store.Store, subject, friendlyName string) *store.User {
+func createTestUnit_User_User(t *testing.T, ctx context.Context, s store.Store, subject, friendlyName string) *store.User {
 	t.Helper()
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -260,15 +260,15 @@ func createTestUser(t *testing.T, ctx context.Context, s store.Store, subject, f
 	return createdUser
 }
 
-func TestListUsersBySubjects(t *testing.T) {
+func TestUnit_User_ListUsersBySubjects(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// --- Setup: Create test users ---
-	userA := createTestUser(t, ctx, s, "subj-a", "User A") // Oldest
-	userB := createTestUser(t, ctx, s, "subj-b", "User B")
-	userD := createTestUser(t, ctx, s, "subj-d", "User D") // Newest
+	userA := createTestUnit_User_User(t, ctx, s, "subj-a", "User A") // Oldest
+	userB := createTestUnit_User_User(t, ctx, s, "subj-b", "User B")
+	userD := createTestUnit_User_User(t, ctx, s, "subj-d", "User D") // Newest
 
-	// --- Test Cases ---
+	// --- TestUnit_User_ Cases ---
 
 	t.Run("Fetch specific existing subjects", func(t *testing.T) {
 		subjectsToFetch := []string{"subj-b", "subj-d"}

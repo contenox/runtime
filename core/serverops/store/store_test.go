@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestQueryingEmptyDB(t *testing.T) {
+func TestUnit_Store_QueryingEmptyDB(t *testing.T) {
 	ctx := context.TODO()
 	connStr, _, cleanup, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
 	require.NoError(t, err)
