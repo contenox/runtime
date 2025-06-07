@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
@@ -121,7 +120,7 @@ func (s *State) RunDownloadCycle(ctx context.Context) error {
 	ch := make(chan []byte, 16)
 	sub, err := s.psInstance.Stream(ctx, "queue_cancel", ch)
 	if err != nil {
-		log.Println("Error subscribing to queue_cancel:", err)
+		//log.Println("Error subscribing to queue_cancel:", err)
 		return nil
 	}
 	go func() {
@@ -137,7 +136,7 @@ func (s *State) RunDownloadCycle(ctx context.Context) error {
 				}
 				var queueItem store.Job
 				if err := json.Unmarshal(data, &queueItem); err != nil {
-					log.Println("Error unmarshalling cancel message:", err)
+					//log.Println("Error unmarshalling cancel message:", err)
 					continue
 				}
 				// Check if the cancellation request matches the current download task.
@@ -152,9 +151,9 @@ func (s *State) RunDownloadCycle(ctx context.Context) error {
 		}
 	}()
 
-	log.Printf("Processing download job: %+v", item)
+	//log.Printf("Processing download job: %+v", item)
 	err = s.dwQueue.downloadModel(ctx, *item, func(status store.Status) error {
-		// log.Printf("Download progress for model %s: %+v", item.Model, status)
+		// //log.Printf("Download progress for model %s: %+v", item.Model, status)
 		message, _ := json.Marshal(status)
 		return s.psInstance.Publish(ctx, "model_download", message)
 	})
@@ -177,17 +176,17 @@ func (s *State) Get(ctx context.Context) map[string]LLMState {
 	s.state.Range(func(key, value any) bool {
 		backend, ok := value.(*LLMState)
 		if !ok {
-			log.Printf("invalid type in state: %T", value)
+			//log.Printf("invalid type in state: %T", value)
 			return true
 		}
 		var backendCopy LLMState
 		raw, err := json.Marshal(backend)
 		if err != nil {
-			log.Printf("failed to marshal backend: %v", err)
+			//log.Printf("failed to marshal backend: %v", err)
 		}
 		err = json.Unmarshal(raw, &backendCopy)
 		if err != nil {
-			log.Printf("failed to unmarshal backend: %v", err)
+			//log.Printf("failed to unmarshal backend: %v", err)
 		}
 		state[backend.ID] = backendCopy
 		return true
@@ -212,7 +211,7 @@ func (s *State) cleanupStaleBackends(currentIDs map[string]struct{}) error {
 		id, ok := key.(string)
 		if !ok {
 			err = fmt.Errorf("BUG: invalid key type: %T %v", key, key)
-			log.Printf("BUG: %v", err)
+			//log.Printf("BUG: %v", err)
 			return true
 		}
 		if _, exists := currentIDs[id]; !exists {
@@ -324,7 +323,7 @@ func (s *State) processBackend(ctx context.Context, backend *store.Backend, decl
 	case "Ollama":
 		s.processOllamaBackend(ctx, backend, declaredOllamaModels)
 	default:
-		log.Printf("Unsupported backend type: %s", backend.Type)
+		//log.Printf("Unsupported backend type: %s", backend.Type)
 		brokenService := &LLMState{
 			ID:      backend.ID,
 			Name:    backend.Name,
@@ -344,17 +343,17 @@ func (s *State) processBackend(ctx context.Context, backend *store.Backend, decl
 // Finally, it updates the internal state map with the latest observed list of pulled models
 // and any communication errors encountered.
 func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend, declaredOllamaModels []*store.Model) {
-	log.Printf("Processing Ollama backend for ID %s with declared models: %+v", backend.ID, declaredOllamaModels)
+	//log.Printf("Processing Ollama backend for ID %s with declared models: %+v", backend.ID, declaredOllamaModels)
 
 	models := []string{}
 	for _, model := range declaredOllamaModels {
 		models = append(models, model.Model)
 	}
-	log.Printf("Extracted model names for backend %s: %v", backend.ID, models)
+	//log.Printf("Extracted model names for backend %s: %v", backend.ID, models)
 
 	backendURL, err := url.Parse(backend.BaseURL)
 	if err != nil {
-		log.Printf("Error parsing URL for backend %s: %v", backend.ID, err)
+		//log.Printf("Error parsing URL for backend %s: %v", backend.ID, err)
 		stateservice := &LLMState{
 			ID:           backend.ID,
 			Name:         backend.Name,
@@ -366,12 +365,12 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 		s.state.Store(backend.ID, stateservice)
 		return
 	}
-	log.Printf("Parsed URL for backend %s: %s", backend.ID, backendURL.String())
+	//log.Printf("Parsed URL for backend %s: %s", backend.ID, backendURL.String())
 
 	client := api.NewClient(backendURL, http.DefaultClient)
 	existingModels, err := client.List(ctx)
 	if err != nil {
-		log.Printf("Error listing models for backend %s: %v", backend.ID, err)
+		//log.Printf("Error listing models for backend %s: %v", backend.ID, err)
 		stateservice := &LLMState{
 			ID:           backend.ID,
 			Name:         backend.Name,
@@ -383,24 +382,24 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 		s.state.Store(backend.ID, stateservice)
 		return
 	}
-	log.Printf("Existing models from backend %s: %+v", backend.ID, existingModels.Models)
+	//log.Printf("Existing models from backend %s: %+v", backend.ID, existingModels.Models)
 
 	declaredModelSet := make(map[string]struct{})
 	for _, declaredModel := range declaredOllamaModels {
 		declaredModelSet[declaredModel.Model] = struct{}{}
 	}
-	log.Printf("Declared model set for backend %s: %v", backend.ID, declaredModelSet)
+	//log.Printf("Declared model set for backend %s: %v", backend.ID, declaredModelSet)
 
 	existingModelSet := make(map[string]struct{})
 	for _, existingModel := range existingModels.Models {
 		existingModelSet[existingModel.Model] = struct{}{}
 	}
-	log.Printf("Existing model set for backend %s: %v", backend.ID, existingModelSet)
+	//log.Printf("Existing model set for backend %s: %v", backend.ID, existingModelSet)
 
 	// For each declared model missing from the backend, add a download job.
 	for declaredModel := range declaredModelSet {
 		if _, ok := existingModelSet[declaredModel]; !ok {
-			log.Printf("Model %s is declared but missing in backend %s. Adding to download queue.", declaredModel, backend.ID)
+			//log.Printf("Model %s is declared but missing in backend %s. Adding to download queue.", declaredModel, backend.ID)
 			// RATIONALE: Using the backend URL as the Job ID in the queue prevents
 			// queueing multiple downloads for the same backend simultaneously,
 			// acting as a simple lock at the queue level.
@@ -419,7 +418,7 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 			//    the downloadjob will be readded to the queue.
 			err := s.dwQueue.add(ctx, *backendURL, declaredModel)
 			if err != nil {
-				log.Printf("Error adding model %s to download queue: %v", declaredModel, err)
+				//log.Printf("Error adding model %s to download queue: %v", declaredModel, err)
 			}
 		}
 	}
@@ -429,21 +428,21 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 	// ensure some backend-nodes don't just run out of space.
 	for existingModel := range existingModelSet {
 		if _, ok := declaredModelSet[existingModel]; !ok {
-			log.Printf("Model %s exists in backend %s but is not declared. Triggering deletion.", existingModel, backend.ID)
+			//log.Printf("Model %s exists in backend %s but is not declared. Triggering deletion.", existingModel, backend.ID)
 			err := client.Delete(ctx, &api.DeleteRequest{
 				Model: existingModel,
 			})
 			if err != nil {
-				log.Printf("Error deleting model %s for backend %s: %v", existingModel, backend.ID, err)
+				//log.Printf("Error deleting model %s for backend %s: %v", existingModel, backend.ID, err)
 			} else {
-				log.Printf("Successfully deleted model %s for backend %s", existingModel, backend.ID)
+				//log.Printf("Successfully deleted model %s for backend %s", existingModel, backend.ID)
 			}
 		}
 	}
 
 	modelResp, err := client.List(ctx)
 	if err != nil {
-		log.Printf("Error listing running models for backend %s after deletion: %v", backend.ID, err)
+		//log.Printf("Error listing running models for backend %s after deletion: %v", backend.ID, err)
 		stateservice := &LLMState{
 			ID:           backend.ID,
 			Name:         backend.Name,
@@ -455,7 +454,7 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 		s.state.Store(backend.ID, stateservice)
 		return
 	}
-	log.Printf("Updated model list for backend %s: %+v", backend.ID, modelResp.Models)
+	//log.Printf("Updated model list for backend %s: %+v", backend.ID, modelResp.Models)
 
 	stateservice := &LLMState{
 		ID:           backend.ID,
@@ -465,5 +464,5 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 		Backend:      *backend,
 	}
 	s.state.Store(backend.ID, stateservice)
-	log.Printf("Stored updated state for backend %s", backend.ID)
+	//log.Printf("Stored updated state for backend %s", backend.ID)
 }

@@ -151,14 +151,14 @@ func (rm *Routine) MarkFailure() {
 	switch rm.state {
 	case Closed:
 		rm.failureCount++
-		log.Printf("Failure recorded, count: %d", rm.failureCount)
+		// log.Printf("Failure recorded, count: %d", rm.failureCount)
 		if rm.failureCount >= rm.threshold {
-			log.Println("Threshold reached, transitioning to Open state")
+			// log.Println("Threshold reached, transitioning to Open state")
 			rm.state = Open
 			rm.lastFailureAt = time.Now().UTC()
 		}
 	case HalfOpen:
-		log.Println("HalfOpen state: Test request failed, reverting to Open state")
+		// log.Println("HalfOpen state: Test request failed, reverting to Open state")
 		rm.state = Open
 		rm.lastFailureAt = time.Now().UTC()
 		rm.inTest = false
@@ -204,12 +204,12 @@ func (rm *Routine) Execute(ctx context.Context, fn func(ctx context.Context) err
 //   - error: The last error encountered (either from `fn` or `ErrCircuitOpen`) if all attempts fail.
 func (rm *Routine) ExecuteWithRetry(ctx context.Context, interval time.Duration, iterations int, fn func(ctx context.Context) error) error {
 	var err error
-	for i := range iterations {
+	for range iterations {
 		if ctx.Err() != nil {
-			// log.Println("Context cancelled, aborting retries")
+			//log.Println("Context cancelled, aborting retries")
 			return context.Cause(ctx)
 		}
-		log.Printf("Retry attempt %d", i+1)
+		// log.Printf("Retry attempt %d", i+1)
 		if err = rm.Execute(ctx, fn); err == nil {
 			return nil
 		}
@@ -245,7 +245,7 @@ func (rm *Routine) Loop(ctx context.Context, interval time.Duration, triggerChan
 		}
 		select {
 		case <-ctx.Done():
-			log.Println("Loop exiting due to context cancellation")
+			// log.Println("Loop exiting due to context cancellation")
 			return
 		case <-triggerChan:
 			if lastErr != nil {
@@ -253,7 +253,7 @@ func (rm *Routine) Loop(ctx context.Context, interval time.Duration, triggerChan
 			}
 			log.Println("Trigger received, executing immediately")
 		case <-time.After(interval):
-			log.Println("Interval elapsed, executing next cycle")
+			// log.Println("Interval elapsed, executing next cycle")
 		}
 	}
 }
