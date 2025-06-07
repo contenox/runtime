@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateAndGetBackend(t *testing.T) {
+func TestUnit_Backend_CreatesAndFetchesByID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	backend := &store.Backend{
@@ -35,7 +35,7 @@ func TestCreateAndGetBackend(t *testing.T) {
 	require.WithinDuration(t, backend.UpdatedAt, got.UpdatedAt, time.Second)
 }
 
-func TestUpdateBackend(t *testing.T) {
+func TestUnit_Backend_UpdatesFieldsCorrectly(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	backend := &store.Backend{
@@ -67,7 +67,7 @@ func TestUpdateBackend(t *testing.T) {
 	require.True(t, got.UpdatedAt.After(got.CreatedAt))
 }
 
-func TestDeleteBackend(t *testing.T) {
+func TestUnit_Backend_DeletesSuccessfully(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	backend := &store.Backend{
@@ -90,7 +90,7 @@ func TestDeleteBackend(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestListBackends(t *testing.T) {
+func TestUnit_Backend_ListReturnsOrderedByCreationTime(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Initially, the list should be empty.
@@ -125,7 +125,7 @@ func TestListBackends(t *testing.T) {
 	require.Equal(t, backend1.ID, backends[1].ID)
 }
 
-func TestGetBackendByName(t *testing.T) {
+func TestUnit_Backend_FetchesByName(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	backend := &store.Backend{
@@ -145,7 +145,7 @@ func TestGetBackendByName(t *testing.T) {
 	require.Equal(t, backend.ID, got.ID)
 }
 
-func TestGetNonExistentBackend(t *testing.T) {
+func TestUnit_Backend_GetNonexistentReturnsNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Test retrieval by a non-existent ID.

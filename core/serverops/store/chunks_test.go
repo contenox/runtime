@@ -3,13 +3,13 @@ package store_test
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateAndGetChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_CreatesAndFetchesByID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{
@@ -33,7 +33,7 @@ func TestCreateAndGetChunkIndex(t *testing.T) {
 	require.Equal(t, chunk.EmbeddingModel, got.EmbeddingModel)
 }
 
-func TestUpdateChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_UpdatesFieldsCorrectly(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{
@@ -60,7 +60,7 @@ func TestUpdateChunkIndex(t *testing.T) {
 	require.Equal(t, chunk.EmbeddingModel, updated.EmbeddingModel)
 }
 
-func TestDeleteChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_DeletesSuccessfully(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{
@@ -76,7 +76,7 @@ func TestDeleteChunkIndex(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestListChunkIndicesByVectorID(t *testing.T) {
+func TestUnit_ChunkIndex_ListsByVectorID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	vectorID := uuid.NewString()
@@ -107,7 +107,7 @@ func TestListChunkIndicesByVectorID(t *testing.T) {
 	}
 }
 
-func TestListChunkIndicesByResource(t *testing.T) {
+func TestUnit_ChunkIndex_ListsByResource(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	targetResourceID := uuid.NewString()
@@ -147,14 +147,14 @@ func TestListChunkIndicesByResource(t *testing.T) {
 	}
 }
 
-func TestGetNonExistentChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_GetNonexistentReturnsNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	_, err := s.GetChunkIndexByID(ctx, uuid.NewString())
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestUpdateNonExistentChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_UpdateFailsIfNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	chunk := &store.ChunkIndex{ID: uuid.NewString()}
@@ -163,7 +163,7 @@ func TestUpdateNonExistentChunkIndex(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestDeleteNonExistentChunkIndex(t *testing.T) {
+func TestUnit_ChunkIndex_DeleteFailsIfNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	err := s.DeleteChunkIndex(ctx, uuid.NewString())
@@ -171,7 +171,7 @@ func TestDeleteNonExistentChunkIndex(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestDuplicateChunkIndexID(t *testing.T) {
+func TestUnit_ChunkIndex_CreateFailsOnDuplicateID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	id := uuid.NewString()
@@ -186,7 +186,7 @@ func TestDuplicateChunkIndexID(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrUniqueViolation)
 }
 
-func TestEmptyListings(t *testing.T) {
+func TestUnit_ChunkIndex_ListsReturnEmptyWhenNoMatches(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	t.Run("ByVectorID", func(t *testing.T) {

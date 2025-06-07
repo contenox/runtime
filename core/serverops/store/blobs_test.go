@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-// TestCreateAndGetBlob verifies that a blob can be created and then retrieved by its ID.
-func TestCreateAndGetBlob(t *testing.T) {
+// TestUnit_Blob_CreatesAndFetchesByID verifies that a blob can be created and then retrieved by its ID.
+func TestUnit_Blob_CreatesAndFetchesByID(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	blob := &store.Blob{
@@ -36,8 +36,8 @@ func TestCreateAndGetBlob(t *testing.T) {
 	require.WithinDuration(t, blob.UpdatedAt, retrieved.UpdatedAt, time.Second)
 }
 
-// TestGetBlobByIDNotFound verifies that attempting to retrieve a non-existent blob returns ErrNotFound.
-func TestGetBlobByIDNotFound(t *testing.T) {
+// TestUnit_Blob_GetNonexistentReturnsNotFound verifies that attempting to retrieve a non-existent blob returns ErrNotFound.
+func TestUnit_Blob_GetNonexistentReturnsNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Attempt to get a blob with a random ID that hasn't been created.
@@ -45,8 +45,8 @@ func TestGetBlobByIDNotFound(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-// TestDeleteBlob verifies that a blob can be deleted successfully.
-func TestDeleteBlob(t *testing.T) {
+// TestUnit_Blob_DeletesSuccessfully verifies that a blob can be deleted successfully.
+func TestUnit_Blob_DeletesSuccessfully(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	// Create a blob to delete.

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCreateAndGetAccessEntry(t *testing.T) {
+func TestUnit_AccessEntry_CreatesAndFetchesByIDAndIdentityResource(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -58,7 +58,7 @@ func TestCreateAndGetAccessEntry(t *testing.T) {
 	require.WithinDuration(t, entry.UpdatedAt, fetchedEntries[0].UpdatedAt, time.Second)
 }
 
-func TestUpdateAccessEntry(t *testing.T) {
+func TestUnit_AccessEntry_UpdatesFieldsCorrectly(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -93,7 +93,7 @@ func TestUpdateAccessEntry(t *testing.T) {
 	require.True(t, updated.UpdatedAt.After(entry.CreatedAt))
 }
 
-func TestDeleteAccessEntry(t *testing.T) {
+func TestUnit_AccessEntry_DeletesSuccessfully(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -124,7 +124,7 @@ func TestDeleteAccessEntry(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestDeleteAccessEntriesByIdentity(t *testing.T) {
+func TestUnit_AccessEntry_BulkDeletesByIdentity(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -166,7 +166,7 @@ func TestDeleteAccessEntriesByIdentity(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestDeleteAccessEntriesByResource(t *testing.T) {
+func TestUnit_AccessEntry_BulkDeletesByResource(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -205,7 +205,7 @@ func TestDeleteAccessEntriesByResource(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestGetAllAccessEntriesOrder(t *testing.T) {
+func TestUnit_AccessEntry_ListReturnsOrderedByCreationTime(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	beforeCreated := time.Now().UTC()
 	user := &store.User{
@@ -243,7 +243,7 @@ func TestGetAllAccessEntriesOrder(t *testing.T) {
 	require.Len(t, entries, 0)
 }
 
-func TestGetAccessEntriesByIdentity(t *testing.T) {
+func TestUnit_AccessEntry_FetchesAllForGivenIdentity(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
@@ -281,7 +281,7 @@ func TestGetAccessEntriesByIdentity(t *testing.T) {
 	require.Len(t, results, 2)
 }
 
-func TestUpdateNonExistentEntry(t *testing.T) {
+func TestUnit_AccessEntry_UpdateFailsIfNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	entry := &store.AccessEntry{
@@ -291,14 +291,14 @@ func TestUpdateNonExistentEntry(t *testing.T) {
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestDeleteNonExistentEntry(t *testing.T) {
+func TestUnit_AccessEntry_DeleteFailsIfNotFound(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 
 	err := s.DeleteAccessEntry(ctx, uuid.NewString())
 	require.ErrorIs(t, err, libdb.ErrNotFound)
 }
 
-func TestCreateDuplicateEntry(t *testing.T) {
+func TestUnit_AccessEntry_CreateFailsOnDuplicateKey(t *testing.T) {
 	ctx, s := store.SetupStore(t)
 	user := &store.User{
 		ID:           uuid.NewString(),
