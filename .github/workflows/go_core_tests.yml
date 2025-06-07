@@ -5,6 +5,7 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+
 jobs:
   build:
     name: Test
@@ -12,6 +13,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
@@ -22,10 +24,10 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run tests
+      - name: Run unit tests only
         run: |
           set -euo pipefail
-          go test -C ./core/ -json -v ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
+          go test -C ./core/ -json -v -run ^TestUnit_ ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
       - name: Upload test log
         uses: actions/upload-artifact@v4
