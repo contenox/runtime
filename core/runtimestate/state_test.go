@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStateLogic(t *testing.T) {
+func TestSystem_RuntimeState_SyncsBackendAndModel(t *testing.T) {
 	ctx := context.TODO()
 	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
@@ -106,10 +106,7 @@ func TestStateLogic(t *testing.T) {
 	}, 30*time.Second, 100*time.Millisecond)
 }
 
-func TestBackendDeletion(t *testing.T) {
-	// if os.Getenv("SystemTestS") == "" {
-	// 	t.Skip("Set env SystemTestS to true to run this test")
-	// }
+func TestSystem_RuntimeState_RemovesDeletedBackend(t *testing.T) {
 	ctx := context.TODO()
 	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)

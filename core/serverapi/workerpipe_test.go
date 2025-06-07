@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkerPipeSystemTest(t *testing.T) {
+func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T) {
 	port := rand.Intn(16383) + 49152
 	config := &serverops.Config{
 		JWTExpiry:       "1h",
