@@ -46,7 +46,7 @@ func setupPoolTest(t *testing.T) (context.Context, string, *runtimestate.State, 
 	}
 }
 
-func TestPoolAwareStateLogicSmoketest(t *testing.T) {
+func TestSystem_PoolAwareState_ShouldSyncAndDownloadModels(t *testing.T) {
 	ctx, ollamaUrl, backendState, dbStore, cleanup := setupPoolTest(t)
 	defer cleanup()
 
@@ -110,7 +110,7 @@ func TestPoolAwareStateLogicSmoketest(t *testing.T) {
 	}, 30*time.Second, 1*time.Second)
 }
 
-func TestPoolBackendIsolation(t *testing.T) {
+func TestSystem_PoolIsolation_ShouldNotLeakModelsAcrossPools(t *testing.T) {
 	ctx, ollamaUrl, backendState, dbStore, cleanup := setupPoolTest(t)
 	defer cleanup()
 

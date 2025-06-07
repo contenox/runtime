@@ -19,9 +19,6 @@ import (
 )
 
 func TestStateLogic(t *testing.T) {
-	// if os.Getenv("SMOKETESTS") == "" {
-	// 	t.Skip("Set env SMOKETESTS to true to run this test")
-	// }
 	ctx := context.TODO()
 	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
 	require.NoError(t, err)
@@ -110,8 +107,8 @@ func TestStateLogic(t *testing.T) {
 }
 
 func TestBackendDeletion(t *testing.T) {
-	// if os.Getenv("SMOKETESTS") == "" {
-	// 	t.Skip("Set env SMOKETESTS to true to run this test")
+	// if os.Getenv("SystemTestS") == "" {
+	// 	t.Skip("Set env SystemTestS to true to run this test")
 	// }
 	ctx := context.TODO()
 	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)
@@ -170,8 +167,8 @@ func TestBackendDeletion(t *testing.T) {
 }
 
 func TestPoolBasedModelAssignment(t *testing.T) {
-	// if os.Getenv("SMOKETESTS") == "" {
-	// 	t.Skip("Set env SMOKETESTS to true to run this test")
+	// if os.Getenv("SystemTestS") == "" {
+	// 	t.Skip("Set env SystemTestS to true to run this test")
 	// }
 	ctx := context.TODO()
 	uri, _, cleanup, err := libtestenv.SetupOllamaLocalInstance(ctx)

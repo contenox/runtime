@@ -1,6 +1,12 @@
-.PHONY: core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+.PHONY: core-test-unit core-test-system core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
 DEFAULT_ADMIN_USER ?= admin@admin.com
 DEFAULT_CORE_VERSION ?= dev-demo
+
+core-test-unit:
+	GOMAXPROCS=4 go test -C ./core/ -run '^TestUnit_' ./...
+
+core-test-system:
+	GOMAXPROCS=4 go test -C ./core/ -run '^TestSystem_' ./...
 
 core-test:
 	GOMAXPROCS=4 go test -C ./core/ ./...

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestModelProviderAdapter_ReturnsCorrectProviders(t *testing.T) {
+func TestUnit_ModelProviderAdapter_ReturnsExpectedProviders(t *testing.T) {
 	now := time.Now()
 
 	runtime := map[string]runtimestate.LLMState{
@@ -60,7 +60,7 @@ func TestModelProviderAdapter_ReturnsCorrectProviders(t *testing.T) {
 	}
 }
 
-func TestModelProviderAdapter_SetsChatCapabilityNotEmbed(t *testing.T) {
+func TestUnit_ModelProviderAdapter_SetsCorrectModelCapabilities(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	chatModelName := "llama3:latest"           // A model known to support chat by default

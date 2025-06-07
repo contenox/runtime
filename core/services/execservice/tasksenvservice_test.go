@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTasksserviceSmoketest(t *testing.T) {
+func TestTasksserviceSystemTest(t *testing.T) {
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:0.5b",
@@ -21,7 +21,7 @@ func TestTasksserviceSmoketest(t *testing.T) {
 
 	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
-		WithServiceManager(config.JWTExpiry).
+		WithServiceManager(config).
 		WithDBConn("test").
 		WithDBManager().
 		WithPubSub().

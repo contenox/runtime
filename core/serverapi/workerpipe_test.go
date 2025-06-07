@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkerPipeSmoketest(t *testing.T) {
+func TestWorkerPipeSystemTest(t *testing.T) {
 	port := rand.Intn(16383) + 49152
 	config := &serverops.Config{
 		JWTExpiry:       "1h",

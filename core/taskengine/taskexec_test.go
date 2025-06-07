@@ -43,7 +43,7 @@ func TestSimpleExec_TaskExec_PromptToString(t *testing.T) {
 	require.Equal(t, "prompted response for: hello", raw)
 }
 
-func TestSimpleExec_TaskExecSmoketest(t *testing.T) {
+func TestSimpleExec_TaskExecSystemTest(t *testing.T) {
 	config := &serverops.Config{
 		JWTExpiry:  "1h",
 		TasksModel: "qwen2.5:1.5b",

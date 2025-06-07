@@ -15,7 +15,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestChatSmoketest(t *testing.T) {
+func TestChatSystemTest(t *testing.T) {
 	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").

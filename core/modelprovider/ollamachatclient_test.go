@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOllamaChatClientSmoketest(t *testing.T) {
+func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 	ctx, backendState, _, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
@@ -41,7 +41,7 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 	client, err := provider.GetChatConnection(url)
 	require.NoError(t, err)
 	require.NotNil(t, client)
-	t.Run("First chat call", func(t *testing.T) {
+	t.Run("SinglePrompt_ShouldReturnAssistantReply", func(t *testing.T) {
 		// First chat call
 		response, err := client.Chat(ctx, []serverops.Message{
 			{Content: "Hello, world!", Role: "user"},
@@ -60,7 +60,7 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 		require.NotEmpty(t, response2.Content)
 		require.Equal(t, "assistant", response2.Role)
 	})
-	t.Run("conversation", func(t *testing.T) {
+	t.Run("MultiTurnConversation_ShouldMaintainState", func(t *testing.T) {
 		userMessages := []serverops.Message{
 			{Content: "Hello, world!", Role: "user"},
 			{Content: "How are you?", Role: "user"},
@@ -89,7 +89,7 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 		}
 	})
 
-	t.Run("Chat with larger input", func(t *testing.T) {
+	t.Run("LargePrompt_ShouldReturnEmptyOrError", func(t *testing.T) {
 		// Generate a huge input string
 		hugeInput := make([]byte, 100_000)
 		for i := range hugeInput {
@@ -109,10 +109,10 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 		}
 		assert.Contains(t, err.Error(), "empty content from model", "Error should come from the ollama API", response.Content)
 	})
-	t.Run("Non Existent Model", func(t *testing.T) {
+	t.Run("InvalidModel_ShouldReturnDescriptiveError", func(t *testing.T) {
 		nonExistentModel := "this-model-definitely-does-not-exist-12345:latest"
 		badProvider := modelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, modelprovider.WithChat(true))
-		require.True(t, provider.CanChat())
+		require.True(t, badProvider.CanChat())
 
 		invalidClient, err := badProvider.GetChatConnection(url)
 		require.NoError(t, err, "Getting the client should succeed even if model doesn't exist yet")
@@ -130,7 +130,7 @@ func TestOllamaChatClientSmoketest(t *testing.T) {
 
 }
 
-func TestOllamaProvider_GetChatConnection_ChatDisabled(t *testing.T) {
+func TestUnit_OllamaProvider_RejectsChatWhenDisabled(t *testing.T) {
 	dummyURL := "http://localhost:11434"
 	backends := []string{dummyURL}
 	modelName := "smollm2:135m"

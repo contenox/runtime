@@ -36,7 +36,7 @@ func setupTestEnvironment() (*serverops.Config, *testingsetup.Environment) {
 		Build()
 }
 
-func TestNew_InitializesPoolAndModelSmoketest(t *testing.T) {
+func TestSystem_EmbedAndPromptPipeline(t *testing.T) {
 	config, env := setupTestEnvironment()
 	if env.Err != nil {
 		t.Fatal(env.Err)

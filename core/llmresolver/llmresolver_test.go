@@ -10,7 +10,7 @@ import (
 	"github.com/contenox/contenox/core/modelprovider"
 )
 
-func TestResolveCommon(t *testing.T) {
+func TestUnit_ChatModelResolution(t *testing.T) {
 	tests := []struct {
 		name        string
 		req         llmresolver.Request
@@ -85,7 +85,7 @@ func TestResolveCommon(t *testing.T) {
 	}
 }
 
-func TestResolveEmbed(t *testing.T) {
+func TestUnit_EmbedModelResolution(t *testing.T) {
 	// Define common providers used in tests
 	providerEmbedOK := &modelprovider.MockProvider{
 		ID:           "p1",
