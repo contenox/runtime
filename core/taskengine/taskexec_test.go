@@ -196,22 +196,23 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("HookTaskError", func(t *testing.T) {
-		// Test with missing hook definition
-		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
-			ID:   "hook-missing-def",
-			Type: taskengine.Hook,
-		}, "", taskengine.DataTypeString)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "hook task missing hook definition")
-
-		// Test with unimplemented hook
+		// Test with mock hook
 		_, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
-			ID:   "hook-unimplemented",
+			ID:   "hooks-implemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
 		}, "", taskengine.DataTypeString)
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "unimplemented")
+		require.NoError(t, err)
+	})
+
+	t.Run("HookMockTaskNoError", func(t *testing.T) {
+		// Test with mock hook
+		_, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+			ID:   "hooks-implemented",
+			Type: taskengine.Hook,
+			Hook: &taskengine.HookCall{Type: "test-hook"},
+		}, "", taskengine.DataTypeString)
+		require.NoError(t, err)
 	})
 
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
