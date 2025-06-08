@@ -2,6 +2,7 @@ package serverapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -220,6 +221,12 @@ func JWTMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 		if len(r.Header.Get("Authorization")) > 0 {
 			tokenString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			ctx = context.WithValue(r.Context(), libauth.ContextTokenKey, tokenString)
+		}
+		if next == nil {
+			next = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				err := fmt.Errorf("SERVER BUG: middleware error next is nil")
+				serverops.Error(w, r, err, serverops.ServerOperation)
+			})
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

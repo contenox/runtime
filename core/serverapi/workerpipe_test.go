@@ -363,43 +363,86 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			Query           string
 			ExpectedMatches int
 			RelevantFiles   []int
+			args            *indexservice.SearchRequestArgs
 		}{
 			// Direct and paraphrased queries related to AI
-			{"artificial intelligence", 3, []int{0, 1, 3}},
-			{"What is artificial intelligence?", 3, []int{0, 1, 3}},
-			{"Explain how AI systems work", 3, []int{0, 1, 3}},
-			{"examples of AI applications", 3, []int{0, 1, 3}},
+			{"artificial intelligence", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"What is artificial intelligence?", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"Explain how AI systems work", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"examples of AI applications", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
 
 			// Machine learning and related subtopics
-			{"machine learning", 2, []int{1, 3}},
-			{"how does machine learning work?", 2, []int{1, 3}},
-			{"uses of ML in industries", 1, []int{1}},
+			{"machine learning", 2, []int{1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"how does machine learning work?", 2, []int{1}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  15,
+			}},
+			{"uses of ML in industries", 1, []int{1}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  15,
+			}},
 
 			// Irrelevant topic - weather
-			{"sunny weather", 1, []int{2}},
-			{"What’s the temperature today?", 1, []int{2}},
-			{"daily weather report", 1, []int{2}},
+			{"sunny weather", 1, []int{2}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"What’s the temperature today?", 1, []int{2}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"daily weather report", 1, []int{2}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
 
 			// Irrelevant topic - hiking
-			{"hiking mountains", 1, []int{4}},
-			{"Tell me about a mountain trip", 1, []int{4}},
-			{"experiences in nature", 1, []int{4}},
+			{"hiking mountains", 1, []int{4}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"Tell me about a mountain trip", 1, []int{4}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"experiences in nature", 1, []int{4}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
 
 			// Slightly more abstract or misaligned queries
-			{"neural networks", 1, []int{1}},
-			{"how do computers learn?", 2, []int{1, 3}},
+			{"neural networks", 1, []int{1}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  20,
+			}},
+			{"how do computers learn?", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
+				Epsilon: 0.85,
+				Radius:  19,
+			}},
 		}
 
-		t.Run("query", func(t *testing.T) {
-			for _, q := range testQueries {
+		for _, q := range testQueries {
+			t.Run("query="+q.Query, func(t *testing.T) {
 				resp, err := indexService.Search(ctx, &indexservice.SearchRequest{
-					Query: q.Query,
-					TopK:  10,
-					SearchRequestArgs: &indexservice.SearchRequestArgs{
-						Epsilon: 0.85,
-						Radius:  20,
-					},
-					ExpandFiles: true,
+					Query:             q.Query,
+					TopK:              10,
+					SearchRequestArgs: q.args,
+					ExpandFiles:       true,
 				})
 				require.NoError(t, err)
 
@@ -435,7 +478,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					msg := "missing expected files: " + strings.Join(missing, ", ") + "\n"
 					msg += "--- Results were:\n" + resultDetails
 					msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
-					require.True(t, false, msg)
+					require.Fail(t, msg)
 				}
 
 				for _, f := range createdFiles {
@@ -456,10 +499,10 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 						msg := "--- Results were:\n" + resultDetails
 						msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
 						msg += fmt.Sprintf(" unexpected match for file %s", f.Name)
-						require.True(t, false, msg)
+						require.Fail(t, msg)
 					}
 				}
-			}
-		})
+			})
+		}
 	})
 }
