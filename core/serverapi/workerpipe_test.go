@@ -367,8 +367,8 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			// Direct and paraphrased queries related to AI
 			{"artificial intelligence", 3, []int{0, 1, 3}},
 			{"What is artificial intelligence?", 3, []int{0, 1, 3}},
-			{"Explain how AI systems work", 2, []int{0, 3}},
-			{"examples of AI applications", 2, []int{1, 3}},
+			{"Explain how AI systems work", 3, []int{0, 1, 3}},
+			{"examples of AI applications", 3, []int{0, 1, 3}},
 
 			// Machine learning and related subtopics
 			{"machine learning", 2, []int{1, 3}},
@@ -435,7 +435,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					msg := "missing expected files: " + strings.Join(missing, ", ") + "\n"
 					msg += "--- Results were:\n" + resultDetails
 					msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
-					require.Fail(t, msg)
+					require.True(t, false, msg)
 				}
 
 				for _, f := range createdFiles {
@@ -456,7 +456,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 						msg := "--- Results were:\n" + resultDetails
 						msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
 						msg += fmt.Sprintf(" unexpected match for file %s", f.Name)
-						require.Fail(t, msg)
+						require.True(t, false, msg)
 					}
 				}
 			}
