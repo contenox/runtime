@@ -140,8 +140,7 @@ func TestPoolCircuitBreaking(t *testing.T) {
 	defer quiet()
 
 	pool := libroutine.GetPool()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("should enforce circuit breaker parameters", func(t *testing.T) {
 		key := "circuit-params-test"
@@ -158,7 +157,7 @@ func TestPoolCircuitBreaking(t *testing.T) {
 			})
 
 		// Fire triggers to simulate failureThreshold number of calls.
-		for i := 0; i < failureThreshold; i++ {
+		for range failureThreshold {
 			pool.ForceUpdate(key)
 			// Give time for the execution to complete.
 			time.Sleep(5 * time.Millisecond)
@@ -192,8 +191,7 @@ func TestPoolCircuitBreaking(t *testing.T) {
 func TestPoolParameterPersistence(t *testing.T) {
 	defer quiet()
 	pool := libroutine.GetPool()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	t.Run("should persist initial parameters", func(t *testing.T) {
 		key := "param-persistence-test"
