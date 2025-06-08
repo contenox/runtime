@@ -84,7 +84,7 @@ Notes from the devslice:
 * [ ] **Release processes**
 * [ ] **Integrate Observability**
 * [ ] **Prepare release infrastructure**
-* [ ] **RAG-enhanced chat interface:**
+* [ ] **RAG-enhanced chat interface**
 * [ ] **Chat with support for execution of tasks as commands**
 * [ ] **Package a Persona-Chat Application**
 * [ ] **Registration route for new Persona-Chat-Users**

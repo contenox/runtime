@@ -7,9 +7,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/contenox/contenox/core/indexrepo"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/serverapi"
@@ -400,33 +402,59 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					ExpandFiles: true,
 				})
 				require.NoError(t, err)
-				found := make([]bool, len(q.RelevantFiles))
-				requiredMatches := make([]fileservice.File, len(q.RelevantFiles))
-				for i, v := range q.RelevantFiles {
-					requiredMatches[i] = *createdFiles[v]
+
+				// Build a map of result IDs from search response for quick lookup
+				resultMap := make(map[string]indexrepo.SearchResult)
+				var resultDetails string
+				for _, sr := range resp.Results {
+					fileName, err := testenv.Store().GetFileNameByID(ctx, sr.ID)
+					require.NoError(t, err)
+					resultDetails += fmt.Sprintf("%s distance %f\n", fileName, sr.Distance)
+					resultMap[sr.ID] = sr
 				}
-				resultIDs := make(map[string]bool)
-				for i, r := range requiredMatches {
-					for _, sr := range resp.Results {
-						found[i] = r.ID == sr.ID
+
+				// Prepare the list of expected file IDs
+				expectedIDs := make(map[string]string) // ID -> filename for better error messages
+				for _, idx := range q.RelevantFiles {
+					f := createdFiles[idx]
+					expectedIDs[f.ID] = f.Name
+				}
+
+				// Track missing files
+				var missing []string
+
+				// Ensure every expected file is in the results
+				for id, name := range expectedIDs {
+					if _, ok := resultMap[id]; !ok {
+						missing = append(missing, name)
 					}
 				}
 
-				// Check expected matches
-				for i, f := range found {
-					require.True(t, f, "missing expected file %s in %s for query %s", requiredMatches[i].Name, resp.Results, resp.TriedQueries)
+				// Fail if any expected files are missing
+				if len(missing) > 0 {
+					msg := "missing expected files: " + strings.Join(missing, ", ") + "\n"
+					msg += "--- Results were:\n" + resultDetails
+					msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
+					require.Fail(t, msg)
 				}
 
-				for i := range testFiles {
+				// Optionally ensure no unexpected files appear in results
+				for _, f := range createdFiles {
+					isInResults := false
+					if _, ok := resultMap[f.ID]; ok {
+						isInResults = ok
+					}
+
 					isExpected := false
-					for idx := range requiredMatches {
-						if i == idx {
+					for _, idx := range q.RelevantFiles {
+						if f == createdFiles[idx] {
 							isExpected = true
 							break
 						}
 					}
-					if !isExpected {
-						require.False(t, resultIDs[createdFiles[i].ID], "unexpected match for file %s", testFiles[i].Name)
+
+					if !isExpected && isInResults {
+						require.Failf(t, "unexpected match for file %s", f.Name)
 					}
 				}
 			}
