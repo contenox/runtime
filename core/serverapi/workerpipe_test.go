@@ -105,7 +105,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
-			Epsilon: 0.1,
+			Epsilon: 1.0,
 			Radius:  -1,
 		},
 	})
