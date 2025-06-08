@@ -30,13 +30,14 @@ import (
 
 func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T) {
 	port := rand.Intn(16383) + 49152
+	testStartTime := time.Now().UTC()
 	config := &serverops.Config{
 		JWTExpiry:       "1h",
 		JWTSecret:       "securecryptngkeysecurecryptngkey",
 		EncryptionKey:   "securecryptngkeysecurecryptngkey",
 		SigningKey:      "securecryptngkeysecurecryptngkey",
 		EmbedModel:      "nomic-embed-text:latest",
-		TasksModel:      "qwen2.5:0.5b",
+		TasksModel:      "qwen2.5:1.5b",
 		SecurityEnabled: "true",
 	}
 
@@ -105,8 +106,8 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
-			Epsilon: 1.0,
-			Radius:  -1,
+			Epsilon: 0.5,
+			Radius:  20.0,
 		},
 	})
 	if err != nil {
@@ -179,8 +180,9 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	}
 
 	t.Logf("Dimension of query vector generated in test: %d", len(vectorData32))
-	// sanity-check 3
 	require.Equal(t, 768, len(vectorData32), "Query vector dimension mismatch")
+
+	// Run single file test
 	t.Run("create a file should trigger vectorization", func(t *testing.T) {
 		file, err = fileService.CreateFile(ctx, file)
 		if err != nil {
@@ -193,6 +195,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		}
 		require.GreaterOrEqual(t, len(jobs), 1, "expected 1 pending job")
 		require.Equal(t, "vectorize_text/plain; charset=utf-8", jobs[0].TaskType, "expected plaintext job")
+
 		workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
 			APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
 			WorkerEmail:                 serverops.DefaultAdminUser,
@@ -216,21 +219,29 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			t.Logf("Warning: failed to read all worker logs: %v", err)
 		}
 		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
-		jobs, err = dispatcher.PendingJobs(ctx, nil)
-		found := -1
-		for i, j := range jobs {
-			if j.TaskType == "vectorize_text/plain; charset=utf-8" {
-				found = i
+		require.Eventually(t, func() bool {
+			jobs, err = dispatcher.PendingJobs(ctx, &testStartTime)
+			if err != nil {
+				t.Logf("Warning: failed to get pending jobs: %v", err)
 			}
-			t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
-		}
-		errText := ""
-		if found != -1 {
-			errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
-		}
-		require.Equal(t, -1, found, errText)
+			found := -1
+			for i, j := range jobs {
+				if j.TaskType == "vectorize_text/plain; charset=utf-8" {
+					found = i
+				}
+				t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+			}
+			errText := ""
+			if found != -1 {
+				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
+			}
+			if errText != "" {
+				t.Log(errText)
+			}
+			return -1 == found
+		}, time.Second*20, time.Second)
 
-		results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil) // prior 10
+		results, err := vectorStore.Search(ctx, vectorData32, 10, 1, nil)
 		if err != nil {
 			t.Fatalf("failed to search vector store: %v", err)
 		}
@@ -264,4 +275,165 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			t.Fatal("file was not found")
 		}
 	})
+
+	// Run expanded multi-file semantic search test
+	t.Run("multiple files are indexed and semantically searchable", func(t *testing.T) {
+		testFiles := []struct {
+			Name     string
+			Content  string
+			Expected bool
+		}{
+			{"file1.txt", "Artificial intelligence (AI) refers to the simulation of human intelligence in machines that are programmed to think and learn. These systems can perform tasks such as problem-solving, pattern recognition, and decision-making.", true},
+			{"file2.txt", "Machine learning, a key branch of AI, involves training algorithms on data so they can make predictions or decisions without being explicitly programmed. It's widely used in fields like finance, healthcare, and e-commerce.", true},
+			{"file3.txt", "The sun is shining brightly over the hills today, with temperatures expected to reach a comfortable 25°C. It's a perfect day for outdoor activities.", false},
+			{"file4.txt", "Modern AI systems leverage large datasets and sophisticated algorithms to continuously improve their performance. Through techniques like reinforcement learning, they adapt based on feedback and evolving data.", true},
+			{"file5.txt", "Last weekend, I went on a hiking trip through the alpine trails. The air was crisp, and the view from the summit was breathtaking. Nature always offers a refreshing escape.", false},
+		}
+
+		var createdFiles []*fileservice.File
+
+		// Upload all files
+		for _, tf := range testFiles {
+			f := &fileservice.File{
+				Name:        tf.Name,
+				ContentType: "text/plain; charset=utf-8",
+				Data:        []byte(tf.Content),
+			}
+			createdFile, err := fileService.CreateFile(ctx, f)
+			require.NoError(t, err)
+			createdFiles = append(createdFiles, createdFile)
+		}
+
+		workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+			APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
+			WorkerEmail:                 serverops.DefaultAdminUser,
+			WorkerPassword:              "test",
+			WorkerLeaserID:              "my-worker-1",
+			WorkerLeaseDurationSeconds:  2,
+			WorkerRequestTimeoutSeconds: 2,
+			WorkerType:                  "plaintext",
+		})
+		defer cleanup3()
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second * 3)
+		readCloser, err := workerContainer.Logs(ctx)
+		require.NoError(t, err, "failed to get worker logs stream")
+		defer readCloser.Close()
+
+		logBytes, err := io.ReadAll(readCloser)
+		if err != nil && err != io.EOF {
+			t.Logf("Warning: failed to read all worker logs: %v", err)
+		}
+		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
+
+		// Wait for ingestion
+		require.Eventually(t, func() bool {
+			jobs, err := dispatcher.PendingJobs(ctx, &testStartTime)
+			if err != nil {
+				t.Logf("Warning: failed to get pending jobs: %v", err)
+			}
+			found := -1
+			for i, j := range jobs {
+				if j.TaskType == "vectorize_text/plain; charset=utf-8" {
+					found = i
+				}
+				t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+			}
+			errText := ""
+			if found != -1 {
+				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
+			}
+			if errText != "" {
+				t.Log(errText)
+			}
+			return -1 == found
+		}, time.Second*20, time.Second)
+		// Define queries and expected matches
+		testQueries := []struct {
+			Query           string
+			ExpectedMatches int
+			RelevantFiles   []int
+		}{
+			// Direct and paraphrased queries related to AI
+			{"artificial intelligence", 3, []int{0, 1, 3}},
+			{"What is artificial intelligence?", 3, []int{0, 1, 3}},
+			{"Explain how AI systems work", 2, []int{0, 3}},
+			{"examples of AI applications", 2, []int{1, 3}},
+
+			// Machine learning and related subtopics
+			{"machine learning", 2, []int{1, 3}},
+			{"how does machine learning work?", 2, []int{1, 3}},
+			{"uses of ML in industries", 1, []int{1}},
+
+			// Irrelevant topic - weather
+			{"sunny weather", 1, []int{2}},
+			{"What’s the temperature today?", 1, []int{2}},
+			{"daily weather report", 1, []int{2}},
+
+			// Irrelevant topic - hiking
+			{"hiking mountains", 1, []int{4}},
+			{"Tell me about a mountain trip", 1, []int{4}},
+			{"experiences in nature", 1, []int{4}},
+
+			// Slightly more abstract or misaligned queries
+			{"neural networks", 1, []int{1}},
+			{"how do computers learn?", 2, []int{1, 3}},
+		}
+
+		for _, q := range testQueries {
+			t.Run(fmt.Sprintf("query=%q", q.Query), func(t *testing.T) {
+				queryVector := vectorize(t, ctx, testenv, q.Query)
+				results, err := vectorStore.Search(ctx, queryVector, 10, 1, &vectors.SearchArgs{
+					Radius:  40.0,
+					Epsilon: 0.7,
+				})
+				require.NoError(t, err)
+
+				// Map result IDs to file IDs
+				resultIDs := make(map[string]bool)
+				for _, r := range results {
+					chunk, err := testenv.Store().GetChunkIndexByID(ctx, r.ID)
+					require.NoError(t, err)
+					resultIDs[chunk.ResourceID] = true
+				}
+
+				// Check expected matches
+				for _, idx := range q.RelevantFiles {
+					require.True(t, resultIDs[createdFiles[idx].ID], "missing expected file %s", testFiles[idx].Name)
+				}
+
+				// Optional: check irrelevant files aren't matched
+				for i := range testFiles {
+					isExpected := false
+					for idx := range q.RelevantFiles {
+						if i == idx {
+							isExpected = true
+							break
+						}
+					}
+					if !isExpected {
+						require.False(t, resultIDs[createdFiles[i].ID], "unexpected match for file %s", testFiles[i].Name)
+					}
+				}
+			})
+		}
+	})
+}
+
+func vectorize(t *testing.T, ctx context.Context, testenv *testingsetup.Environment, text string) []float32 {
+	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
+		ModelName: "nomic-embed-text:latest",
+	}, modelprovider.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
+	require.NoError(t, err)
+
+	vec, err := client.Embed(ctx, text)
+	require.NoError(t, err)
+
+	f32 := make([]float32, len(vec))
+	for i, v := range vec {
+		f32[i] = float32(v)
+	}
+	return f32
 }
