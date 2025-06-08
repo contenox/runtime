@@ -15,17 +15,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
-const MaxUploadSize = 1 * 1024 * 1024
-const MaxFilesRowCount = 50000
+const (
+	MaxUploadSize    = 1 * 1024 * 1024
+	MaxFilesRowCount = 50000
+)
 
-var ErrUnknownPath = fmt.Errorf("unable to resolve path")
-var ErrFolderNotEmpty = fmt.Errorf("folder is not empty")
+var (
+	ErrUnknownPath    = fmt.Errorf("unable to resolve path")
+	ErrFolderNotEmpty = fmt.Errorf("folder is not empty")
+)
 
 type Service interface {
 	CreateFile(ctx context.Context, file *File) (*File, error)

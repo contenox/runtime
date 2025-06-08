@@ -125,7 +125,7 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 		return 0, err
 	}
 	cleaned := strings.ReplaceAll(response, " ", "")
-	f, err := strconv.ParseFloat(cleaned, 10)
+	f, err := strconv.ParseFloat(cleaned, 64)
 	if err != nil {
 		return 0, err
 	}
@@ -222,7 +222,7 @@ func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Polic
 		return false, err
 	}
 	found := false
-	for k, _ := range conditionMapping {
+	for k := range conditionMapping {
 		if k == response {
 			found = true
 		}

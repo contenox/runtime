@@ -217,14 +217,14 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
 		// Empty input
-		output, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
 		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 
 		// Long input
 		longInput := strings.Repeat("repeat this ", 10)
-		output, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		output, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
 		}, "Echo exactly this including the repetition: "+longInput, taskengine.DataTypeString)
 		require.NoError(t, err)
