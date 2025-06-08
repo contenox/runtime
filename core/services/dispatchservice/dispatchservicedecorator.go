@@ -53,7 +53,7 @@ func (d *activityTrackerDecorator) AssignPendingJob(ctx context.Context, leaserI
 	if err != nil {
 		reportErrFn(err)
 	} else if job != nil {
-		reportChangeFn(job.ID, map[string]interface{}{
+		reportChangeFn(job.ID, map[string]any{
 			"leaser":          job.Leaser,
 			"leaseExpiration": job.LeaseExpiration,
 			"taskType":        job.TaskType,
@@ -98,7 +98,7 @@ func (d *activityTrackerDecorator) MarkJobAsFailed(ctx context.Context, jobID st
 	if err != nil {
 		reportErrFn(err)
 	} else {
-		reportChangeFn(jobID, map[string]interface{}{
+		reportChangeFn(jobID, map[string]any{
 			"retried": true,
 		})
 	}
