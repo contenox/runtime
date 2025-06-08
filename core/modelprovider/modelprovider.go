@@ -190,6 +190,7 @@ var (
 		"neural-chat":     8192,  // Intel fine-tuned LLM
 		"dolphin-mixtral": 32768, // Mixtral fine-tune
 		"qwen2.5:0.5b":    4128,  //TODO:check
+		"paraphrase-multilingual:278m-mpnet-base-v2-fp16": 278,
 	}
 
 	modelContextLengthsFullNames = map[string]int{
@@ -212,6 +213,7 @@ var (
 		"all-minilm":            true,
 		"granite-embedding:30m": true,
 		"nomic-embed-text":      true,
+		"paraphrase-multilingual:278m-mpnet-base-v2-fp16": true,
 	}
 
 	canPrompt = map[string]bool{

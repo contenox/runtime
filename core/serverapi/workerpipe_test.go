@@ -35,10 +35,11 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	port := rand.Intn(16383) + 49152
 	testStartTime := time.Now().UTC()
 	config := &serverops.Config{
-		JWTExpiry:       "1h",
-		JWTSecret:       "securecryptngkeysecurecryptngkey",
-		EncryptionKey:   "securecryptngkeysecurecryptngkey",
-		SigningKey:      "securecryptngkeysecurecryptngkey",
+		JWTExpiry:     "1h",
+		JWTSecret:     "securecryptngkeysecurecryptngkey",
+		EncryptionKey: "securecryptngkeysecurecryptngkey",
+		SigningKey:    "securecryptngkeysecurecryptngkey",
+		// EmbedModel:    "paraphrase-multilingual:278m-mpnet-base-v2-fp16",
 		EmbedModel:      "nomic-embed-text:latest",
 		TasksModel:      "qwen2.5:1.5b",
 		SecurityEnabled: "true",
@@ -158,7 +159,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 
 	// sanity check
 	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-		ModelName: "nomic-embed-text:latest",
+		ModelName: config.EmbedModel,
 	}, modelprovider.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)

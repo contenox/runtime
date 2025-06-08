@@ -47,14 +47,15 @@ func (s *service) AssignPendingJob(ctx context.Context, leaserID string, leaseDu
 		return nil, errors.New("no job types provided")
 	}
 	tx, com, end, err := s.dbInstance.WithTransaction(ctx)
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return nil, err
-	}
 	if err != nil {
 		return nil, err
 	}
 	defer end()
+	authStore := store.New(tx)
 
+	if err := serverops.CheckServiceAuthorization(ctx, authStore, s, store.PermissionManage); err != nil {
+		return nil, err
+	}
 	storeInstance := store.New(tx)
 
 	index := rand.Intn(len(jobTypes))
