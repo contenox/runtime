@@ -323,6 +323,9 @@ type store struct {
 }
 
 func New(exec libdb.Exec) Store {
+	if exec == nil {
+		panic("SERVER BUG: store.New called with nil exec")
+	}
 	return &store{exec}
 }
 

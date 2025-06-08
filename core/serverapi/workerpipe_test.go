@@ -61,8 +61,9 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		}
 		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
 	}
-
-	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Minute*5))
+	defer cancel()
+	testenv := testingsetup.New(ctx, serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(config).
 		WithDBConn("test").
@@ -123,7 +124,6 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	}
 	fileService = fileservice.WithActivityTracker(fileService, fileVectorizationJobCreator)
 	filesapi.AddFileRoutes(mux, config, fileService)
-	ctx := testenv.Ctx
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
