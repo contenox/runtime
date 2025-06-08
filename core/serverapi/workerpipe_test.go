@@ -396,7 +396,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					Query: q.Query,
 					TopK:  10,
 					SearchRequestArgs: &indexservice.SearchRequestArgs{
-						Epsilon: 0.8,
+						Epsilon: 0.85,
 						Radius:  20,
 					},
 					ExpandFiles: true,
@@ -414,7 +414,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 				}
 
 				// Prepare the list of expected file IDs
-				expectedIDs := make(map[string]string) // ID -> filename for better error messages
+				expectedIDs := make(map[string]string)
 				for _, idx := range q.RelevantFiles {
 					f := createdFiles[idx]
 					expectedIDs[f.ID] = f.Name
@@ -438,7 +438,6 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					require.Fail(t, msg)
 				}
 
-				// Optionally ensure no unexpected files appear in results
 				for _, f := range createdFiles {
 					isInResults := false
 					if _, ok := resultMap[f.ID]; ok {
@@ -454,7 +453,10 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 					}
 
 					if !isExpected && isInResults {
-						require.Failf(t, "unexpected match for file %s", f.Name)
+						msg := "--- Results were:\n" + resultDetails
+						msg += "--- Tried queries: " + strings.Join(resp.TriedQueries, ", ")
+						msg += fmt.Sprintf(" unexpected match for file %s", f.Name)
+						require.Fail(t, msg)
 					}
 				}
 			}
