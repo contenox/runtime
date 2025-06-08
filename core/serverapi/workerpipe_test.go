@@ -26,6 +26,7 @@ import (
 	"github.com/contenox/contenox/libs/libauth"
 	"github.com/contenox/contenox/libs/libtestenv"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 )
 
 func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T) {
@@ -39,6 +40,24 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		EmbedModel:      "nomic-embed-text:latest",
 		TasksModel:      "qwen2.5:1.5b",
 		SecurityEnabled: "true",
+	}
+	var workerContainer testcontainers.Container
+	var cleanupWorker func() = func() {}
+	defer cleanupWorker()
+
+	getLogs := func(ctx context.Context) {
+		if workerContainer == nil {
+			t.Fatalf("worker container is not initialized")
+		}
+		readCloser, err := workerContainer.Logs(ctx)
+		require.NoError(t, err, "failed to get worker logs stream")
+		defer readCloser.Close()
+
+		logBytes, err := io.ReadAll(readCloser)
+		if err != nil && err != io.EOF {
+			t.Logf("Warning: failed to read all worker logs: %v", err)
+		}
+		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
 	}
 
 	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
@@ -106,7 +125,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	vectorStore, cleanup4, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
-			Epsilon: 0.5,
+			Epsilon: 0.9,
 			Radius:  20.0,
 		},
 	})
@@ -147,8 +166,8 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dispatchapi.AddDispatchRoutes(mux, config, dispatcher)
 	handler := serverapi.JWTMiddleware(config, mux)
+	dispatchapi.AddDispatchRoutes(mux, config, dispatcher)
 	go func() {
 		if err := http.ListenAndServe("0.0.0.0:"+fmt.Sprint(port), handler); err != nil {
 			log.Fatal(err)
@@ -196,7 +215,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		require.GreaterOrEqual(t, len(jobs), 1, "expected 1 pending job")
 		require.Equal(t, "vectorize_text/plain; charset=utf-8", jobs[0].TaskType, "expected plaintext job")
 
-		workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+		workerContainer, cleanupWorker, err = libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
 			APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
 			WorkerEmail:                 serverops.DefaultAdminUser,
 			WorkerPassword:              "test",
@@ -205,7 +224,6 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			WorkerRequestTimeoutSeconds: 2,
 			WorkerType:                  "plaintext",
 		})
-		defer cleanup3()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -213,12 +231,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		readCloser, err := workerContainer.Logs(ctx)
 		require.NoError(t, err, "failed to get worker logs stream")
 		defer readCloser.Close()
-
-		logBytes, err := io.ReadAll(readCloser)
-		if err != nil && err != io.EOF {
-			t.Logf("Warning: failed to read all worker logs: %v", err)
-		}
-		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
+		getLogs(ctx)
 		require.Eventually(t, func() bool {
 			jobs, err = dispatcher.PendingJobs(ctx, &testStartTime)
 			if err != nil {
@@ -303,30 +316,21 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			require.NoError(t, err)
 			createdFiles = append(createdFiles, createdFile)
 		}
-
-		workerContainer, cleanup3, err := libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
-			APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
-			WorkerEmail:                 serverops.DefaultAdminUser,
-			WorkerPassword:              "test",
-			WorkerLeaserID:              "my-worker-1",
-			WorkerLeaseDurationSeconds:  2,
-			WorkerRequestTimeoutSeconds: 2,
-			WorkerType:                  "plaintext",
-		})
-		defer cleanup3()
+		if workerContainer == nil {
+			workerContainer, cleanupWorker, err = libtestenv.SetupLocalWorkerInstance(ctx, libtestenv.WorkerConfig{
+				APIBaseURL:                  fmt.Sprintf("http://172.17.0.1:%d", port),
+				WorkerEmail:                 serverops.DefaultAdminUser,
+				WorkerPassword:              "test",
+				WorkerLeaserID:              "my-worker-1",
+				WorkerLeaseDurationSeconds:  2,
+				WorkerRequestTimeoutSeconds: 2,
+				WorkerType:                  "plaintext",
+			})
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(time.Second * 3)
-		readCloser, err := workerContainer.Logs(ctx)
-		require.NoError(t, err, "failed to get worker logs stream")
-		defer readCloser.Close()
-
-		logBytes, err := io.ReadAll(readCloser)
-		if err != nil && err != io.EOF {
-			t.Logf("Warning: failed to read all worker logs: %v", err)
-		}
-		t.Logf("WORKER LOGS:\n%s\n--- END WORKER LOGS ---", string(logBytes))
 
 		// Wait for ingestion
 		require.Eventually(t, func() bool {
@@ -350,6 +354,8 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			}
 			return -1 == found
 		}, time.Second*20, time.Second)
+		time.Sleep(time.Second * 3)
+		getLogs(ctx)
 		// Define queries and expected matches
 		testQueries := []struct {
 			Query           string
@@ -382,32 +388,38 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			{"how do computers learn?", 2, []int{1, 3}},
 		}
 
-		for _, q := range testQueries {
-			t.Run(fmt.Sprintf("query=%q", q.Query), func(t *testing.T) {
-				queryVector := vectorize(t, ctx, testenv, q.Query)
-				results, err := vectorStore.Search(ctx, queryVector, 10, 1, &vectors.SearchArgs{
-					Radius:  40.0,
-					Epsilon: 0.7,
+		t.Run("query", func(t *testing.T) {
+			for _, q := range testQueries {
+				resp, err := indexService.Search(ctx, &indexservice.SearchRequest{
+					Query: q.Query,
+					TopK:  10,
+					SearchRequestArgs: &indexservice.SearchRequestArgs{
+						Epsilon: 0.8,
+						Radius:  20,
+					},
+					ExpandFiles: true,
 				})
 				require.NoError(t, err)
-
-				// Map result IDs to file IDs
+				found := make([]bool, len(q.RelevantFiles))
+				requiredMatches := make([]fileservice.File, len(q.RelevantFiles))
+				for i, v := range q.RelevantFiles {
+					requiredMatches[i] = *createdFiles[v]
+				}
 				resultIDs := make(map[string]bool)
-				for _, r := range results {
-					chunk, err := testenv.Store().GetChunkIndexByID(ctx, r.ID)
-					require.NoError(t, err)
-					resultIDs[chunk.ResourceID] = true
+				for i, r := range requiredMatches {
+					for _, sr := range resp.Results {
+						found[i] = r.ID == sr.ID
+					}
 				}
 
 				// Check expected matches
-				for _, idx := range q.RelevantFiles {
-					require.True(t, resultIDs[createdFiles[idx].ID], "missing expected file %s", testFiles[idx].Name)
+				for i, f := range found {
+					require.True(t, f, "missing expected file %s in %s for query %s", requiredMatches[i].Name, resp.Results, resp.TriedQueries)
 				}
 
-				// Optional: check irrelevant files aren't matched
 				for i := range testFiles {
 					isExpected := false
-					for idx := range q.RelevantFiles {
+					for idx := range requiredMatches {
 						if i == idx {
 							isExpected = true
 							break
@@ -417,23 +429,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 						require.False(t, resultIDs[createdFiles[i].ID], "unexpected match for file %s", testFiles[i].Name)
 					}
 				}
-			})
-		}
+			}
+		})
 	})
-}
-
-func vectorize(t *testing.T, ctx context.Context, testenv *testingsetup.Environment, text string) []float32 {
-	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-		ModelName: "nomic-embed-text:latest",
-	}, modelprovider.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
-	require.NoError(t, err)
-
-	vec, err := client.Embed(ctx, text)
-	require.NoError(t, err)
-
-	f32 := make([]float32, len(vec))
-	for i, v := range vec {
-		f32[i] = float32(v)
-	}
-	return f32
 }

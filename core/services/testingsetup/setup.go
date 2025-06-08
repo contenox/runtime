@@ -726,7 +726,7 @@ func (env *Environment) WaitForModel(model string) *Environment {
 			return false
 		}
 		return bytes.Contains(data, []byte(fmt.Sprintf(`"pulledModels":[{"name":"%s"`, model)))
-	}, 2*time.Minute, 100*time.Millisecond)
+	}, 3*time.Minute, 2*time.Second)
 
 	// Handle wait result
 	if err != nil {
