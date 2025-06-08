@@ -153,14 +153,15 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ConditionInvalidResponse", func(t *testing.T) {
-		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, res, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-invalid",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
 				"yes": true,
 				"no":  false,
 			},
-		}, "Respond with 'maybe'", taskengine.DataTypeString)
+		}, "Echo the input. Input: 'maybe'", taskengine.DataTypeBool)
+		t.Log(res)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to parse into valid condition")
 	})

@@ -251,7 +251,7 @@ func (rm *Routine) Loop(ctx context.Context, interval time.Duration, triggerChan
 			if lastErr != nil {
 				time.Sleep(interval)
 			}
-			log.Println("Trigger received, executing immediately")
+			// log.Println("Trigger received, executing immediately")
 		case <-time.After(interval):
 			// log.Println("Interval elapsed, executing next cycle")
 		}
