@@ -387,7 +387,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			// Machine learning and related subtopics
 			{"machine learning", 2, []int{1, 3}, &indexservice.SearchRequestArgs{
 				Epsilon: 0.85,
-				Radius:  20,
+				Radius:  18.5,
 			}},
 			{"how does machine learning work?", 2, []int{1}, &indexservice.SearchRequestArgs{
 				Epsilon: 0.85,
@@ -429,7 +429,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 			// Slightly more abstract or misaligned queries
 			{"neural networks", 1, []int{1}, &indexservice.SearchRequestArgs{
 				Epsilon: 0.85,
-				Radius:  20,
+				Radius:  19,
 			}},
 			{"how do computers learn?", 3, []int{0, 1, 3}, &indexservice.SearchRequestArgs{
 				Epsilon: 0.85,
