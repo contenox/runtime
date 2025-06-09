@@ -36,7 +36,7 @@ func (s *SearchResolve) Exec(ctx context.Context, input any, dataType taskengine
 		a := float32(conv)
 		distanceF = &a
 	}
-	var position int = 0
+	position := 0
 	if positionArg, ok := args.Args["position"]; ok {
 		a, err := strconv.ParseInt(positionArg, 10, 64)
 		if err != nil {
