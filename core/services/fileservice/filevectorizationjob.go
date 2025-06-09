@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
 type fileVectorizationJobCreator struct {
@@ -70,7 +70,6 @@ func (f *fileVectorizationJobCreator) Start(ctx context.Context, operation strin
 		if err != nil {
 			fmt.Printf("Error reporting change in activity %s on %s: %v\n", instance.operation, instance.subject, err)
 		}
-		return
 	}
 
 	end = func() {

@@ -213,7 +213,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		jobs, err := dispatcher.PendingJobs(ctx, nil)
 		require.NoError(t, err, "failed to get pending jobs")
 		for i, j := range jobs {
-			t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+			t.Logf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount)
 		}
 		require.GreaterOrEqual(t, len(jobs), 1, "expected 1 pending job")
 		require.Equal(t, "vectorize_text/plain; charset=utf-8", jobs[0].TaskType, "expected plaintext job")
@@ -245,11 +245,11 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 				if j.TaskType == "vectorize_text/plain; charset=utf-8" {
 					found = i
 				}
-				t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+				t.Logf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount)
 			}
 			errText := ""
 			if found != -1 {
-				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
+				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", jobs[found].RetryCount, *jobs[found])
 			}
 			if errText != "" {
 				t.Log(errText)
@@ -346,11 +346,11 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 				if j.TaskType == "vectorize_text/plain; charset=utf-8" {
 					found = i
 				}
-				t.Log(fmt.Sprintf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount))
+				t.Logf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount)
 			}
 			errText := ""
 			if found != -1 {
-				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", *&jobs[found].RetryCount, *jobs[found])
+				errText = fmt.Sprintf("expected 0 pending job for vectorize_text %v %v", jobs[found].RetryCount, *jobs[found])
 			}
 			if errText != "" {
 				t.Log(errText)
