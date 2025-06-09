@@ -1,185 +1,153 @@
 package hooks
 
-// type ChatHook struct {
-// 	dbInstance  libdb.DBManager
-// 	chatManager chat.Manager
-// }
+import (
+	"context"
+	"fmt"
+	"time"
 
-// func NewChatHook(dbInstance libdb.DBManager, chatManager chat.Manager) *ChatHook {
-// 	return &ChatHook{
-// 		dbInstance:  dbInstance,
-// 		chatManager: chatManager,
-// 	}
-// }
+	"github.com/contenox/contenox/core/chat"
+	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/contenox/libs/libdb"
+)
 
-// func (h *ChatHook) Get(name string) (func(context.Context, any, *taskengine.HookCall) (int, any, error), error) {
-// 	switch name {
-// 	case "load_chat_history":
-// 		return h.LoadChatHistory, nil
-// 	case "append_user_input":
-// 		return h.AppendUserInput, nil
-// 	case "execute_chat_model":
-// 		return h.ChatExec, nil
-// 	case "persist_input_output":
-// 		return h.PersistMessages, nil
-// 	default:
-// 		return nil, fmt.Errorf("unknown hook: %s", name)
-// 	}
-// }
+type Chat struct {
+	dbInstance  libdb.DBManager
+	chatManager chat.Manager
+}
 
-// func (h *ChatHook) Exec(ctx context.Context, input any, args *taskengine.HookCall) (int, any, error) {
-// 	if args == nil || args.Type == "" {
-// 		return taskengine.StatusError, nil, fmt.Errorf("invalid hook call: missing type")
-// 	}
+// Supports implements taskengine.HookRepo.
+func (h *Chat) Supports(ctx context.Context) ([]string, error) {
+	return []string{
+		"append_user_input",
+		"execute_chat_model",
+		"persist_input_output",
+	}, nil
+}
 
-// 	hookFunc, err := h.Get(args.Type)
-// 	if err != nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("failed to get hook function: %w", err)
-// 	}
+func NewChatHook(dbInstance libdb.DBManager, chatManager chat.Manager) *Chat {
+	return &Chat{
+		dbInstance:  dbInstance,
+		chatManager: chatManager,
+	}
+}
 
-// 	return hookFunc(ctx, input, args)
-// }
+var _ taskengine.HookRepo = (*Chat)(nil)
 
-// // LoadChatHistory loads chat history from storage
-// func (h *ChatHook) LoadChatHistory(ctx context.Context, hook *taskengine.HookCall) (int, any, error) {
-// 	if hook.Args == nil || hook.Args["subject_id"] == "" {
-// 		return taskengine.StatusError, nil, fmt.Errorf("missing session_id")
-// 	}
+func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, *taskengine.HookCall) (int, any, taskengine.DataType, error), error) {
+	switch name {
+	case "append_user_input":
+		return h.AppendUserInputToChathistory, nil
+	case "execute_chat_model":
+		return h.ChatExec, nil
+	case "persist_input_output":
+		return h.PersistMessages, nil
+	default:
+		return nil, fmt.Errorf("unknown hook: %s", name)
+	}
+}
 
-// 	subjectID := hook.Args["subject_id"]
-// 	tx := h.dbInstance.WithoutTransaction()
-// 	messages, err := h.chatManager.ListMessages(ctx, tx, subjectID)
-// 	if err != nil {
-// 		return taskengine.StatusError, nil, err
-// 	}
+func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+	if hookCall.Args == nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid hook call: missing type")
+	}
+	hookFunc, err := h.Get(hookCall.Type)
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to get hook function: %w", err)
+	}
 
-// 	return taskengine.StatusSuccess, messages, nil
-// }
+	return hookFunc(ctx, startTime, input, dataType, hookCall)
+}
 
-// // AppendUserInput appends new user input to chat history
-// func (h *ChatHook) AppendUserInput(ctx context.Context, input any, hook *taskengine.HookCall) (int, any, error) {
-// 	if hook.Args == nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("missing args")
-// 	}
+// AppendUserInputToChathistory adds user input to chat history
+func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+	if dataType != taskengine.DataTypeString {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected string input")
+	}
 
-// 	// Parse input messages
-// 	var messages []serverops.Message
-// 	if data, ok := hook.Args["input"]; ok && data != "" {
-// 		if err := json.Unmarshal([]byte(data), &messages); err != nil {
-// 			return taskengine.StatusError, nil, fmt.Errorf("failed to parse input: %w", err)
-// 		}
-// 	}
+	inputStr, ok := input.(string)
+	if !ok {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid input type")
+	}
 
-// 	// Append new message
-// 	userMsg := serverops.Message{
-// 		Role:    "user",
-// 		Content: hook.Input,
-// 	}
+	// Get subject ID from hook args
+	subjectID, ok := hookCall.Args["subject_id"]
+	if !ok || subjectID == "" {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing subject_id")
+	}
 
-// 	messages = append(messages, userMsg)
+	// Get chat history from DB
+	tx := h.dbInstance.WithoutTransaction()
+	messages, err := h.chatManager.ListMessages(ctx, tx, subjectID)
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to load history: %w", err)
+	}
 
-// 	return taskengine.StatusSuccess, messages, nil
-// }
+	// Append new message
+	updatedMessages, err := h.chatManager.AppendMessage(ctx, messages, inputStr, "user")
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to append message: %w", err)
+	}
 
-// // ChatExec runs a chat completion using the current history
-// func (h *ChatHook) ChatExec(ctx context.Context, hook *taskengine.HookCall) (int, any, error) {
-// 	if hook.Args == nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("missing args")
-// 	}
+	return taskengine.StatusSuccess, updatedMessages, taskengine.DataTypeChatHistory, nil
+}
 
-// 	// Parse input messages
-// 	var messages []serverops.Message
-// 	if data, ok := hook.Args["input"]; ok && data != "" {
-// 		if err := json.Unmarshal([]byte(data), &messages); err != nil {
-// 			return taskengine.StatusError, nil, fmt.Errorf("failed to parse messages: %w", err)
-// 		}
-// 	}
+// ChatExec processes chat history through LLM
+func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+	if dataType != taskengine.DataTypeChatHistory {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
+	}
 
-// 	// Get session ID
-// 	sessionID := hook.Args["session_id"]
-// 	if sessionID == "" {
-// 		sessionID = hook.Args["subject_id"]
-// 	}
+	messages, ok := input.([]serverops.Message)
+	if !ok || len(messages) == 0 {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
+	}
 
-// 	if sessionID == "" {
-// 		return taskengine.StatusError, nil, fmt.Errorf("missing session ID")
-// 	}
+	// Get model name from args
+	modelName := "default"
+	if m, ok := hookCall.Args["model"]; ok {
+		modelName = m
+	}
 
-// 	// Get preferred model names
-// 	modelNames := []string{"default"}
-// 	if models, ok := hook.Args["model_names"]; ok && models != "" {
-// 		modelNames = strings.Split(models, ",")
-// 	}
+	// Process through LLM
+	responseMessage, _, err := h.chatManager.ChatExec(ctx, messages, 0, modelName) // TODO: pass context length
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("chat failed: %w", err)
+	}
 
-// 	// Execute chat completion
-// 	beginTime := time.Now().UTC()
-// 	responseMessage, contextLength, err := h.chatManager.ChatExec(
-// 		ctx, messages, len(messages), modelNames...,
-// 	)
-// 	if err != nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("chat exec failed: %w", err)
-// 	}
+	// Append response to history
+	updatedMessages := append(messages, *responseMessage)
+	return taskengine.StatusSuccess, updatedMessages, taskengine.DataTypeChatHistory, nil
+}
 
-// 	// Create response wrapper
-// 	response := struct {
-// 		Response      *serverops.Message `json:"response"`
-// 		ContextLength int                `json:"context_length"`
-// 	}{
-// 		Response:      responseMessage,
-// 		ContextLength: contextLength,
-// 	}
+// PersistMessages saves chat history to DB
+func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+	if dataType != taskengine.DataTypeChatHistory {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
+	}
 
-// 	return taskengine.StatusSuccess, response, nil
-// }
+	messages, ok := input.([]serverops.Message)
+	if !ok || len(messages) < 2 {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
+	}
 
-// // PersistMessages saves the latest input/output to storage
-// func (h *ChatHook) PersistMessages(ctx context.Context, input any, hook *taskengine.HookCall) (int, any, error) {
-// 	if hook.Args == nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("missing args")
-// 	}
+	// Get subject ID from args
+	subjectID, ok := hookCall.Args["subject_id"]
+	if !ok || subjectID == "" {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing subject_id")
+	}
 
-// 	// Parse input messages
-// 	var messages []serverops.Message
-// 	if data, ok := hook.Args["input"]; ok && data != "" {
-// 		if err := json.Unmarshal([]byte(data), &messages); err != nil {
-// 			return taskengine.StatusError, nil, fmt.Errorf("failed to parse messages: %w", err)
-// 		}
-// 	}
+	// Get transaction from DB
+	tx := h.dbInstance.WithoutTransaction()
 
-// 	// Get last message for input
-// 	input := ""
-// 	if len(messages) > 0 {
-// 		input = messages[len(messages)-1].Content
-// 	}
+	// Save messages
+	err := h.chatManager.AppendMessages(ctx, tx, startTime, subjectID,
+		&messages[len(messages)-2], // User message
+		&messages[len(messages)-1], // Assistant message
+	)
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("persist failed: %w", err)
+	}
 
-// 	// Get model response
-// 	var response *serverops.Message
-// 	if data, ok := hook.Args["output"]; ok && data != "" {
-// 		if err := json.Unmarshal([]byte(data), &response); err != nil {
-// 			return taskengine.StatusError, nil, fmt.Errorf("failed to parse response: %w", err)
-// 		}
-// 	}
-
-// 	// If no response yet, just save input
-// 	if response == nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("no response")
-// 	}
-
-// 	// Save to storage
-// 	tx := h.dbInstance.WithoutTransaction()
-// 	err := h.chatManager.AppendMessages(
-// 		ctx, tx, time.Now(), subjectID,
-// 		&serverops.Message{
-// 			Role:    "user",
-// 			Content: input,
-// 		},
-// 		response,
-// 	)
-
-// 	if err != nil {
-// 		return taskengine.StatusError, nil, fmt.Errorf("failed to persist messages: %w", err)
-// 	}
-
-// 	// Return success with original input
-// 	return taskengine.StatusSuccess, input, nil
-// }
+	return taskengine.StatusSuccess, messages, taskengine.DataTypeChatHistory, nil
+}

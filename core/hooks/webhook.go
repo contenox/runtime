@@ -56,7 +56,7 @@ func WithDefaultHeader(key, value string) WebhookOption {
 }
 
 // Exec implements the HookRepo interface
-func (h *WebCaller) Exec(ctx context.Context, input any, dataType taskengine.DataType, hook *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hook *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	// Get URL from args
 	rawURL, ok := hook.Args["url"]
 	if !ok {

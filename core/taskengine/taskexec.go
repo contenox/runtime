@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
@@ -14,7 +15,7 @@ import (
 // It consumes a prompt and resolver policy, and returns structured output
 // alongside the raw LLM response.
 type TaskExecutor interface {
-	TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
+	TaskExec(ctx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
 }
 
 // SimpleExec is a basic implementation of TaskExecutor.
@@ -135,7 +136,7 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 // TaskExec dispatches task execution based on the task type.
 // It handles prompt-based task types like string, number, score, condition, and range,
 // as well as custom hook invocations.
-func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
+func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	var rawResponse string
 	var taskErr error
 	var output any
@@ -191,7 +192,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
 		} else {
-			output, outputType, taskErr = exe.hookengine(taskCtx, output, DataTypeAny, *currentTask.Hook)
+			output, outputType, taskErr = exe.hookengine(taskCtx, startingTime, output, DataTypeAny, *currentTask.Hook)
 			rawResponse = fmt.Sprintf("%v", output)
 		}
 	default:
@@ -203,8 +204,8 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, resolver llmresolver.Po
 
 // hookengine is a placeholder for future hook execution support using the hookProvider.
 // Currently unimplemented.
-func (exe *SimpleExec) hookengine(ctx context.Context, input any, dataType DataType, hook HookCall) (any, DataType, error) {
-	status, res, dataType, err := exe.hookProvider.Exec(ctx, input, dataType, &hook)
+func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, input any, dataType DataType, hook HookCall) (any, DataType, error) {
+	status, res, dataType, err := exe.hookProvider.Exec(ctx, startingTime, input, dataType, &hook)
 	if err != nil {
 		return nil, dataType, err
 	}

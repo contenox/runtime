@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/contenox/contenox/core/indexrepo"
 	"github.com/contenox/contenox/core/llmrepo"
@@ -41,6 +42,7 @@ func (h *Rag) Supports(ctx context.Context) ([]string, error) {
 // Exec executes the "rag" hook by performing a vector search based on the input string.
 func (h *Rag) Exec(
 	ctx context.Context,
+	startTime time.Time,
 	input any,
 	dataType taskengine.DataType,
 	hook *taskengine.HookCall,
@@ -64,6 +66,8 @@ func (h *Rag) Exec(
 		if kStr := hook.Args["top_k"]; kStr != "" {
 			if k, err := strconv.Atoi(kStr); err == nil && k > 0 {
 				topK = k
+			} else {
+				return taskengine.StatusError, nil, taskengine.DataTypeAny, errors.New("top_k must be a positive integer")
 			}
 			if topK <= 0 {
 				return taskengine.StatusError, nil, taskengine.DataTypeAny, errors.New("top_k must be a positive integer")

@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
@@ -37,7 +38,7 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.PromptToString,
 	}
 
-	output, _, raw, err := exec.TaskExec(context.Background(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
+	output, _, raw, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "prompted response for: hello", output)
 	require.Equal(t, "prompted response for: hello", raw)
@@ -85,7 +86,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(t, resp)
 	t.Run("simple test-case", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "simple",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
@@ -103,7 +104,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "true", formatted)
 	})
 	t.Run("PromptToNumber", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-test",
 			Type: taskengine.PromptToNumber,
 		}, "Respond with only the number 10 as a digit, no other text.", taskengine.DataTypeInt)
@@ -112,7 +113,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "10", formatted)
 	})
 	t.Run("PromptToScore", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-test",
 			Type: taskengine.PromptToScore,
 		}, "Respond with exactly the number 7.5, no other text.", taskengine.DataTypeFloat)
@@ -122,7 +123,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("PromptToRange", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-test",
 			Type: taskengine.PromptToRange,
 		}, "Echo the Input. Input: 3-5", taskengine.DataTypeString)
@@ -131,7 +132,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "3-5", formatted)
 
 		// Test single number to range conversion
-		response, _, formatted, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-single-test",
 			Type: taskengine.PromptToRange,
 		}, "Respond with the number 4, no other text.", taskengine.DataTypeString)
@@ -141,7 +142,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ConditionCaseSensitive", func(t *testing.T) {
-		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-case-insensitive",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
@@ -153,7 +154,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ConditionInvalidResponse", func(t *testing.T) {
-		_, _, res, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, res, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-invalid",
 			Type: taskengine.PromptToCondition,
 			ConditionMapping: map[string]bool{
@@ -167,7 +168,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("RangeReverseNumbers", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-reverse-test",
 			Type: taskengine.PromptToRange,
 		}, "Echo the Input as is. Input: 5-3", taskengine.DataTypeString)
@@ -177,7 +178,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ScoreIntegerValue", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-integer-test",
 			Type: taskengine.PromptToScore,
 		}, "Respond with exactly the number 7, no decimal places or other text.", taskengine.DataTypeString)
@@ -187,7 +188,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("NumberInvalidFloat", func(t *testing.T) {
-		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-invalid-test",
 			Type: taskengine.PromptToNumber,
 		}, "Respond with '10.5'", taskengine.DataTypeString)
@@ -197,7 +198,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("HookTaskError", func(t *testing.T) {
 		// Test with mock hook
-		_, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "hooks-implemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
@@ -207,7 +208,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("HookMockTaskNoError", func(t *testing.T) {
 		// Test with mock hook
-		_, _, _, err = exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "hooks-implemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
@@ -217,14 +218,14 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
 		// Empty input
-		_, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
 		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 
 		// Long input
 		longInput := strings.Repeat("repeat this ", 10)
-		output, _, _, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		output, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			Type: taskengine.PromptToString,
 		}, "Echo exactly this including the repetition: "+longInput, taskengine.DataTypeString)
 		require.NoError(t, err)
@@ -232,7 +233,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("NumberWithSpaces", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-space-test",
 			Type: taskengine.PromptToNumber,
 		}, "Respond with ' 42 '", taskengine.DataTypeInt)

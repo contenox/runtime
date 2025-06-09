@@ -3,6 +3,7 @@ package taskengine
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // MockHookRepo is a mock implementation of the HookProvider interface.
@@ -19,7 +20,7 @@ func NewMockHookRegistry() *MockHookRepo {
 }
 
 // Exec simulates execution of a hook call.
-func (m *MockHookRepo) Exec(ctx context.Context, _ any, _ DataType, args *HookCall) (int, any, DataType, error) {
+func (m *MockHookRepo) Exec(ctx context.Context, _ time.Time, _ any, _ DataType, args *HookCall) (int, any, DataType, error) {
 	// Record call
 	m.Calls = append(m.Calls, *args)
 

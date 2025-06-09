@@ -2,6 +2,7 @@ package taskengine
 
 import (
 	"context"
+	"time"
 
 	"github.com/contenox/contenox/core/llmresolver"
 )
@@ -20,7 +21,7 @@ type MockTaskExecutor struct {
 }
 
 // TaskExec is the mock implementation of the TaskExec method.
-func (m *MockTaskExecutor) TaskExec(ctx context.Context, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
+func (m *MockTaskExecutor) TaskExec(ctx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	m.CalledWithTask = currentTask
 	m.CalledWithPrompt, _ = input.(string)
 

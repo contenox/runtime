@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/taskengine"
@@ -15,7 +16,7 @@ type SearchResolve struct {
 }
 
 // Exec implements taskengine.HookRepo.
-func (s *SearchResolve) Exec(ctx context.Context, input any, dataType taskengine.DataType, args *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, args *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	if dataType != taskengine.DataTypeSearchResults {
 		return taskengine.StatusError, nil, dataType, fmt.Errorf("unsupported data type: %v", dataType)
 	}

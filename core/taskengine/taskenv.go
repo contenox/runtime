@@ -30,6 +30,7 @@ const (
 	DataTypeFloat
 	DataTypeSearchResults
 	DataTypeJSON
+	DataTypeChatHistory
 )
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.
@@ -45,7 +46,7 @@ var ErrUnsupportedTaskType = errors.New("executor does not support the task type
 // HookRepo defines an interface for external system integrations
 // and to conduct side effects on internal state.
 type HookRepo interface {
-	Exec(ctx context.Context, input any, dataType DataType, args *HookCall) (int, any, DataType, error)
+	Exec(ctx context.Context, startingTime time.Time, input any, dataType DataType, args *HookCall) (int, any, DataType, error)
 	HookRegistry
 }
 
@@ -82,6 +83,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	vars := map[string]any{
 		"input": input,
 	}
+	startingTime := time.Now().UTC()
 	resolver := llmresolver.Randomly
 	var err error
 	if len(chain.RoutingStrategy) > 0 {
@@ -139,7 +141,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, outputType, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, resolver, currentTask, renderedPrompt, outputType)
+			output, outputType, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, renderedPrompt, outputType)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
