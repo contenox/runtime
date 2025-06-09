@@ -45,7 +45,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		SecurityEnabled: "true",
 	}
 	var workerContainer testcontainers.Container
-	var cleanupWorker func() = func() {}
+	cleanupWorker := func() {}
 	defer cleanupWorker()
 
 	getLogs := func(ctx context.Context) {
