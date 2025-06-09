@@ -13,34 +13,33 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 )
 
-type RagHook struct {
+type Rag struct {
 	embedder     llmrepo.ModelRepo
 	vectorsStore vectors.Store
 	dbInstance   libdb.DBManager
-	topK         int
 }
 
-func NewRagHook(
+func NewRag(
 	embedder llmrepo.ModelRepo,
 	vectorsStore vectors.Store,
 	dbInstance libdb.DBManager,
-) *RagHook {
-	return &RagHook{
+) *Rag {
+	return &Rag{
 		embedder:     embedder,
 		vectorsStore: vectorsStore,
 		dbInstance:   dbInstance,
 	}
 }
 
-var _ taskengine.HookRepo = (*RagHook)(nil)
+var _ taskengine.HookRepo = (*Rag)(nil)
 
 // Supports returns the list of hook names this provider supports.
-func (h *RagHook) Supports(ctx context.Context) ([]string, error) {
+func (h *Rag) Supports(ctx context.Context) ([]string, error) {
 	return []string{"rag"}, nil
 }
 
 // Exec executes the "rag" hook by performing a vector search based on the input string.
-func (h *RagHook) Exec(
+func (h *Rag) Exec(
 	ctx context.Context,
 	input any,
 	dataType taskengine.DataType,
@@ -58,7 +57,7 @@ func (h *RagHook) Exec(
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, errors.New("input must be a string")
 	}
 
-	topK := h.topK
+	topK := 1
 	var epsilon, radius float32
 	var argsSet bool
 	if hook.Args != nil {
@@ -109,9 +108,9 @@ func (h *RagHook) Exec(
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("vector search failed: %w", err)
 	}
-	convertedResults := make([]taskengine.SearchResults, len(results))
+	convertedResults := make([]taskengine.SearchResult, len(results))
 	for i := range results {
-		convertedResults[i] = taskengine.SearchResults{
+		convertedResults[i] = taskengine.SearchResult{
 			ID:           results[i].ID,
 			Distance:     results[i].Distance,
 			ResourceType: results[i].ResourceType,

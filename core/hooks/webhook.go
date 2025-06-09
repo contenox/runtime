@@ -13,15 +13,15 @@ import (
 	"github.com/contenox/contenox/core/taskengine"
 )
 
-// WebhookCaller makes HTTP requests to external services
-type WebhookCaller struct {
+// WebCaller makes HTTP requests to external services
+type WebCaller struct {
 	client         *http.Client
 	defaultHeaders map[string]string
 }
 
-// NewWebhookCaller creates a new webhook caller
-func NewWebhookCaller(options ...WebhookOption) *WebhookCaller {
-	wh := &WebhookCaller{
+// NewWebCaller creates a new webhook caller
+func NewWebCaller(options ...WebhookOption) *WebCaller {
+	wh := &WebCaller{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -39,24 +39,24 @@ func NewWebhookCaller(options ...WebhookOption) *WebhookCaller {
 }
 
 // WebhookOption configures the WebhookCaller
-type WebhookOption func(*WebhookCaller)
+type WebhookOption func(*WebCaller)
 
 // WithHTTPClient sets a custom HTTP client
 func WithHTTPClient(client *http.Client) WebhookOption {
-	return func(h *WebhookCaller) {
+	return func(h *WebCaller) {
 		h.client = client
 	}
 }
 
 // WithDefaultHeader sets a default header
 func WithDefaultHeader(key, value string) WebhookOption {
-	return func(h *WebhookCaller) {
+	return func(h *WebCaller) {
 		h.defaultHeaders[key] = value
 	}
 }
 
 // Exec implements the HookRepo interface
-func (h *WebhookCaller) Exec(ctx context.Context, input any, dataType taskengine.DataType, hook *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *WebCaller) Exec(ctx context.Context, input any, dataType taskengine.DataType, hook *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	// Get URL from args
 	rawURL, ok := hook.Args["url"]
 	if !ok {
@@ -155,8 +155,8 @@ func (h *WebhookCaller) Exec(ctx context.Context, input any, dataType taskengine
 	return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("webhook failed with status %d: %s", resp.StatusCode, string(respBody))
 }
 
-func (h *WebhookCaller) Supports(ctx context.Context) ([]string, error) {
+func (h *WebCaller) Supports(ctx context.Context) ([]string, error) {
 	return []string{"webhook"}, nil
 }
 
-var _ taskengine.HookRepo = (*WebhookCaller)(nil)
+var _ taskengine.HookRepo = (*WebCaller)(nil)

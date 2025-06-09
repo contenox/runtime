@@ -127,8 +127,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
-	rag := hooks.NewRagHook(embedder, vectorStore, dbInstance)
-	webcall := hooks.NewWebhookCaller()
+	rag := hooks.NewRag(embedder, vectorStore, dbInstance)
+	webcall := hooks.NewWebCaller()
 	hookrepo := taskengine.NewSimpleHookProvider(map[string]taskengine.HookRepo{
 		"rag":     rag,
 		"webhook": webcall,

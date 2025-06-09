@@ -29,6 +29,7 @@ const (
 	DataTypeInt
 	DataTypeFloat
 	DataTypeSearchResults
+	DataTypeJSON
 )
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.

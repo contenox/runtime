@@ -161,7 +161,7 @@ type ChainDefinition struct {
 	RoutingStrategy string `yaml:"routing_strategy" json:"routingStrategy"`
 }
 
-type SearchResults struct {
+type SearchResult struct {
 	ID           string  `json:"id"`
 	ResourceType string  `json:"type"`
 	Distance     float32 `json:"distance"`

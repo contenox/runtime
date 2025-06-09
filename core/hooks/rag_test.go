@@ -62,7 +62,7 @@ func TestSystemRag(t *testing.T) {
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 
 	dbInstance := testenv.GetDBInstance()
-	ragHook := hooks.NewRagHook(embedder, vectorStore, dbInstance)
+	ragHook := hooks.NewRag(embedder, vectorStore, dbInstance)
 	supports, err := ragHook.Supports(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -199,7 +199,7 @@ func TestSystemRag(t *testing.T) {
 					t.Errorf("Expected DataTypeSearchResults, got %v", dataType)
 				}
 
-				results, ok := result.([]taskengine.SearchResults)
+				results, ok := result.([]taskengine.SearchResult)
 				if !ok {
 					t.Fatal("Result type assertion failed")
 				}
