@@ -38,6 +38,9 @@ func ExecuteVectorSearch(
 	searchResults := make([]SearchResult, 0)
 
 	for _, query := range queries {
+		if query == "" {
+			continue
+		}
 		provider, err := embedder.GetProvider(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get embedder provider: %w", err)
@@ -91,6 +94,9 @@ func ExecuteVectorSearch(
 				Distance:     res.Distance,
 			})
 		}
+	}
+	if len(searchResults) == 0 {
+		return []SearchResult{}, nil
 	}
 
 	// Deduplicate results

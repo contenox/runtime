@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/indexrepo"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/vectors"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/core/taskengine/hooks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,13 +37,12 @@ func TestSystemRag(t *testing.T) {
 	if testenv.Err != nil {
 		t.Fatal(testenv.Err)
 	}
-	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
-
-	embedder, err := testenv.NewEmbedder(config)
+	uri, _, cleanup2, err := vectors.SetupLocalInstance(testenv.Ctx, "../../")
+	defer cleanup2()
 	if err != nil {
-		log.Fatalf("initializing embedding pool failed: %v", err)
+		t.Fatal(err)
 	}
-
+	config.VectorStoreURL = uri
 	vectorStore, cleanupVectorStore, err := vectors.New(t.Context(), config.VectorStoreURL, vectors.Args{
 		Timeout: 1 * time.Second,
 		SearchArgs: vectors.SearchArgs{
@@ -55,6 +54,13 @@ func TestSystemRag(t *testing.T) {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	defer cleanupVectorStore()
+	embedder, err := testenv.NewEmbedder(config)
+	if err != nil {
+		log.Fatalf("initializing embedding pool failed: %v", err)
+	}
+	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
+
 	dbInstance := testenv.GetDBInstance()
 	ragHook := hooks.NewRagHook(embedder, vectorStore, dbInstance)
 	supports, err := ragHook.Supports(t.Context())
@@ -112,59 +118,121 @@ func TestSystemRag(t *testing.T) {
 	}
 
 	t.Run("ragHook", func(t *testing.T) {
-		// Define a test query that should match the "machine learning" document
-		query := "What is machine learning and how does it work?"
-
-		// Create a HookCall with the "rag" hook and configure top_k
-		hookCall := &taskengine.HookCall{
-			Type: "rag",
-			Args: map[string]string{
-				"top_k":   "1",
-				"epsilon": "0.1",
-				"radius":  "25",
+		tests := []struct {
+			name          string
+			query         string
+			topK          string
+			epsilon       string
+			radius        string
+			wantIDs       []string
+			wantDistances []float32
+			wantErr       bool
+		}{
+			{
+				name:    "Quantum Computing with Distance Filter",
+				query:   "How do qubits work in quantum computing?",
+				topK:    "1",
+				epsilon: "0.8",
+				radius:  "15.0",
+				wantIDs: []string{"3"},
+			},
+			{
+				name:    "Non-Matching Query",
+				query:   "What is the capital of Mars?",
+				topK:    "1",
+				epsilon: "0.8",
+				radius:  "19",
+				wantIDs: []string{}, // Should return empty results
+			},
+			{
+				name:    "Invalid TopK",
+				query:   "Test invalid parameters",
+				topK:    "-1",
+				epsilon: "0.8",
+				radius:  "19",
+				wantErr: true,
+			},
+			{
+				name:    "Radius Without Epsilon",
+				query:   "Test radius without epsilon",
+				topK:    "1",
+				radius:  "10.0",
+				wantErr: true,
 			},
 		}
 
-		// Execute the RAG hook with the query
-		status, result, dataType, err := ragHook.Exec(
-			t.Context(),
-			query,
-			taskengine.DataTypeString,
-			hookCall,
-		)
-		// Assert no errors occurred
-		if err != nil {
-			t.Fatalf("RAG hook execution failed: %v", err)
-		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				hookCall := &taskengine.HookCall{
+					Type: "rag",
+					Args: map[string]string{
+						"top_k":   tt.topK,
+						"epsilon": tt.epsilon,
+						"radius":  tt.radius,
+					},
+				}
 
-		// Assert successful execution status
-		if status != taskengine.StatusSuccess {
-			t.Fatalf("Expected StatusSuccess, got %d", status)
-		}
+				status, result, dataType, err := ragHook.Exec(
+					t.Context(),
+					tt.query,
+					taskengine.DataTypeString,
+					hookCall,
+				)
 
-		// Assert correct data type
-		if dataType != taskengine.DataTypeSearchResults {
-			t.Fatalf("Expected DataTypeSearchResults, got %v", dataType)
-		}
+				if tt.wantErr {
+					if err == nil {
+						t.Error("Expected error but got none")
+					}
+					return
+				}
 
-		// Type assert the result
-		results, ok := result.([]taskengine.SearchResults)
-		if !ok {
-			t.Fatal("Expected result to be a slice of SearchResults")
-		}
+				if !tt.wantErr && err != nil {
+					t.Errorf("Unexpected error: %v", err)
+					return
+				}
 
-		// Assert we received at least one result
-		if len(results) == 0 {
-			t.Fatal("Expected at least one result, got none")
-		}
+				if status != taskengine.StatusSuccess {
+					t.Errorf("Expected StatusSuccess, got %d", status)
+				}
 
-		// Assert the most relevant result is document #1
-		if results[0].ID != "1" {
-			t.Errorf("Expected top result ID to be '1', got '%s'", results[0].ID)
-		}
+				if dataType != taskengine.DataTypeSearchResults {
+					t.Errorf("Expected DataTypeSearchResults, got %v", dataType)
+				}
 
-		if results[0].Distance > 0.2 {
-			t.Logf("Warning: Top result distance is %f, which might be too high", results[0].Distance)
+				results, ok := result.([]taskengine.SearchResults)
+				if !ok {
+					t.Fatal("Result type assertion failed")
+				}
+
+				// Check result count
+				if len(results) != len(tt.wantIDs) {
+					t.Errorf("Expected %d results, got %d", len(tt.wantIDs), len(results))
+				}
+
+				// Check expected IDs
+				for i := range tt.wantIDs {
+					if i >= len(results) {
+						break
+					}
+					if results[i].ID != tt.wantIDs[i] {
+						t.Errorf("Result[%d] ID mismatch: expected %s, got %s",
+							i, tt.wantIDs[i], results[i].ID)
+					}
+				}
+
+				// Check distance thresholds if specified
+				if tt.wantDistances != nil {
+					for i := range tt.wantDistances {
+						if i >= len(results) {
+							break
+						}
+						if results[i].Distance > tt.wantDistances[i] {
+							t.Errorf("Result[%d] distance too high: got %f, threshold %f",
+								i, results[i].Distance, tt.wantDistances[i])
+						}
+					}
+				}
+			})
 		}
 	})
 }

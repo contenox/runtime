@@ -66,6 +66,9 @@ func (h *RagHook) Exec(
 			if k, err := strconv.Atoi(kStr); err == nil && k > 0 {
 				topK = k
 			}
+			if topK <= 0 {
+				return taskengine.StatusError, nil, taskengine.DataTypeAny, errors.New("top_k must be a positive integer")
+			}
 		}
 		if eStr := hook.Args["epsilon"]; eStr != "" {
 			if e, err := strconv.ParseFloat(eStr, 32); err == nil {

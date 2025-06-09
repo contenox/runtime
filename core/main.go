@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverapi"
@@ -16,7 +17,6 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
 	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/core/taskengine/hooks"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/contenox/contenox/libs/libroutine"
