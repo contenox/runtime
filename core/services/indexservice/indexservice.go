@@ -2,7 +2,6 @@ package indexservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -74,19 +73,8 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	if job.Leaser != request.LeaserID {
 		return nil, fmt.Errorf("job is not leased by this leaser")
 	}
-	provider, err := s.embedder.GetProvider(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get provider: %w", err)
-	}
-	embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-		ModelName: provider.ModelName(),
-	}, s.embedder.GetRuntime(ctx), llmresolver.Randomly)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve embed client: %w", err)
-	}
-	if embedClient == nil {
-		return nil, errors.New("embed client is nil")
-	}
+
+	// Replace existing vectors if needed
 	if request.Replace {
 		chunks, err := storeInstance.ListChunkIndicesByResource(ctx, request.ID, store.ResourceTypeFile)
 		if err != nil {
@@ -99,62 +87,45 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			}
 		}
 	}
-	meta := []string{}
-	ids := make([]string, len(request.Chunks))
-	for i, chunk := range request.Chunks {
-		keywords, err := s.findKeywords(ctx, chunk)
-		meta = append(meta, keywords)
-		if err != nil {
-			return nil, fmt.Errorf("failed to enrich chunk: %w", err)
-		}
-		enriched := fmt.Sprintf("%s\n\nKeywords: %s", chunk, keywords)
-		vectorData, err := embedClient.Embed(ctx, enriched)
-		if err != nil {
-			return nil, fmt.Errorf("failed to embed text: %w", err)
-		}
-		vectorData32 := make([]float32, len(vectorData))
-		// Iterate and cast each element
-		for i, v := range vectorData {
-			vectorData32[i] = float32(v)
-		}
-		id := fmt.Sprintf("%s-%d", request.ID, i)
-		ids[i] = id
-		v := vectors.Vector{
-			ID:   id,
-			Data: vectorData32,
-		}
 
-		err = s.vectors.Insert(ctx, v)
+	// Create augment strategy using service's findKeywords
+	augmentStrategy := func(ctx context.Context, chunk string) (string, error) {
+		keywords, err := s.findKeywords(ctx, chunk)
 		if err != nil {
-			return nil, fmt.Errorf("failed to insert vector: %w", err)
+			return "", fmt.Errorf("failed to enrich chunk: %w", err)
 		}
-		err = storeInstance.CreateChunkIndex(ctx, &store.ChunkIndex{
-			ID:             id,
-			VectorID:       id,
-			VectorStore:    "vald",
-			ResourceID:     request.ID,
-			ResourceType:   job.EntityType,
-			EmbeddingModel: provider.ModelName(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create chunk index: %w", err)
-		}
+		return fmt.Sprintf("%s\n\nKeywords: %s", chunk, keywords), nil
 	}
+
+	// Use indexrepo for core ingestion logic
+	vectorIDs, augmentedMetadata, err := indexrepo.IngestChunks(
+		ctx,
+		s.embedder,
+		s.vectors,
+		tx,
+		request.ID,
+		job.EntityType,
+		request.Chunks,
+		augmentStrategy,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	err = storeInstance.DeleteLeasedJob(ctx, job.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to delete leased job: %w", err)
 	}
-	// on failure we don't commit the chunk-entries but endup with ingested vectors.
-	// this is not an issue, if on search we verify that to the matching vectors chunks exist
-	// and only then include them in the response.
+
 	err = commit(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
+
 	return &IndexResponse{
 		ID:                request.ID,
-		VectorIDs:         ids,
-		AugmentedMetadata: meta,
+		VectorIDs:         vectorIDs,
+		AugmentedMetadata: augmentedMetadata,
 	}, nil
 }
 

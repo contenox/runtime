@@ -7,6 +7,7 @@ import (
 
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
 	"github.com/contenox/contenox/libs/libdb"
@@ -105,4 +106,90 @@ func ExecuteVectorSearch(
 	}
 
 	return deduplicatedResults, nil
+}
+
+func DummyaugmentStrategy(ctx context.Context, chunk string) (string, error) {
+	return chunk, nil
+}
+
+func IngestChunks(
+	ctx context.Context,
+	embedder llmrepo.ModelRepo,
+	vectorsStore vectors.Store,
+	dbExec libdb.Exec,
+	resourceID string,
+	resourceType string,
+	chunks []string,
+	augmentStrategy func(ctx context.Context, chunk string) (string, error),
+) (vectorIDs []string, augmentedMetadata []string, err error) {
+	// Get embedding provider once
+	embedProvider, err := embedder.GetProvider(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get embedder provider: %w", err)
+	}
+	embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
+		ModelName: embedProvider.ModelName(),
+	}, embedder.GetRuntime(ctx), llmresolver.Randomly)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve embed client: %w", err)
+	}
+	if embedClient == nil {
+		return nil, nil, errors.New("embed client is nil")
+	}
+
+	modelName := embedProvider.ModelName()
+	vectorIDs = make([]string, len(chunks))
+	augmentedMetadata = make([]string, len(chunks))
+	storeInstance := store.New(dbExec)
+
+	for i, chunk := range chunks {
+		var enriched string
+		enriched, err := augmentStrategy(ctx, chunk)
+		if err != nil {
+			return nil, nil, fmt.Errorf("chunk %d: %w", i, err)
+		}
+
+		// Generate embedding
+		vectorData, err := embedText(ctx, embedClient, enriched)
+		if err != nil {
+			return nil, nil, fmt.Errorf("chunk %d: %w", i, err)
+		}
+
+		// Create vector ID
+		vectorID := fmt.Sprintf("%s-%d", resourceID, i)
+		vectorIDs[i] = vectorID
+
+		// Insert vector
+		v := vectors.Vector{ID: vectorID, Data: vectorData}
+		if err := vectorsStore.Insert(ctx, v); err != nil {
+			return nil, nil, fmt.Errorf("chunk %d: failed to insert vector: %w", i, err)
+		}
+
+		// Create chunk index
+		if err := storeInstance.CreateChunkIndex(ctx, &store.ChunkIndex{
+			ID:             vectorID,
+			VectorID:       vectorID,
+			VectorStore:    "vald",
+			ResourceID:     resourceID,
+			ResourceType:   resourceType,
+			EmbeddingModel: modelName,
+		}); err != nil {
+			return nil, nil, fmt.Errorf("chunk %d: failed to create chunk index: %w", i, err)
+		}
+	}
+	return vectorIDs, augmentedMetadata, nil
+}
+
+// Helper function for text embedding
+func embedText(ctx context.Context, embedClient serverops.LLMEmbedClient, text string) ([]float32, error) {
+	vectorData, err := embedClient.Embed(ctx, text)
+	if err != nil {
+		return nil, fmt.Errorf("embedding failed: %w", err)
+	}
+
+	vectorData32 := make([]float32, len(vectorData))
+	for i, v := range vectorData {
+		vectorData32[i] = float32(v)
+	}
+	return vectorData32, nil
 }

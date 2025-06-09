@@ -22,8 +22,10 @@ import (
 	"github.com/contenox/contenox/libs/libroutine"
 )
 
-var cliSetAdminUser string
-var cliSetCoreVersion string
+var (
+	cliSetAdminUser   string
+	cliSetCoreVersion string
+)
 
 func initDatabase(ctx context.Context, cfg *serverops.Config) (libdb.DBManager, error) {
 	dbURL := cfg.DatabaseURL
@@ -125,7 +127,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
-	rag := hooks.NewRagHook(embedder, vectorStore, dbInstance, 5)
+	rag := hooks.NewRagHook(embedder, vectorStore, dbInstance)
 	webcall := hooks.NewWebhookCaller()
 	hookrepo := taskengine.NewSimpleHookProvider(map[string]taskengine.HookRepo{
 		"rag":     rag,

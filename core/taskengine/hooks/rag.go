@@ -24,13 +24,11 @@ func NewRagHook(
 	embedder llmrepo.ModelRepo,
 	vectorsStore vectors.Store,
 	dbInstance libdb.DBManager,
-	topK int,
 ) *RagHook {
 	return &RagHook{
 		embedder:     embedder,
 		vectorsStore: vectorsStore,
 		dbInstance:   dbInstance,
-		topK:         topK,
 	}
 }
 
