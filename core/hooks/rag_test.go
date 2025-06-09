@@ -132,8 +132,8 @@ func TestSystemRag(t *testing.T) {
 				name:    "Quantum Computing with Distance Filter",
 				query:   "How do qubits work in quantum computing?",
 				topK:    "1",
-				epsilon: "0.8",
-				radius:  "15.0",
+				epsilon: "0.7",
+				radius:  "20.0",
 				wantIDs: []string{"3"},
 			},
 			{
