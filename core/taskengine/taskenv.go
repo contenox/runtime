@@ -28,6 +28,7 @@ const (
 	DataTypeBool
 	DataTypeInt
 	DataTypeFloat
+	DataTypeSearchResults
 )
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.

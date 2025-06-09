@@ -160,3 +160,9 @@ type ChainDefinition struct {
 	// RoutingStrategy defines how transitions should be evaluated (optional).
 	RoutingStrategy string `yaml:"routing_strategy" json:"routingStrategy"`
 }
+
+type SearchResults struct {
+	ID           string  `json:"id"`
+	ResourceType string  `json:"type"`
+	Distance     float32 `json:"distance"`
+}
