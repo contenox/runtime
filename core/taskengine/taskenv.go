@@ -14,9 +14,11 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 )
 
-const StatusSuccess = 1
-const StatusUnknownHookProvider = 2
-const StatusError = 3
+const (
+	StatusSuccess             = 1
+	StatusUnknownHookProvider = 2
+	StatusError               = 3
+)
 
 type DataType int
 
@@ -41,7 +43,7 @@ var ErrUnsupportedTaskType = errors.New("executor does not support the task type
 // HookRepo defines an interface for external system integrations
 // and to conduct side effects on internal state.
 type HookRepo interface {
-	Exec(ctx context.Context, input any, args *HookCall) (int, any, error)
+	Exec(ctx context.Context, input any, dataType DataType, args *HookCall) (int, any, DataType, error)
 	HookRegistry
 }
 

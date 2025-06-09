@@ -19,17 +19,17 @@ func NewMockHookRegistry() *MockHookRepo {
 }
 
 // Exec simulates execution of a hook call.
-func (m *MockHookRepo) Exec(ctx context.Context, _ any, args *HookCall) (int, any, error) {
+func (m *MockHookRepo) Exec(ctx context.Context, _ any, _ DataType, args *HookCall) (int, any, DataType, error) {
 	// Record call
 	m.Calls = append(m.Calls, *args)
 
 	// Simulate response
 	if resp, ok := m.ResponseMap[args.Type]; ok {
-		return StatusSuccess, resp, nil
+		return StatusSuccess, resp, DataTypeAny, nil
 	}
 
 	// Default behavior
-	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Type), nil
+	return StatusSuccess, fmt.Sprintf("mock response for hook %s", args.Type), DataTypeAny, nil
 }
 
 func (m *MockHookRepo) Supports(ctx context.Context) ([]string, error) {

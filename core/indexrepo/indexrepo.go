@@ -106,35 +106,3 @@ func ExecuteVectorSearch(
 
 	return deduplicatedResults, nil
 }
-
-func ResolveBlobFromQuery(
-	ctx context.Context,
-	embedder llmrepo.ModelRepo,
-	vectorsStore vectors.Store,
-	dbExec libdb.Exec,
-	query string,
-	topK int,
-) ([]byte, error) {
-	results, err := ExecuteVectorSearch(ctx, embedder, vectorsStore, dbExec, []string{query}, topK, nil)
-	if err != nil || len(results) == 0 {
-		return nil, err
-	}
-
-	storeInstance := store.New(dbExec)
-	top := results[0]
-
-	if top.ResourceType != store.ResourceTypeFile {
-		return nil, fmt.Errorf("unsupported resource type: %s", top.ResourceType)
-	}
-
-	file, err := storeInstance.GetFileByID(ctx, top.ID)
-	if err != nil {
-		return nil, err
-	}
-	blob, err := storeInstance.GetBlobByID(ctx, file.BlobsID)
-	if err != nil {
-		return nil, err
-	}
-
-	return blob.Data, nil
-}

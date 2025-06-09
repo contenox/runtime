@@ -15,11 +15,11 @@ func NewSimpleHookProvider(hooks map[string]HookRepo) *SimpleHookRepo {
 	}
 }
 
-func (m *SimpleHookRepo) Exec(ctx context.Context, input any, args *HookCall) (int, any, error) {
+func (m *SimpleHookRepo) Exec(ctx context.Context, input any, dataType DataType, args *HookCall) (int, any, DataType, error) {
 	if hook, ok := m.hooks[args.Type]; ok {
-		return hook.Exec(ctx, input, args)
+		return hook.Exec(ctx, input, dataType, args)
 	}
-	return StatusUnknownHookProvider, nil, fmt.Errorf("unknown hook type: %s", args.Type)
+	return StatusUnknownHookProvider, nil, DataTypeAny, fmt.Errorf("unknown hook type: %s", args.Type)
 }
 
 func (m *SimpleHookRepo) Supports(ctx context.Context) ([]string, error) {
