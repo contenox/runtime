@@ -13,7 +13,7 @@ import (
 
 type Chat struct {
 	dbInstance  libdb.DBManager
-	chatManager chat.Manager
+	chatManager *chat.Manager
 }
 
 // Supports implements taskengine.HookRepo.
@@ -25,7 +25,7 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	}, nil
 }
 
-func NewChatHook(dbInstance libdb.DBManager, chatManager chat.Manager) *Chat {
+func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) *Chat {
 	return &Chat{
 		dbInstance:  dbInstance,
 		chatManager: chatManager,
