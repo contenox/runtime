@@ -37,7 +37,7 @@ func (d *activityTrackerDecorator) NewInstance(ctx context.Context, subject stri
 	return sessionID, err
 }
 
-func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
+func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"chat",
@@ -47,18 +47,19 @@ func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, m
 	)
 	defer endFn()
 
-	response, tokencount, err := d.service.Chat(ctx, subjectID, message, preferredModelNames...)
+	response, tokencount, outputtokencount, err := d.service.Chat(ctx, subjectID, message, preferredModelNames...)
 	if err != nil {
 		reportErrFn(err)
 	} else {
 		reportChangeFn(subjectID, map[string]interface{}{
-			"user_message": message,
-			"response":     response,
-			"token_count":  tokencount,
+			"user_message":       message,
+			"response":           response,
+			"input_token_count":  tokencount,
+			"output_token_count": outputtokencount,
 		})
 	}
 
-	return response, tokencount, err
+	return response, tokencount, outputtokencount, err
 }
 
 func (d *activityTrackerDecorator) AddInstruction(ctx context.Context, id string, message string) error {

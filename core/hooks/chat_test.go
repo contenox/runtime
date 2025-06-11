@@ -67,7 +67,8 @@ func TestSystemChatHooks(t *testing.T) {
 		require.Equal(t, taskengine.StatusSuccess, status)
 		require.Equal(t, taskengine.DataTypeChatHistory, dataType)
 
-		messages, ok := result.([]serverops.Message)
+		history, ok := result.(taskengine.ChatHistory)
+		messages := history.Messages
 		require.True(t, ok)
 		require.Len(t, messages, 1)
 		require.Equal(t, "user", messages[0].Role)
@@ -92,7 +93,8 @@ func TestSystemChatHooks(t *testing.T) {
 		require.Equal(t, taskengine.StatusSuccess, status)
 		require.Equal(t, taskengine.DataTypeChatHistory, dataType)
 
-		updatedMessages, ok := result.([]serverops.Message)
+		updatedHistory, ok := result.(taskengine.ChatHistory)
+		updatedMessages := updatedHistory.Messages
 		require.True(t, ok)
 		require.Len(t, updatedMessages, 2)
 		require.Equal(t, "user", updatedMessages[0].Role)
@@ -112,11 +114,11 @@ func TestSystemChatHooks(t *testing.T) {
 			taskengine.DataTypeChatHistory,
 			hookCall,
 		)
-		t.Log(result)
 		// Validate results
 		require.NoError(t, err)
 		require.Equal(t, taskengine.StatusSuccess, status)
 		require.Equal(t, taskengine.DataTypeChatHistory, dataType)
+		t.Log(result)
 
 		// Verify database persistence
 		persistedMessages, err := chatManager.ListMessages(ctx, dbInstance.WithoutTransaction(), subjectID)

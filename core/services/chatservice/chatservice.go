@@ -4,19 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
+	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/google/uuid"
 )
 
 type Service interface {
 	GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error)
-	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, error)
+	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error)
 	ListChats(ctx context.Context) ([]ChatSession, error)
 	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
@@ -33,7 +36,8 @@ type service struct {
 func New(
 	dbInstance libdb.DBManager,
 	tokenizer tokenizerservice.Tokenizer,
-	manager *chat.Manager) Service {
+	manager *chat.Manager,
+) Service {
 	return &service{
 		dbInstance: dbInstance,
 		tokenizer:  tokenizer,
@@ -85,18 +89,60 @@ func (s *service) AddInstruction(ctx context.Context, id string, message string)
 	return s.manager.AddInstruction(ctx, tx, id, message)
 }
 
-func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
+func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
 	now := time.Now().UTC()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 
-	response, tokenCount, err := s.manager.Chat(ctx, tx, now, subjectID, message, preferredModelNames...)
-	if err != nil {
-		return "", 0, err
+	chatHook := hooks.NewChatHook(s.dbInstance, s.manager)
+
+	// Append user message
+	status, result, dtype, err := chatHook.Exec(ctx, now, message, taskengine.DataTypeString, &taskengine.HookCall{
+		Type: "append_user_input",
+		Args: map[string]string{
+			"subject_id": subjectID,
+		},
+	})
+	if err != nil || status != taskengine.StatusSuccess {
+		return "", 0, 0, fmt.Errorf("append_user_input failed: %w", err)
 	}
-	return response, tokenCount, nil
+
+	// Run model inference
+	status, result, dtype, err = chatHook.Exec(ctx, now, result, dtype, &taskengine.HookCall{
+		Type: "execute_chat_model",
+		Args: map[string]string{
+			"models": strings.Join(preferredModelNames, ", "),
+		},
+	})
+	if err != nil || status != taskengine.StatusSuccess {
+		return "", 0, 0, fmt.Errorf("execute_chat_model failed: %w", err)
+	}
+
+	// Persist messages
+	status, result, _, err = chatHook.Exec(ctx, now, result, dtype, &taskengine.HookCall{
+		Type: "persist_input_output",
+		Args: map[string]string{
+			"subject_id": subjectID,
+		},
+	})
+	if err != nil || status != taskengine.StatusSuccess {
+		return "", 0, 0, fmt.Errorf("persist_input_output failed: %w", err)
+	}
+
+	// Extract the final assistant message
+	history, ok := result.(taskengine.ChatHistory)
+	if !ok || len(history.Messages) == 0 {
+		return "", 0, 0, fmt.Errorf("unexpected result from hooks")
+	}
+
+	lastMsg := history.Messages[len(history.Messages)-1]
+	if lastMsg.Role != "assistant" {
+		return "", 0, 0, fmt.Errorf("expected assistant message, got %q", lastMsg.Role)
+	}
+
+	return lastMsg.Content, history.InputTokens, history.OutputTokens, nil
 }
 
 // ChatMessage is the public representation of a message in a chat.

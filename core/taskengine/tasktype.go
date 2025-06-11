@@ -1,5 +1,7 @@
 package taskengine
 
+import "github.com/contenox/contenox/core/serverops"
+
 // TaskType defines the expected output format of a task.
 // It determines how the LLM's response will be interpreted.
 type TaskType string
@@ -165,4 +167,10 @@ type SearchResult struct {
 	ID           string  `json:"id"`
 	ResourceType string  `json:"type"`
 	Distance     float32 `json:"distance"`
+}
+
+type ChatHistory struct {
+	Messages     []serverops.Message `json:"messages"`
+	InputTokens  int                 `json:"inputTokens"`
+	OutputTokens int                 `json:"outputTokens"`
 }

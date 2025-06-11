@@ -3,20 +3,23 @@ package hooks
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
 )
 
+// Chat implements taskengine.HookRepo and manages chat-related hooks.
+// It enables integration of chat-based logic like appending user input,
+// invoking LLMs, and persisting chat messages.
 type Chat struct {
 	dbInstance  libdb.DBManager
 	chatManager *chat.Manager
 }
 
-// Supports implements taskengine.HookRepo.
+// Supports returns the list of hook types supported by this hook repository.
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		"append_user_input",
@@ -25,6 +28,7 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	}, nil
 }
 
+// NewChatHook creates a new Chat hook repository instance.
 func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) *Chat {
 	return &Chat{
 		dbInstance:  dbInstance,
@@ -47,6 +51,7 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 	}
 }
 
+// Exec resolves and runs the hook function based on the provided hook call.
 func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	if hookCall.Args == nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid hook call: missing type")
@@ -59,7 +64,7 @@ func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataTyp
 	return hookFunc(ctx, startTime, input, dataType, hookCall)
 }
 
-// AppendUserInputToChathistory adds user input to chat history
+// AppendUserInputToChathistory appends a user message to the current chat history. The subject_id must already exist.
 func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	if dataType != taskengine.DataTypeString {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected string input")
@@ -89,44 +94,57 @@ func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to append message: %w", err)
 	}
 
-	return taskengine.StatusSuccess, updatedMessages, taskengine.DataTypeChatHistory, nil
+	history := taskengine.ChatHistory{
+		Messages: updatedMessages,
+	}
+
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
 }
 
-// ChatExec processes chat history through LLM
+// ChatExec invokes the model to generate a response based on chat history.
 func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	if dataType != taskengine.DataTypeChatHistory {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
 	}
 
-	messages, ok := input.([]serverops.Message)
+	history, ok := input.(taskengine.ChatHistory)
+	messages := history.Messages
 	if !ok || len(messages) == 0 {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
 	}
 
-	// Get model name from args
-	modelName := "default"
+	models := []string{}
 	if m, ok := hookCall.Args["model"]; ok {
-		modelName = m
+		models = append(models, m)
+	}
+	if m, ok := hookCall.Args["models"]; ok {
+		models = strings.Split(strings.ReplaceAll(m, " ", ""), ",")
 	}
 
 	// Process through LLM
-	responseMessage, _, err := h.chatManager.ChatExec(ctx, messages, 0, modelName) // TODO: pass context length
+	responseMessage, inputTokens, outputTokens, err := h.chatManager.ChatExec(ctx, messages, 0, models...) // TODO: pass context length
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("chat failed: %w", err)
 	}
 
 	// Append response to history
 	updatedMessages := append(messages, *responseMessage)
-	return taskengine.StatusSuccess, updatedMessages, taskengine.DataTypeChatHistory, nil
+	history = taskengine.ChatHistory{
+		Messages:     updatedMessages,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+	}
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
 }
 
-// PersistMessages saves chat history to DB
+// PersistMessages saves the most recent user and assistant messages to the database.
 func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
 	if dataType != taskengine.DataTypeChatHistory {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
 	}
 
-	messages, ok := input.([]serverops.Message)
+	history, ok := input.(taskengine.ChatHistory)
+	messages := history.Messages
 	if !ok || len(messages) < 2 {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
 	}
@@ -148,6 +166,6 @@ func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input a
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("persist failed: %w", err)
 	}
-
-	return taskengine.StatusSuccess, messages, taskengine.DataTypeChatHistory, nil
+	history.Messages = messages
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
 }

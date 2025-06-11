@@ -50,7 +50,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
 		require.NoError(t, err)
-		response, _, err := manager.Chat(ctx, id, "what is the capital of england?", "smollm2:135m")
+		response, _, _, err := manager.Chat(ctx, id, "what is the capital of england?", "smollm2:135m")
 		require.NoError(t, err)
 		responseLower := strings.ToLower(response)
 		println(responseLower)
@@ -71,7 +71,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 		// First interaction
 		userMessage1 := "What's the capital of France?"
-		_, _, err = manager.Chat(ctx, id, userMessage1, "smollm2:135m")
+		_, _, _, err = manager.Chat(ctx, id, userMessage1, "smollm2:135m")
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond)
 		// Verify first pair of messages
@@ -97,7 +97,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 		// Second interaction
 		userMessage2 := "What about Germany?"
-		_, _, err = manager.Chat(ctx, id, userMessage2, "smollm2:135m")
+		_, _, _, err = manager.Chat(ctx, id, userMessage2, "smollm2:135m")
 		require.NoError(t, err)
 
 		// Verify updated history
@@ -159,8 +159,8 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		for i, userMsg := range userMessages {
 			t.Logf("====================================================================================\n")
 			t.Logf("Sending message %d: %s \n", i+1, userMsg)
-			response, tokenCount, err := manager.Chat(ctx, instanceID, userMsg, model)
-			tokens += tokenCount
+			response, inputtokenCount, outputtokencount, err := manager.Chat(ctx, instanceID, userMsg, model)
+			tokens += inputtokenCount + outputtokencount
 			require.NoError(t, err, "Chat interaction failed for message %d", i+1)
 			require.NotEmpty(t, response, "Assistant response should not be empty for message %d", i+1)
 			require.Greater(t, len(response), 5)

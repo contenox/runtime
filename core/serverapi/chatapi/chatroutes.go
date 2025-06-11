@@ -15,7 +15,7 @@ func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatserv
 
 	mux.HandleFunc("POST /chats", h.createChat)
 	mux.HandleFunc("POST /chats/{id}/chat", h.chat)
-	//mux.HandleFunc("POST /chats/{id}/chat/{model}", h.chat)
+	// mux.HandleFunc("POST /chats/{id}/chat/{model}", h.chat)
 	mux.HandleFunc("POST /chats/{id}/instruction", h.addInstruction)
 	mux.HandleFunc("GET /chats/{id}", h.history)
 	mux.HandleFunc("GET /chats", h.listChats)
@@ -100,7 +100,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, _, err := h.manager.Chat(ctx, chatID.String(), req.Message)
+	reply, _, _, err := h.manager.Chat(ctx, chatID.String(), req.Message)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

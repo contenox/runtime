@@ -1,3 +1,5 @@
+// Package chat provides chat session management, message persistence,
+// and LLM invocation logic.
 package chat
 
 import (
@@ -18,22 +20,24 @@ import (
 	"github.com/ollama/ollama/api"
 )
 
+// Manager coordinates chat message management and LLM execution.
 type Manager struct {
 	state     *runtimestate.State
 	tokenizer tokenizerservice.Tokenizer
 }
 
+// New creates a new Manager for chat processing.
 func New(
 	state *runtimestate.State,
-	tokenizer tokenizerservice.Tokenizer) *Manager {
+	tokenizer tokenizerservice.Tokenizer,
+) *Manager {
 	return &Manager{
 		state:     state,
 		tokenizer: tokenizer,
 	}
 }
 
-// AddInstruction adds a system instruction to an existing chat instance.
-// This method requires admin panel permissions.
+// AddInstruction inserts a system message into an existing chat.
 func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, message string) error {
 	msg := serverops.Message{
 		Role:    "system",
@@ -55,39 +59,7 @@ func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, 
 	return nil
 }
 
-func (m *Manager) Chat(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, message string, preferredModelNames ...string) (string, int, error) {
-	// TODO: check authorization for the chat instance.
-	messages, err := m.ListMessages(ctx, tx, subjectID)
-	if err != nil {
-		return "", 0, err
-	}
-	messages, err = m.AppendMessage(ctx, messages, message, "user")
-	if err != nil {
-		return "", 0, err
-	}
-	contextLength, err := m.CalculateContextSize(ctx, messages)
-	if err != nil {
-		return "", contextLength, fmt.Errorf("could not estimate context size %w", err)
-	}
-	// Use chatExec to handle the chat logic
-	responseMessage, contextLength, err := m.ChatExec(ctx, messages, contextLength, preferredModelNames...)
-	if err != nil {
-		return "", contextLength, err
-	}
-
-	err = m.AppendMessages(ctx, tx, beginTime, subjectID, &serverops.Message{
-		Role:    "user",
-		Content: message,
-	},
-		responseMessage,
-	)
-	if err != nil {
-		return "", contextLength, err
-	}
-
-	return responseMessage.Content, contextLength, nil
-}
-
+// AppendMessage appends a message to an existing message slice.
 func (m *Manager) AppendMessage(ctx context.Context, messages []serverops.Message, message string, role string) ([]serverops.Message, error) {
 	userMsg := serverops.Message{
 		Role:    role,
@@ -98,6 +70,7 @@ func (m *Manager) AppendMessage(ctx context.Context, messages []serverops.Messag
 	return messages, nil
 }
 
+// ListMessages retrieves all stored messages for a given subject ID.
 func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID string) ([]serverops.Message, error) {
 	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
@@ -116,6 +89,7 @@ func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID str
 	return messages, nil
 }
 
+// AppendMessages stores a user message and the assistant response to the database.
 func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *serverops.Message, responseMessage *serverops.Message) error {
 	payload, err := json.Marshal(inputMessage)
 	if err != nil {
@@ -147,40 +121,51 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 	return nil
 }
 
-func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, error) {
+// ChatExec runs the chat history through a selected model and returns the assistant response.
+func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, int, error) {
 	if len(messages) == 0 {
-		return nil, 0, errors.New("no messages provided")
+		return nil, 0, 0, errors.New("no messages provided")
 	}
 	if messages[len(messages)-1].Role != "user" {
-		return nil, 0, errors.New("last message must be from user")
+		return nil, 0, 0, errors.New("last message must be from user")
 	}
-
+	inputtokens := 0
 	convertedMessage := make([]api.Message, len(messages))
-	for i, m := range messages {
+	for i, msg := range messages {
 		convertedMessage[i] = api.Message{
-			Role:    m.Role,
-			Content: m.Content,
+			Role:    msg.Role,
+			Content: msg.Content,
 		}
+		var err error
+		inputtokens, err = m.tokenizer.CountTokens(ctx, "phi-3", msg.Content)
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("failed to count tokens %w", err)
+		}
+
 	}
 	chatClient, err := llmresolver.Chat(ctx, llmresolver.Request{
 		ContextLength: contextLength,
 		ModelNames:    preferredModelNames,
 	}, modelprovider.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
-		return nil, contextLength, fmt.Errorf("failed to resolve backend %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to resolve backend %w", err)
 	}
 	responseMessage, err := chatClient.Chat(ctx, messages)
 	if err != nil {
-		return nil, contextLength, fmt.Errorf("failed to chat %w", err)
+		return nil, 0, 0, fmt.Errorf("failed to chat %w", err)
+	}
+	outputtokens, err := m.tokenizer.CountTokens(ctx, "phi-3", responseMessage.Content)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("failed to count tokens %w", err)
 	}
 	assistantMsgData := serverops.Message{
 		Role:    responseMessage.Role,
 		Content: responseMessage.Content,
 	}
-
-	return &assistantMsgData, contextLength, nil
+	return &assistantMsgData, inputtokens, outputtokens, nil
 }
 
+// CalculateContextSize estimates the token count for the chat prompt history.
 func (m *Manager) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
 	var prompt string
 	for _, m := range messages {
