@@ -8,6 +8,7 @@ import (
 	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/core/taskengine"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestSystemChatHooks(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	tenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").
@@ -30,7 +31,9 @@ func TestSystemChatHooks(t *testing.T) {
 		RunDownloadManager().
 		WithDefaultUser().
 		WaitForModel("smollm2:135m").
-		Build().Unzip()
+		Build()
+
+	ctx, backendState, dbInstance, cleanup, err := tenv.Unzip()
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -38,9 +41,10 @@ func TestSystemChatHooks(t *testing.T) {
 	tokenizer := tokenizerservice.MockTokenizer{}
 	chatManager := chat.New(backendState, tokenizer)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
-
 	// Generate unique subject ID for this test session
 	subjectID := uuid.New().String()
+	err = store.New(dbInstance.WithoutTransaction()).CreateMessageIndex(t.Context(), subjectID, serverops.DefaultAdminUser)
+	require.NoError(t, err)
 	userMessage := "What's the capital of France?"
 
 	t.Run("chat_hooks", func(t *testing.T) {
