@@ -121,7 +121,13 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 	return nil
 }
 
-// ChatExec runs the chat history through a selected model and returns the assistant response.
+// ChatExec runs the chat history through a selected LLM and returns the assistant's response.
+// Validates that the last message is from the user and uses the preferred model names.
+//
+// Returns:
+//   - Assistant response message
+//   - Number of input tokens
+//   - Number of output tokens
 func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, int, error) {
 	if len(messages) == 0 {
 		return nil, 0, 0, errors.New("no messages provided")

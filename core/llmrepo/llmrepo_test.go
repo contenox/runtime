@@ -150,6 +150,8 @@ Keywords and types:
 
 Text: %s`, response2, text)
 		response3, err := execClient.Prompt(ctx, prompt)
+		require.NoError(t, err)
+		t.Logf("Response 3: %s", response3)
 		response2 = strings.ToLower(response2)
 		response1 = strings.ToLower(response1)
 		response3 = strings.ToLower(response3)
@@ -159,5 +161,6 @@ Text: %s`, response2, text)
 
 		require.Contains(t, response2, "flow state")
 		require.Contains(t, response2, "smalltown")
+		require.Contains(t, response3, "flow state")
 	})
 }

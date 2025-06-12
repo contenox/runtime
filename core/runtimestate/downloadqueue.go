@@ -40,7 +40,8 @@ func (q dwqueue) add(ctx context.Context, u url.URL, models ...string) error {
 			Payload:  payload,
 		})
 		if err != nil {
-			println(err)
+			_ = err
+			// log.Println("Expected error adding job to queue:", err)
 		}
 	}
 

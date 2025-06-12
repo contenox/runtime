@@ -327,7 +327,7 @@ func (builder *Builder) WaitForModel(model string) *Builder {
 
 	// Trigger a sync
 	builder.triggerChan <- struct{}{}
-
+	i := 0
 	// Wait for the condition
 	err := WaitForCondition(builder.ctx, func() bool {
 		currentState := builder.state.Get(builder.ctx)
@@ -335,9 +335,15 @@ func (builder *Builder) WaitForModel(model string) *Builder {
 		if err != nil {
 			return false
 		}
+		i++
+		if i%10 == 0 {
+			reportChange(model, map[string]interface{}{
+				"status": "waiting",
+				"waited": i,
+			})
+		}
 		return bytes.Contains(data, []byte(fmt.Sprintf(`"pulledModels":[{"name":"%s"`, model)))
 	}, 2*time.Minute, 100*time.Millisecond)
-
 	if err != nil {
 		builder.Err = fmt.Errorf("timeout waiting for condition: %v", err)
 		reportErr(builder.Err)
@@ -419,7 +425,6 @@ func DefaultConfig() *serverops.Config {
 	return &serverops.Config{
 		JWTExpiry: "1h",
 	}
-
 }
 
 type Environment struct {
@@ -666,7 +671,6 @@ func (env *Environment) GetDBInstance() libdb.DBManager {
 }
 
 func (env *Environment) NewExecRepo(config *serverops.Config) (llmrepo.ModelRepo, error) {
-
 	if env.dbManager == nil {
 		env.Err = fmt.Errorf("dbManager is nil")
 		return nil, env.Err
@@ -727,7 +731,6 @@ func (env *Environment) WaitForModel(model string) *Environment {
 		}
 		return bytes.Contains(data, []byte(fmt.Sprintf(`"pulledModels":[{"name":"%s"`, model)))
 	}, 3*time.Minute, 2*time.Second)
-
 	// Handle wait result
 	if err != nil {
 		env.Err = fmt.Errorf("timeout waiting for model %s: %w", model, err)
