@@ -1,21 +1,33 @@
-# contenox
+# contenox – Conversation Interface Engine
 
-A modular platform for building context-aware agents, semantic search, and task automation — grounded in your data.
+A modular platform for building context-aware agents, semantic search, and LLM-driven automation — all powered by a **conversation interface engine** that replaces traditional UIs with natural language interaction.
 
-## 🚀 Project Vision
+## 🧠 Key Features
 
-contenox (cognitive AI/Agent transformation engine/environment) aims to become a platform for semantic search and user-defined AI agents that operate within specific contexts.
+- **Conversational UI Engine**: Replace buttons and menus with chat-based navigation and slash commands (`/echo`, `/summarize`, `/search`).
+- **RAG-Powered Search & QA**: Ask questions and get answers grounded in your internal knowledge base.
+- **Prompt Chain Automation**: Define repeatable actions using YAML-defined chains of prompts, hooks, and conditions.
+- **Stateful Chat Sessions**: Maintain context across turns with role-based message history.
+- **Command-Driven Interaction**: Use `/echo`, `/summarize`, and custom commands inside chat to trigger powerful actions.
+- **Self-Hosted Infrastructure**: Full control over data and deployment — GDPR-ready and compliant with AI Act standards.
+- **Modular Architecture**: Plug-and-play components for scalable, microservice-friendly design.
+- **Open Core**: Built with Apache 2.0 licensing. Extendable, auditable, and enterprise-ready.
 
-The project's vision is focused on delivering these core features:
+## 📦 What This Enables
 
-- **Document Ingestion**: Upload PDFs, text files, or URLs to build a knowledge base.
-- **Semantic Search**: Search for relevant information within the declared knowledge base.
-- **Contextual Chat Sessions**: Ask questions and get answers grounded in your documents.
-- **Task Handling**: Create templates for repetitive tasks and execute them with user input.
-- **Triggers**: Define conditions that trigger actions based on semantic matches.
-- **Steps**: For complex requests, let the agent split the request into a chain of prompts.
+You now have the foundation to support:
+
+| Use Case | Description |
+|---------|-------------|
+| 📄 **Document QA Interface** | Users ask questions → system retrieves relevant documents → LLM synthesizes answer |
+| 💬 **AI Chat Assistant** | Conversations maintain state, use commands like `/summarize`, `/help` |
+| ⚙️ **Workflow Automation** | Chains define multi-step actions triggered by input or events |
+| 🔍 **Semantic Search Engine** | Natural language queries over embedded documents |
+| 🧩 **Extensible Hook System** | Add new capabilities easily via hooks (`/echo`, `/web`, `/clear`, etc.) |
+| 🛠️ **Low-code Agent Development** | Build and deploy AI agents using YAML configuration only |
 
 ## 🔧 What's Under the Hood
+
 
 contenox combines several technologies to deliver its features:
 
