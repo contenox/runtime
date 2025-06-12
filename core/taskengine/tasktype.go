@@ -113,8 +113,8 @@ type ChainTask struct {
 	// Print optionally formats the output for display/logging.
 	Print string `yaml:"print,omitempty" json:"print,omitempty"`
 
-	// PromptTemplate is the text prompt (with optional template variables) sent to the LLM.
-	PromptTemplate string `yaml:"prompt_template" json:"prompt_template"`
+	// Template is the text prompt (with optional template variables) sent to the LLM.
+	Template string `yaml:"template" json:"template"`
 
 	// Transition defines what to do after this task completes.
 	Transition Transition `yaml:"transition" json:"transition"`

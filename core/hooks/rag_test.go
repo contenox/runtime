@@ -172,11 +172,12 @@ func TestSystemRag(t *testing.T) {
 					},
 				}
 
-				status, result, dataType, err := ragHook.Exec(
+				status, result, dataType, _, err := ragHook.Exec(
 					t.Context(),
 					time.Now().UTC(),
 					tt.query,
 					taskengine.DataTypeString,
+					"",
 					hookCall,
 				)
 

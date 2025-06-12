@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/google/uuid"
@@ -27,21 +24,20 @@ type Service interface {
 }
 
 type service struct {
-	// state      *runtimestate.State
 	dbInstance libdb.DBManager
-	tokenizer  tokenizerservice.Tokenizer
 	manager    *chat.Manager
+	env        taskengine.EnvExecutor
 }
 
 func New(
 	dbInstance libdb.DBManager,
-	tokenizer tokenizerservice.Tokenizer,
 	manager *chat.Manager,
+	env taskengine.EnvExecutor,
 ) Service {
 	return &service{
 		dbInstance: dbInstance,
-		tokenizer:  tokenizer,
 		manager:    manager,
+		env:        env,
 	}
 }
 
@@ -90,59 +86,35 @@ func (s *service) AddInstruction(ctx context.Context, id string, message string)
 }
 
 func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
-	now := time.Now().UTC()
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", 0, 0, err
 	}
 
-	chatHook := hooks.NewChatHook(s.dbInstance, s.manager)
+	// Use raw string as input
+	input := message
 
-	// Append user message
-	status, result, dtype, err := chatHook.Exec(ctx, now, message, taskengine.DataTypeString, &taskengine.HookCall{
-		Type: "append_user_input",
-		Args: map[string]string{
-			"subject_id": subjectID,
-		},
-	})
-	if err != nil || status != taskengine.StatusSuccess {
-		return "", 0, 0, fmt.Errorf("append_user_input failed: %w", err)
+	// Build or load chain definition
+	chain := buildChatChain(subjectID, preferredModelNames)
+
+	// Run the chain using the environment executor
+	result, err := s.env.ExecEnv(ctx, chain, input, taskengine.DataTypeString)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("chain execution failed: %w", err)
 	}
 
-	// Run model inference
-	status, result, dtype, err = chatHook.Exec(ctx, now, result, dtype, &taskengine.HookCall{
-		Type: "execute_chat_model",
-		Args: map[string]string{
-			"models": strings.Join(preferredModelNames, ", "),
-		},
-	})
-	if err != nil || status != taskengine.StatusSuccess {
-		return "", 0, 0, fmt.Errorf("execute_chat_model failed: %w", err)
+	// Extract final assistant message
+	hist, ok := result.(taskengine.ChatHistory)
+	if !ok || len(hist.Messages) == 0 {
+		return "", 0, 0, fmt.Errorf("unexpected result from chain")
 	}
 
-	// Persist messages
-	status, result, _, err = chatHook.Exec(ctx, now, result, dtype, &taskengine.HookCall{
-		Type: "persist_input_output",
-		Args: map[string]string{
-			"subject_id": subjectID,
-		},
-	})
-	if err != nil || status != taskengine.StatusSuccess {
-		return "", 0, 0, fmt.Errorf("persist_input_output failed: %w", err)
+	lastMsg := hist.Messages[len(hist.Messages)-1]
+	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
+		return "", 0, 0, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
 	}
 
-	// Extract the final assistant message
-	history, ok := result.(taskengine.ChatHistory)
-	if !ok || len(history.Messages) == 0 {
-		return "", 0, 0, fmt.Errorf("unexpected result from hooks")
-	}
-
-	lastMsg := history.Messages[len(history.Messages)-1]
-	if lastMsg.Role != "assistant" {
-		return "", 0, 0, fmt.Errorf("expected assistant message, got %q", lastMsg.Role)
-	}
-
-	return lastMsg.Content, history.InputTokens, history.OutputTokens, nil
+	return lastMsg.Content, hist.InputTokens, hist.OutputTokens, nil
 }
 
 // ChatMessage is the public representation of a message in a chat.
@@ -221,6 +193,85 @@ type ModelResult struct {
 	Model      string
 	TokenCount int
 	MaxTokens  int // Max token length for the model.
+}
+
+func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.ChainDefinition {
+	return &taskengine.ChainDefinition{
+		ID:          "chat_chain",
+		Description: "Standard chat processing pipeline with hooks",
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:          "append_user_input",
+				Description: "Append user message to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "append_user_input",
+					Args: map[string]string{
+						"subject_id": subjectID,
+					},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "mux_input"},
+					},
+				},
+			},
+			{
+				ID:          "mux_input",
+				Description: "Check for commands like /echo using Mux",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "mux",
+					Args: map[string]string{
+						"subject_id": subjectID,
+					},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "execute_chat_model"},
+						{
+							Operator: "equals",
+							Value:    "echo",
+							ID:       "persist_input_output",
+						},
+					},
+				},
+			},
+			{
+				ID:              "execute_chat_model",
+				Description:     "Run inference using selected LLM",
+				Type:            taskengine.Hook,
+				PreferredModels: preferredModelNames,
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "persist_input_output"},
+					},
+				},
+				Hook: &taskengine.HookCall{
+					Type: "execute_chat_model",
+					Args: map[string]string{
+						"subject_id": subjectID,
+					},
+				},
+			},
+			{
+				ID:          "persist_input_output",
+				Description: "Persist the conversation",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "persist_input_output",
+					Args: map[string]string{
+						"subject_id": subjectID,
+					},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "end"},
+					},
+				},
+			},
+		},
+	}
 }
 
 func (s *service) GetServiceName() string {

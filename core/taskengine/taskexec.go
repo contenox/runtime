@@ -54,7 +54,9 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)
 	}
-
+	if provider == nil {
+		return "", fmt.Errorf("provider is nil for prompt execution")
+	}
 	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
 		ModelName: provider.ModelName(),
 	}, exe.promptExec.GetRuntime(ctx), resolver)
@@ -137,18 +139,18 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 // It handles prompt-based task types like string, number, score, condition, and range,
 // as well as custom hook invocations.
 func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
-	var rawResponse string
+	var transitionEval string
 	var taskErr error
-	var output any
-	var outputType DataType
+	var output any = input
+	var outputType DataType = dataType
 	switch currentTask.Type {
 	case PromptToString:
 		prompt, ok := input.(string)
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
-		rawResponse, taskErr = exe.Prompt(taskCtx, resolver, prompt)
-		output = rawResponse
+		transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
+		output = transitionEval
 		outputType = DataTypeString
 	case PromptToCondition:
 		var hit bool
@@ -159,7 +161,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, prompt)
 		output = hit
 		outputType = DataTypeBool
-		rawResponse = strconv.FormatBool(hit)
+		transitionEval = strconv.FormatBool(hit)
 	case PromptToNumber:
 		var number int
 		prompt, ok := input.(string)
@@ -169,7 +171,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		number, taskErr = exe.number(taskCtx, resolver, prompt)
 		output = number
 		outputType = DataTypeInt
-		rawResponse = strconv.FormatInt(int64(number), 10)
+		transitionEval = strconv.FormatInt(int64(number), 10)
 	case PromptToScore:
 		var score float64
 		prompt, ok := input.(string)
@@ -179,40 +181,37 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		score, taskErr = exe.score(taskCtx, resolver, prompt)
 		output = score
 		outputType = DataTypeFloat
-		rawResponse = strconv.FormatFloat(score, 'f', 2, 64)
+		transitionEval = strconv.FormatFloat(score, 'f', 2, 64)
 	case PromptToRange:
 		prompt, ok := input.(string)
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
-		rawResponse, taskErr = exe.rang(taskCtx, resolver, prompt)
+		transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
 		outputType = DataTypeString
-		output = rawResponse
+		output = transitionEval
 	case Hook:
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
 		} else {
-			output, outputType, taskErr = exe.hookengine(taskCtx, startingTime, output, DataTypeAny, *currentTask.Hook)
-			rawResponse = fmt.Sprintf("%v", output)
+			output, outputType, transitionEval, taskErr = exe.hookengine(taskCtx, startingTime, output, outputType, transitionEval, currentTask.Hook)
 		}
 	default:
 		taskErr = fmt.Errorf("unknown task type: %w %s", ErrUnsupportedTaskType, currentTask.Type)
 	}
 
-	return output, outputType, rawResponse, taskErr
+	return output, outputType, transitionEval, taskErr
 }
 
-// hookengine is a placeholder for future hook execution support using the hookProvider.
-// Currently unimplemented.
-func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, input any, dataType DataType, hook HookCall) (any, DataType, error) {
-	status, res, dataType, err := exe.hookProvider.Exec(ctx, startingTime, input, dataType, &hook)
+func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, input any, dataType DataType, transition string, hook *HookCall) (any, DataType, string, error) {
+	status, res, dataType, transition, err := exe.hookProvider.Exec(ctx, startingTime, input, dataType, transition, hook)
 	if err != nil {
-		return nil, dataType, err
+		return nil, dataType, "", err
 	}
 	if status != StatusSuccess {
-		return nil, dataType, fmt.Errorf("hook execution failed")
+		return nil, dataType, "", fmt.Errorf("hook execution failed")
 	}
-	return res, dataType, nil
+	return res, dataType, transition, nil
 }
 
 // condition executes a prompt and evaluates its result against a provided condition mapping.

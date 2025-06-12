@@ -16,23 +16,23 @@ type SearchResolve struct {
 }
 
 // Exec implements taskengine.HookRepo.
-func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, args *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, args *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeSearchResults {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("unsupported data type: %v", dataType)
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("unsupported data type: %v", dataType)
 	}
 	in, ok := input.([]taskengine.SearchResult)
 	if !ok {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("SERVER BUG: invalid input type")
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("SERVER BUG: invalid input type")
 	}
 	if len(in) == 0 {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("no results found")
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("no results found")
 	}
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	var distanceF *float32
 	if distance, ok := args.Args["distance"]; ok {
 		conv, err := strconv.ParseFloat(distance, 64)
 		if err != nil {
-			return taskengine.StatusError, nil, dataType, fmt.Errorf("invalid distance: %v", err)
+			return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("invalid distance: %v", err)
 		}
 		a := float32(conv)
 		distanceF = &a
@@ -41,33 +41,33 @@ func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any
 	if positionArg, ok := args.Args["position"]; ok {
 		a, err := strconv.ParseInt(positionArg, 10, 64)
 		if err != nil {
-			return taskengine.StatusError, nil, dataType, fmt.Errorf("invalid position: %v", err)
+			return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("invalid position: %v", err)
 		}
 		position = int(a)
 	}
 	if position >= len(in) {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("position out of range")
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("position out of range")
 	}
 	if distanceF != nil && in[position].Distance > *distanceF {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("distance too large")
+		return taskengine.StatusError, nil, dataType, "", fmt.Errorf("distance too large")
 	}
 
 	file, err := storeInstance.GetFileByID(ctx, in[position].ID)
 	if err != nil {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("failed to get file: %v", err)
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("failed to get file: %v", err)
 	}
 	blob, err := storeInstance.GetBlobByID(ctx, file.ID)
 	if err != nil {
-		return taskengine.StatusError, nil, dataType, fmt.Errorf("failed to get blob: %v", err)
+		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("failed to get blob: %v", err)
 	}
 	if file.Type == "application/json" {
-		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeJSON, nil
+		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeJSON, "application/json", nil
 	}
 	if file.Type == "text/plain" {
-		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeString, nil
+		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeString, "text/plain", nil
 	}
 
-	return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeAny, nil
+	return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeAny, "any", nil
 }
 
 // Supports implements taskengine.HookRepo.

@@ -18,15 +18,15 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(t.Context(), tracker, mockExec)
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:             "task1",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `What is {{.input}}?`,
+				ID:       "task1",
+				Type:     taskengine.PromptToString,
+				Template: `What is {{.input}}?`,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
 						{
@@ -57,11 +57,11 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:             "task1",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `Broken task`,
-				RetryOnError:   1,
-				Transition:     taskengine.Transition{},
+				ID:           "task1",
+				Type:         taskengine.PromptToString,
+				Template:     `Broken task`,
+				RetryOnError: 1,
+				Transition:   taskengine.Transition{},
 			},
 		},
 	}
@@ -85,9 +85,9 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:             "task1",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `{{.input}}`,
+				ID:       "task1",
+				Type:     taskengine.PromptToString,
+				Template: `{{.input}}`,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
 						{Operator: "equals", Value: "continue", ID: "task2"},
@@ -95,9 +95,9 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 				},
 			},
 			{
-				ID:             "task2",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `Follow up`,
+				ID:       "task2",
+				Type:     taskengine.PromptToString,
+				Template: `Follow up`,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
 						{Operator: "equals", Value: "continue", ID: "end"},
@@ -126,17 +126,17 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:             "task1",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `fail`,
+				ID:       "task1",
+				Type:     taskengine.PromptToString,
+				Template: `fail`,
 				Transition: taskengine.Transition{
 					OnError: "task2",
 				},
 			},
 			{
-				ID:             "task2",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `recover`,
+				ID:       "task2",
+				Type:     taskengine.PromptToString,
+				Template: `recover`,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
 						{Operator: "equals", Value: "recovered", ID: "end"},
@@ -164,10 +164,10 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:             "task1",
-				Type:           taskengine.PromptToString,
-				PromptTemplate: `hi {{.input}}`,
-				Print:          `Output: {{.task1}}`,
+				ID:       "task1",
+				Type:     taskengine.PromptToString,
+				Template: `hi {{.input}}`,
+				Print:    `Output: {{.task1}}`,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
 						{Operator: "equals", Value: "printed-value", ID: "end"},

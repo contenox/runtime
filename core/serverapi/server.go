@@ -31,7 +31,6 @@ import (
 	"github.com/contenox/contenox/core/services/indexservice"
 	"github.com/contenox/contenox/core/services/modelservice"
 	"github.com/contenox/contenox/core/services/poolservice"
-	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/core/services/userservice"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libauth"
@@ -51,6 +50,7 @@ func New(
 	state *runtimestate.State,
 	vectorStore vectors.Store,
 	hookRegistry taskengine.HookRegistry,
+	chatManager *chat.Manager,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -97,15 +97,8 @@ func New(
 	backendapi.AddQueueRoutes(mux, config, downloadService)
 	modelService := modelservice.New(dbInstance, config)
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
-	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
-		ServerAddress: config.TokenizerServiceURL,
-	})
-	if err != nil {
-		return nil, cleanup, err
-	}
-	manager := chat.New(state, tokenizerSvc)
 
-	chatService := chatservice.New(dbInstance, tokenizerSvc, manager)
+	chatService := chatservice.New(dbInstance, chatManager, environmentExec)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
 	usersapi.AddUserRoutes(mux, config, userService)

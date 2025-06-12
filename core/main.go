@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
@@ -16,6 +17,7 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
+	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
@@ -124,16 +126,39 @@ func main() {
 			Epsilon: 0.001,
 		},
 	})
+	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
 	rag := hooks.NewRag(embedder, vectorStore, dbInstance)
 	webcall := hooks.NewWebCaller()
-	hookrepo := hooks.NewSimpleHookProvider(map[string]taskengine.HookRepo{
-		"rag":     rag,
-		"webhook": webcall,
+	// Hook instances
+	echocmd := hooks.NewEchoHook()
+	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
+		ServerAddress: config.TokenizerServiceURL,
 	})
-	exec, err := taskengine.NewExec(ctx, execRepo, hookrepo)
+	if err != nil {
+		cleanup()
+		log.Fatalf("initializing tokenizer service failed: %v", err)
+	}
+	chatManager := chat.New(state, tokenizerSvc)
+	chatHook := hooks.NewChatHook(dbInstance, chatManager)
+
+	// Mux for handling commands like /echo
+	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
+		"echo": echocmd,
+	})
+
+	// Combine all hooks into one registry
+	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
+		"rag":                  rag,
+		"webhook":              webcall,
+		"mux":                  hookMux,
+		"append_user_input":    chatHook,
+		"execute_chat_model":   chatHook,
+		"persist_input_output": chatHook,
+	})
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks)
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
@@ -142,7 +167,7 @@ func main() {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hookrepo)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hooks, chatManager)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

@@ -2,6 +2,7 @@ package llmrepo
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/contenox/contenox/core/modelprovider"
 )
@@ -11,6 +12,9 @@ type MockModelRepo struct {
 }
 
 func (m *MockModelRepo) GetProvider(ctx context.Context) (modelprovider.Provider, error) {
+	if m.Provider == nil {
+		return nil, fmt.Errorf("provider is nil for prompt execution")
+	}
 	return m.Provider, nil
 }
 

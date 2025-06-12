@@ -1,7 +1,6 @@
 package hooks_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 )
 
 func TestSystemChatHooks(t *testing.T) {
-	tenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	tenv := testingsetup.New(t.Context(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").
@@ -54,11 +53,12 @@ func TestSystemChatHooks(t *testing.T) {
 		}
 
 		// Execute hook
-		status, result, dataType, err := chatHook.Exec(
+		status, result, dataType, _, err := chatHook.Exec(
 			ctx,
 			time.Now().UTC(),
 			userMessage,
 			taskengine.DataTypeString,
+			"",
 			hookCall,
 		)
 
@@ -80,11 +80,12 @@ func TestSystemChatHooks(t *testing.T) {
 		}
 
 		// Execute hook
-		status, result, dataType, err = chatHook.Exec(
+		status, result, dataType, _, err = chatHook.Exec(
 			ctx,
 			time.Now().UTC(),
 			result,
 			taskengine.DataTypeChatHistory,
+			"",
 			hookCall,
 		)
 
@@ -107,11 +108,12 @@ func TestSystemChatHooks(t *testing.T) {
 		}
 
 		// Execute hook
-		status, result, dataType, err = chatHook.Exec(
+		status, result, dataType, _, err = chatHook.Exec(
 			ctx,
 			time.Now().UTC(),
 			result,
 			taskengine.DataTypeChatHistory,
+			"",
 			hookCall,
 		)
 		// Validate results

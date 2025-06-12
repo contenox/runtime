@@ -46,7 +46,7 @@ var ErrUnsupportedTaskType = errors.New("executor does not support the task type
 // HookRepo defines an interface for external system integrations
 // and to conduct side effects on internal state.
 type HookRepo interface {
-	Exec(ctx context.Context, startingTime time.Time, input any, dataType DataType, args *HookCall) (int, any, DataType, error)
+	Exec(ctx context.Context, startingTime time.Time, input any, dataType DataType, transition string, args *HookCall) (int, any, DataType, string, error)
 	HookRegistry
 }
 
@@ -99,23 +99,21 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	}
 
 	var finalOutput any
-
+	var transitionEval string
+	var output any = input
+	var outputType DataType = dataType
+	var taskErr error
 	for {
 		// Render prompt template
-		var renderedPrompt any
-		renderedPrompt = input
-		var err error
-		if dataType == DataTypeString {
-			renderedPrompt, err = renderTemplate(currentTask.PromptTemplate, vars)
+		if outputType == DataTypeString && currentTask.Template != "" {
+			output, err = renderTemplate(currentTask.Template, vars)
 			if err != nil {
 				return nil, fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
 			}
+			if output == 0 || output == "" {
+				return nil, fmt.Errorf("task %s: template rendered empty string", currentTask.ID)
+			}
 		}
-
-		var rawResponse string
-		var output any
-		var outputType DataType
-		var taskErr error
 
 		maxRetries := max(currentTask.RetryOnError, 0)
 
@@ -141,7 +139,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, outputType, rawResponse, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, renderedPrompt, outputType)
+			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, output, outputType)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
@@ -189,7 +187,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		}
 
 		// Evaluate transitions
-		nextTaskID, err := evaluateTransitions(currentTask.Transition, rawResponse)
+		nextTaskID, err := evaluateTransitions(currentTask.Transition, transitionEval)
 		if err != nil {
 			return nil, fmt.Errorf("task %s: transition error: %v", currentTask.ID, err)
 		}
@@ -216,7 +214,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			"next_task", nextTaskID,
 		)
 		defer endTransition()
-		reportChangeTransition(nextTaskID, nil)
+		reportChangeTransition(nextTaskID, transitionEval)
 
 		// Find next task
 		currentTask, err = findTaskByID(chain.Tasks, nextTaskID)
@@ -240,14 +238,14 @@ func renderTemplate(tmplStr string, vars map[string]any) (string, error) {
 	return buf.String(), nil
 }
 
-func evaluateTransitions(transition Transition, rawResponse string) (string, error) {
+func evaluateTransitions(transition Transition, eval string) (string, error) {
 	// First check explicit matches
 	for _, ct := range transition.Next {
 		if ct.Value == "_default" {
 			continue
 		}
 
-		match, err := compare(ct.Operator, rawResponse, ct.Value)
+		match, err := compare(ct.Operator, eval, ct.Value)
 		if err != nil {
 			return "", err
 		}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/execservice"
 	"github.com/contenox/contenox/core/services/testingsetup"
@@ -38,7 +39,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, taskengine.NewMockHookRegistry())
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks.NewMockHookRegistry())
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
@@ -46,7 +47,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}
-	service := execservice.NewTasksEnv(ctx, env, testenv.GetDBInstance(), taskengine.NewMockHookRegistry())
+	service := execservice.NewTasksEnv(ctx, env, testenv.GetDBInstance(), hooks.NewMockHookRegistry())
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
 	t.Run("simple echo task", func(t *testing.T) {
@@ -57,10 +58,10 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 			MaxTokenSize:    1000,
 			Tasks: []taskengine.ChainTask{
 				{
-					ID:             "echo-task",
-					Description:    "Just echo back the input",
-					Type:           taskengine.PromptToString,
-					PromptTemplate: "echo back the input without any explanation. Input: {{.input}}",
+					ID:          "echo-task",
+					Description: "Just echo back the input",
+					Type:        taskengine.PromptToString,
+					Template:    "echo back the input without any explanation. Input: {{.input}}",
 					Transition: taskengine.Transition{
 						OnError: "",
 						Next: []taskengine.ConditionalTransition{

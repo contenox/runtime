@@ -56,24 +56,25 @@ func WithDefaultHeader(key, value string) WebhookOption {
 }
 
 // Exec implements the HookRepo interface
-func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hook *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hook *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+	transitionEval := transition
 	// Get URL from args
 	rawURL, ok := hook.Args["url"]
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing 'url' argument")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("missing 'url' argument")
 	}
 
 	// Parse URL
 	baseURL, err := url.Parse(rawURL)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid URL: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("invalid URL: %w", err)
 	}
 
 	// Handle query parameters
 	if queryParams, ok := hook.Args["query"]; ok {
 		params, err := url.ParseQuery(queryParams)
 		if err != nil {
-			return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid query parameters: %w", err)
+			return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("invalid query parameters: %w", err)
 		}
 		baseURL.RawQuery = params.Encode()
 	}
@@ -84,7 +85,7 @@ func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, da
 		method = m
 	}
 	if method == "POST" && input == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing input for POST request")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("missing input for POST request")
 	}
 
 	// Prepare request body
@@ -92,7 +93,7 @@ func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, da
 	if method == "POST" {
 		in, ok := input.(string)
 		if !ok {
-			return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid input type for POST request")
+			return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("invalid input type for POST request")
 		}
 		// If input is JSON, send as-is
 		if json.Valid([]byte(in)) {
@@ -105,7 +106,7 @@ func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, da
 			}
 			jsonData, err := json.Marshal(payload)
 			if err != nil {
-				return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to marshal payload: %w", err)
+				return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("failed to marshal payload: %w", err)
 			}
 			body = bytes.NewBuffer(jsonData)
 		}
@@ -114,7 +115,7 @@ func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, da
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, method, baseURL.String(), body)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to create request: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -133,26 +134,27 @@ func (h *WebCaller) Exec(ctx context.Context, startTime time.Time, input any, da
 	// Make the request
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("request failed: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Read response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to read response: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	// Check for success status (2xx)
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		var result interface{}
 		if err := json.Unmarshal(respBody, &result); err == nil {
-			return taskengine.StatusSuccess, result, taskengine.DataTypeAny, nil
+			transitionEval := string(respBody)
+			return taskengine.StatusSuccess, result, taskengine.DataTypeAny, transitionEval, nil
 		}
-		return taskengine.StatusSuccess, string(respBody), taskengine.DataTypeString, nil
+		return taskengine.StatusSuccess, string(respBody), taskengine.DataTypeString, transitionEval, nil
 	}
 
-	return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("webhook failed with status %d: %s", resp.StatusCode, string(respBody))
+	return taskengine.StatusError, nil, taskengine.DataTypeAny, transitionEval, fmt.Errorf("webhook failed with status %d: %s", resp.StatusCode, string(respBody))
 }
 
 func (h *WebCaller) Supports(ctx context.Context) ([]string, error) {

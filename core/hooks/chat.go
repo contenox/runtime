@@ -38,7 +38,7 @@ func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) *Chat {
 
 var _ taskengine.HookRepo = (*Chat)(nil)
 
-func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, *taskengine.HookCall) (int, any, taskengine.DataType, error), error) {
+func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (int, any, taskengine.DataType, string, error), error) {
 	switch name {
 	case "append_user_input":
 		return h.AppendUserInputToChathistory, nil
@@ -52,65 +52,68 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 }
 
 // Exec resolves and runs the hook function based on the provided hook call.
-func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if hookCall.Args == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid hook call: missing type")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("invalid hook call: missing type")
 	}
 	hookFunc, err := h.Get(hookCall.Type)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to get hook function: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("failed to get hook function: %w", err)
 	}
 
-	return hookFunc(ctx, startTime, input, dataType, hookCall)
+	return hookFunc(ctx, startTime, input, dataType, transition, hookCall)
 }
 
 // AppendUserInputToChathistory appends a user message to the current chat history. The subject_id must already exist.
-func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeString {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected string input")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected string input")
 	}
 
 	inputStr, ok := input.(string)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid input type")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+	}
+	if inputStr == "" {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("empty input")
 	}
 
 	// Get subject ID from hook args
 	subjectID, ok := hookCall.Args["subject_id"]
 	if !ok || subjectID == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing subject_id")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("missing subject_id")
 	}
 
 	// Get chat history from DB
 	tx := h.dbInstance.WithoutTransaction()
 	messages, err := h.chatManager.ListMessages(ctx, tx, subjectID)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to load history: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to load history: %w", err)
 	}
 
 	// Append new message
 	updatedMessages, err := h.chatManager.AppendMessage(ctx, messages, inputStr, "user")
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("failed to append message: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to append message: %w", err)
 	}
 
 	history := taskengine.ChatHistory{
 		Messages: updatedMessages,
 	}
 
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, inputStr, nil
 }
 
 // ChatExec invokes the model to generate a response based on chat history.
-func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected chat history got %T %v", input, dataType)
 	}
 
 	history, ok := input.(taskengine.ChatHistory)
 	messages := history.Messages
 	if !ok || len(messages) == 0 {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history")
 	}
 
 	models := []string{}
@@ -124,7 +127,7 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 	// Process through LLM
 	responseMessage, inputTokens, outputTokens, err := h.chatManager.ChatExec(ctx, messages, 0, models...) // TODO: pass context length
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("chat failed: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("chat failed: %w", err)
 	}
 
 	// Append response to history
@@ -134,25 +137,25 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
 	}
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, responseMessage.Content, nil
 }
 
 // PersistMessages saves the most recent user and assistant messages to the database.
-func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, error) {
+func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("expected chat history")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected chat history")
 	}
 
 	history, ok := input.(taskengine.ChatHistory)
 	messages := history.Messages
 	if !ok || len(messages) < 2 {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("invalid chat history")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history")
 	}
 
 	// Get subject ID from args
 	subjectID, ok := hookCall.Args["subject_id"]
 	if !ok || subjectID == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("missing subject_id")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("missing subject_id")
 	}
 
 	// Get transaction from DB
@@ -164,8 +167,8 @@ func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input a
 		&messages[len(messages)-1], // Assistant message
 	)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, fmt.Errorf("persist failed: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("persist failed: %w", err)
 	}
 	history.Messages = messages
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, nil
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, messages[len(messages)-1].Content, nil
 }

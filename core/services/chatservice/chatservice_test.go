@@ -1,22 +1,26 @@
 package chatservice_test
 
 import (
+	"log"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
+	"github.com/contenox/contenox/core/hooks"
+	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/chatservice"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 )
 
 func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(t.Context(), serverops.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").
@@ -36,8 +40,32 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 	tokenizer := tokenizerservice.MockTokenizer{}
 	manager := chat.New(backendState, tokenizer)
+	chatHook := hooks.NewChatHook(dbInstance, manager)
+	echocmd := hooks.NewEchoHook()
+
+	// Mux for handling commands like /echo
+	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
+		"echo": echocmd,
+	})
+
+	// Combine all hooks into one registry
+	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
+		"mux":                  hookMux,
+		"append_user_input":    chatHook,
+		"execute_chat_model":   chatHook,
+		"persist_input_output": chatHook,
+	})
+
+	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks)
+	if err != nil {
+		log.Fatalf("initializing task engine engine failed: %v", err)
+	}
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec)
+	if err != nil {
+		log.Fatalf("initializing task engine failed: %v", err)
+	}
 	t.Run("creating new chat instance", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, tokenizer, manager)
+		manager := chatservice.New(dbInstance, manager, environmentExec)
 
 		// Test valid model
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
@@ -46,7 +74,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("simple chat interaction tests", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, tokenizer, manager)
+		manager := chatservice.New(dbInstance, manager, environmentExec)
 
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
 		require.NoError(t, err)
@@ -57,8 +85,20 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		require.Contains(t, responseLower, "london")
 	})
 
+	t.Run("simple echo command interaction tests", func(t *testing.T) {
+		manager := chatservice.New(dbInstance, manager, environmentExec)
+
+		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
+		require.NoError(t, err)
+		response, _, _, err := manager.Chat(ctx, id, "/echo hello world! 123", "smollm2:135m")
+		require.NoError(t, err)
+		responseLower := strings.ToLower(response)
+		println(responseLower)
+		require.Equal(t, responseLower, "hello world! 123")
+	})
+
 	t.Run("test chat history via interactions", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, tokenizer, manager)
+		manager := chatservice.New(dbInstance, manager, environmentExec)
 
 		// Create new chat instance
 		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
@@ -130,7 +170,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, tokenizer, manager)
+		manager := chatservice.New(dbInstance, manager, environmentExec)
 
 		model := "smollm2:135m"
 		subject := "user-long-convo"

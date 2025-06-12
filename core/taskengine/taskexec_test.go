@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/modelprovider"
@@ -31,7 +32,7 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Provider: mockProvider,
 	}
 
-	exec, err := taskengine.NewExec(context.Background(), mockRepo, taskengine.NewMockHookRegistry())
+	exec, err := taskengine.NewExec(context.Background(), mockRepo, hooks.NewMockHookRegistry())
 	require.NoError(t, err)
 
 	task := &taskengine.ChainTask{
@@ -69,7 +70,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, &taskengine.MockHookRepo{})
+	exec, err := taskengine.NewExec(ctx, execRepo, &hooks.MockHookRepo{})
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}

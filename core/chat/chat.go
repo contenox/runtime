@@ -132,8 +132,8 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, co
 	if len(messages) == 0 {
 		return nil, 0, 0, errors.New("no messages provided")
 	}
-	if messages[len(messages)-1].Role != "user" {
-		return nil, 0, 0, errors.New("last message must be from user")
+	if messages[len(messages)-1].Role != "user" && messages[len(messages)-1].Role != "system" {
+		return nil, 0, 0, fmt.Errorf("last message must be from user or system was %v", messages[len(messages)-1].Role)
 	}
 	inputtokens := 0
 	convertedMessage := make([]api.Message, len(messages))
