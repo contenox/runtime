@@ -129,7 +129,7 @@ func main() {
 	}
 	rag := hooks.NewRag(embedder, vectorStore, dbInstance)
 	webcall := hooks.NewWebCaller()
-	hookrepo := taskengine.NewSimpleHookProvider(map[string]taskengine.HookRepo{
+	hookrepo := hooks.NewSimpleHookProvider(map[string]taskengine.HookRepo{
 		"rag":     rag,
 		"webhook": webcall,
 	})
