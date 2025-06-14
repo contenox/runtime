@@ -173,30 +173,47 @@ func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption
 
 var (
 	modelContextLengths = map[string]int{
-		"smollm2:135m":    100000, // TODO: check if it's correct
-		"llama2":          4096,
-		"llama3":          8192,
-		"mistral":         8192,  // Mistral 7B
-		"mixtral":         32768, // Mixtral 8x7B
-		"phi":             2048,  // Phi-2
-		"codellama":       16384, // CodeLlama 34B
-		"gemma":           8192,  // Gemma 2B/7B
-		"openhermes":      4096,  // Based on OpenChat or Mistral
-		"notux":           4096,  // Notux (fine-tuned Mistral)
-		"llava":           8192,  // LLaVA (multimodal, Mistral-based)
-		"deepseek":        8192,  // DeepSeek-Coder
-		"qwen":            8192,  // Qwen 7B
-		"zephyr":          8192,  // Zephyr 7B (based on Mistral)
-		"neural-chat":     8192,  // Intel fine-tuned LLM
-		"dolphin-mixtral": 32768, // Mixtral fine-tune
-		"qwen2.5:0.5b":    4128,  //TODO:check
+		"smollm2:135m":       100000,
+		"llama2":             4096,
+		"llama3":             8192,
+		"llama3-70b":         8192,
+		"mistral":            8192,
+		"mixtral":            32768,
+		"phi":                2048,
+		"codellama":          16384,
+		"codellama:34b-100k": 100000,
+		"gemma":              8192,
+		"openhermes":         4096,
+		"notux":              4096,
+		"llava":              8192,
+		"deepseek":           8192,
+		"qwen":               8192,
+		"qwen2":              8192,
+		"zephyr":             8192,
+		"neural-chat":        8192,
+		"dolphin-mixtral":    32768,
+		"qwen2.5:0.5b":       4128,
+		"qwen2.5:1.5b":       8192,
 		"paraphrase-multilingual:278m-mpnet-base-v2-fp16": 278,
+		"llama2-uncensored":   4096,
+		"llama2-70b":          4096,
+		"llama2-70b-chat":     4096,
+		"llama3-instruct":     8192,
+		"llama3-70b-instruct": 8192,
+		"vicuna":              4096,  // Based on Llama2
+		"guanaco":             4096,  // Based on Llama2
+		"koala":               4096,  // Based on Llama
+		"wizardlm":            4096,  // Based on Llama
+		"airoboros":           4096,  // Llama-based
+		"open-orca":           8192,  // Based on Llama3
+		"yi":                  32768, // Yi Llama-based large context
 	}
 
 	modelContextLengthsFullNames = map[string]int{
 		"smollm2:135m":       100000, // TODO: check if it's correct:30m
 		"codellama:34b-100k": 100000,
-		"mixtral-8x7b":       32768}
+		"mixtral-8x7b":       32768,
+	}
 
 	canChat = map[string]bool{
 		"llama2": true, "llama3": true, "mistral": true,
@@ -204,7 +221,7 @@ var (
 		"gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
-		"smollm2:135m": true,
+		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true,
 	}
 
 	canEmbed = map[string]bool{
@@ -214,11 +231,34 @@ var (
 		"granite-embedding:30m": true,
 		"nomic-embed-text":      true,
 		"paraphrase-multilingual:278m-mpnet-base-v2-fp16": true,
+		"llama3":              true, // TODO Check if that's correct
+		"codellama":           true, // TODO Check if that's correct
+		"gemma":               true, // TODO Check if that's correct
+		"mistral":             true, // TODO Check if that's correct
+		"llama3-instruct":     true, // TODO Check if that's correct
+		"llama3-70b-instruct": true, // TODO Check if that's correct
+		"open-orca":           true, // TODO Check if that's correct
+		"yi":                  true, // TODO Check if that's correct
 	}
 
 	canPrompt = map[string]bool{
-		// "qwen2.5":      true,
-		// "qwen2.5:0.5b": true,
+		"llama2":              true,
+		"llama3":              true,
+		"mistral":             true,
+		"codellama":           true,
+		"gemma":               true,
+		"qwen":                true,
+		"deepseek":            true,
+		"vicuna":              true,
+		"guanaco":             true,
+		"wizardlm":            true,
+		"airoboros":           true,
+		"llama2-70b":          true,
+		"llama2-70b-chat":     true,
+		"llama3-instruct":     true,
+		"llama3-70b-instruct": true,
+		"open-orca":           true,
+		"yi":                  true,
 	}
 
 	canStreaming = map[string]bool{
@@ -227,6 +267,19 @@ var (
 		"gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
+		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true,
+		"llama2-uncensored":   true,
+		"llama2-70b":          true,
+		"llama2-70b-chat":     true,
+		"llama3-instruct":     true,
+		"llama3-70b-instruct": true,
+		"vicuna":              true,
+		"guanaco":             true,
+		"koala":               true,
+		"wizardlm":            true,
+		"airoboros":           true,
+		"open-orca":           true,
+		"yi":                  true,
 	}
 )
 

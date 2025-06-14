@@ -14,7 +14,7 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 )
 
-type Rag struct {
+type Search struct {
 	embedder     llmrepo.ModelRepo
 	vectorsStore vectors.Store
 	dbInstance   libdb.DBManager
@@ -24,23 +24,23 @@ func NewRag(
 	embedder llmrepo.ModelRepo,
 	vectorsStore vectors.Store,
 	dbInstance libdb.DBManager,
-) *Rag {
-	return &Rag{
+) *Search {
+	return &Search{
 		embedder:     embedder,
 		vectorsStore: vectorsStore,
 		dbInstance:   dbInstance,
 	}
 }
 
-var _ taskengine.HookRepo = (*Rag)(nil)
+var _ taskengine.HookRepo = (*Search)(nil)
 
 // Supports returns the list of hook names this provider supports.
-func (h *Rag) Supports(ctx context.Context) ([]string, error) {
-	return []string{"rag"}, nil
+func (h *Search) Supports(ctx context.Context) ([]string, error) {
+	return []string{"search"}, nil
 }
 
-// Exec executes the "rag" hook by performing a vector search based on the input string.
-func (h *Rag) Exec(
+// Exec executes the "search" hook by performing a vector search based on the input string.
+func (h *Search) Exec(
 	ctx context.Context,
 	startTime time.Time,
 	input any,

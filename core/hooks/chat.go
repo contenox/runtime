@@ -23,6 +23,7 @@ type Chat struct {
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		"append_user_input",
+		"append_instruction",
 		"execute_chat_model",
 		"persist_input_output",
 	}, nil

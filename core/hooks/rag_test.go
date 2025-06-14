@@ -70,7 +70,7 @@ func TestSystemRag(t *testing.T) {
 	if len(supports) != 1 {
 		t.Fatal("registry returns wrong number of hooks")
 	}
-	if supports[0] != "rag" {
+	if supports[0] != "search" {
 		t.Fatal("registry returns wrong hook name")
 	}
 	// populate the vector store
@@ -164,7 +164,7 @@ func TestSystemRag(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				hookCall := &taskengine.HookCall{
-					Type: "rag",
+					Type: "search",
 					Args: map[string]string{
 						"top_k":   tt.topK,
 						"epsilon": tt.epsilon,
