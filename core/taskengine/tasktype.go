@@ -171,6 +171,48 @@ type SearchResult struct {
 
 type ChatHistory struct {
 	Messages     []serverops.Message `json:"messages"`
+	Model        string              `json:"model"`
 	InputTokens  int                 `json:"inputTokens"`
 	OutputTokens int                 `json:"outputTokens"`
+}
+
+type OpenAIChatRequest struct {
+	Model            string                     `json:"model"`
+	Messages         []OpenAIChatRequestMessage `json:"messages"`
+	MaxTokens        int                        `json:"max_tokens,omitempty"`
+	Temperature      float64                    `json:"temperature,omitempty"`
+	TopP             float64                    `json:"top_p,omitempty"`
+	Stop             []string                   `json:"stop,omitempty"`
+	N                int                        `json:"n,omitempty"`
+	Stream           bool                       `json:"stream,omitempty"`
+	PresencePenalty  float64                    `json:"presence_penalty,omitempty"`
+	FrequencyPenalty float64                    `json:"frequency_penalty,omitempty"`
+	User             string                     `json:"user,omitempty"`
+}
+
+type OpenAIChatRequestMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type OpenAIChatResponse struct {
+	ID                string                     `json:"id"`
+	Object            string                     `json:"object"`
+	Created           int64                      `json:"created"`
+	Model             string                     `json:"model"`
+	Choices           []OpenAIChatResponseChoice `json:"choices"`
+	Usage             OpenAITokenUsage           `json:"usage"`
+	SystemFingerprint string                     `json:"system_fingerprint,omitempty"`
+}
+
+type OpenAIChatResponseChoice struct {
+	Index        int                      `json:"index"`
+	Message      OpenAIChatRequestMessage `json:"message"`
+	FinishReason string                   `json:"finish_reason"`
+}
+
+type OpenAITokenUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }

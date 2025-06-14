@@ -128,12 +128,12 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 //   - Assistant response message
 //   - Number of input tokens
 //   - Number of output tokens
-func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, int, error) {
+func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, preferredModelNames ...string) (*serverops.Message, int, int, string, error) {
 	if len(messages) == 0 {
-		return nil, 0, 0, errors.New("no messages provided")
+		return nil, 0, 0, "", errors.New("no messages provided")
 	}
 	if messages[len(messages)-1].Role != "user" && messages[len(messages)-1].Role != "system" {
-		return nil, 0, 0, fmt.Errorf("last message must be from user or system was %v", messages[len(messages)-1].Role)
+		return nil, 0, 0, "", fmt.Errorf("last message must be from user or system was %v", messages[len(messages)-1].Role)
 	}
 	inputtokens := 0
 	convertedMessage := make([]api.Message, len(messages))
@@ -145,30 +145,30 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, co
 		var err error
 		inputtokens, err = m.tokenizer.CountTokens(ctx, "phi-3", msg.Content)
 		if err != nil {
-			return nil, 0, 0, fmt.Errorf("failed to count tokens %w", err)
+			return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
 		}
 
 	}
-	chatClient, err := llmresolver.Chat(ctx, llmresolver.Request{
+	chatClient, model, err := llmresolver.Chat(ctx, llmresolver.Request{
 		ContextLength: contextLength,
 		ModelNames:    preferredModelNames,
 	}, modelprovider.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to resolve backend %w", err)
+		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
 	}
 	responseMessage, err := chatClient.Chat(ctx, messages)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to chat %w", err)
+		return nil, 0, 0, "", fmt.Errorf("failed to chat %w", err)
 	}
 	outputtokens, err := m.tokenizer.CountTokens(ctx, "phi-3", responseMessage.Content)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("failed to count tokens %w", err)
+		return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
 	}
 	assistantMsgData := serverops.Message{
 		Role:    responseMessage.Role,
 		Content: responseMessage.Content,
 	}
-	return &assistantMsgData, inputtokens, outputtokens, nil
+	return &assistantMsgData, inputtokens, outputtokens, model, nil
 }
 
 // CalculateContextSize estimates the token count for the chat prompt history.

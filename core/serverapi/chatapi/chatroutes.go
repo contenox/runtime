@@ -7,22 +7,23 @@ import (
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/chatservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/google/uuid"
 )
 
 func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatservice.Service, stateService *runtimestate.State) {
-	h := &chatManagerHandler{manager: chatManager, stateService: stateService}
+	h := &chatManagerHandler{service: chatManager, stateService: stateService}
 
 	mux.HandleFunc("POST /chats", h.createChat)
 	mux.HandleFunc("POST /chats/{id}/chat", h.chat)
-	// mux.HandleFunc("POST /chats/{id}/chat/{model}", h.chat)
+	mux.HandleFunc("POST /v1/chat/completions", h.openAIChatCompletions)
 	mux.HandleFunc("POST /chats/{id}/instruction", h.addInstruction)
 	mux.HandleFunc("GET /chats/{id}", h.history)
 	mux.HandleFunc("GET /chats", h.listChats)
 }
 
 type chatManagerHandler struct {
-	manager      chatservice.Service
+	service      chatservice.Service
 	stateService *runtimestate.State
 }
 
@@ -39,7 +40,7 @@ func (h *chatManagerHandler) createChat(w http.ResponseWriter, r *http.Request) 
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
-	chatID, err := h.manager.NewInstance(ctx, req.Subject, req.Model)
+	chatID, err := h.service.NewInstance(ctx, req.Subject, req.Model)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -70,7 +71,7 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = h.manager.AddInstruction(ctx, chatID.String(), req.Instruction)
+	err = h.service.AddInstruction(ctx, chatID.String(), req.Instruction)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -81,13 +82,13 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 }
 
 type chatRequest struct {
-	Message string `json:"message"`
+	Message string   `json:"message"`
+	Models  []string `json:"models"`
 }
 
 func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
-	// model := r.PathValue("model")
 	chatID, err := uuid.Parse(idStr)
 	if err != nil {
 		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.ServerOperation)
@@ -100,7 +101,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, _, _, err := h.manager.Chat(ctx, chatID.String(), req.Message)
+	reply, _, _, err := h.service.Chat(ctx, chatID.String(), req.Message, req.Models...)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -109,6 +110,30 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{
 		"response": reply,
 	}
+	_ = serverops.Encode(w, r, http.StatusOK, resp)
+}
+
+func (h *chatManagerHandler) openAIChatCompletions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	oaiReq, err := serverops.Decode[taskengine.OpenAIChatRequest](r)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		return
+	}
+
+	// Validate at least one message exists
+	if len(oaiReq.Messages) == 0 {
+		_ = serverops.Error(w, r, fmt.Errorf("at least one message required"), serverops.CreateOperation)
+		return
+	}
+
+	resp, err := h.service.OpenAIChatCompletions(ctx, oaiReq)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		return
+	}
+
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }
 
@@ -121,7 +146,7 @@ func (h *chatManagerHandler) history(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	history, err := h.manager.GetChatHistory(ctx, chatID.String())
+	history, err := h.service.GetChatHistory(ctx, chatID.String())
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.GetOperation)
 		return
@@ -131,7 +156,7 @@ func (h *chatManagerHandler) history(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *chatManagerHandler) listChats(w http.ResponseWriter, r *http.Request) {
-	chats, err := h.manager.ListChats(r.Context())
+	chats, err := h.service.ListChats(r.Context())
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.ListOperation)
 		return

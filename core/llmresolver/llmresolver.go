@@ -210,16 +210,21 @@ func Chat(
 	req Request,
 	getModels modelprovider.RuntimeState,
 	resolver Policy,
-) (serverops.LLMChatClient, error) {
+) (serverops.LLMChatClient, string, error) {
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return provider.GetChatConnection(backend)
+	modelName := provider.ModelName()
+	client, err := provider.GetChatConnection(backend)
+	if err != nil {
+		return nil, "", err
+	}
+	return client, modelName, nil
 }
 
 type EmbedRequest struct {

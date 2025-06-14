@@ -8,7 +8,6 @@ def test_create_backend(base_url, admin_session):
         "name": "Test backend",
         "baseUrl": "http://backend.example.com",
         "type": "Ollama",
-        "model": "testmodel",
     }
     response = requests.post(f"{base_url}/backends", json=payload, headers=headers)
     assert_status_code(response, 201)

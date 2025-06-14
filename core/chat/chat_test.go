@@ -106,7 +106,7 @@ func TestManagerSystem(t *testing.T) {
 			{Role: "user", Content: userMessage},
 		}
 
-		resp, inputTokens, outputTokens, err := manager.ChatExec(ctx, history, 4096, "smollm2:135m")
+		resp, inputTokens, outputTokens, _, err := manager.ChatExec(ctx, history, 4096, "smollm2:135m")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		require.Greater(t, inputTokens, 0)
@@ -116,7 +116,7 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("ChatExec_fails_when_no_messages_given", func(t *testing.T) {
-		resp, _, _, err := manager.ChatExec(ctx, nil, 4096, "smollm2:135m")
+		resp, _, _, _, err := manager.ChatExec(ctx, nil, 4096, "smollm2:135m")
 		require.Error(t, err)
 		require.Nil(t, resp)
 		require.EqualError(t, err, "no messages provided")
@@ -126,7 +126,7 @@ func TestManagerSystem(t *testing.T) {
 		history := []serverops.Message{
 			{Role: "assistant", Content: "I don't know."},
 		}
-		resp, _, _, err := manager.ChatExec(ctx, history, 4096, "smollm2:135m")
+		resp, _, _, _, err := manager.ChatExec(ctx, history, 4096, "smollm2:135m")
 		require.Error(t, err)
 		require.Nil(t, resp)
 		require.EqualError(t, err, "last message must be from user")

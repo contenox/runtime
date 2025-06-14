@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/core/taskengine"
 )
 
 type activityTrackerDecorator struct {
@@ -111,6 +112,11 @@ func (d *activityTrackerDecorator) ListChats(ctx context.Context) ([]ChatSession
 	}
 
 	return sessions, err
+}
+
+// OpenAIChatCompletions implements Service.
+func (d *activityTrackerDecorator) OpenAIChatCompletions(ctx context.Context, req taskengine.OpenAIChatRequest) (*taskengine.OpenAIChatResponse, error) {
+	panic("unimplemented")
 }
 
 func (d *activityTrackerDecorator) GetServiceName() string {

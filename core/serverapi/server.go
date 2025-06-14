@@ -98,7 +98,7 @@ func New(
 	modelService := modelservice.New(dbInstance, config)
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
 
-	chatService := chatservice.New(dbInstance, chatManager, environmentExec)
+	chatService := chatservice.New(dbInstance, environmentExec)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
 	usersapi.AddUserRoutes(mux, config, userService)

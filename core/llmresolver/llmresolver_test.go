@@ -77,7 +77,7 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				return tt.providers, nil
 			}
 
-			_, err := llmresolver.Chat(context.Background(), tt.req, getModels, llmresolver.Randomly)
+			_, _, err := llmresolver.Chat(context.Background(), tt.req, getModels, llmresolver.Randomly)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("got error %v, want %v", err, tt.wantErr)
 			}

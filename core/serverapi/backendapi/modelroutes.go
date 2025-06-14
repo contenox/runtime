@@ -17,6 +17,7 @@ func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService models
 
 	mux.HandleFunc("POST /models", s.append)
 	mux.HandleFunc("GET /models", s.list)
+	// mux.HandleFunc("GET /v1/models/{model}", s.modelDetails) // TODO: Implement model details endpoint
 	mux.HandleFunc("DELETE /models/{model}", s.delete)
 }
 
@@ -46,13 +47,42 @@ func (s *service) append(w http.ResponseWriter, r *http.Request) {
 func (s *service) list(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	models, err := s.service.List(ctx)
+	// Get internal models
+	internalModels, err := s.service.List(ctx)
 	if err != nil {
-		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		serverops.Error(w, r, err, serverops.ListOperation)
 		return
 	}
 
-	_ = serverops.Encode(w, r, http.StatusOK, models)
+	type OpenAIModel struct {
+		ID      string `json:"id"`
+		Object  string `json:"object"`
+		Created int64  `json:"created"`
+		OwnedBy string `json:"owned_by"`
+	}
+
+	type ListResponse struct {
+		Object string        `json:"object"`
+		Data   []OpenAIModel `json:"data"`
+	}
+
+	openAIModels := make([]OpenAIModel, len(internalModels))
+
+	for i, m := range internalModels {
+		openAIModels[i] = OpenAIModel{
+			ID:      m.Model,
+			Object:  "model",
+			Created: m.CreatedAt.Unix(),
+			OwnedBy: "system",
+		}
+	}
+
+	response := ListResponse{
+		Object: "list",
+		Data:   openAIModels,
+	}
+
+	serverops.Encode(w, r, http.StatusOK, response)
 }
 
 func (s *service) delete(w http.ResponseWriter, r *http.Request) {

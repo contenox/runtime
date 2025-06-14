@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
+	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/google/uuid"
 )
 
 // Chat implements taskengine.HookRepo and manages chat-related hooks.
@@ -23,9 +25,11 @@ type Chat struct {
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		"append_user_input",
+		"openai_to_history",
 		"append_instruction",
 		"execute_chat_model",
 		"persist_input_output",
+		"history_to_openAI_response",
 	}, nil
 }
 
@@ -43,10 +47,14 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 	switch name {
 	case "append_user_input":
 		return h.AppendUserInputToChathistory, nil
+	case "openai_to_history":
+		return h.AppendOpenAIChatToChathistory, nil
 	case "append_instruction":
 		return h.AppendInstructionToChathistory, nil
 	case "execute_chat_model":
 		return h.ChatExec, nil
+	case "history_to_openAI_response":
+		return h.ConvertToOpenAIResponse, nil
 	case "persist_input_output":
 		return h.PersistMessages, nil
 	default:
@@ -105,6 +113,29 @@ func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.
 	}
 
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, inputStr, nil
+}
+
+func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+	if dataType != taskengine.DataTypeOpenAIChat {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected OpenAI chat input")
+	}
+
+	openAIHistory, ok := input.(taskengine.OpenAIChatRequest)
+	if !ok {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+	}
+	history := taskengine.ChatHistory{
+		Messages: []serverops.Message{},
+	}
+
+	for _, oarm := range openAIHistory.Messages {
+		history.Messages = append(history.Messages, serverops.Message{
+			Role:    oarm.Role,
+			Content: oarm.Content,
+		})
+	}
+
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, "appended", nil
 }
 
 // AppendInstructionToChathistory appends a system message to the current chat history. The subject_id must already exist.
@@ -168,7 +199,7 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 	}
 
 	// Process through LLM
-	responseMessage, inputTokens, outputTokens, err := h.chatManager.ChatExec(ctx, messages, 0, models...) // TODO: pass context length
+	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, 0, models...) // TODO: pass context length
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("chat failed: %w", err)
 	}
@@ -179,8 +210,70 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 		Messages:     updatedMessages,
 		InputTokens:  inputTokens,
 		OutputTokens: outputTokens,
+		Model:        model,
 	}
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, responseMessage.Content, nil
+}
+
+func (h *Chat) ConvertToOpenAIResponse(
+	ctx context.Context,
+	startTime time.Time,
+	input any,
+	dataType taskengine.DataType,
+	transition string,
+	hookCall *taskengine.HookCall,
+) (int, any, taskengine.DataType, string, error) {
+	if dataType != taskengine.DataTypeChatHistory {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+			fmt.Errorf("expected chat history, got %v", dataType)
+	}
+
+	history, ok := input.(taskengine.ChatHistory)
+	if !ok {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+			fmt.Errorf("invalid input type: expected ChatHistory")
+	}
+
+	// Find the last assistant message
+	var lastAsstMessage *serverops.Message
+	for i := len(history.Messages) - 1; i >= 0; i-- {
+		if history.Messages[i].Role == "assistant" {
+			lastAsstMessage = &history.Messages[i]
+			break
+		}
+	}
+
+	if lastAsstMessage == nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+			fmt.Errorf("no assistant message found in history")
+	}
+
+	// Build OpenAI response
+	resp := taskengine.OpenAIChatResponse{
+		ID:      "chatcmpl-" + uuid.New().String(), // TODO: Implement ID generation
+		Object:  "chat.completion",
+		Created: time.Now().Unix(),
+		Model:   history.Model,
+		Choices: []taskengine.OpenAIChatResponseChoice{
+			{
+				Index: 0,
+				Message: taskengine.OpenAIChatRequestMessage{
+					Role:    lastAsstMessage.Role,
+					Content: lastAsstMessage.Content,
+				},
+				FinishReason: "stop",
+			},
+		},
+		Usage: taskengine.OpenAITokenUsage{
+			PromptTokens:     history.InputTokens,
+			CompletionTokens: history.OutputTokens,
+			TotalTokens:      history.InputTokens + history.OutputTokens,
+		},
+		SystemFingerprint: "fp_" + uuid.New().String()[:8],
+	}
+
+	return taskengine.StatusSuccess, resp, taskengine.DataTypeOpenAIChatResponse,
+		"converted history to OpenAI response", nil
 }
 
 // PersistMessages saves the most recent user and assistant messages to the database.

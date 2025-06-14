@@ -31,6 +31,8 @@ const (
 	DataTypeSearchResults
 	DataTypeJSON
 	DataTypeChatHistory
+	DataTypeOpenAIChat
+	DataTypeOpenAIChatResponse
 )
 
 // EnvExecutor defines an environment that can execute a ChainDefinition with input.

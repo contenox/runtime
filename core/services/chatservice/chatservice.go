@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/taskengine"
@@ -20,7 +19,12 @@ type Service interface {
 	ListChats(ctx context.Context) ([]ChatSession, error)
 	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
+	OpenAIChat
 	serverops.ServiceMeta
+}
+
+type OpenAIChat interface {
+	OpenAIChatCompletions(ctx context.Context, req taskengine.OpenAIChatRequest) (*taskengine.OpenAIChatResponse, error)
 }
 
 type service struct {
@@ -30,7 +34,6 @@ type service struct {
 
 func New(
 	dbInstance libdb.DBManager,
-	manager *chat.Manager,
 	env taskengine.EnvExecutor,
 ) Service {
 	return &service{
@@ -291,6 +294,88 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 					Type: "persist_input_output",
 					Args: map[string]string{
 						"subject_id": subjectID,
+					},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "end"},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.OpenAIChatRequest) (*taskengine.OpenAIChatResponse, error) {
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
+		return nil, err
+	}
+
+	// Build chain with subject ID and model
+	chain := buildOpenAIChatChain(req.Model)
+
+	// Use correct data type
+	result, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
+	if err != nil {
+		return nil, fmt.Errorf("chain execution failed: %w", err)
+	}
+
+	if result == nil {
+		return nil, fmt.Errorf("empty result from chain")
+	}
+
+	// Correct type assertion
+	res, ok := result.(*taskengine.OpenAIChatResponse)
+	if !ok {
+		return nil, fmt.Errorf("invalid result type: %T", result)
+	}
+
+	return res, nil
+}
+
+func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
+	return &taskengine.ChainDefinition{
+		ID:          "openai_chat_chain",
+		Description: "OpenAI Style chat processing pipeline with hooks",
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:          "openai_to_history",
+				Description: "Convert OpenAI request to internal history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "openai_to_history",
+					Args: map[string]string{},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "execute_chat_model"},
+					},
+				},
+			},
+			{
+				ID:              "execute_chat_model",
+				Description:     "Run inference using selected LLM",
+				Type:            taskengine.Hook,
+				PreferredModels: []string{model},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "history_to_openAI_response"},
+					},
+				},
+				Hook: &taskengine.HookCall{
+					Type: "execute_chat_model",
+					Args: map[string]string{},
+				},
+			},
+			{
+				ID:          "history_to_openAI_response",
+				Description: "Convert chat history to OpenAI response",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "history_to_openAI_response",
+					Args: map[string]string{
+						"model": model,
 					},
 				},
 				Transition: taskengine.Transition{
