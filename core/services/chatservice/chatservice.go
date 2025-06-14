@@ -25,7 +25,6 @@ type Service interface {
 
 type service struct {
 	dbInstance libdb.DBManager
-	manager    *chat.Manager
 	env        taskengine.EnvExecutor
 }
 
@@ -36,7 +35,6 @@ func New(
 ) Service {
 	return &service{
 		dbInstance: dbInstance,
-		manager:    manager,
 		env:        env,
 	}
 }
@@ -76,13 +74,21 @@ func (s *service) NewInstance(ctx context.Context, subject string, preferredMode
 
 // AddInstruction adds a system instruction to an existing chat instance.
 // This method requires admin panel permissions.
-func (s *service) AddInstruction(ctx context.Context, id string, message string) error {
+func (s *service) AddInstruction(ctx context.Context, subjectID string, message string) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
 
-	return s.manager.AddInstruction(ctx, tx, id, message)
+	// Build or load chain definition
+	chain := buildAppendInstruction(subjectID)
+
+	// Run the chain using the environment executor
+	_, err := s.env.ExecEnv(ctx, chain, message, taskengine.DataTypeString)
+	if err != nil {
+		return fmt.Errorf("chain execution failed: %w", err)
+	}
+	return nil
 }
 
 func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
@@ -193,6 +199,29 @@ type ModelResult struct {
 	Model      string
 	TokenCount int
 	MaxTokens  int // Max token length for the model.
+}
+
+func buildAppendInstruction(subjectID string) *taskengine.ChainDefinition {
+	return &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:          "append_instruction",
+				Description: "Append instruction message to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "append_instruction",
+					Args: map[string]string{
+						"subject_id": subjectID,
+					},
+				},
+				Transition: taskengine.Transition{
+					Next: []taskengine.ConditionalTransition{
+						{Value: "_default", ID: "end"},
+					},
+				},
+			},
+		},
+	}
 }
 
 func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.ChainDefinition {

@@ -42,6 +42,8 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 	switch name {
 	case "append_user_input":
 		return h.AppendUserInputToChathistory, nil
+	case "append_instruction":
+		return h.AppendInstructionToChathistory, nil
 	case "execute_chat_model":
 		return h.ChatExec, nil
 	case "persist_input_output":
@@ -99,6 +101,46 @@ func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.
 
 	history := taskengine.ChatHistory{
 		Messages: updatedMessages,
+	}
+
+	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, inputStr, nil
+}
+
+// AppendInstructionToChathistory appends a system message to the current chat history. The subject_id must already exist.
+func (h *Chat) AppendInstructionToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+	if dataType != taskengine.DataTypeString {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected string input")
+	}
+
+	inputStr, ok := input.(string)
+	if !ok {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+	}
+	if inputStr == "" {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("empty input")
+	}
+
+	// Get subject ID from hook args
+	subjectID, ok := hookCall.Args["subject_id"]
+	if !ok || subjectID == "" {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("missing subject_id")
+	}
+
+	// Get chat history from DB
+	tx := h.dbInstance.WithoutTransaction()
+
+	// Append new message
+	err := h.chatManager.AddInstruction(ctx, tx, subjectID, inputStr)
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to append message: %w", err)
+	}
+	messages, err := h.chatManager.ListMessages(ctx, tx, subjectID)
+	if err != nil {
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to load history: %w", err)
+	}
+
+	history := taskengine.ChatHistory{
+		Messages: messages,
 	}
 
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, inputStr, nil
