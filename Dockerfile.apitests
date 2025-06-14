@@ -1,0 +1,26 @@
+# Use an official Python base image
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies (optional but often useful)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only the requirements first to leverage Docker layer caching
+COPY apitests/requirements.txt /app/requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy test code into the container
+COPY apitests /app/apitests
+
+# Set the working directory to where pytest will run
+WORKDIR /app/apitests
+
+# Default command to run tests
+CMD ["pytest", "."]

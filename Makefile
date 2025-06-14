@@ -11,6 +11,10 @@ core-test-system:
 core-test:
 	GOMAXPROCS=4 go test -C ./core/ ./...
 
+api-test-docker:
+	docker build -f Dockerfile.apitests -t contenox-apitests .
+	docker run --rm --network=host contenox-apitests
+
 libs-test:
 	for d in libs/*; do \
 	  if [ -f "$$d/go.mod" ]; then \
