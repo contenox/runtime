@@ -1,4 +1,4 @@
-.PHONY: core-test-unit core-test-system core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-init wait-for-server
+.PHONY: core-test-unit core-test-system core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-test-logs api-test-docker api-init wait-for-server
 DEFAULT_ADMIN_USER ?= admin@admin.com
 DEFAULT_CORE_VERSION ?= dev-demo
 
@@ -10,10 +10,6 @@ core-test-system:
 
 core-test:
 	GOMAXPROCS=4 go test -C ./core/ ./...
-
-api-test-docker:
-	docker build -f Dockerfile.apitests -t contenox-apitests .
-	docker run --rm --network=host contenox-apitests
 
 libs-test:
 	for d in libs/*; do \
@@ -77,6 +73,13 @@ wait-for-server:
 api-test: run wait-for-server
 	. apitests/.venv/bin/activate && pytest apitests/
 
+api-test-logs: run wait-for-server
+	. apitests/.venv/bin/activate && pytest --log-cli-level=DEBUG --capture=no -v apitests
+
+
+api-test-docker:
+	docker build -f Dockerfile.apitests -t contenox-apitests .
+	docker run --rm --network=host contenox-apitests
 
 proto:
 	protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative core/serverapi/tokenizerapi/proto/tokenizerapi.proto

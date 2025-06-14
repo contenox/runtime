@@ -82,17 +82,17 @@ services:
       WORKER_LEASER_ID: Text Worker 1
       WORKER_LEASE_DURATION_SECONDS: 30
       WORKER_REQUEST_TIMEOUT_SECONDS: 2
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   ports:
-  #     - "11434:11434"
-  #   # volumes:
-  #   #   - ollama-data:/root/.ollama
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:11434 || exit 1"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 10
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    # volumes:
+    #   - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 # volumes:
 #   postgres-data:
 #   ollama-data:

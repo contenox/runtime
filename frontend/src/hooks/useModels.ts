@@ -6,10 +6,10 @@ import {
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { modelKeys } from '../lib/queryKeys';
-import { Model } from '../lib/types';
+import { Model, ModelListResponse } from '../lib/types';
 
 export function useModels() {
-  return useSuspenseQuery<Model[]>({
+  return useSuspenseQuery<ModelListResponse>({
     queryKey: modelKeys.all,
     queryFn: api.getModels,
   });

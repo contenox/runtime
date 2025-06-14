@@ -12,6 +12,7 @@ import {
   InProgressJob,
   Job,
   Model,
+  ModelListResponse,
   PendingJob,
   Pool,
   SearchResponse,
@@ -73,7 +74,7 @@ export const api = {
 
   // Model State
   createModel: (model: string) => apiFetch<Model>('/api/models', options('POST', { model })),
-  getModels: () => apiFetch<Model[]>('/api/models'),
+  getModels: () => apiFetch<ModelListResponse>('/api/models'),
   deleteModel: (model: string) => apiFetch<void>(`/api/models/${model}`, options('DELETE')),
 
   // Chats

@@ -89,20 +89,56 @@ func (b *backendManager) list(w http.ResponseWriter, r *http.Request) {
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }
 
+type RespBackend struct {
+	ID           string                  `json:"id"`
+	Name         string                  `json:"name"`
+	BaseURL      string                  `json:"baseUrl"`
+	Type         string                  `json:"type"`
+	Models       []string                `json:"models"`
+	PulledModels []api.ListModelResponse `json:"pulledModels"`
+	Error        string                  `json:"error,omitempty"`
+	CreatedAt    time.Time               `json:"createdAt"`
+	UpdatedAt    time.Time               `json:"updatedAt"`
+}
+
 func (b *backendManager) get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("id")
 	if id == "" {
-		_ = serverops.Error(w, r, fmt.Errorf("missing id parameter %w", serverops.ErrBadPathValue), serverops.GetOperation)
-		return
-	}
-	backend, err := b.service.Get(ctx, id)
-	if err != nil {
-		_ = serverops.Error(w, r, err, serverops.GetOperation)
+		serverops.Error(w, r, fmt.Errorf("missing id parameter %w", serverops.ErrBadPathValue), serverops.GetOperation)
 		return
 	}
 
-	_ = serverops.Encode(w, r, http.StatusOK, backend)
+	// Get static backend info
+	backend, err := b.service.Get(ctx, id)
+	if err != nil {
+		serverops.Error(w, r, err, serverops.GetOperation)
+		return
+	}
+
+	// Get dynamic runtime state
+	state := b.stateService.Get(ctx)
+	itemState, ok := state[id]
+
+	resp := RespBackend{
+		ID:           backend.ID,
+		Name:         backend.Name,
+		BaseURL:      backend.BaseURL,
+		Type:         "Ollama", // Could be made dynamic later
+		Models:       []string{},
+		PulledModels: []api.ListModelResponse{},
+		Error:        "",
+		CreatedAt:    backend.CreatedAt,
+		UpdatedAt:    backend.UpdatedAt,
+	}
+
+	if ok {
+		resp.Models = itemState.Models
+		resp.PulledModels = itemState.PulledModels
+		resp.Error = itemState.Error
+	}
+
+	serverops.Encode(w, r, http.StatusOK, resp)
 }
 
 func (b *backendManager) update(w http.ResponseWriter, r *http.Request) {

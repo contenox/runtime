@@ -4,7 +4,7 @@ export type Backend = {
   baseUrl: string;
   type: string;
   models: string[];
-  pulledModels: OllamaAPIModel[];
+  pulledModels: OpenAIModel[];
   error: string;
   createdAt?: string;
   updatedAt?: string;
@@ -35,11 +35,18 @@ export type Job = {
   createdAt: Date;
 };
 
-export type OllamaAPIModel = {
-  id: string;
-  name: string;
-  model: string;
+export type ModelListResponse = {
+  data: OpenAIModel[];
+  object: string;
 };
+
+export type OpenAIModel = {
+  id: string;
+  object: string;
+  created: string;
+  owned_by: string;
+};
+
 export type ChatSession = {
   id: string;
   startedAt: string;

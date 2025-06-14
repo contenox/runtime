@@ -9,7 +9,6 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/downloadservice"
 	"github.com/contenox/contenox/core/services/modelservice"
-	"github.com/google/uuid"
 )
 
 func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService modelservice.Service, dwService downloadservice.Service) {
@@ -35,7 +34,7 @@ func (s *service) append(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model.ID = uuid.NewString()
+	model.ID = model.Model
 	if err := s.service.Append(ctx, &model); err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

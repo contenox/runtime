@@ -35,12 +35,12 @@ export default function ModelsSection() {
 
   return (
     <>
-      {models.map(model => (
+      {models.data.map(model => (
         <ModelCard
-          key={model.model}
+          key={model.id}
           model={model}
           onDelete={handleDeleteModel}
-          deletePending={deletingModel === model.model}
+          deletePending={deletingModel === model.id}
         />
       ))}
     </>

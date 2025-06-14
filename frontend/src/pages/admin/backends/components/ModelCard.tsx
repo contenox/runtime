@@ -7,10 +7,10 @@ import {
   usePoolsForModel,
   useRemoveModelFromPool,
 } from '../../../../hooks/usePool';
-import { Model } from '../../../../lib/types';
+import { OpenAIModel } from '../../../../lib/types';
 
 type ModelCardProps = {
-  model: Model;
+  model: OpenAIModel;
   onDelete: (modelId: string) => void;
   deletePending: boolean;
 };
@@ -73,20 +73,13 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
     removeMutation.isPending && removeMutation.variables?.poolID === poolId;
 
   return (
-    <Section key={model.id} title={model.model}>
+    <Section key={model.id} title={model.id}>
       <div className="flex justify-between">
         <div>
-          {model.createdAt && (
+          {model.created && (
             <P>
               <small>
-                {t('common.created_at')} {new Date(model.createdAt).toLocaleString()}
-              </small>
-            </P>
-          )}
-          {model.updatedAt && (
-            <P>
-              <small>
-                {t('common.updated_at')} {new Date(model.updatedAt).toLocaleString()}
+                {t('common.created_at')} {new Date(model.created).toLocaleString()}
               </small>
             </P>
           )}
@@ -94,7 +87,7 @@ export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onDelete(model.model)}
+          onClick={() => onDelete(model.id)}
           className="text-error"
           disabled={deletePending}>
           {deletePending ? t('common.deleting') : t('translation:model.model_delete')}
