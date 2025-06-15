@@ -129,7 +129,7 @@ func TestManagerSystem(t *testing.T) {
 		resp, _, _, _, err := manager.ChatExec(ctx, history, 4096, "smollm2:135m")
 		require.Error(t, err)
 		require.Nil(t, resp)
-		require.EqualError(t, err, "last message must be from user")
+		require.EqualError(t, err, "last message must be from user or system was assistant")
 	})
 
 	t.Run("CalculateContextSize_estimates_token_count_for_prompt", func(t *testing.T) {

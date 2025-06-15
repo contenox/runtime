@@ -101,9 +101,9 @@ func TestUnit_ModelProviderAdapter_SetsCorrectModelCapabilities(t *testing.T) {
 		switch p.ModelName() {
 		case chatModelName:
 			foundChat = true
-			// Default for llama3 is chat=true, embed=false. Adapter uses WithChat(true).
+			// Default for llama3 is chat=true, embed=true. Adapter uses WithChat(true).
 			require.True(t, p.CanChat(), "Provider for %s should support chat (default + adapter override)", chatModelName)
-			require.False(t, p.CanEmbed(), "Provider for %s should NOT support embed (default)", chatModelName)
+			require.True(t, p.CanEmbed(), "Provider for %s should support embed (default)", chatModelName)
 		case embedModelName:
 			foundEmbed = true
 			// Default for all-minilm is chat=false, embed=false. Adapter uses WithChat(true).
