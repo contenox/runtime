@@ -103,16 +103,24 @@ def admin_session(base_url, admin_email, admin_password):
     logger.info("Admin registered successfully, token obtained.")
     return {"Authorization": f"Bearer {token}"}
 
-
 @pytest.fixture
 def create_test_file(base_url, admin_session, tmp_path):
-    """Fixture to create a test file and return its metadata."""
-    def _create_test_file(content="Test content", path=None):
-        if path is None:
-            path = f"test-{uuid.uuid4().hex}.txt"
+    """Fixture to create a test file and return its metadata.
 
-        file_path = tmp_path / "tempfile.txt"
+    Usage:
+        test_file = create_test_file(file_name="my-test-file.txt")
+    """
+    def _create_test_file(content="Test content", file_name=None, path=None):
+        if file_name is None:
+            file_name = f"tempfile-{uuid.uuid4().hex}.txt"
+
+        # Ensure tmp_path is used
+        file_path = tmp_path / file_name
         file_path.write_text(content)
+
+        # Prepare upload data
+        if path is None:
+            path = file_name  # Use file_name as default path if not provided
 
         with open(file_path, 'rb') as f:
             files = {'file': f}
@@ -127,8 +135,8 @@ def create_test_file(base_url, admin_session, tmp_path):
             file_data = response.json()
             file_data['content'] = content
             return file_data
-    return _create_test_file
 
+    return _create_test_file
 @pytest.fixture
 def create_test_folder(base_url, admin_session):
     """Fixture to create a test folder and return its metadata (simple pattern)."""
@@ -254,7 +262,7 @@ def wait_for_model_in_backend(base_url, admin_session):
 
                 data = response.json()
                 pulled_models = data.get("pulledModels", [])
-                logger.debug("Pulled models: %s %s", [m.get('name') for m in pulled_models], data)
+                logger.debug("Pulled models: %s", [m.get('name') for m in pulled_models])
 
                 if any(m.get('name') == model_name for m in pulled_models):
                     logger.info("✅ Model '%s' found in backend '%s'", model_name, backend_id)

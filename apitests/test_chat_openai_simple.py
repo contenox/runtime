@@ -23,7 +23,7 @@ def test_chat_completion_uses_assigned_model(
     # Now send a chat request using the model name
     payload = {
         "model": model_name,
-        "messages": [{"role": "user", "content": "Say 'hello'"}],
+        "messages": [{"role": "user", "content": "Echo 'hello'"}],
     }
     response = requests.post(f"{base_url}/v1/chat/completions", json=payload, headers=admin_session)
     assert response.status_code == 200, f"Chat failed: {response.text}"

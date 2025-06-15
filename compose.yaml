@@ -37,7 +37,7 @@ services:
     environment:
       - FALLBACK_MODEL=phi-3
       - USE_DEFAULT_URLS=true
-      - PRELOAD_MODELS=tiny,phi-3
+      - PRELOAD_MODELS=phi-3
       - ADDR=0.0.0.0:50051
   vald:
     build:
@@ -86,13 +86,13 @@ services:
     image: ollama/ollama:latest
     ports:
       - "11435:11434"
-    # volumes:
-    #   - ollama-data:/root/.ollama
+    volumes:
+      - ollama-data:/root/.ollama
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:11434 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 10
-# volumes:
-#   postgres-data:
-#   ollama-data:
+volumes:
+  #   postgres-data:
+  ollama-data:

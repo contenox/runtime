@@ -326,12 +326,12 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	}
 
 	// Correct type assertion
-	res, ok := result.(*taskengine.OpenAIChatResponse)
+	res, ok := result.(taskengine.OpenAIChatResponse)
 	if !ok {
 		return nil, fmt.Errorf("invalid result type: %T", result)
 	}
 
-	return res, nil
+	return &res, nil
 }
 
 func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
