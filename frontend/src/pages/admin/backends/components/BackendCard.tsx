@@ -112,7 +112,7 @@ export function BackendCard({ backend, onEdit, onDelete, statusMap }: BackendCar
           key={model}
           modelName={model}
           downloadStatus={getDownloadStatusForModel(statusMap, backend.baseUrl, model)}
-          isPulled={backend.pulledModels?.some(pulledModel => pulledModel.name === model)}
+          isPulled={backend.pulledModels?.some(pulledModel => pulledModel.id === model)}
         />
       ))}
 
