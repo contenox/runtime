@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/contenox/contenox/core/serverapi/tokenizerapi"
@@ -41,6 +42,18 @@ func main() {
 	if err := tokenizerapi.RegisterTokenizerService(grpcServer, coreSvc); err != nil {
 		log.Fatalf("failed to register tokenizer service: %v", err)
 	}
+
+	// Start HTTP server for health check in a goroutine
+	go func() {
+		http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
+		log.Println("Tokenizer HTTP health check listening on :8081")
+		if err := http.ListenAndServe(":8081", nil); err != nil {
+			log.Fatalf("HTTP health check failed: %v", err)
+		}
+	}()
 
 	listenAddr := config.Addr
 	listener, err := net.Listen("tcp", listenAddr)

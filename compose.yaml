@@ -27,18 +27,20 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.tokenizer
+    environment:
+      - PRELOAD_MODELS=granite-embedding-30m
+      - TOKENIZER_TIMEOUT=30s
+      - FALLBACK_MODEL=granite-embedding-30m
+      - USE_DEFAULT_URLS=true
+      - ADDR=0.0.0.0:50051
     ports:
       - "50051:50051"
+      - "8083:8081"
     healthcheck:
-      test: ["CMD-SHELL", "grpc_health_probe -addr=localhost:50051"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/healthz"]
       interval: 5s
-      timeout: 5s
-      retries: 10
-    environment:
-      - FALLBACK_MODEL=phi-3
-      - USE_DEFAULT_URLS=true
-      - PRELOAD_MODELS=phi-3
-      - ADDR=0.0.0.0:50051
+      timeout: 3s
+      retries: 5
   vald:
     build:
       context: ./

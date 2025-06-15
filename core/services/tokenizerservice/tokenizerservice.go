@@ -29,6 +29,7 @@ type ConfigGRPC struct {
 }
 
 func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() error, error) {
+	clean := func() error { return nil }
 	opts := cfg.DialOptions
 	if len(opts) == 0 {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -36,8 +37,7 @@ func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() er
 
 	conn, err := grpc.NewClient(cfg.ServerAddress, opts...)
 	if err != nil {
-		err = fmt.Errorf("failed to dial gRPC server at %s: %w", cfg.ServerAddress, err)
-		return nil, nil, err
+		return nil, clean, fmt.Errorf("failed to dial gRPC server at %s: %w", cfg.ServerAddress, err)
 	}
 
 	closeFunc := func() error {
@@ -47,12 +47,6 @@ func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() er
 		}
 		return nil
 	}
-
-	defer func() {
-		if err != nil && conn != nil {
-			closeFunc()
-		}
-	}()
 
 	stub := proto.NewTokenizerServiceClient(conn)
 	client := &grpcClient{
@@ -104,11 +98,10 @@ func (c *grpcClient) AvailableModels(ctx context.Context) ([]string, error) {
 
 	resp, err := c.client.AvailableModels(ctx, req)
 	if err != nil {
-		return []string{}, fmt.Errorf("gRPC AvailableModels call failed: %w.", err)
+		return []string{}, fmt.Errorf("gRPC AvailableModels call failed: %w", err)
 	}
 	if resp == nil {
-		return []string{}, fmt.Errorf("gRPC AvailableModels returned nil response.")
-
+		return []string{}, fmt.Errorf("gRPC AvailableModels returned nil response")
 	}
 	return resp.ModelNames, nil
 }

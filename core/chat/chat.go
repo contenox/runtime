@@ -16,6 +16,7 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
 )
@@ -142,10 +143,17 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, co
 			Role:    msg.Role,
 			Content: msg.Content,
 		}
-		var err error
-		inputtokens, err = m.tokenizer.CountTokens(ctx, "phi-3", msg.Content)
+		var err2 error
+		retryFunc := func(ctx context.Context) error {
+			inputtokens, err2 = m.tokenizer.CountTokens(ctx, "phi-3", msg.Content)
+			if err2 != nil {
+				fmt.Printf("Retrying token count due to error: %v\n", err2)
+			}
+			return err2
+		}
+		err := libroutine.NewRoutine(6, time.Second*10).ExecuteWithRetry(ctx, time.Second, 10, retryFunc)
 		if err != nil {
-			return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
+			return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w %w", err, err2)
 		}
 
 	}

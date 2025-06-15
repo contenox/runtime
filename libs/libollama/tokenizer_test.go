@@ -3,12 +3,11 @@ package libollama_test
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"slices"
 
 	"github.com/contenox/contenox/libs/libollama"
 	"github.com/stretchr/testify/require"
