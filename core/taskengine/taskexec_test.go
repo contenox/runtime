@@ -90,7 +90,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "simple",
 			Type: taskengine.PromptToCondition,
-			ConditionMapping: map[string]bool{
+			ValidConditions: map[string]bool{
 				"yes": true,
 				"Yes": true,
 				"no":  false,
@@ -146,7 +146,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-case-insensitive",
 			Type: taskengine.PromptToCondition,
-			ConditionMapping: map[string]bool{
+			ValidConditions: map[string]bool{
 				"yes": true,
 				"no":  false,
 			},
@@ -158,7 +158,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		_, _, res, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-invalid",
 			Type: taskengine.PromptToCondition,
-			ConditionMapping: map[string]bool{
+			ValidConditions: map[string]bool{
 				"yes": true,
 				"no":  false,
 			},

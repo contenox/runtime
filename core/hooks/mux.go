@@ -105,14 +105,14 @@ func (m *Mux) Exec(ctx context.Context, startTime time.Time, input any, dataType
 	return taskengine.StatusSuccess, result, resultType, transition, nil
 }
 
-// Supports returns the single hook type "mux" that this router handles.
+// Supports returns the single hook type "command_router" that this router handles.
 func (m *Mux) Supports(ctx context.Context) ([]string, error) {
-	return []string{"mux"}, nil
+	return []string{"command_router"}, nil
 }
 
 // Get returns the Exec function for the mux hook.
 func (m *Mux) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (int, any, taskengine.DataType, string, error), error) {
-	if name != "mux" {
+	if name != "command_router" {
 		return nil, fmt.Errorf("unsupported hook type: %s", name)
 	}
 	return m.Exec, nil

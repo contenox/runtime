@@ -59,7 +59,7 @@ export default function SearchPage() {
 
           <FormField label={t('search.topk')}>
             <Input
-              type="number"
+              type="parse_number"
               value={topk?.toString() ?? ''}
               onChange={e => setTopk(e.target.value ? parseInt(e.target.value) : undefined)}
               placeholder={t('search.topk_placeholder')}
@@ -68,7 +68,7 @@ export default function SearchPage() {
 
           <FormField label={t('search.radius')}>
             <Input
-              type="number"
+              type="parse_number"
               step="0.01"
               value={radius?.toString() ?? ''}
               onChange={e => setRadius(e.target.value ? parseFloat(e.target.value) : undefined)}
@@ -78,7 +78,7 @@ export default function SearchPage() {
 
           <FormField label={t('search.epsilon')}>
             <Input
-              type="number"
+              type="parse_number"
               step="0.01"
               value={epsilon?.toString() ?? ''}
               onChange={e => setEpsilon(e.target.value ? parseFloat(e.target.value) : undefined)}

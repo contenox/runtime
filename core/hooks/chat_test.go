@@ -48,7 +48,7 @@ func TestSystemChatHooks(t *testing.T) {
 
 	t.Run("chat_hooks", func(t *testing.T) {
 		hookCall := &taskengine.HookCall{
-			Type: "append_user_input",
+			Type: "append_user_message",
 			Args: map[string]string{"subject_id": subjectID},
 		}
 
@@ -75,7 +75,7 @@ func TestSystemChatHooks(t *testing.T) {
 		require.Equal(t, userMessage, messages[0].Content)
 
 		hookCall = &taskengine.HookCall{
-			Type: "execute_chat_model",
+			Type: "persist_chat_messages",
 			Args: map[string]string{"model": "smollm2:135m"},
 		}
 

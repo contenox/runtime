@@ -65,7 +65,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 					Transition: taskengine.Transition{
 						OnError: "",
 						Next: []taskengine.ConditionalTransition{
-							{ID: "end", Value: "_default"},
+							{ID: "end", Value: "default"},
 						},
 					},
 					PreferredModels: []string{config.TasksModel},

@@ -38,7 +38,7 @@
 //	      prompt_template: "How many words should the article be?"
 //	      transition:
 //	        next:
-//	          - value: "_default"
+//	          - value: "default"
 //	            id: generate_article
 //
 //	    - id: generate_article
@@ -47,7 +47,7 @@
 //	      print: "Generated article:\n{{ .previous_output }}"
 //	      transition:
 //	        next:
-//	          - value: "_default"
+//	          - value: "default"
 //	            id: end
 //
 //	    - id: end

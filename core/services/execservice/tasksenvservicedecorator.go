@@ -15,17 +15,12 @@ type activityTrackerTaskEnvDecorator struct {
 func (d *activityTrackerTaskEnvDecorator) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
 	// Extract useful metadata from the chain
 	chainID := chain.ID
-	triggerTypes := make([]string, len(chain.Triggers))
-	for i, t := range chain.Triggers {
-		triggerTypes[i] = string(t.Type)
-	}
 
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"execute",
 		"task-chain",
 		"chainID", chainID,
-		"triggerTypes", triggerTypes,
 		"inputLength", len(input),
 	)
 	defer endFn()

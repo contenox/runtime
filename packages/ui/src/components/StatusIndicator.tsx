@@ -57,7 +57,7 @@ export function StatusIndicator({
           </P>
         )}
 
-        {typeof progress === "number" && (
+        {typeof progress === "parse_number" && (
           <ProgressBar
             value={progress}
             palette={

@@ -94,7 +94,9 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			return nil, err
 		}
 	}
-
+	if len(chain.Tasks) == 0 {
+		return nil, fmt.Errorf("chain has no tasks")
+	}
 	currentTask, err := findTaskByID(chain.Tasks, chain.Tasks[0].ID)
 	if err != nil {
 		return nil, err
@@ -162,7 +164,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				// Track error-based transition
 				_, reportChangeErrTransition, endErrTransition := exe.tracker.Start(
 					ctx,
-					"transition",
+					"next_task",
 					previousTaskID,
 					"next_task", currentTask.ID,
 					"reason", "error",
@@ -211,7 +213,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		// Track normal transition to next task
 		_, reportChangeTransition, endTransition := exe.tracker.Start(
 			ctx,
-			"transition",
+			"next_task",
 			currentTask.ID,
 			"next_task", nextTaskID,
 		)
@@ -243,7 +245,7 @@ func renderTemplate(tmplStr string, vars map[string]any) (string, error) {
 func evaluateTransitions(transition Transition, eval string) (string, error) {
 	// First check explicit matches
 	for _, ct := range transition.Next {
-		if ct.Value == "_default" {
+		if ct.Value == "default" {
 			continue
 		}
 
@@ -258,7 +260,7 @@ func evaluateTransitions(transition Transition, eval string) (string, error) {
 
 	// Then check for default
 	for _, ct := range transition.Next {
-		if ct.Value == "_default" {
+		if ct.Value == "default" {
 			return ct.ID, nil
 		}
 	}
@@ -279,16 +281,16 @@ func parseNumber(s string) (float64, error) {
 // compare applies a logical operator to a model response and a target value.
 //
 // Supported operators include equality, string containment, numeric comparisons,
-// and range checks using "between".
+// and range checks using "parse_range".
 func compare(operator, response, value string) (bool, error) {
 	switch operator {
 	case "equals":
 		return response == value, nil
 	case "contains":
 		return strings.Contains(response, value), nil
-	case "startsWith":
+	case "starts_with":
 		return strings.HasPrefix(response, value), nil
-	case "endsWith":
+	case "ends_with":
 		return strings.HasSuffix(response, value), nil
 	case ">", "gt":
 		resNum, err := parseNumber(response)
@@ -310,7 +312,7 @@ func compare(operator, response, value string) (bool, error) {
 			return false, err
 		}
 		return resNum < targetNum, nil
-	case "between":
+	case "in_range":
 		parts := strings.Split(value, "-")
 		if len(parts) != 2 {
 			return false, fmt.Errorf("invalid between range format: %s", value)

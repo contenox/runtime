@@ -158,7 +158,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
-		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ConditionMapping, prompt)
+		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ValidConditions, prompt)
 		output = hit
 		outputType = DataTypeBool
 		transitionEval = strconv.FormatBool(hit)
@@ -216,13 +216,13 @@ func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, i
 
 // condition executes a prompt and evaluates its result against a provided condition mapping.
 // It returns true/false based on the resolved condition value or fallback heuristics.
-func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, conditionMapping map[string]bool, prompt string) (bool, error) {
+func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, validConditions map[string]bool, prompt string) (bool, error) {
 	response, err := exe.Prompt(ctx, resolver, prompt)
 	if err != nil {
 		return false, err
 	}
 	found := false
-	for k := range conditionMapping {
+	for k := range validConditions {
 		if k == response {
 			found = true
 		}
@@ -230,7 +230,7 @@ func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Polic
 	if !found {
 		return false, fmt.Errorf("failed to parse into valid condition output was %s", response)
 	}
-	for key, val := range conditionMapping {
+	for key, val := range validConditions {
 		if strings.EqualFold(response, key) {
 			if val {
 				return strings.EqualFold(strings.TrimSpace(response), key), nil

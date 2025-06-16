@@ -24,12 +24,12 @@ type Chat struct {
 // Supports returns the list of hook types supported by this hook repository.
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
-		"append_user_input",
-		"openai_to_history",
-		"append_instruction",
-		"execute_chat_model",
+		"append_user_message",
+		"convert_openai_to_history",
+		"append_system_message",
+		"persist_chat_messages",
 		"persist_input_output",
-		"history_to_openAI_response",
+		"convert_history_to_openai",
 	}, nil
 }
 
@@ -45,15 +45,15 @@ var _ taskengine.HookRepo = (*Chat)(nil)
 
 func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (int, any, taskengine.DataType, string, error), error) {
 	switch name {
-	case "append_user_input":
+	case "append_user_message":
 		return h.AppendUserInputToChathistory, nil
-	case "openai_to_history":
+	case "convert_openai_to_history":
 		return h.AppendOpenAIChatToChathistory, nil
-	case "append_instruction":
+	case "append_system_message":
 		return h.AppendInstructionToChathistory, nil
-	case "execute_chat_model":
+	case "persist_chat_messages":
 		return h.ChatExec, nil
-	case "history_to_openAI_response":
+	case "convert_history_to_openai":
 		return h.ConvertToOpenAIResponse, nil
 	case "persist_input_output":
 		return h.PersistMessages, nil

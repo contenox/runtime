@@ -72,7 +72,7 @@ func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any
 
 // Supports implements taskengine.HookRepo.
 func (s *SearchResolve) Supports(ctx context.Context) ([]string, error) {
-	return []string{"resolve-search"}, nil
+	return []string{"resolve_search_result"}, nil
 }
 
 func NewSearchResolveHook(dbInstance libdb.DBManager) *SearchResolve {

@@ -151,15 +151,15 @@ func main() {
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
-		"search":                     rag,
-		"webhook":                    webcall,
-		"mux":                        hookMux,
-		"append_user_input":          chatHook,
-		"openai_to_history":          chatHook,
-		"history_to_openAI_response": chatHook,
-		"append_instruction":         chatHook,
-		"execute_chat_model":         chatHook,
-		"persist_input_output":       chatHook,
+		"vector_search":             rag,
+		"webhook":                   webcall,
+		"command_router":            hookMux,
+		"append_user_message":       chatHook,
+		"convert_openai_to_history": chatHook,
+		"convert_history_to_openai": chatHook,
+		"append_system_message":     chatHook,
+		"persist_chat_messages":     chatHook,
+		"persist_input_output":      chatHook,
 	})
 	exec, err := taskengine.NewExec(ctx, execRepo, hooks)
 	if err != nil {

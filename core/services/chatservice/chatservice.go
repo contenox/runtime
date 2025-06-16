@@ -208,18 +208,18 @@ func buildAppendInstruction(subjectID string) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:          "append_instruction",
+				ID:          "append_system_message",
 				Description: "Append instruction message to chat history",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "append_instruction",
+					Type: "append_system_message",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "end"},
+						{Value: "default", ID: "end"},
 					},
 				},
 			},
@@ -233,18 +233,18 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 		Description: "Standard chat processing pipeline with hooks",
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:          "append_user_input",
+				ID:          "append_user_message",
 				Description: "Append user message to chat history",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "append_user_input",
+					Type: "append_user_message",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "mux_input"},
+						{Value: "default", ID: "mux_input"},
 					},
 				},
 			},
@@ -253,14 +253,14 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 				Description: "Check for commands like /echo using Mux",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "mux",
+					Type: "command_router",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "execute_chat_model"},
+						{Value: "default", ID: "persist_chat_messages"},
 						{
 							Operator: "equals",
 							Value:    "echo",
@@ -270,17 +270,17 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 				},
 			},
 			{
-				ID:              "execute_chat_model",
+				ID:              "persist_chat_messages",
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: preferredModelNames,
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "persist_input_output"},
+						{Value: "default", ID: "persist_input_output"},
 					},
 				},
 				Hook: &taskengine.HookCall{
-					Type: "execute_chat_model",
+					Type: "persist_chat_messages",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},
@@ -298,7 +298,7 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "end"},
+						{Value: "default", ID: "end"},
 					},
 				},
 			},
@@ -340,47 +340,47 @@ func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 		Description: "OpenAI Style chat processing pipeline with hooks",
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:          "openai_to_history",
+				ID:          "convert_openai_to_history",
 				Description: "Convert OpenAI request to internal history",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "openai_to_history",
+					Type: "convert_openai_to_history",
 					Args: map[string]string{},
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "execute_chat_model"},
+						{Value: "default", ID: "persist_chat_messages"},
 					},
 				},
 			},
 			{
-				ID:              "execute_chat_model",
+				ID:              "persist_chat_messages",
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: []string{model},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "history_to_openAI_response"},
+						{Value: "default", ID: "convert_history_to_openai"},
 					},
 				},
 				Hook: &taskengine.HookCall{
-					Type: "execute_chat_model",
+					Type: "persist_chat_messages",
 					Args: map[string]string{},
 				},
 			},
 			{
-				ID:          "history_to_openAI_response",
+				ID:          "convert_history_to_openai",
 				Description: "Convert chat history to OpenAI response",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "history_to_openAI_response",
+					Type: "convert_history_to_openai",
 					Args: map[string]string{
 						"model": model,
 					},
 				},
 				Transition: taskengine.Transition{
 					Next: []taskengine.ConditionalTransition{
-						{Value: "_default", ID: "end"},
+						{Value: "default", ID: "end"},
 					},
 				},
 			},
