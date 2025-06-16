@@ -62,7 +62,7 @@ func TestSystemRag(t *testing.T) {
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 
 	dbInstance := testenv.GetDBInstance()
-	ragHook := hooks.NewRag(embedder, vectorStore, dbInstance)
+	ragHook := hooks.NewSearch(embedder, vectorStore, dbInstance)
 	supports, err := ragHook.Supports(t.Context())
 	if err != nil {
 		t.Fatal(err)

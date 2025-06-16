@@ -12,7 +12,7 @@ type SimpleRepo struct {
 	hooks map[string]taskengine.HookRepo
 }
 
-func NewSimpleProvider(hooks map[string]taskengine.HookRepo) *SimpleRepo {
+func NewSimpleProvider(hooks map[string]taskengine.HookRepo) taskengine.HookRepo {
 	return &SimpleRepo{
 		hooks: hooks,
 	}

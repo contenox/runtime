@@ -20,7 +20,7 @@ type WebCaller struct {
 }
 
 // NewWebCaller creates a new webhook caller
-func NewWebCaller(options ...WebhookOption) *WebCaller {
+func NewWebCaller(options ...WebhookOption) taskengine.HookRepo {
 	wh := &WebCaller{
 		client: &http.Client{
 			Timeout: 30 * time.Second,

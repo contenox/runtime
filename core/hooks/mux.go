@@ -17,7 +17,7 @@ type Mux struct {
 }
 
 // NewMux creates a new Mux hook router with registered sub-hooks.
-func NewMux(hooks map[string]taskengine.HookRepo) *Mux {
+func NewMux(hooks map[string]taskengine.HookRepo) taskengine.HookRepo {
 	return &Mux{
 		hooks: hooks,
 	}

@@ -20,11 +20,11 @@ type Search struct {
 	dbInstance   libdb.DBManager
 }
 
-func NewRag(
+func NewSearch(
 	embedder llmrepo.ModelRepo,
 	vectorsStore vectors.Store,
 	dbInstance libdb.DBManager,
-) *Search {
+) taskengine.HookRepo {
 	return &Search{
 		embedder:     embedder,
 		vectorsStore: vectorsStore,
@@ -36,10 +36,10 @@ var _ taskengine.HookRepo = (*Search)(nil)
 
 // Supports returns the list of hook names this provider supports.
 func (h *Search) Supports(ctx context.Context) ([]string, error) {
-	return []string{"vector_search"}, nil
+	return []string{"search"}, nil
 }
 
-// Exec executes the "vector_search" hook by performing a vector search based on the input string.
+// Exec executes the "search" hook by performing a vector search based on the input string.
 func (h *Search) Exec(
 	ctx context.Context,
 	startTime time.Time,
@@ -122,5 +122,5 @@ func (h *Search) Exec(
 		}
 	}
 
-	return taskengine.StatusSuccess, convertedResults, taskengine.DataTypeSearchResults, string(len(results)), nil
+	return taskengine.StatusSuccess, convertedResults, taskengine.DataTypeSearchResults, fmt.Sprint(len(results)), nil
 }

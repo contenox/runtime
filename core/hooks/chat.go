@@ -34,7 +34,7 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 }
 
 // NewChatHook creates a new Chat hook repository instance.
-func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) *Chat {
+func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) taskengine.HookRepo {
 	return &Chat{
 		dbInstance:  dbInstance,
 		chatManager: chatManager,

@@ -130,7 +130,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
-	rag := hooks.NewRag(embedder, vectorStore, dbInstance)
+	rag := hooks.NewSearch(embedder, vectorStore, dbInstance)
 	webcall := hooks.NewWebCaller()
 	// Hook instances
 	echocmd := hooks.NewEchoHook()
