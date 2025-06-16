@@ -20,8 +20,10 @@ const (
 	StatusError               = 3
 )
 
+// DataType represents the type of data that can be passed between tasks
 type DataType int
 
+// Constants representing hook execution status
 const (
 	DataTypeAny DataType = iota
 	DataTypeString
@@ -35,19 +37,19 @@ const (
 	DataTypeOpenAIChatResponse
 )
 
-// EnvExecutor defines an environment that can execute a ChainDefinition with input.
-//
-// It handles task transitions, error recovery, retry logic, and output tracking.
+// EnvExecutor defines an environment for executing ChainDefinitions
 type EnvExecutor interface {
+	// ExecEnv executes a chain with input and returns final output
 	ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, error)
 }
 
-// ErrUnsupportedTaskType is returned when a TaskExecutor does not recognize the task type.
+// ErrUnsupportedTaskType indicates unrecognized task type
 var ErrUnsupportedTaskType = errors.New("executor does not support the task type")
 
 // HookRepo defines an interface for external system integrations
 // and to conduct side effects on internal state.
 type HookRepo interface {
+	// Exec runs a hook with input and returns results
 	Exec(ctx context.Context, startingTime time.Time, input any, dataType DataType, transition string, args *HookCall) (int, any, DataType, string, error)
 	HookRegistry
 }
@@ -57,7 +59,7 @@ type HookRegistry interface {
 }
 
 // SimpleEnv is the default implementation of EnvExecutor.
-//
+// this is the default EnvExecutor implementation
 // It executes tasks in order, using retry and timeout policies, and tracks execution
 // progress using an ActivityTracker.
 type SimpleEnv struct {
@@ -94,8 +96,9 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			return nil, err
 		}
 	}
-	if len(chain.Tasks) == 0 {
-		return nil, fmt.Errorf("chain has no tasks")
+	err = validateChain(chain.Tasks)
+	if err != nil {
+		return nil, err
 	}
 	currentTask, err := findTaskByID(chain.Tasks, chain.Tasks[0].ID)
 	if err != nil {
@@ -119,7 +122,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			}
 		}
 
-		maxRetries := max(currentTask.RetryOnError, 0)
+		maxRetries := max(currentTask.RetryOnFailure, 0)
 
 	retryLoop:
 		for retry := 0; retry <= maxRetries; retry++ {
@@ -155,9 +158,9 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		}
 
 		if taskErr != nil {
-			if currentTask.Transition.OnError != "" {
+			if currentTask.Transition.OnFailure != "" {
 				previousTaskID := currentTask.ID
-				currentTask, err = findTaskByID(chain.Tasks, currentTask.Transition.OnError)
+				currentTask, err = findTaskByID(chain.Tasks, currentTask.Transition.OnFailure)
 				if err != nil {
 					return nil, fmt.Errorf("error transition target not found: %v", err)
 				}
@@ -196,7 +199,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			return nil, fmt.Errorf("task %s: transition error: %v", currentTask.ID, err)
 		}
 
-		if nextTaskID == "" || nextTaskID == "end" {
+		if nextTaskID == "" || nextTaskID == TermEnd {
 			finalOutput = output
 			// Track final output
 			_, reportChangeFinal, endFinal := exe.tracker.Start(
@@ -242,26 +245,26 @@ func renderTemplate(tmplStr string, vars map[string]any) (string, error) {
 	return buf.String(), nil
 }
 
-func evaluateTransitions(transition Transition, eval string) (string, error) {
+func evaluateTransitions(transition TaskTransition, eval string) (string, error) {
 	// First check explicit matches
-	for _, ct := range transition.Next {
-		if ct.Value == "default" {
+	for _, ct := range transition.Branches {
+		if ct.Operator == OpDefault {
 			continue
 		}
 
-		match, err := compare(ct.Operator, eval, ct.Value)
+		match, err := compare(ct.Operator, eval, ct.When)
 		if err != nil {
 			return "", err
 		}
 		if match {
-			return ct.ID, nil
+			return ct.Goto, nil
 		}
 	}
 
 	// Then check for default
-	for _, ct := range transition.Next {
-		if ct.Value == "default" {
-			return ct.ID, nil
+	for _, ct := range transition.Branches {
+		if ct.Operator == "default" {
+			return ct.Goto, nil
 		}
 	}
 
@@ -282,40 +285,40 @@ func parseNumber(s string) (float64, error) {
 //
 // Supported operators include equality, string containment, numeric comparisons,
 // and range checks using "parse_range".
-func compare(operator, response, value string) (bool, error) {
+func compare(operator OperatorTerm, response, when string) (bool, error) {
 	switch operator {
-	case "equals":
-		return response == value, nil
-	case "contains":
-		return strings.Contains(response, value), nil
-	case "starts_with":
-		return strings.HasPrefix(response, value), nil
-	case "ends_with":
-		return strings.HasSuffix(response, value), nil
-	case ">", "gt":
+	case OpEquals:
+		return response == when, nil
+	case OpContains:
+		return strings.Contains(response, when), nil
+	case OpStartsWith:
+		return strings.HasPrefix(response, when), nil
+	case OpEndsWith:
+		return strings.HasSuffix(response, when), nil
+	case OpGreaterThan, OpGt:
 		resNum, err := parseNumber(response)
 		if err != nil {
 			return false, err
 		}
-		targetNum, err := parseNumber(value)
+		targetNum, err := parseNumber(when)
 		if err != nil {
 			return false, err
 		}
 		return resNum > targetNum, nil
-	case "<", "lt":
+	case OpLessThan, OpLt:
 		resNum, err := parseNumber(response)
 		if err != nil {
 			return false, err
 		}
-		targetNum, err := parseNumber(value)
+		targetNum, err := parseNumber(when)
 		if err != nil {
 			return false, err
 		}
 		return resNum < targetNum, nil
-	case "in_range":
-		parts := strings.Split(value, "-")
+	case OpInRange:
+		parts := strings.Split(when, "-")
 		if len(parts) != 2 {
-			return false, fmt.Errorf("invalid between range format: %s", value)
+			return false, fmt.Errorf("invalid between range format: %s", when)
 		}
 		lower, err := parseNumber(strings.TrimSpace(parts[0]))
 		if err != nil {
@@ -343,4 +346,21 @@ func findTaskByID(tasks []ChainTask, id string) (*ChainTask, error) {
 		}
 	}
 	return nil, fmt.Errorf("task not found: %s", id)
+}
+
+func validateChain(tasks []ChainTask) error {
+	if len(tasks) == 0 {
+		return fmt.Errorf("chain has no tasks")
+	}
+	for _, ct := range tasks {
+		if ct.ID == "" || ct.ID == TermEnd {
+			if ct.ID == "" {
+				return fmt.Errorf("task ID cannot be empty")
+			}
+			if ct.ID == TermEnd {
+				return fmt.Errorf("task ID cannot be '%s'", TermEnd)
+			}
+		}
+	}
+	return nil
 }

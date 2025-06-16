@@ -36,7 +36,7 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 	require.NoError(t, err)
 
 	task := &taskengine.ChainTask{
-		Type: taskengine.PromptToString,
+		Type: taskengine.RawString,
 	}
 
 	output, _, raw, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
@@ -89,7 +89,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("simple test-case", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "simple",
-			Type: taskengine.PromptToCondition,
+			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
 				"yes": true,
 				"Yes": true,
@@ -107,7 +107,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("PromptToNumber", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-test",
-			Type: taskengine.PromptToNumber,
+			Type: taskengine.ParseNumber,
 		}, "Respond with only the number 10 as a digit, no other text.", taskengine.DataTypeInt)
 		require.NoError(t, err)
 		require.Equal(t, 10, response)
@@ -116,7 +116,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("PromptToScore", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-test",
-			Type: taskengine.PromptToScore,
+			Type: taskengine.ParseScore,
 		}, "Respond with exactly the number 7.5, no other text.", taskengine.DataTypeFloat)
 		require.NoError(t, err)
 		require.Equal(t, 7.5, response)
@@ -126,7 +126,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("PromptToRange", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-test",
-			Type: taskengine.PromptToRange,
+			Type: taskengine.ParseRange,
 		}, "Echo the Input. Input: 3-5", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "3-5", response)
@@ -135,7 +135,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		// Test single number to range conversion
 		response, _, formatted, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-single-test",
-			Type: taskengine.PromptToRange,
+			Type: taskengine.ParseRange,
 		}, "Respond with the number 4, no other text.", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "4-4", response)
@@ -145,7 +145,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("ConditionCaseSensitive", func(t *testing.T) {
 		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-case-insensitive",
-			Type: taskengine.PromptToCondition,
+			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
 				"yes": true,
 				"no":  false,
@@ -157,7 +157,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("ConditionInvalidResponse", func(t *testing.T) {
 		_, _, res, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "condition-invalid",
-			Type: taskengine.PromptToCondition,
+			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
 				"yes": true,
 				"no":  false,
@@ -171,7 +171,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("RangeReverseNumbers", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "range-reverse-test",
-			Type: taskengine.PromptToRange,
+			Type: taskengine.ParseRange,
 		}, "Echo the Input as is. Input: 5-3", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, "5-3", response)
@@ -181,7 +181,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("ScoreIntegerValue", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "score-integer-test",
-			Type: taskengine.PromptToScore,
+			Type: taskengine.ParseScore,
 		}, "Respond with exactly the number 7, no decimal places or other text.", taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Equal(t, 7.0, response)
@@ -191,7 +191,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("NumberInvalidFloat", func(t *testing.T) {
 		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-invalid-test",
-			Type: taskengine.PromptToNumber,
+			Type: taskengine.ParseNumber,
 		}, "Respond with '10.5'", taskengine.DataTypeString)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid syntax")
@@ -220,14 +220,14 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
 		// Empty input
 		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
-			Type: taskengine.PromptToString,
+			Type: taskengine.RawString,
 		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 
 		// Long input
 		longInput := strings.Repeat("repeat this ", 10)
 		output, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
-			Type: taskengine.PromptToString,
+			Type: taskengine.RawString,
 		}, "Echo exactly this including the repetition: "+longInput, taskengine.DataTypeString)
 		require.NoError(t, err)
 		require.Contains(t, longInput, output)
@@ -236,7 +236,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	t.Run("NumberWithSpaces", func(t *testing.T) {
 		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
 			ID:   "number-space-test",
-			Type: taskengine.PromptToNumber,
+			Type: taskengine.ParseNumber,
 		}, "Respond with ' 42 '", taskengine.DataTypeInt)
 		require.NoError(t, err)
 		require.Equal(t, 42, response)

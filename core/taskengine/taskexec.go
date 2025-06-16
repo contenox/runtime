@@ -11,10 +11,11 @@ import (
 	"github.com/contenox/contenox/core/llmresolver"
 )
 
-// TaskExecutor defines the interface for executing a single task step.
-// It consumes a prompt and resolver policy, and returns structured output
-// alongside the raw LLM response.
+// TaskExecutor defines the interface for executing a individual tasks.
 type TaskExecutor interface {
+	// TaskExec runs a single task and returns output
+	// It consumes a prompt and resolver policy, and returns structured output
+	// TODO: THIS IS NOT TRUE: alongside the raw LLM response.
 	TaskExec(ctx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
 }
 
@@ -26,7 +27,7 @@ type SimpleExec struct {
 	hookProvider HookRepo
 }
 
-// NewExec creates a new instance of SimpleExec.
+// NewExec creates a new SimpleExec instance
 func NewExec(
 	_ context.Context,
 	promptExec llmrepo.ModelRepo,
@@ -136,15 +137,13 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 }
 
 // TaskExec dispatches task execution based on the task type.
-// It handles prompt-based task types like string, number, score, condition, and range,
-// as well as custom hook invocations.
 func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	var transitionEval string
 	var taskErr error
 	var output any = input
 	var outputType DataType = dataType
 	switch currentTask.Type {
-	case PromptToString:
+	case RawString:
 		prompt, ok := input.(string)
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
@@ -152,7 +151,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
 		output = transitionEval
 		outputType = DataTypeString
-	case PromptToCondition:
+	case ConditionKey:
 		var hit bool
 		prompt, ok := input.(string)
 		if !ok {
@@ -162,7 +161,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		output = hit
 		outputType = DataTypeBool
 		transitionEval = strconv.FormatBool(hit)
-	case PromptToNumber:
+	case ParseNumber:
 		var number int
 		prompt, ok := input.(string)
 		if !ok {
@@ -172,7 +171,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		output = number
 		outputType = DataTypeInt
 		transitionEval = strconv.FormatInt(int64(number), 10)
-	case PromptToScore:
+	case ParseScore:
 		var score float64
 		prompt, ok := input.(string)
 		if !ok {
@@ -182,7 +181,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		output = score
 		outputType = DataTypeFloat
 		transitionEval = strconv.FormatFloat(score, 'f', 2, 64)
-	case PromptToRange:
+	case ParseRange:
 		prompt, ok := input.(string)
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")

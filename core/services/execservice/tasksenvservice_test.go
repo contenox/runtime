@@ -55,17 +55,17 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 			ID:              "echo-chain",
 			Description:     "Echo input string",
 			RoutingStrategy: "random",
-			MaxTokenSize:    1000,
+			TokenLimit:      1000,
 			Tasks: []taskengine.ChainTask{
 				{
 					ID:          "echo-task",
 					Description: "Just echo back the input",
-					Type:        taskengine.PromptToString,
+					Type:        taskengine.RawString,
 					Template:    "echo back the input without any explanation. Input: {{.input}}",
-					Transition: taskengine.Transition{
-						OnError: "",
-						Next: []taskengine.ConditionalTransition{
-							{ID: "end", Value: "default"},
+					Transition: taskengine.TaskTransition{
+						OnFailure: "",
+						Branches: []taskengine.TransitionBranch{
+							{Goto: taskengine.TermEnd, Operator: "default"},
 						},
 					},
 					PreferredModels: []string{config.TasksModel},

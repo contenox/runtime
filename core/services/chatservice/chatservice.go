@@ -217,9 +217,9 @@ func buildAppendInstruction(subjectID string) *taskengine.ChainDefinition {
 						"subject_id": subjectID,
 					},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -242,9 +242,9 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 						"subject_id": subjectID,
 					},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "mux_input"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "mux_input"},
 					},
 				},
 			},
@@ -258,13 +258,13 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 						"subject_id": subjectID,
 					},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "persist_chat_messages"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_chat_messages"},
 						{
 							Operator: "equals",
-							Value:    "echo",
-							ID:       "persist_input_output",
+							When:     "echo",
+							Goto:     "persist_input_output",
 						},
 					},
 				},
@@ -274,9 +274,9 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: preferredModelNames,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "persist_input_output"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_input_output"},
 					},
 				},
 				Hook: &taskengine.HookCall{
@@ -296,9 +296,9 @@ func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.
 						"subject_id": subjectID,
 					},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -347,9 +347,9 @@ func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 					Type: "convert_openai_to_history",
 					Args: map[string]string{},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "persist_chat_messages"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_chat_messages"},
 					},
 				},
 			},
@@ -358,9 +358,9 @@ func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: []string{model},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "convert_history_to_openai"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "convert_history_to_openai"},
 					},
 				},
 				Hook: &taskengine.HookCall{
@@ -378,9 +378,9 @@ func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 						"model": model,
 					},
 				},
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Value: "default", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
 					},
 				},
 			},

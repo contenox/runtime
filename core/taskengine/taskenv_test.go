@@ -25,14 +25,14 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 		Tasks: []taskengine.ChainTask{
 			{
 				ID:       "task1",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `What is {{.input}}?`,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
 						{
 							Operator: "equals",
-							Value:    "42",
-							ID:       "end",
+							When:     "42",
+							Goto:     taskengine.TermEnd,
 						},
 					},
 				},
@@ -57,11 +57,11 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:           "task1",
-				Type:         taskengine.PromptToString,
-				Template:     `Broken task`,
-				RetryOnError: 1,
-				Transition:   taskengine.Transition{},
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				Template:       `Broken task`,
+				RetryOnFailure: 1,
+				Transition:     taskengine.TaskTransition{},
 			},
 		},
 	}
@@ -86,21 +86,21 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 		Tasks: []taskengine.ChainTask{
 			{
 				ID:       "task1",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `{{.input}}`,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Operator: "equals", Value: "continue", ID: "task2"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "equals", When: "continue", Goto: "task2"},
 					},
 				},
 			},
 			{
 				ID:       "task2",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `Follow up`,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Operator: "equals", Value: "continue", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "equals", When: "continue", Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -127,19 +127,19 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 		Tasks: []taskengine.ChainTask{
 			{
 				ID:       "task1",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `fail`,
-				Transition: taskengine.Transition{
-					OnError: "task2",
+				Transition: taskengine.TaskTransition{
+					OnFailure: "task2",
 				},
 			},
 			{
 				ID:       "task2",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `recover`,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Operator: "equals", Value: "recovered", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "equals", When: "recovered", Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -165,12 +165,12 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 		Tasks: []taskengine.ChainTask{
 			{
 				ID:       "task1",
-				Type:     taskengine.PromptToString,
+				Type:     taskengine.RawString,
 				Template: `hi {{.input}}`,
 				Print:    `Output: {{.task1}}`,
-				Transition: taskengine.Transition{
-					Next: []taskengine.ConditionalTransition{
-						{Operator: "equals", Value: "printed-value", ID: "end"},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "equals", When: "printed-value", Goto: taskengine.TermEnd},
 					},
 				},
 			},
