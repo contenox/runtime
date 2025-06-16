@@ -96,10 +96,10 @@ Notes from the devslice:
 * [ ] **Release processes**
 * [ ] **Integrate Observability**
 * [ ] **Prepare release infrastructure**
-* [ ] **RAG-enhanced chat interface**
-* [ ] **Chat with support for execution of tasks as commands**
+* [x] **RAG-enhanced chat interface**
+* [x] **Chat with support for execution of tasks as commands**
 * [ ] **Package a Persona-Chat Application**
-* [ ] **Registration route for new Persona-Chat-Users**
+* [x] **Registration route for new Persona-Chat-Users**
 * [ ] **Add API Rate Limiting middleware**
 
 ## ⚙️ Starting the Development Environment

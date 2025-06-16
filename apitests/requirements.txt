@@ -4,3 +4,4 @@ testcontainers
 testcontainers[opensearch]
 testcontainers[postgresql]
 testcontainers[nats]
+openai
