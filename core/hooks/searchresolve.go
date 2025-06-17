@@ -56,15 +56,15 @@ func (s *SearchResolve) Exec(ctx context.Context, startTime time.Time, input any
 	if err != nil {
 		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("failed to get file: %v", err)
 	}
-	blob, err := storeInstance.GetBlobByID(ctx, file.ID)
+	blob, err := storeInstance.GetBlobByID(ctx, file.BlobsID)
 	if err != nil {
 		return taskengine.StatusError, nil, dataType, transition, fmt.Errorf("failed to get blob: %v", err)
 	}
 	if file.Type == "application/json" {
 		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeJSON, "application/json", nil
 	}
-	if file.Type == "text/plain" {
-		return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeString, "text/plain", nil
+	if file.Type == "text/plain" || file.Type == "text/plain; charset=utf-8" {
+		return taskengine.StatusSuccess, string(blob.Data), taskengine.DataTypeString, "text/plain", nil
 	}
 
 	return taskengine.StatusSuccess, blob.Data, taskengine.DataTypeAny, "any", nil

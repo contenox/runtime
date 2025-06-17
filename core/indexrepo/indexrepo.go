@@ -98,7 +98,7 @@ func ExecuteVectorSearch(
 	if len(searchResults) == 0 {
 		return []SearchResult{}, nil
 	}
-
+	// TODO deduplication does not aggregate distances
 	// Deduplicate results
 	deduplicate := make(map[string]SearchResult)
 	for _, sr := range searchResults {
