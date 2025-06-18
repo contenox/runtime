@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
+	"github.com/contenox/contenox/core/hookrecipes"
 	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
@@ -143,10 +144,19 @@ func main() {
 	}
 	chatManager := chat.New(state, tokenizerSvc)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
-
+	knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
+		SearchHook:     rag,
+		ResolveHook:    hooks.NewSearchResolveHook(dbInstance),
+		DefaultTopK:    1,
+		DefaultDist:    40,
+		DefaultPos:     0,
+		DefaultEpsilon: 0.5,
+		DefaultRadius:  40,
+	})
 	// Mux for handling commands like /echo
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
-		"echo": echocmd,
+		"echo":      echocmd,
+		"knowledge": knowledgeHook,
 	})
 
 	// Combine all hooks into one registry

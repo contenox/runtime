@@ -10,6 +10,18 @@ import (
 	"github.com/contenox/contenox/core/taskengine"
 )
 
+func NewSearchThenResolveHook(searchThenResolveHook SearchThenResolveHook) taskengine.HookRepo {
+	return &SearchThenResolveHook{
+		SearchHook:     searchThenResolveHook.SearchHook,
+		ResolveHook:    searchThenResolveHook.ResolveHook,
+		DefaultTopK:    searchThenResolveHook.DefaultTopK,
+		DefaultDist:    searchThenResolveHook.DefaultDist,
+		DefaultPos:     searchThenResolveHook.DefaultPos,
+		DefaultEpsilon: searchThenResolveHook.DefaultEpsilon,
+		DefaultRadius:  searchThenResolveHook.DefaultRadius,
+	}
+}
+
 // SearchThenResolveHook is a recipe that chains:
 type SearchThenResolveHook struct {
 	SearchHook     taskengine.HookRepo
