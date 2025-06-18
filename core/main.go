@@ -155,8 +155,8 @@ func main() {
 	})
 	// Mux for handling commands like /echo
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
-		"echo":      echocmd,
-		"knowledge": knowledgeHook,
+		"echo":             echocmd,
+		"search_knowledge": knowledgeHook,
 	})
 
 	// Combine all hooks into one registry

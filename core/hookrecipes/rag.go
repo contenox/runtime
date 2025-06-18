@@ -36,7 +36,7 @@ type SearchThenResolveHook struct {
 var _ taskengine.HookRepo = (*SearchThenResolveHook)(nil)
 
 func (r *SearchThenResolveHook) Supports(ctx context.Context) ([]string, error) {
-	return []string{"search_then_resolve"}, nil
+	return []string{"search_knowledge"}, nil
 }
 
 func (r *SearchThenResolveHook) Exec(

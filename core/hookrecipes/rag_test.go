@@ -187,7 +187,7 @@ func TestSystemSearchThenResolveWithFiles(t *testing.T) {
 					tt.query,
 					taskengine.DataTypeString,
 					"",
-					&taskengine.HookCall{Type: "search_then_resolve"},
+					&taskengine.HookCall{Type: "search_knowledge"},
 				)
 
 				if tt.wantErr {
