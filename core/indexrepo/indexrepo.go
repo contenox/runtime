@@ -144,34 +144,31 @@ func IngestChunks(
 	}
 
 	modelName := embedProvider.ModelName()
-	vectorIDs = make([]string, len(chunks))
-	augmentedMetadata = make([]string, len(chunks))
 	storeInstance := store.New(dbExec)
+
+	vectorIDs = make([]string, 0, len(chunks))
+	augmentedMetadata = make([]string, 0, len(chunks))
 
 	for i, chunk := range chunks {
 		var enriched string
 		enriched, err := augmentStrategy(ctx, chunk)
 		if err != nil {
-			return nil, nil, fmt.Errorf("chunk %d: %w", i, err)
+			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
 
-		// Generate embedding
 		vectorData, err := embedText(ctx, embedClient, enriched)
 		if err != nil {
-			return nil, nil, fmt.Errorf("chunk %d: %w", i, err)
+			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
 
-		// Create vector ID
 		vectorID := fmt.Sprintf("%s-%d", resourceID, i)
-		vectorIDs[i] = vectorID
 
-		// Insert vector
 		v := vectors.Vector{ID: vectorID, Data: vectorData}
 		if err := vectorsStore.Insert(ctx, v); err != nil {
-			return nil, nil, fmt.Errorf("chunk %d: failed to insert vector: %w", i, err)
+			// Return partial results + current error
+			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: failed to insert vector: %w", i, err)
 		}
 
-		// Create chunk index
 		if err := storeInstance.CreateChunkIndex(ctx, &store.ChunkIndex{
 			ID:             vectorID,
 			VectorID:       vectorID,
@@ -180,9 +177,13 @@ func IngestChunks(
 			ResourceType:   resourceType,
 			EmbeddingModel: modelName,
 		}); err != nil {
-			return nil, nil, fmt.Errorf("chunk %d: failed to create chunk index: %w", i, err)
+			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: failed to create chunk index: %w", i, err)
 		}
+
+		vectorIDs = append(vectorIDs, vectorID)
+		augmentedMetadata = append(augmentedMetadata, enriched)
 	}
+
 	return vectorIDs, augmentedMetadata, nil
 }
 

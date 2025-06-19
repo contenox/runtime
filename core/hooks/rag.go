@@ -36,7 +36,7 @@ var _ taskengine.HookRepo = (*Search)(nil)
 
 // Supports returns the list of hook names this provider supports.
 func (h *Search) Supports(ctx context.Context) ([]string, error) {
-	return []string{"search"}, nil
+	return []string{"vector_search"}, nil
 }
 
 // Exec executes the "search" hook by performing a vector search based on the input string.

@@ -21,18 +21,18 @@ type Service interface {
 }
 
 type service struct {
-	embedder   llmrepo.ModelRepo
-	promptExec llmrepo.ModelRepo
-	vectors    vectors.Store
-	db         libdb.DBManager
+	embedder     llmrepo.ModelRepo
+	promptExec   llmrepo.ModelRepo
+	vectorsStore vectors.Store
+	db           libdb.DBManager
 }
 
-func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectors vectors.Store, dbInstance libdb.DBManager) Service {
+func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectorsStore vectors.Store, dbInstance libdb.DBManager) Service {
 	return &service{
-		embedder:   embedder,
-		promptExec: promptExec,
-		vectors:    vectors,
-		db:         dbInstance,
+		embedder:     embedder,
+		promptExec:   promptExec,
+		vectorsStore: vectorsStore,
+		db:           dbInstance,
 	}
 }
 
@@ -57,15 +57,29 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 	if request.JobID == "" {
 		return nil, serverops.ErrMissingParameter
 	}
-	tx, commit, end, err := s.db.WithTransaction(ctx)
+
+	var vectorIDs []string
+
+	clean := func() {
+		for _, id := range vectorIDs {
+			if delErr := s.vectorsStore.Delete(ctx, id); delErr != nil {
+				fmt.Printf("failed to clean up vector %q: %v\n", id, delErr)
+			}
+		}
+	}
+
+	tx, commit, end, err := s.db.WithTransaction(ctx, clean)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer end()
+
 	storeInstance := store.New(tx)
+
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionEdit); err != nil {
 		return nil, err
 	}
+
 	job, err := storeInstance.GetLeasedJob(ctx, request.JobID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get leased job %s: %w", request.JobID, err)
@@ -81,14 +95,13 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			return nil, fmt.Errorf("failed to get chunk index by ID: %w", err)
 		}
 		for _, chunk := range chunks {
-			err := s.vectors.Delete(ctx, chunk.VectorID)
+			err := s.vectorsStore.Delete(ctx, chunk.VectorID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to delete vector: %w", err)
 			}
 		}
 	}
 
-	// Create augment strategy using service's findKeywords
 	augmentStrategy := func(ctx context.Context, chunk string) (string, error) {
 		keywords, err := s.findKeywords(ctx, chunk)
 		if err != nil {
@@ -97,11 +110,10 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 		return fmt.Sprintf("%s\n\nKeywords: %s", chunk, keywords), nil
 	}
 
-	// Use indexrepo for core ingestion logic
 	vectorIDs, augmentedMetadata, err := indexrepo.IngestChunks(
 		ctx,
 		s.embedder,
-		s.vectors,
+		s.vectorsStore,
 		tx,
 		request.ID,
 		job.EntityType,
@@ -180,7 +192,7 @@ func (s *service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 	searchResults, err := indexrepo.ExecuteVectorSearch(
 		ctx,
 		s.embedder,
-		s.vectors,
+		s.vectorsStore,
 		tx,
 		tryQuery,
 		topK,
