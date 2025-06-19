@@ -52,7 +52,7 @@ func (sm *postgresDBManager) WithoutTransaction() Exec {
 
 // WithTransaction starts a PostgreSQL transaction and returns the associated
 // executor, commit function, and release function.
-func (sm *postgresDBManager) WithTransaction(ctx context.Context) (Exec, CommitTx, ReleaseTx, error) {
+func (sm *postgresDBManager) WithTransaction(ctx context.Context, onRollback ...func()) (Exec, CommitTx, ReleaseTx, error) {
 	// Use default transaction options. Could allow passing sql.TxOptions if needed.
 	tx, err := sm.dbInstance.BeginTx(ctx, nil)
 	if err != nil {
@@ -62,7 +62,14 @@ func (sm *postgresDBManager) WithTransaction(ctx context.Context) (Exec, CommitT
 
 	// Executor bound to the transaction
 	store := &txAwareDB{tx: tx}
-
+	committed := false
+	rollback := func() {
+		for _, f := range onRollback {
+			if f != nil {
+				f()
+			}
+		}
+	}
 	// Define the Commit function
 	commitFn := func(commitCtx context.Context) error {
 		// Check context before attempting commit
@@ -81,6 +88,7 @@ func (sm *postgresDBManager) WithTransaction(ctx context.Context) (Exec, CommitT
 			// Return the translated commit error, wrapped for context.
 			return fmt.Errorf("%w: commit failed: %w", ErrTxFailed, translateError(err))
 		}
+		committed = true
 		// Commit succeeded
 		return nil
 	}
@@ -88,12 +96,15 @@ func (sm *postgresDBManager) WithTransaction(ctx context.Context) (Exec, CommitT
 	// Define the Release (Rollback) function
 	releaseFn := func() error {
 		// Attempt rollback
-		err := tx.Rollback()
+		rollbackErr := tx.Rollback()
+		if !committed {
+			rollback()
+		}
 		// Rollback is often called via defer, even after a successful commit.
 		// Ignore sql.ErrTxDone, as it means the transaction is already finalized.
-		if err != nil && !errors.Is(err, sql.ErrTxDone) {
+		if rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
 			// Report any other *unexpected* rollback error, wrapped for context.
-			return fmt.Errorf("%w: rollback failed: %w", ErrTxFailed, translateError(err))
+			return fmt.Errorf("%w: rollback failed: %w", ErrTxFailed, translateError(rollbackErr))
 		}
 		// Rollback succeeded or was unnecessary (already finalized)
 		return nil

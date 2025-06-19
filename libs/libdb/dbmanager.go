@@ -64,20 +64,51 @@ var (
 
 // DBManager defines the interface for obtaining database executors and managing
 // the database connection lifecycle. It serves as the main entry point for database interactions.
+//
+// Usage Example (Transaction):
+// 	func handleRequest(ctx context.Context, mgr libdb.DBManager) error {
+// 	    // Start transaction, get executor and commit/release functions
+// 	    exec, commit, release, err := mgr.WithTransaction(ctx)
+// 	    if err != nil {
+// 	        return fmt.Errorf("failed to start transaction: %w", err)
+// 	    }
+//
+// 	    // Always defer release() to ensure cleanup (rollback on error/panic, no-op after commit)
+// 	    defer release()
+
+//	    // --- Do work using exec ---
+//	    _, err = exec.ExecContext(ctx, "UPDATE settings SET value = $1 WHERE key = $2", "new_value", "setting_key")
+//	    if err != nil {
+//	        // Error occurred - no need to call release explicitly, defer handles it.
+//	        return fmt.Errorf("failed to update setting: %w", err)
+//	    }
+//
+//	    // --- Success ---
+//	    // Attempt to commit; if it fails, the deferred release() still runs.
+//	    if err = commit(ctx); err != nil {
+//	        return fmt.Errorf("transaction commit failed: %w", err)
+//	    }
+//
+//	    // Commit successful. The deferred release() will run but do nothing (idempotent).
+//	    return nil
+//	}
 type DBManager interface {
 	// WithoutTransaction returns an executor that operates directly on the underlying
 	// database connection pool (i.e., outside of an explicit transaction).
 	// Each operation may run on a different connection.
 	WithoutTransaction() Exec
 
-	// WithTransaction starts a new database transaction and returns an executor
-	// bound to that transaction, a function to commit the transaction, and a function
-	// to release (roll back) the transaction.
+	// WithTransaction starts a new database transaction and returns:
+	//   - Exec:       An executor bound to the transaction for executing queries
+	//   - CommitTx:   Function to commit the transaction (call only on success path)
+	//   - ReleaseTx:  Function to release resources (designed for defer, handles rollback)
+	//   - error:      Non-nil if transaction couldn't be started
 	//
-	// The returned ReleaseTx function is designed to be deferred to ensure the transaction
-	// is always finalized (rolled back on error/panic, or a no-op after successful commit)
-	// and the connection is released. See package documentation for usage patterns.
-	WithTransaction(ctx context.Context) (Exec, CommitTx, ReleaseTx, error)
+	// Parameters:
+	//   ctx:        Context for transaction initialization (timeout/cancellation)
+	//   onRollback: Optional functions executed ONLY if transaction is rolled back.
+	//               Called AFTER successful rollback. Must NOT use the transaction.
+	WithTransaction(ctx context.Context, onRollback ...func()) (Exec, CommitTx, ReleaseTx, error)
 
 	// Close terminates the underlying database connection pool.
 	// It should be called when the application is shutting down.
@@ -117,6 +148,10 @@ type QueryRower interface {
 // It should typically only be called on the success path of a transactional operation.
 // It may check the context before committing and returns ErrTxFailed or a translated
 // database error if the commit fails.
+// Returns:
+//   - nil:        Successfully committed
+//   - ErrTxFailed: Wrapped error if commit failed (transaction already rolled back)
+//   - context error: If ctx is done before commit attempt
 type CommitTx func(ctx context.Context) error
 
 // ReleaseTx is a function type responsible for rolling back a transaction, ensuring
@@ -124,4 +159,12 @@ type CommitTx func(ctx context.Context) error
 // or after a commit) and is ideal for use with `defer` to guarantee cleanup.
 // It returns ErrTxFailed or a translated database error if the rollback fails
 // (and the transaction wasn't already finalized).
+// recap: it safely releases transaction resources:
+//   - Rolls back if not committed
+//   - No-op if already committed/rolled back
+//   - Executes onRollback handlers only after successful rollback
+//
+// Returns:
+//   - nil:        Success or no-op (ErrTxDone)
+//   - ErrTxFailed: Wrapped error if rollback unexpectedly failed
 type ReleaseTx func() error

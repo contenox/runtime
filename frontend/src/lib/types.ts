@@ -4,7 +4,7 @@ export type Backend = {
   baseUrl: string;
   type: string;
   models: string[];
-  pulledModels: OpenAIModel[];
+  pulledModels: Model[];
   error: string;
   createdAt?: string;
   updatedAt?: string;
