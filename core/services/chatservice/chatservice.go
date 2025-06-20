@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/contenox/core/tasksrecipes"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/google/uuid"
 )
@@ -84,7 +85,7 @@ func (s *service) AddInstruction(ctx context.Context, subjectID string, message 
 	}
 
 	// Build or load chain definition
-	chain := buildAppendInstruction(subjectID)
+	chain := tasksrecipes.BuildAppendInstruction(subjectID)
 
 	// Run the chain using the environment executor
 	_, err := s.env.ExecEnv(ctx, chain, message, taskengine.DataTypeString)
@@ -104,7 +105,7 @@ func (s *service) Chat(ctx context.Context, subjectID string, message string, pr
 	input := message
 
 	// Build or load chain definition
-	chain := buildChatChain(subjectID, preferredModelNames)
+	chain := tasksrecipes.BuildChatChain(subjectID, preferredModelNames...)
 
 	// Run the chain using the environment executor
 	result, err := s.env.ExecEnv(ctx, chain, input, taskengine.DataTypeString)
@@ -204,108 +205,6 @@ type ModelResult struct {
 	MaxTokens  int // Max token length for the model.
 }
 
-func buildAppendInstruction(subjectID string) *taskengine.ChainDefinition {
-	return &taskengine.ChainDefinition{
-		Tasks: []taskengine.ChainTask{
-			{
-				ID:          "append_system_message",
-				Description: "Append instruction message to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "append_system_message",
-					Args: map[string]string{
-						"subject_id": subjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: taskengine.TermEnd},
-					},
-				},
-			},
-		},
-	}
-}
-
-func buildChatChain(subjectID string, preferredModelNames []string) *taskengine.ChainDefinition {
-	return &taskengine.ChainDefinition{
-		ID:          "chat_chain",
-		Description: "Standard chat processing pipeline with hooks",
-		Tasks: []taskengine.ChainTask{
-			{
-				ID:          "append_user_message",
-				Description: "Append user message to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "append_user_message",
-					Args: map[string]string{
-						"subject_id": subjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "mux_input"},
-					},
-				},
-			},
-			{
-				ID:          "mux_input",
-				Description: "Check for commands like /echo using Mux",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "command_router",
-					Args: map[string]string{
-						"subject_id": subjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_chat_messages"},
-						{
-							Operator: "equals",
-							When:     "echo",
-							Goto:     "persist_input_output",
-						},
-					},
-				},
-			},
-			{
-				ID:              "persist_chat_messages",
-				Description:     "Run inference using selected LLM",
-				Type:            taskengine.Hook,
-				PreferredModels: preferredModelNames,
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_input_output"},
-					},
-				},
-				Hook: &taskengine.HookCall{
-					Type: "persist_chat_messages",
-					Args: map[string]string{
-						"subject_id": subjectID,
-					},
-				},
-			},
-			{
-				ID:          "persist_input_output",
-				Description: "Persist the conversation",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "persist_input_output",
-					Args: map[string]string{
-						"subject_id": subjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: taskengine.TermEnd},
-					},
-				},
-			},
-		},
-	}
-}
-
 func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.OpenAIChatRequest) (*taskengine.OpenAIChatResponse, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
@@ -313,7 +212,7 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	}
 
 	// Build chain with subject ID and model
-	chain := buildOpenAIChatChain(req.Model)
+	chain := tasksrecipes.BuildOpenAIChatChain(req.Model)
 
 	// Use correct data type
 	result, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
@@ -332,60 +231,6 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	}
 
 	return &res, nil
-}
-
-func buildOpenAIChatChain(model string) *taskengine.ChainDefinition {
-	return &taskengine.ChainDefinition{
-		ID:          "openai_chat_chain",
-		Description: "OpenAI Style chat processing pipeline with hooks",
-		Tasks: []taskengine.ChainTask{
-			{
-				ID:          "convert_openai_to_history",
-				Description: "Convert OpenAI request to internal history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "convert_openai_to_history",
-					Args: map[string]string{},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_chat_messages"},
-					},
-				},
-			},
-			{
-				ID:              "persist_chat_messages",
-				Description:     "Run inference using selected LLM",
-				Type:            taskengine.Hook,
-				PreferredModels: []string{model},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "convert_history_to_openai"},
-					},
-				},
-				Hook: &taskengine.HookCall{
-					Type: "persist_chat_messages",
-					Args: map[string]string{},
-				},
-			},
-			{
-				ID:          "convert_history_to_openai",
-				Description: "Convert chat history to OpenAI response",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "convert_history_to_openai",
-					Args: map[string]string{
-						"model": model,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: taskengine.TermEnd},
-					},
-				},
-			},
-		},
-	}
 }
 
 func (s *service) GetServiceName() string {
