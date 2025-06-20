@@ -76,7 +76,7 @@ type Routine struct {
 //   - threshold: The number of consecutive failures required to move the state from Closed to Open. Must be greater than 0.
 //   - resetTimeout: The period the circuit breaker will remain Open before transitioning to HalfOpen. Must be positive.
 func NewRoutine(threshold int, resetTimeout time.Duration) *Routine {
-	log.Printf("Creating new routine with threshold: %d, reset timeout: %s", threshold, resetTimeout)
+	// log.Printf("Creating new routine with threshold: %d, reset timeout: %s", threshold, resetTimeout)
 	return &Routine{
 		threshold:    threshold,
 		resetTimeout: resetTimeout,
@@ -206,7 +206,7 @@ func (rm *Routine) ExecuteWithRetry(ctx context.Context, interval time.Duration,
 	var err error
 	for range iterations {
 		if ctx.Err() != nil {
-			//log.Println("Context cancelled, aborting retries")
+			// log.Println("Context cancelled, aborting retries")
 			return context.Cause(ctx)
 		}
 		// log.Printf("Retry attempt %d", i+1)
