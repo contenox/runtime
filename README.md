@@ -1,10 +1,10 @@
-# contenox – Conversation Interface Engine
+# contenox – Conversation Interface Runtime
 
-A modular platform for building context-aware agents, semantic search, and LLM-driven automation — all powered by a **conversation interface engine** that replaces traditional UIs with natural language interaction.
+A modular platform for building context-aware agents, semantic search, and LLM-driven automation — all powered by a **conversation interface runtime** that replaces traditional UIs with natural language interaction.
 
 ## 🧠 Key Features
 
-- **Conversational UI Engine**: Replace buttons and menus with chat-based navigation and slash commands (`/echo`, `/summarize`, `/search`).
+- **Conversational UI Runtime**: Replace buttons and menus with chat-based navigation and slash commands (`/echo`, `/summarize`, `/search`).
 - **RAG-Powered Search & QA**: Ask questions and get answers grounded in your internal knowledge base.
 - **Prompt Chain Automation**: Define repeatable actions using YAML-defined chains of prompts, hooks, and conditions.
 - **Stateful Chat Sessions**: Maintain context across turns with role-based message history.
