@@ -1,6 +1,6 @@
 # contenox – Conversation Interface Runtime
 
-A modular platform for building context-aware agents, semantic search, and LLM-driven automation — all powered by a **conversation interface runtime** that replaces traditional UIs with natural language interaction.
+A modular platform for building context-aware agents, semantic search, and LLM-driven automation — all powered by a **conversation interface runtime** to replace traditional UIs with natural language interaction.
 
 ## 🧠 Key Features
 
