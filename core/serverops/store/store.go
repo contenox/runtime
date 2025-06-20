@@ -246,6 +246,7 @@ type Store interface {
 	ListPoolsForModel(ctx context.Context, modelID string) ([]*Pool, error)
 
 	AppendJob(ctx context.Context, job Job) error
+	AppendJobs(ctx context.Context, jobs ...*Job) error
 	PopAllJobs(ctx context.Context) ([]*Job, error)
 	PopJobsForType(ctx context.Context, taskType string) ([]*Job, error)
 	PopJobForType(ctx context.Context, taskType string) (*Job, error)
@@ -302,6 +303,7 @@ type Store interface {
 	AppendMessages(ctx context.Context, messages ...*Message) error
 	DeleteMessages(ctx context.Context, stream string) error
 	ListMessages(ctx context.Context, stream string) ([]*Message, error)
+	LastMessage(ctx context.Context, stream string) (*Message, error)
 
 	CreateMessageIndex(ctx context.Context, id string, identity string) error
 	DeleteMessageIndex(ctx context.Context, id string, identity string) error

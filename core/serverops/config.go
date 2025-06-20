@@ -10,11 +10,13 @@ import (
 
 var CoreVersion = "CORE-UNSET-dev"
 
-const EmbedPoolID = "internal_embed_pool"
-const EmbedPoolName = "Embedder"
-const TasksPoolID = "internal_tasks_pool"
-const TasksPoolName = "Tasks"
-const TenantID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+const (
+	EmbedPoolID   = "internal_embed_pool"
+	EmbedPoolName = "Embedder"
+	TasksPoolID   = "internal_tasks_pool"
+	TasksPoolName = "Tasks"
+	TenantID      = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+)
 
 type Config struct {
 	DatabaseURL         string `json:"database_url"`
@@ -42,6 +44,7 @@ type Config struct {
 	WorkerUserAccountID string `json:"worker_user_account_id"`
 	WorkerUserPassword  string `json:"worker_user_password"`
 	WorkerUserEmail     string `json:"worker_user_email"`
+	TelegramToken       string `json:"telegram_token"`
 }
 
 type ConfigTokenizerService struct {

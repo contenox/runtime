@@ -41,7 +41,6 @@ func (s *store) DeleteMessages(ctx context.Context, stream string) error {
 		WHERE idx_id = $1`,
 		stream,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to delete messages: %w", err)
 	}
@@ -81,4 +80,27 @@ func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, er
 	}
 
 	return models, nil
+}
+
+func (s *store) LastMessage(ctx context.Context, stream string) (*Message, error) {
+	row := s.Exec.QueryRowContext(ctx, `
+		SELECT id, idx_id, payload, added_at
+		FROM messages
+		WHERE idx_id = $1
+		ORDER BY added_at DESC
+		LIMIT 1`,
+		stream,
+	)
+
+	var model Message
+	if err := row.Scan(
+		&model.ID,
+		&model.IDX,
+		&model.Payload,
+		&model.AddedAt,
+	); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return &model, nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
+	"github.com/contenox/contenox/core/services/telegramservice"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libbus"
@@ -185,7 +186,36 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
 	}
-
+	if config.TelegramToken != "" {
+		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, environmentExec, dbInstance)
+		if err != nil {
+			log.Fatalf("initializing Telegram worker failed: %v", err)
+		}
+		var Boterr error
+		triggerChan := make(chan struct{})
+		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Millisecond*30, triggerChan, func(ctx context.Context) error {
+			Boterr = telegramWorker.ProcessTick(ctx)
+			if Boterr != nil {
+				return fmt.Errorf("initializing Telegram worker failed: %v", Boterr)
+			}
+			return nil
+		}, func(err error) {
+			if err != nil {
+				// ("Telegram worker failed: %v", err)
+			}
+		})
+		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
+			Boterr = telegramWorker.ReceiveTick(ctx)
+			if Boterr != nil {
+				return fmt.Errorf("initializing Telegram worker failed: %v", Boterr)
+			}
+			return nil
+		}, func(err error) {
+			if err != nil {
+				// ("Telegram worker failed: %v", err)
+			}
+		})
+	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
 	uiURL, err := url.Parse(config.UIBaseURL)

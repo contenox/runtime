@@ -30,6 +30,16 @@ func (s *store) AppendJob(ctx context.Context, job Job) error {
 	return err
 }
 
+func (s *store) AppendJobs(ctx context.Context, jobs ...*Job) error {
+	for _, job := range jobs {
+		job.CreatedAt = time.Now().UTC()
+		if err := s.AppendJob(ctx, *job); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // PopAllJobs removes and returns every job in the job_queue.
 func (s *store) PopAllJobs(ctx context.Context) ([]*Job, error) {
 	query := `
