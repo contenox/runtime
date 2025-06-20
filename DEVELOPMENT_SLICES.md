@@ -60,7 +60,7 @@
 - [ ] **Release Infrastructure Setup**
 - [ ] **API Rate Limiting Middleware**
 - [ ] **Package a Persona-Chat Application**
-- [ ] **Telegram/Slack bot integrations**
+- [ ] **Telegram bot integrations**
 - [x] **Simple OpenAI SDK compatible chat endpoint**
 
 ---
@@ -70,8 +70,8 @@
 #### Potential Focus Areas:
 - Multi-user collaboration via shared chat sessions
 - Persiting Tasks + UI-Tasks Builder
+- Slack bot integrations
 - Voice interface integration
-- Telegram/Slack bot integrations
 - Audit logging and compliance tooling
 - Exportable conversation transcripts
 - Model fine-tuning management dashboard
