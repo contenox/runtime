@@ -27,7 +27,7 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 		"append_user_message",
 		"convert_openai_to_history",
 		"append_system_message",
-		"persist_chat_messages",
+		"execute_model_on_messages",
 		"persist_input_output",
 		"convert_history_to_openai",
 	}, nil
@@ -51,7 +51,7 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 		return h.AppendOpenAIChatToChathistory, nil
 	case "append_system_message":
 		return h.AppendInstructionToChathistory, nil
-	case "persist_chat_messages":
+	case "execute_model_on_messages":
 		return h.ChatExec, nil
 	case "convert_history_to_openai":
 		return h.ConvertToOpenAIResponse, nil

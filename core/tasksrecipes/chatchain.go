@@ -17,12 +17,12 @@ func BuildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_chat_messages"},
+						{Operator: "default", Goto: "execute_model_on_messages"},
 					},
 				},
 			},
 			{
-				ID:              "persist_chat_messages",
+				ID:              "execute_model_on_messages",
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: []string{model},
@@ -32,7 +32,7 @@ func BuildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 					},
 				},
 				Hook: &taskengine.HookCall{
-					Type: "persist_chat_messages",
+					Type: "execute_model_on_messages",
 					Args: map[string]string{},
 				},
 			},
@@ -89,7 +89,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_chat_messages"},
+						{Operator: "default", Goto: "execute_model_on_messages"},
 						{
 							Operator: "equals",
 							When:     "echo",
@@ -99,7 +99,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				},
 			},
 			{
-				ID:              "persist_chat_messages",
+				ID:              "execute_model_on_messages",
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: preferredModelNames,
@@ -109,7 +109,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 					},
 				},
 				Hook: &taskengine.HookCall{
-					Type: "persist_chat_messages",
+					Type: "execute_model_on_messages",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},

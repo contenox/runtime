@@ -169,7 +169,7 @@ func main() {
 		"convert_openai_to_history": chatHook,
 		"convert_history_to_openai": chatHook,
 		"append_system_message":     chatHook,
-		"persist_chat_messages":     chatHook,
+		"execute_model_on_messages": chatHook,
 		"persist_input_output":      chatHook,
 	})
 	exec, err := taskengine.NewExec(ctx, execRepo, hooks)
@@ -187,16 +187,16 @@ func main() {
 		log.Fatalf("initializing API handler failed: %v", err)
 	}
 	if config.TelegramToken != "" {
-		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, environmentExec, dbInstance)
+		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, config.WorkerUserAccountID, environmentExec, dbInstance)
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)
 		}
-		var Boterr error
+		var BotErr error
 		triggerChan := make(chan struct{})
-		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Millisecond*30, triggerChan, func(ctx context.Context) error {
-			Boterr = telegramWorker.ProcessTick(ctx)
-			if Boterr != nil {
-				return fmt.Errorf("initializing Telegram worker failed: %v", Boterr)
+		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
+			BotErr = telegramWorker.ProcessTick(ctx)
+			if BotErr != nil {
+				return fmt.Errorf("initializing Telegram worker failed: %v", BotErr)
 			}
 			return nil
 		}, func(err error) {
@@ -205,9 +205,9 @@ func main() {
 			}
 		})
 		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
-			Boterr = telegramWorker.ReceiveTick(ctx)
-			if Boterr != nil {
-				return fmt.Errorf("initializing Telegram worker failed: %v", Boterr)
+			BotErr = telegramWorker.ReceiveTick(ctx)
+			if BotErr != nil {
+				return fmt.Errorf("initializing Telegram worker failed: %v", BotErr)
 			}
 			return nil
 		}, func(err error) {
