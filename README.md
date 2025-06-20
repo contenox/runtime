@@ -4,12 +4,12 @@ A modular platform for building context-aware agents, semantic search, and LLM-d
 
 ## 🧠 Key Features
 
-- **Conversational UI Runtime**: Replace buttons and menus with chat-based navigation and slash commands (`/echo`, `/summarize`, `/search`).
+- **Conversational UI Runtime**: Replace buttons and menus with chat-based navigation and slash commands (`/echo`, `/search_knowledge`).
 - **RAG-Powered Search & QA**: Ask questions and get answers grounded in your internal knowledge base.
-- **Prompt Chain Automation**: Define repeatable actions using YAML-defined chains of prompts, hooks, and conditions.
+- **Prompt Chain Automation**: Configure repeatable tasks using chains of prompts, hooks, and conditions to enable transparent and configurable agentic behavior.
 - **Stateful Chat Sessions**: Maintain context across turns with role-based message history.
-- **Command-Driven Interaction**: Use `/echo`, `/summarize`, and custom commands inside chat to trigger powerful actions.
-- **Self-Hosted Infrastructure**: Full control over data and deployment — GDPR-ready and compliant with AI Act standards.
+- **Command-Driven Interaction**: Use `/echo`, `/search_knowledge`, and custom commands inside chat to trigger powerful actions.
+- **Self-Hosted Infrastructure**: Full control over data, and deployment.
 - **Modular Architecture**: Plug-and-play components for scalable, microservice-friendly design.
 - **Open Core**: Built with Apache 2.0 licensing. Extendable, auditable, and enterprise-ready.
 
