@@ -24,9 +24,9 @@
 - `Makefile`: Contains commands for building, testing, running, or deploying parts of the project.
 - `README.md`: Have a look if you have not already.
 - `LICENSE`: APACHE 2.0!
-- `pyrightconfig.json` This is for linting the python codebase.
+- `pyrightconfig.json`: This is for linting the Python codebase.
 
-## Platform's core (`core`)
+## Platform's Core (`core`)
 Provides shared utilities, interfaces, and implementations for operational concerns cutting across services.
 
 **Language**: `Go`
@@ -50,11 +50,9 @@ Provides shared utilities, interfaces, and implementations for operational conce
 ```
 
 ### Transport Layer (`serverapi`)
-Defines the HTTP API endpoints. Not all api-routes are (or have to be) exposed by the core.
-The API layers tasks are only encoding, error translation and exposing services. Routes don't have to translate a service 1:1 they can and should combine multiple services to provide a supporting API.
-
+Defines the HTTP API endpoints. Not all API routes are (or have to be) exposed by the core.
+The API layers tasks are only encoding, error translation, and exposing services. Routes don't have to translate a service 1:1; they can and should combine multiple services to provide a supporting API.
 It's modularized by functionality:
-
 - `backendapi`: Routes for managing backend configurations, models, downloads (`/backend`, `/models`, `/downloads`).
 - `chatapi`: Routes for chat functionality (`/chat`).
 - `dispatchapi`: Routes for leasing and the lifecycle of jobs for workers.
@@ -62,7 +60,7 @@ It's modularized by functionality:
 - `indexapi`: Routes for indexing and embedding (`/index`).
 - `poolapi`: Routes related to managing resource pools (likely model pools) (`/pool`).
 - `systemapi`: Routes for system information/status (`/system`).
-- `tokenizerapi`: Handles tokenization requests. it uses gRPC for communication.
+- `tokenizerapi`: Handles tokenization requests. It uses gRPC for communication.
 - `usersapi`: Routes for user management, authentication, and access control (`/users`, `/auth`, `/access`).
 
 ```bash
@@ -81,13 +79,12 @@ It's modularized by functionality:
 │   │   ├── workerpipe_test.go
 ```
 
-system integration tests and the core server setup are also located in the `serverapi` module.
+System integration tests and the core server setup are also located in the `serverapi` module.
 
 ### Business Logic/Services (`services`)
-
 Contains the core logic for each functional area, orchestrating operations. Each service corresponds to an API module (e.g., `chatservice`, `userservice`, `modelservice`, `filesservice`, `poolservice`, `tokenizerservice`, `dispatchservice`, `downloadservice`, `indexservice`).
-services enforce authorization and authentication enforcement as requests by the service requirements. Also services orchistrate db-calls via transactions if needet.
-Data validation, which is not enforced via DB-schema is also handled here. Services should never use other services.
+Services enforce authorization and authentication enforcement as requested by the service requirements. Also, services orchestrate DB calls via transactions if needed.
+Data validation, which is not enforced via DB schema, is also handled here. Services should never use other services.
 
 ```bash
 │   └── services
@@ -101,11 +98,10 @@ Data validation, which is not enforced via DB-schema is also handled here. Servi
 ```
 
 A service can be decorated with additional functionality, such as the activity tracker/hooks from `serverops`.
-Which is intended to prevent changing a service implementation to add additional functionality and allow extension
+This is intended to prevent changing a service implementation to add additional functionality and allow extension
 of the system with features like tracing depending on the required operational logic.
 
 ### Operational Logic (`serverops`)
-
 ```bash
 │   ├── serverops
 │   │   ├── auth.go
@@ -113,16 +109,14 @@ of the system with features like tracing depending on the required operational l
 │   │   ├── encode.go
 │   │   ├── errors.go
 ```
-
 Provides supporting functions and common interfaces for the server and services:
 - `activitytracker.go`: Provides a mechanism for attaching tracking system activity to services.
 - `auth.go`: Authentication/authorization helpers.
 - `config.go`: Configuration loading/management.
 - `llmclients.go`: Clients for interacting with LLMs.
-- `servicemanager.go`: mainly manages configuration of the services.
+- `servicemanager.go`: Mainly manages configuration of the services.
 
 #### `store`
-
 Data Persistence Layer. Interacts with the database(s).
 Contains functions to manage: users, models, files, backends, accesslists, jobqueue, etc.
 The `schema.sql` PostgreSQL, managed by `libdb/postgres.go`.
@@ -140,7 +134,6 @@ The `schema.sql` PostgreSQL, managed by `libdb/postgres.go`.
 ```
 
 ### Vector Store (`vectors`)
-
 Handles interaction with the Vald vector database. This component is responsible for storing, retrieving, and searching high-dimensional vector embeddings, primarily used for semantic search (RAG).
 
 ```bash
@@ -161,7 +154,6 @@ Handles resolving and providing access to Large Language Models (LLMs). The pres
 │   │   ├── modelprovider.go
 │   │   ├── ollamachatclient.go
 │   │   └── ollamachatclient_test.go
-
 ```
 
 ## Runtime State (`runtimestate`)
@@ -176,18 +168,153 @@ Manages reconciling the ollama backend to match the desired state, including mod
 ```
 
 ## Task Engine (`taskengine`)
-
 ```bash
 │   ├── taskengine
 │   │   ├── taskenv.go
 │   │   ├── taskexec.go
 │   │   └── tasktype.go
 ```
-
 The Task Engine provides the core capability to define, manage, and execute complex, chained sequences of operations (workflows). It is designed to enable automation, including multi-step interactions with Large Language Models (LLMs), conditional logic, and integration with other internal or external systems via hooks.
 
-## Dockerfile (`Dockerfile.core`)
 
+Thank you for the detailed code and explanation. Based on your input, I will now add a new section to the structure document that explains the **`hookrecipes`** package and its role in the system.
+
+---
+
+## Hook Recipes (`hookrecipes`)
+This package provides pre-built compositions of hooks that combine multiple hook functionalities into reusable patterns. These "recipes" enable complex behavior by chaining or configuring simpler hooks together, reducing duplication and increasing flexibility in how tasks are executed.
+
+**Language**: Go
+**Purpose**: To provide higher-level logic for task execution by composing existing hooks into structured workflows.
+
+### Key Concepts
+
+- **Hook Composition**: A recipe combines two or more `taskengine.HookRepo` implementations into a single logical operation.
+- **Parameterization**: Recipes support runtime configuration through named arguments (e.g., `"top_k"`, `"distance"`).
+- **Chaining Execution**: The output of one hook is passed as input to the next, enabling pipelines like search → resolve.
+
+### Structure
+
+```bash
+core/hookrecipes/
+├── parser.go
+├── parser_test.go
+├── rag.go
+└── rag_test.go
+```
+
+#### `SearchThenResolveHook`
+A core recipe that chains:
+1. A **search hook** to retrieve relevant knowledge vectors.
+2. A **resolve hook** to interpret and format the results.
+
+This pattern supports RAG (Retrieval-Augmented Generation) workflows where context is retrieved before being used in an LLM prompt.
+
+##### Features:
+- Accepts parameters via hook arguments:
+  - `top_k`: Number of top results to return.
+  - `epsilon`: Tolerance for similarity matching.
+  - `distance`: Threshold for relevance filtering.
+  - `position`: Index within result list to focus on.
+  - `radius`: Spatial scope for vector search.
+- Supports input parsing: allows prefix-based argument extraction from strings.
+- Implements interface: `taskengine.HookRepo`
+
+##### Example Usage:
+
+```go
+knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
+    SearchHook:     rag,
+    ResolveHook:    hooks.NewSearchResolveHook(dbInstance),
+    DefaultTopK:    1,
+    DefaultDist:    40,
+    DefaultPos:     0,
+    DefaultEpsilon: 0.5,
+    DefaultRadius:  40,
+})
+```
+
+Used in a command router or pipeline:
+
+```go
+hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
+    "echo":             echocmd,
+    "search_knowledge": knowledgeHook,
+})
+```
+
+## Hooks (`hooks`)
+The `hooks` package provides modular, pluggable components for executing side effects or external integrations during task execution in the system. These hooks can be composed together to form complex behaviors such as calling external APIs, interacting with databases, or managing chat workflows.
+
+**Language**: Go
+**Purpose**: To define reusable actions that can be triggered during a task lifecycle, enabling extensibility and integration with internal/external systems.
+
+### Key Concepts
+
+- **HookRepo Interface**: All hooks implement this interface, which defines two methods:
+  - `Supports(ctx context.Context) ([]string, error)` – declares the types of hooks supported.
+  - `Exec(...)` – executes the hook logic with input data and returns transformed output along with status.
+
+- **Modular Design**: Each hook is self-contained and can be reused across different parts of the system.
+
+- **Composable**: Hooks can be combined using structures like `Mux` or `SimpleProvider`, allowing multiple hooks to coexist and be dispatched dynamically.
+
+### Structure
+
+```bash
+core/hooks/
+├── chat.go       echo.go       mockrepo.go     rag.go       searchresolve.go   webhook.go
+└── chat_test.go  echo_test.go  mux.go          rag_test.go  simpleprovider.go
+```
+
+#### Example Hook Implementations
+
+- `WebCaller` (`webhook.go`):
+  Makes HTTP requests to external services (e.g., REST APIs).
+  - Supports dynamic method selection (`GET`, `POST`, etc.)
+  - Handles query parameters, headers, and JSON payloads.
+  - Returns parsed JSON or raw response string based on success/failure.
+
+  ```go
+  hook := hooks.NewWebCaller()
+  ```
+
+- `ChatHook`:
+  Integrates with the chat system to handle message persistence, history retrieval, and LLM invocation.
+
+- `SearchResolveHook`:
+  Combines vector search with post-processing logic to support RAG workflows.
+
+- `Mux`:
+  Routes to different hooks based on command names (e.g., `/echo`, `/search_knowledge`).
+
+- `SimpleProvider`:
+  A registry for named hooks, used to bind them into the task engine.
+
+### Usage Pattern
+
+Hooks are typically registered and used within the task engine setup:
+
+```go
+// Create a webhook hook
+webhookHook := hooks.NewWebCaller()
+
+// Create a command router
+hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
+    "echo":             echocmd,
+    "search_knowledge": knowledgeHook,
+})
+
+// Combine all hooks
+hooksRegistry := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
+    "webhook":      webhookHook,
+    "command_router": hookMux,
+})
+```
+
+These hooks are then passed to the task engine to enable dynamic behavior during task execution.
+
+## Dockerfile (`Dockerfile.core`)
 Instructions to build the Docker image for this core backend service.
 
 ## Frontend
@@ -204,11 +331,9 @@ Instructions to build the Docker image for this core backend service.
 │   ├── public
 │   │   └── vite.svg
 │   ├── README.md
-
 ```
 
 ### Structure
-
 - `src/main.tsx`: Entry point for the React application.
 - `src/App.tsx`: Root application component.
 - `src/components`: Application-specific reusable UI components (Layout, Sidebar, etc.).
@@ -262,9 +387,7 @@ Instructions to build the Docker image for this core backend service.
 ```
 
 #### UI Library
-
-Uses components from the separate packages/ui library. This component Library is not evaluated as final yet. It may be replaces once's rapid prototyping in the UI
-is not necessary, but currently it's in and allows to pinpoint core differentiators that would require later on custom fool and feel.
+Uses components from the separate packages/ui library. This component Library is not evaluated as final yet. It may be replaced once rapid prototyping in the UI is not necessary, but currently, it's in and allows pinpointing core differentiators that would require custom feel later on.
 
 ```bash
 ├── packages
@@ -289,7 +412,7 @@ is not necessary, but currently it's in and allows to pinpoint core differentiat
 **Language**: Go
 **Purpose**: A separate microservice dedicated to handling text tokenization.
 Done separately to potentially scale out and to reduce build time due to CGO requirements.
-**Communication**: gRPC to the core later core may expose some features via HTTP.
+**Communication**: gRPC to the core; later, the core may expose some features via HTTP.
 **Implementation**: Uses libollama for the actual tokenization logic via Ollama.
 **Dockerfile** (`Dockerfile.tokenizer`): Corresponding Dockerfile.
 
@@ -303,7 +426,6 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 ```
 
 ## Shared Libraries (`libs`)
-
 ```bash
 ├── libs
 │   ├── libauth
@@ -314,17 +436,16 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 │   ├── libbus
 ```
 
- - `libauth`: Authentication utilities.
- - `libbus`: message bus interface (implemented via NATS) for event data streaming and cordination of async processes, like canceling downloads.
- - `libcipher`: Cryptography (hashing, encryption).
- - `libdb`: Database abstraction (PostgreSQL).
- - `libkv`: Key-Value store abstraction (TiKV, Valkey/Redis, NATS), will be used for distributed cache.
- - `libollama`: library for interacting with Ollama features not exposed via ollama-API (tokenization).
- - `libroutine`: Goroutine management utilities, like circuit breaker.
- - `libtestenv`: Utilities for setting up testing environments for integration tests.
+- `libauth`: Authentication utilities.
+- `libbus`: Message bus interface (implemented via NATS) for event data streaming and coordination of async processes, like canceling downloads.
+- `libcipher`: Cryptography (hashing, encryption).
+- `libdb`: Database abstraction (PostgreSQL).
+- `libkv`: Key-Value store abstraction (TiKV, Valkey/Redis, NATS), will be used for distributed cache.
+- `libollama`: Library for interacting with Ollama features not exposed via ollama-API (tokenization).
+- `libroutine`: Goroutine management utilities, like circuit breaker.
+- `libtestenv`: Utilities for setting up testing environments for integration tests.
 
-## API tests (`apitests`)
-
+## API Tests (`apitests`)
 ```bash
 ├── apitests
 │   ├── conftest.py
@@ -335,7 +456,6 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 ```
 
 ## Workers (`workers`)
-
 ```bash
 workers/
 ├── __init__.py
@@ -344,5 +464,8 @@ workers/
 ├── requirements.txt
 └── worker.py
 ```
+Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatchapi endpoints and marking them as done when the results are ingested into the core.
 
-Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatchapi endpoints and marking them as done, when the results are ingested into the core.
+---
+
+Let me know if there are specific areas you'd like to expand upon or clarify further!
