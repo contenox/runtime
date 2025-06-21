@@ -155,6 +155,7 @@ func TestUnit_AccessEntry_BulkDeletesByIdentity(t *testing.T) {
 	}
 	require.NoError(t, s.CreateAccessEntry(ctx, entry))
 	ae, err := s.GetAccessEntriesByIdentity(ctx, "user|123")
+	require.NoError(t, err)
 	require.Len(t, ae, 2)
 	// Delete entry
 	err = s.DeleteAccessEntriesByIdentity(ctx, "user|123")
