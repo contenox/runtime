@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -176,7 +177,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec)
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec)
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
@@ -188,6 +189,7 @@ func main() {
 	}
 	if config.TelegramToken != "" {
 		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, config.WorkerUserAccountID, environmentExec, dbInstance)
+		telegramservice.WithActivityTracker(telegramWorker, serverops.NewLogActivityTracker(slog.Default()))
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)
 		}

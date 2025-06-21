@@ -75,3 +75,4 @@
 - Audit logging and compliance tooling
 - Exportable conversation transcripts
 - Model fine-tuning management dashboard
+- Implement queue based model provider

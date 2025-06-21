@@ -3,6 +3,7 @@ package serverapi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -66,6 +67,7 @@ func New(
 		return nil, cleanup, err
 	}
 	backendService := backendservice.New(dbInstance)
+	backendservice.WithActivityTracker(backendService, serverops.NewLogActivityTracker(slog.Default()))
 	backendapi.AddBackendRoutes(mux, config, backendService, state)
 	poolservice := poolservice.New(dbInstance)
 	poolapi.AddPoolRoutes(mux, config, poolservice)
@@ -92,23 +94,31 @@ func New(
 	)
 	fileService := fileservice.New(dbInstance, config)
 	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
+	fileService = fileservice.WithActivityTracker(fileService, serverops.NewLogActivityTracker(slog.Default()))
 	filesapi.AddFileRoutes(mux, config, fileService)
 	downloadService := downloadservice.New(dbInstance, pubsub)
+	downloadService = downloadservice.WithActivityTracker(downloadService, serverops.NewLogActivityTracker(slog.Default()))
 	backendapi.AddQueueRoutes(mux, config, downloadService)
 	modelService := modelservice.New(dbInstance, config)
+	modelService = modelservice.WithActivityTracker(modelService, serverops.NewLogActivityTracker(slog.Default()))
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
 
 	chatService := chatservice.New(dbInstance, environmentExec)
+	chatService = chatservice.WithActivityTracker(chatService, serverops.NewLogActivityTracker(slog.Default()))
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
+	userService = userservice.WithActivityTracker(userService, serverops.NewLogActivityTracker(slog.Default()))
 	usersapi.AddUserRoutes(mux, config, userService)
 
 	accessService := accessservice.New(dbInstance)
+	accessService = accessservice.WithActivityTracker(accessService, serverops.NewLogActivityTracker(slog.Default()))
 	usersapi.AddAccessRoutes(mux, config, accessService)
 	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
+	indexService = indexservice.WithActivityTracker(indexService, serverops.NewLogActivityTracker(slog.Default()))
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	execService := execservice.NewExec(ctx, execmodelrepo, dbInstance)
+	execService = execservice.WithActivityTracker(execService, serverops.NewLogActivityTracker(slog.Default()))
 	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance, hookRegistry)
 	execapi.AddExecRoutes(mux, config, execService, taskService)
 	usersapi.AddAuthRoutes(mux, userService)

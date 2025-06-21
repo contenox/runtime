@@ -20,22 +20,23 @@ func (d *activityTrackerDecorator) NewInstance(ctx context.Context, subject stri
 		"create",
 		"chat-session",
 		"subject", subject,
-		"preferredModels", fmt.Sprintf("%v", preferredModels),
+		"preferred_models", fmt.Sprintf("%v", preferredModels),
 	)
 	defer endFn()
 
 	sessionID, err := d.service.NewInstance(ctx, subject, preferredModels...)
 	if err != nil {
 		reportErrFn(err)
-	} else {
-		reportChangeFn(sessionID, map[string]interface{}{
-			"id":             sessionID,
-			"startedAt":      time.Now().UTC(),
-			"preferredModel": preferredModels[0],
-		})
+		return "", err
 	}
 
-	return sessionID, err
+	reportChangeFn(sessionID, map[string]interface{}{
+		"id":               sessionID,
+		"subject":          subject,
+		"preferred_models": preferredModels,
+	})
+
+	return sessionID, nil
 }
 
 func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
@@ -43,24 +44,26 @@ func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, m
 		ctx,
 		"chat",
 		"message",
-		"subjectID", subjectID,
-		"model", preferredModelNames[0],
+		"subject_id", subjectID,
+		"models", preferredModelNames,
 	)
 	defer endFn()
 
 	response, tokencount, outputtokencount, err := d.service.Chat(ctx, subjectID, message, preferredModelNames...)
 	if err != nil {
 		reportErrFn(err)
-	} else {
-		reportChangeFn(subjectID, map[string]interface{}{
-			"user_message":       message,
-			"response":           response,
-			"input_token_count":  tokencount,
-			"output_token_count": outputtokencount,
-		})
+		return "", 0, 0, err
 	}
 
-	return response, tokencount, outputtokencount, err
+	reportChangeFn(subjectID, map[string]interface{}{
+		"user_message":       message,
+		"response":           response,
+		"input_token_count":  tokencount,
+		"output_token_count": outputtokencount,
+		"timestamp":          time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+	})
+
+	return response, tokencount, outputtokencount, nil
 }
 
 func (d *activityTrackerDecorator) AddInstruction(ctx context.Context, id string, message string) error {
@@ -68,7 +71,7 @@ func (d *activityTrackerDecorator) AddInstruction(ctx context.Context, id string
 		ctx,
 		"add",
 		"instruction",
-		"chatID", id,
+		"chat_id", id,
 		"length", len(message),
 	)
 	defer endFn()
@@ -76,13 +79,16 @@ func (d *activityTrackerDecorator) AddInstruction(ctx context.Context, id string
 	err := d.service.AddInstruction(ctx, id, message)
 	if err != nil {
 		reportErrFn(err)
-	} else {
-		reportChangeFn(id, map[string]interface{}{
-			"content": message,
-		})
+		return err
 	}
 
-	return err
+	reportChangeFn(id, map[string]interface{}{
+		"content":   message,
+		"chat_id":   id,
+		"timestamp": time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+	})
+
+	return nil
 }
 
 func (d *activityTrackerDecorator) GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error) {
@@ -90,16 +96,17 @@ func (d *activityTrackerDecorator) GetChatHistory(ctx context.Context, id string
 		ctx,
 		"read",
 		"chat-history",
-		"chatID", id,
+		"chat_id", id,
 	)
 	defer endFn()
 
 	history, err := d.service.GetChatHistory(ctx, id)
 	if err != nil {
 		reportErrFn(err)
+		return nil, err
 	}
 
-	return history, err
+	return history, nil
 }
 
 func (d *activityTrackerDecorator) ListChats(ctx context.Context) ([]ChatSession, error) {
@@ -109,14 +116,35 @@ func (d *activityTrackerDecorator) ListChats(ctx context.Context) ([]ChatSession
 	sessions, err := d.service.ListChats(ctx)
 	if err != nil {
 		reportErrFn(err)
+		return nil, err
 	}
 
-	return sessions, err
+	return sessions, nil
 }
 
-// OpenAIChatCompletions implements Service.
 func (d *activityTrackerDecorator) OpenAIChatCompletions(ctx context.Context, req taskengine.OpenAIChatRequest) (*taskengine.OpenAIChatResponse, error) {
-	panic("unimplemented")
+	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
+		ctx,
+		"openai_chat_completion",
+		"request",
+		"model", req.Model,
+		"user", req.User,
+		"temperature", req.Temperature,
+	)
+	defer endFn()
+
+	resp, err := d.service.OpenAIChatCompletions(ctx, req)
+	if err != nil {
+		reportErrFn(err)
+		return nil, err
+	}
+
+	reportChangeFn(req.Model, map[string]interface{}{
+		"request":  req,
+		"response": resp,
+	})
+
+	return resp, nil
 }
 
 func (d *activityTrackerDecorator) GetServiceName() string {
@@ -133,5 +161,3 @@ func WithActivityTracker(service Service, tracker serverops.ActivityTracker) Ser
 		tracker: tracker,
 	}
 }
-
-var _ Service = (*activityTrackerDecorator)(nil)
