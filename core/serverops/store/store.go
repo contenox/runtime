@@ -249,6 +249,7 @@ type Store interface {
 	AppendJobs(ctx context.Context, jobs ...*Job) error
 	PopAllJobs(ctx context.Context) ([]*Job, error)
 	PopJobsForType(ctx context.Context, taskType string) ([]*Job, error)
+	PopNJobsForType(ctx context.Context, taskType string, n int) ([]*Job, error)
 	PopJobForType(ctx context.Context, taskType string) (*Job, error)
 	GetJobsForType(ctx context.Context, taskType string) ([]*Job, error)
 	ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Job, error)

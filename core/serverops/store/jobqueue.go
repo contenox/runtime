@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -31,13 +33,50 @@ func (s *store) AppendJob(ctx context.Context, job Job) error {
 }
 
 func (s *store) AppendJobs(ctx context.Context, jobs ...*Job) error {
-	for _, job := range jobs {
-		job.CreatedAt = time.Now().UTC()
-		if err := s.AppendJob(ctx, *job); err != nil {
-			return err
-		}
+	if len(jobs) == 0 {
+		return nil
 	}
-	return nil
+
+	now := time.Now().UTC()
+	valueStrings := make([]string, 0, len(jobs))
+	valueArgs := make([]interface{}, 0, len(jobs)*11)
+
+	for i, job := range jobs {
+		job.CreatedAt = now
+
+		// Build placeholders like ($1, $2, ..., $11)
+		startIdx := i*11 + 1
+		placeholders := make([]string, 11)
+		for j := 0; j < 11; j++ {
+			placeholders[j] = fmt.Sprintf("$%d", startIdx+j)
+		}
+		valueStrings = append(valueStrings, "("+strings.Join(placeholders, ", ")+")")
+
+		// Append values in the same order as columns
+		valueArgs = append(valueArgs,
+			job.ID,
+			job.TaskType,
+			job.Operation,
+			job.Subject,
+			job.EntityID,
+			job.EntityType,
+			job.Payload,
+			job.ScheduledFor,
+			job.ValidUntil,
+			job.RetryCount,
+			job.CreatedAt,
+		)
+	}
+
+	stmt := fmt.Sprintf(`
+        INSERT INTO job_queue_v2
+        (id, task_type, operation, subject, entity_id, entity_type, payload, scheduled_for, valid_until, retry_count, created_at)
+        VALUES %s`,
+		strings.Join(valueStrings, ","),
+	)
+
+	_, err := s.Exec.ExecContext(ctx, stmt, valueArgs...)
+	return err
 }
 
 // PopAllJobs removes and returns every job in the job_queue.
@@ -103,6 +142,34 @@ func (s *store) PopJobForType(ctx context.Context, taskType string) (*Job, error
 	}
 
 	return &job, nil
+}
+
+func (s *store) PopNJobsForType(ctx context.Context, taskType string, n int) ([]*Job, error) {
+	query := `
+        DELETE FROM job_queue_v2
+        WHERE id IN (
+            SELECT id FROM job_queue_v2
+            WHERE task_type = $1
+            ORDER BY created_at, id
+            LIMIT $2
+        )
+        RETURNING id, task_type, operation, subject, entity_id, entity_type, payload, scheduled_for, valid_until, retry_count, created_at;
+    `
+	rows, err := s.Exec.QueryContext(ctx, query, taskType, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []*Job
+	for rows.Next() {
+		var job Job
+		if err := rows.Scan(&job.ID, &job.TaskType, &job.Operation, &job.Subject, &job.EntityID, &job.EntityType, &job.Payload, &job.ScheduledFor, &job.ValidUntil, &job.RetryCount, &job.CreatedAt); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, &job)
+	}
+	return jobs, nil
 }
 
 func (s *store) GetJobsForType(ctx context.Context, taskType string) ([]*Job, error) {

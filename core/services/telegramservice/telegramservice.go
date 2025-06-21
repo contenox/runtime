@@ -144,7 +144,7 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 
 func (w *worker) ProcessTick(ctx context.Context) error {
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
-	jobs, err := storeInstance.PopJobsForType(ctx, JobTypeTelegram)
+	jobs, err := storeInstance.PopNJobsForType(ctx, JobTypeTelegram, 10)
 	if err != nil {
 		return fmt.Errorf("pop job: %w", err)
 	}

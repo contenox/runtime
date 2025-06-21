@@ -437,3 +437,199 @@ func TestUnit_JobQueue_EmptyListOperations(t *testing.T) {
 		require.Empty(t, jobs)
 	})
 }
+
+func TestUnit_JobQueue_PopNJobsForType(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	taskType := "batch-process"
+	otherType := "other-process"
+
+	// Setup test data
+	jobs := []*store.Job{
+		{
+			ID:       uuid.New().String(),
+			TaskType: taskType,
+			Payload:  []byte(`{"batch": 1}`),
+		},
+		{
+			ID:       uuid.New().String(),
+			TaskType: taskType,
+			Payload:  []byte(`{"batch": 2}`),
+		},
+		{
+			ID:       uuid.New().String(),
+			TaskType: taskType,
+			Payload:  []byte(`{"batch": 3}`),
+		},
+		{
+			ID:       uuid.New().String(),
+			TaskType: otherType,
+			Payload:  []byte(`{"other": 1}`),
+		},
+	}
+
+	// Insert jobs with slight delay to ensure ordering
+	for _, job := range jobs {
+		require.NoError(t, s.AppendJob(ctx, *job))
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Run("pop_fewer_than_available", func(t *testing.T) {
+		// Pop 2 out of 3 available
+		popped, err := s.PopNJobsForType(ctx, taskType, 2)
+		require.NoError(t, err)
+		require.Len(t, popped, 2)
+
+		// Verify oldest jobs were popped first
+		require.Equal(t, jobs[0].ID, popped[0].ID)
+		require.Equal(t, jobs[1].ID, popped[1].ID)
+
+		// Verify remaining jobs
+		remaining, err := s.GetJobsForType(ctx, taskType)
+		require.NoError(t, err)
+		require.Len(t, remaining, 1)
+		require.Equal(t, jobs[2].ID, remaining[0].ID)
+	})
+
+	t.Run("pop_more_than_available", func(t *testing.T) {
+		// Now only 1 of our type remains (plus the other type)
+		popped, err := s.PopNJobsForType(ctx, taskType, 5)
+		require.NoError(t, err)
+		require.Len(t, popped, 1)
+		require.Equal(t, jobs[2].ID, popped[0].ID)
+
+		// Verify queue is empty for our type
+		remaining, err := s.GetJobsForType(ctx, taskType)
+		require.NoError(t, err)
+		require.Empty(t, remaining)
+	})
+
+	t.Run("pop_from_empty_queue", func(t *testing.T) {
+		popped, err := s.PopNJobsForType(ctx, taskType, 1)
+		require.NoError(t, err)
+		require.Empty(t, popped)
+	})
+
+	t.Run("pop_exact_amount", func(t *testing.T) {
+		// Reset state by adding 3 new jobs
+		newJobs := []*store.Job{
+			{
+				ID:       uuid.New().String(),
+				TaskType: taskType,
+				Payload:  []byte(`{"new": 1}`),
+			},
+			{
+				ID:       uuid.New().String(),
+				TaskType: taskType,
+				Payload:  []byte(`{"new": 2}`),
+			},
+			{
+				ID:       uuid.New().String(),
+				TaskType: taskType,
+				Payload:  []byte(`{"new": 3}`),
+			},
+		}
+		for _, job := range newJobs {
+			require.NoError(t, s.AppendJob(ctx, *job))
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		// Pop exactly 3
+		popped, err := s.PopNJobsForType(ctx, taskType, 3)
+		require.NoError(t, err)
+		require.Len(t, popped, 3)
+
+		// Verify all were popped
+		remaining, err := s.GetJobsForType(ctx, taskType)
+		require.NoError(t, err)
+		require.Empty(t, remaining)
+	})
+
+	t.Run("pop_zero_jobs", func(t *testing.T) {
+		popped, err := s.PopNJobsForType(ctx, taskType, 0)
+		require.NoError(t, err)
+		require.Empty(t, popped)
+	})
+
+	t.Run("pop_negative_amount", func(t *testing.T) {
+		popped, err := s.PopNJobsForType(ctx, taskType, -1)
+		require.Error(t, err)
+		require.Nil(t, popped)
+	})
+
+	t.Run("does_not_pop_other_types", func(t *testing.T) {
+		// The otherType job should still be there
+		popped, err := s.PopNJobsForType(ctx, otherType, 10)
+		require.NoError(t, err)
+		require.Len(t, popped, 1)
+		require.Equal(t, jobs[3].ID, popped[0].ID)
+	})
+}
+
+func TestUnit_JobQueue_DeleteJobsByEntity(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	entityID := uuid.New().String()
+	entityType := "test-entity"
+
+	// Insert jobs for the target entity
+	for i := 0; i < 3; i++ {
+		job := &store.Job{
+			ID:         uuid.New().String(),
+			TaskType:   "delete-by-entity",
+			EntityID:   entityID,
+			EntityType: entityType,
+			Payload:    []byte(`{}`),
+		}
+		require.NoError(t, s.AppendJob(ctx, *job))
+	}
+
+	// Insert unrelated job
+	otherJob := &store.Job{
+		ID:         uuid.New().String(),
+		TaskType:   "delete-by-entity",
+		EntityID:   uuid.New().String(),
+		EntityType: entityType,
+		Payload:    []byte(`{}`),
+	}
+	require.NoError(t, s.AppendJob(ctx, *otherJob))
+
+	// Delete by entity
+	require.NoError(t, s.DeleteJobsByEntity(ctx, entityID, entityType))
+
+	// Remaining jobs should only be the unrelated one
+	jobs, err := s.GetJobsForType(ctx, "delete-by-entity")
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	require.Equal(t, otherJob.ID, jobs[0].ID)
+}
+
+func TestUnit_JobQueue_PopNJobsForType_EdgeCases(t *testing.T) {
+	ctx, s := store.SetupStore(t)
+
+	taskType := "edge-case-test"
+
+	// Insert 2 jobs
+	for i := 0; i < 2; i++ {
+		job := &store.Job{
+			ID:       uuid.New().String(),
+			TaskType: taskType,
+			Payload:  []byte(`{}`),
+		}
+		require.NoError(t, s.AppendJob(ctx, *job))
+	}
+
+	// Request more than available
+	jobs, err := s.PopNJobsForType(ctx, taskType, 5)
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+
+	// Request zero
+	jobs, err = s.PopNJobsForType(ctx, taskType, 0)
+	require.NoError(t, err)
+	require.Empty(t, jobs)
+
+	// Request negative
+	jobs, err = s.PopNJobsForType(ctx, taskType, -1)
+	require.Error(t, err)
+}
