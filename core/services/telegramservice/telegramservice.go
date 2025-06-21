@@ -38,22 +38,8 @@ func New(ctx context.Context, botToken string, workerUserAccountID string, env t
 		return nil, err
 	}
 	w := &worker{bot: bot, env: env, dbInstance: dbInstance}
-	err = w.newInstance(ctx)
-	if err != nil {
-		return nil, err
-	}
 	w.workerUserAccountID = workerUserAccountID
 	return w, nil
-}
-
-func (w *worker) newInstance(ctx context.Context) error {
-	tx := w.dbInstance.WithoutTransaction()
-	err := store.New(tx).CreateMessageIndex(ctx, w.workerUserAccountID, w.workerUserAccountID)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (w *worker) ReceiveTick(ctx context.Context) error {
@@ -91,7 +77,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 	u := tgbotapi.NewUpdate(offset)
 	u.Timeout = 60
-	u.Limit = 10
+	u.Limit = 5
 
 	updates, err := w.bot.GetUpdates(u)
 	if err != nil {
@@ -104,19 +90,36 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 	storeInstance := store.New(tx)
 	jobs := make([]*store.Job, 0, len(updates))
 	for _, update := range updates {
-		id := fmt.Sprint(update.SentFrom().ID)
-		_, err := storeInstance.GetUserBySubject(ctx, id)
+		userID := fmt.Sprint(update.SentFrom().ID)
+		subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
+		_, err := storeInstance.GetUserBySubject(ctx, userID)
 		if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 			return err
 		}
 		if errors.Is(err, libdb.ErrNotFound) {
 			err := storeInstance.CreateUser(ctx, &store.User{
-				ID:           uuid.NewString(),
+				ID:           userID,
 				FriendlyName: update.SentFrom().UserName,
-				Subject:      id,
+				Subject:      userID,
 				Salt:         uuid.NewString(),
-				Email:        id + "@telegramservice.contnox.com",
+				Email:        userID + "@telegramservice.contnox.com",
 			})
+			if err != nil {
+				return err
+			}
+		}
+		found := false
+		idxs, err := storeInstance.ListMessageIndices(ctx, userID)
+		if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+			return err
+		}
+		for _, v := range idxs {
+			if v == subjID {
+				found = true
+			}
+		}
+		if !found {
+			err := storeInstance.CreateMessageIndex(ctx, subjID, userID)
 			if err != nil {
 				return err
 			}
@@ -144,38 +147,26 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 
 func (w *worker) ProcessTick(ctx context.Context) error {
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
-	jobs, err := storeInstance.PopNJobsForType(ctx, JobTypeTelegram, 10)
+	job, err := storeInstance.PopJobForType(ctx, JobTypeTelegram)
 	if err != nil {
 		return fmt.Errorf("pop job: %w", err)
 	}
-	if jobs == nil {
-		return nil
+	if job.RetryCount > 30 {
+		return fmt.Errorf("job %s: max retries reached", job.ID)
 	}
-	var errors []error
-	updates := make([]*tgbotapi.Update, len(jobs))
-	for i, job := range jobs {
-		err = json.Unmarshal(job.Payload, &updates[i])
-		if err != nil {
-			errors = append(errors, fmt.Errorf("unmarshal update: %w", err))
-			continue
-		}
+
+	var update tgbotapi.Update
+	if err := json.Unmarshal(job.Payload, &update); err != nil {
+		return fmt.Errorf("unmarshal update: %w", err)
 	}
-	if len(errors) > 0 {
-		return fmt.Errorf("process jobs: %s", errors)
-	}
-	for i, update := range updates {
-		if jobs[i].RetryCount > 3 {
-			err = fmt.Errorf("max retries reached")
-			errors = append(errors, err)
-			continue
+
+	err = w.Process(ctx, &update)
+	if err != nil {
+		// Only increment retry count and requeue on failure
+		job.RetryCount++
+		if err := storeInstance.AppendJob(ctx, *job); err != nil {
+			// errors = append(errors, fmt.Errorf("requeue job %s: %w", job.ID, err))
 		}
-		err = w.Process(ctx, update)
-		if err != nil {
-			errors = append(errors, err)
-		}
-		failedJob := jobs[i]
-		failedJob.RetryCount++
-		storeInstance.AppendJob(ctx, *failedJob)
 	}
 
 	return nil
@@ -183,7 +174,7 @@ func (w *worker) ProcessTick(ctx context.Context) error {
 
 func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 	text := update.Message.Text
-	subjID := fmt.Sprint(update.SentFrom().ID)
+	subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
 
 	chain := tasksrecipes.BuildChatChain(subjID)
 	result, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)

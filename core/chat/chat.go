@@ -92,6 +92,18 @@ func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID str
 
 // AppendMessages stores a user message and the assistant response to the database.
 func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *serverops.Message, responseMessage *serverops.Message) error {
+	if beginTime.IsZero() {
+		return fmt.Errorf("beginTime cannot be zero")
+	}
+	if subjectID == "" {
+		return fmt.Errorf("subjectID cannot be empty")
+	}
+	if inputMessage == nil {
+		return fmt.Errorf("inputMessage cannot be nil")
+	}
+	if responseMessage == nil {
+		return fmt.Errorf("responseMessage cannot be nil")
+	}
 	payload, err := json.Marshal(inputMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal user message %w", err)

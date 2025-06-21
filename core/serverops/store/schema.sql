@@ -171,6 +171,14 @@ CREATE TABLE IF NOT EXISTS messages (
     added_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS kv (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_job_queue_v2_task_type ON job_queue_v2 USING hash(task_type);
 CREATE INDEX IF NOT EXISTS idx_accesslists_identity ON accesslists USING hash(identity);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users USING hash(email);

@@ -195,26 +195,28 @@ func main() {
 		}
 		var BotErr error
 		triggerChan := make(chan struct{})
-		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
+		breakerTelegram := libroutine.NewRoutine(10, time.Second)
+		go breakerTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
 			BotErr = telegramWorker.ProcessTick(ctx)
 			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker failed: %v", BotErr)
+				return fmt.Errorf("initializing Telegram worker ProcessTick failed: %v", BotErr)
 			}
 			return nil
 		}, func(err error) {
 			if err != nil {
-				// ("Telegram worker failed: %v", err)
+				slog.Error("Telegram worker ProcessTick failed", "error", err)
 			}
 		})
-		libroutine.NewRoutine(10, time.Second).Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
+		breakerPullTelegram := libroutine.NewRoutine(10, time.Second)
+		go breakerPullTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
 			BotErr = telegramWorker.ReceiveTick(ctx)
 			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker failed: %v", BotErr)
+				return fmt.Errorf("initializing Telegram worker ReceiveTick failed: %v", BotErr)
 			}
 			return nil
 		}, func(err error) {
 			if err != nil {
-				// ("Telegram worker failed: %v", err)
+				slog.Error("Telegram worker ReceiveTick failed", "error", err)
 			}
 		})
 	}
