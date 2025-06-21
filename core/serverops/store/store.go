@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"log"
 	"os"
@@ -213,6 +214,14 @@ func (al AccessList) RequireAuthorisation(forResource string, permission int) (b
 	return false, nil
 }
 
+// KV represents a key-value pair in the database
+type KV struct {
+	Key       string          `json:"key"`
+	Value     json.RawMessage `json:"value"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
 type Store interface {
 	CreateBackend(ctx context.Context, backend *Backend) error
 	GetBackend(ctx context.Context, id string) (*Backend, error)
@@ -287,6 +296,12 @@ type Store interface {
 	ListFiles(ctx context.Context) ([]string, error)
 	EstimateFileCount(ctx context.Context) (int64, error)
 	EnforceMaxFileCount(ctx context.Context, maxCount int64) error
+
+	SetKV(ctx context.Context, key string, value json.RawMessage) error
+	GetKV(ctx context.Context, key string, out interface{}) error
+	DeleteKV(ctx context.Context, key string) error
+	ListKV(ctx context.Context) ([]*KV, error)
+	ListKVPrefix(ctx context.Context, prefix string) ([]*KV, error)
 
 	ListFileIDsByParentID(ctx context.Context, parentID string) ([]string, error)
 	CreateFileNameID(ctx context.Context, id, parentID, name string) error
