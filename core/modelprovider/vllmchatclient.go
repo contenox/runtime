@@ -15,6 +15,7 @@ type vLLMClient struct {
 	baseURL    string
 	httpClient *http.Client
 	modelName  string
+	maxTokens  int
 }
 
 // VLLMPromptClient handles prompt execution
@@ -28,7 +29,7 @@ type VLLMChatClient struct {
 }
 
 // NewVLLMPromptClient creates a new prompt client
-func NewVLLMPromptClient(baseURL, modelName string, httpClient *http.Client) *VLLMPromptClient {
+func NewVLLMPromptClient(baseURL, modelName string, httpClient *http.Client, maxTokens int) *VLLMPromptClient {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -37,12 +38,13 @@ func NewVLLMPromptClient(baseURL, modelName string, httpClient *http.Client) *VL
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
+			maxTokens:  maxTokens,
 		},
 	}
 }
 
 // NewVLLMChatClient creates a new chat client
-func NewVLLMChatClient(baseURL, modelName string, httpClient *http.Client) *VLLMChatClient {
+func NewVLLMChatClient(baseURL, modelName string, httpClient *http.Client, maxTokens int) *VLLMChatClient {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -51,6 +53,7 @@ func NewVLLMChatClient(baseURL, modelName string, httpClient *http.Client) *VLLM
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
+			maxTokens:  maxTokens,
 		},
 	}
 }
@@ -58,10 +61,10 @@ func NewVLLMChatClient(baseURL, modelName string, httpClient *http.Client) *VLLM
 // Prompt implements LLMPromptExecClient interface
 func (c *VLLMPromptClient) Prompt(ctx context.Context, prompt string) (string, error) {
 	request := completionRequest{
-		Model:  c.modelName,
-		Prompt: prompt,
-		// Temperature: 0.0,
-		// MaxTokens:   4096,
+		Model:       c.modelName,
+		Prompt:      prompt,
+		Temperature: 0.5,
+		MaxTokens:   c.maxTokens,
 	}
 
 	var response completionResponse
@@ -92,10 +95,10 @@ func (c *VLLMPromptClient) Prompt(ctx context.Context, prompt string) (string, e
 // Chat implements LLMChatClient interface
 func (c *VLLMChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
 	request := chatRequest{
-		Model:    c.modelName,
-		Messages: messages,
-		// Temperature: 0.0,
-		// MaxTokens:   4096,
+		Model:       c.modelName,
+		Messages:    messages,
+		Temperature: 0.5,
+		MaxTokens:   c.maxTokens,
 	}
 
 	var response chatResponse

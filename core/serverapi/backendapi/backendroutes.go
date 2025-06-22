@@ -75,7 +75,7 @@ func (b *backendManager) list(w http.ResponseWriter, r *http.Request) {
 			ID:      backend.ID,
 			Name:    backend.Name,
 			BaseURL: backend.BaseURL,
-			Type:    "Ollama",
+			Type:    backend.Type,
 		}
 		state, ok := backendState[backend.ID]
 		if ok {
@@ -124,7 +124,7 @@ func (b *backendManager) get(w http.ResponseWriter, r *http.Request) {
 		ID:           backend.ID,
 		Name:         backend.Name,
 		BaseURL:      backend.BaseURL,
-		Type:         "Ollama", // Could be made dynamic later
+		Type:         backend.Type,
 		Models:       []string{},
 		PulledModels: []api.ListModelResponse{},
 		Error:        "",

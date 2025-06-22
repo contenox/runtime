@@ -465,7 +465,3 @@ workers/
 └── worker.py
 ```
 Workers are responsible for processing Jobs asynchronously, such as parsing and indexing documents, or generating embeddings for text data. They gain Jobs by polling the dispatchapi endpoints and marking them as done when the results are ingested into the core.
-
----
-
-Let me know if there are specific areas you'd like to expand upon or clarify further!

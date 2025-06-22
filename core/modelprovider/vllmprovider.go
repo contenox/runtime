@@ -91,20 +91,23 @@ func (p *vLLMProvider) GetChatConnection(backendID string) (serverops.LLMChatCli
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	return NewVLLMChatClient(backendID, p.ModelName(), http.DefaultClient), nil
+	maxTokens := int(vllmContextLengths[p.ModelName()] / 10)
+
+	return NewVLLMChatClient(backendID, p.ModelName(), http.DefaultClient, maxTokens), nil
 }
 
 func (p *vLLMProvider) GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}
+	maxTokens := int(vllmContextLengths[p.ModelName()] / 10)
 
 	// Validate backend URL
 	if _, err := url.Parse(backendID); err != nil {
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	return NewVLLMPromptClient(backendID, p.ModelName(), http.DefaultClient), nil
+	return NewVLLMPromptClient(backendID, p.ModelName(), http.DefaultClient, maxTokens), nil
 }
 
 func (p *vLLMProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error) {

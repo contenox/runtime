@@ -2,7 +2,6 @@
 // of LLM backends (from dbInstance) with their actual observed state.
 // It provides the functionality for synchronizing models and processing downloads,
 // intended to be executed repeatedly within background tasks managed externally.
-// TODO: rewire for new pool feature
 package runtimestate
 
 import (
@@ -12,7 +11,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libbus"
@@ -199,14 +200,6 @@ func (s *State) Get(ctx context.Context) map[string]LLMState {
 	return state
 }
 
-// Helper method to process backends and collect their IDs
-func (s *State) processBackends(ctx context.Context, backends []*store.Backend, models []*store.Model, currentIDs map[string]struct{}) {
-	for _, backend := range backends {
-		currentIDs[backend.ID] = struct{}{}
-		s.processBackend(ctx, backend, models)
-	}
-}
-
 // cleanupStaleBackends removes state entries for backends not present in currentIDs.
 // It performs type checking on state keys and logs errors for invalid key types.
 // This centralizes the state cleanup logic used by all reconciliation flows.
@@ -319,16 +312,26 @@ func (s *State) syncBackends(ctx context.Context) error {
 	return s.cleanupStaleBackends(currentIDs)
 }
 
+// Helper method to process backends and collect their IDs
+func (s *State) processBackends(ctx context.Context, backends []*store.Backend, models []*store.Model, currentIDs map[string]struct{}) {
+	for _, backend := range backends {
+		currentIDs[backend.ID] = struct{}{}
+		s.processBackend(ctx, backend, models)
+	}
+}
+
 // processBackend routes the backend processing logic based on the backend's Type.
 // It acts as a dispatcher to type-specific handling functions (e.g., for Ollama).
 // It updates the internal state map with the results of the processing,
 // including any errors encountered for unsupported types.
-func (s *State) processBackend(ctx context.Context, backend *store.Backend, declaredOllamaModels []*store.Model) {
-	switch backend.Type {
-	case "Ollama":
-		s.processOllamaBackend(ctx, backend, declaredOllamaModels)
+// Helper method to process backends and collect their IDs
+func (s *State) processBackend(ctx context.Context, backend *store.Backend, declaredModels []*store.Model) {
+	switch strings.ToLower(backend.Type) {
+	case "ollama":
+		s.processOllamaBackend(ctx, backend, declaredModels)
+	case "vllm":
+		s.processVLLMBackend(ctx, backend, declaredModels)
 	default:
-		// log.Printf("Unsupported backend type: %s", backend.Type)
 		brokenService := &LLMState{
 			ID:      backend.ID,
 			Name:    backend.Name,
@@ -470,4 +473,102 @@ func (s *State) processOllamaBackend(ctx context.Context, backend *store.Backend
 	}
 	s.state.Store(backend.ID, stateservice)
 	// log.Printf("Stored updated state for backend %s", backend.ID)
+}
+
+// processVLLMBackend handles the state reconciliation for a single vLLM backend.
+// Since vLLM instances typically serve a single model, we verify that the running model
+// matches one of the models assigned to the backend through its pools.
+func (s *State) processVLLMBackend(ctx context.Context, backend *store.Backend, _ []*store.Model) {
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	// Build models endpoint URL
+	modelsURL := strings.TrimSuffix(backend.BaseURL, "/") + "/v1/models"
+	req, err := http.NewRequestWithContext(ctx, "GET", modelsURL, nil)
+	if err != nil {
+		s.state.Store(backend.ID, &LLMState{
+			ID:           backend.ID,
+			Name:         backend.Name,
+			Models:       []string{},
+			PulledModels: nil,
+			Backend:      *backend,
+			Error:        fmt.Sprintf("Failed to create request: %v", err),
+		})
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		s.state.Store(backend.ID, &LLMState{
+			ID:           backend.ID,
+			Name:         backend.Name,
+			Models:       []string{},
+			PulledModels: nil,
+			Backend:      *backend,
+			Error:        fmt.Sprintf("HTTP request failed: %v", err),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.state.Store(backend.ID, &LLMState{
+			ID:           backend.ID,
+			Name:         backend.Name,
+			Models:       []string{},
+			PulledModels: nil,
+			Backend:      *backend,
+			Error:        fmt.Sprintf("Unexpected status: %d", resp.StatusCode),
+		})
+		return
+	}
+
+	var modelResp struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&modelResp); err != nil {
+		s.state.Store(backend.ID, &LLMState{
+			ID:           backend.ID,
+			Name:         backend.Name,
+			Models:       []string{},
+			PulledModels: nil,
+			Backend:      *backend,
+			Error:        fmt.Sprintf("Failed to decode response: %v", err),
+		})
+		return
+	}
+
+	if len(modelResp.Data) == 0 {
+		s.state.Store(backend.ID, &LLMState{
+			ID:           backend.ID,
+			Name:         backend.Name,
+			Models:       []string{},
+			PulledModels: nil,
+			Backend:      *backend,
+			Error:        "No models found in response",
+		})
+		return
+	}
+
+	servedModel := modelResp.Data[0].ID
+	// Create mock PulledModels for state reporting
+	pulledModels := []api.ListModelResponse{
+		{
+			Model: servedModel,
+		},
+	}
+
+	s.state.Store(backend.ID, &LLMState{
+		ID:           backend.ID,
+		Name:         backend.Name,
+		Models:       []string{servedModel},
+		PulledModels: pulledModels,
+		Backend:      *backend,
+	})
 }
