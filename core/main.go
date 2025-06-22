@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
@@ -188,7 +189,14 @@ func main() {
 		log.Fatalf("initializing API handler failed: %v", err)
 	}
 	if config.TelegramToken != "" {
-		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, config.WorkerUserAccountID, environmentExec, dbInstance)
+		bootOffset := 0
+		if config.TelegramBootOffset != "" {
+			bootOffset, err = strconv.Atoi(config.TelegramBootOffset)
+			if err != nil {
+				log.Fatalf("parsing Telegram boot offset failed: %v", err)
+			}
+		}
+		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
 		telegramservice.WithActivityTracker(telegramWorker, serverops.NewLogActivityTracker(slog.Default()))
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)

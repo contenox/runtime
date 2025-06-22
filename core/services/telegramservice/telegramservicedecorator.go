@@ -7,6 +7,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+var _ Worker = (*activityTrackerDecorator)(nil)
+
 type activityTrackerDecorator struct {
 	worker  Worker
 	tracker serverops.ActivityTracker
@@ -21,6 +23,11 @@ func (d *activityTrackerDecorator) ProcessTick(ctx context.Context) error {
 }
 
 func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi.Update) error {
+	if update.Message == nil {
+		// Not a message; don't track
+		return d.worker.Process(ctx, update)
+	}
+
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"process",
@@ -35,9 +42,10 @@ func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi
 		reportErrFn(err)
 	} else {
 		reportChangeFn("processed", map[string]interface{}{
-			"text":     update.Message.Text,
-			"chat_id":  update.Message.Chat.ID,
-			"username": update.SentFrom().UserName,
+			"text":       update.Message.Text,
+			"chat_id":    update.Message.Chat.ID,
+			"message_id": update.Message.MessageID,
+			"username":   update.SentFrom().UserName,
 		})
 	}
 

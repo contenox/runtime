@@ -45,6 +45,7 @@ type Config struct {
 	WorkerUserPassword  string `json:"worker_user_password"`
 	WorkerUserEmail     string `json:"worker_user_email"`
 	TelegramToken       string `json:"telegram_token"`
+	TelegramBootOffset  string `json:"telegram_boot_offset"`
 }
 
 type ConfigTokenizerService struct {

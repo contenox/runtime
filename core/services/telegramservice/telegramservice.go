@@ -35,15 +35,29 @@ type worker struct {
 	env                 taskengine.EnvExecutor
 	dbInstance          libdb.DBManager
 	workerUserAccountID string
+	bootOffset          int
 }
 
-func New(ctx context.Context, botToken string, workerUserAccountID string, env taskengine.EnvExecutor, dbInstance libdb.DBManager) (Worker, error) {
+func New(ctx context.Context, botToken string, bootOffset int, env taskengine.EnvExecutor, dbInstance libdb.DBManager) (Worker, error) {
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
 		return nil, err
 	}
-	w := &worker{bot: bot, env: env, dbInstance: dbInstance}
-	w.workerUserAccountID = workerUserAccountID
+	w := &worker{bot: bot, env: env, dbInstance: dbInstance, bootOffset: bootOffset}
+
+	if w.dbInstance == nil {
+		return nil, errors.New("db instance is nil")
+	}
+	var offset int
+	storeInstance := store.New(w.dbInstance.WithoutTransaction())
+	err = storeInstance.GetKV(ctx, JobTypeTelegramWorkerOffsetKey, &offset)
+	if err != nil && err != libdb.ErrNotFound {
+		return nil, err
+	}
+	if offset > bootOffset {
+		w.bootOffset = offset
+	}
+
 	return w, nil
 }
 
@@ -70,6 +84,9 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec) error {
 	err := storeInstance.GetKV(ctx, JobTypeTelegramWorkerOffsetKey, &offset)
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return fmt.Errorf("get offset: %w", err)
+	}
+	if offset < w.bootOffset {
+		offset = w.bootOffset
 	}
 
 	u := tgbotapi.NewUpdate(offset)
