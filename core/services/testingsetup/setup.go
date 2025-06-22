@@ -218,7 +218,7 @@ func (builder *Builder) WithBackend() *Builder {
 		ID:      backendID,
 		Name:    "test-backend",
 		BaseURL: builder.ollamaURI,
-		Type:    "Ollama",
+		Type:    "ollama",
 	})
 	builder.backends = append(builder.backends, backendID)
 	if err != nil {
@@ -229,7 +229,7 @@ func (builder *Builder) WithBackend() *Builder {
 
 	reportChange(backendID, map[string]interface{}{
 		"name":   "test-backend",
-		"type":   "Ollama",
+		"type":   "ollama",
 		"status": "created",
 	})
 

@@ -187,7 +187,7 @@ def create_backend_and_assign_to_pool(base_url, admin_session, with_ollama_backe
     payload = {
         "name": "Test Embedder Backend",
         "baseUrl": ollama_url,
-        "type": "Ollama",
+        "type": "ollama",
     }
     response = requests.post(f"{base_url}/backends", json=payload, headers=headers)
     response.raise_for_status()

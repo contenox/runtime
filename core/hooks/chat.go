@@ -197,9 +197,16 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 	if m, ok := hookCall.Args["models"]; ok {
 		models = strings.Split(strings.ReplaceAll(m, " ", ""), ",")
 	}
+	providerTypes := []string{""}
+	if pType, ok := hookCall.Args["provider_type"]; ok {
+		providerTypes = append(providerTypes, pType)
+	}
+	if pTypes, ok := hookCall.Args["provider_types"]; ok {
+		providerTypes = append(providerTypes, strings.Split(strings.ReplaceAll(pTypes, " ", ""), ",")...)
+	}
 
 	// Process through LLM
-	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, 0, models...) // TODO: pass context length
+	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, 0, providerTypes, models...) // TODO: pass context length
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("chat failed: %w", err)
 	}

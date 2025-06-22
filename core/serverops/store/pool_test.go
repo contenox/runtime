@@ -141,7 +141,7 @@ func TestUnit_Pools_AssignAndListBackendsForPool(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "Backend1",
 		BaseURL: "http://backend1",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 	s.CreateBackend(ctx, backend)
 

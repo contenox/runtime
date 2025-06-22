@@ -69,6 +69,90 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "partial match after normalization - tag stripped",
+			req: llmresolver.Request{
+				ModelNames:    []string{"llama2:7b"},
+				ContextLength: 4096,
+			},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:            "3",
+					Name:          "llama2",
+					ContextLength: 4096,
+					CanChatFlag:   true,
+					Backends:      []string{"b3"},
+				},
+			},
+			wantModelID: "3",
+		},
+		{
+			name: "case-insensitive match after normalization",
+			req: llmresolver.Request{
+				ModelNames:    []string{"Llama2"},
+				ContextLength: 4096,
+			},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:            "4",
+					Name:          "llama2",
+					ContextLength: 4096,
+					CanChatFlag:   true,
+					Backends:      []string{"b4"},
+				},
+			},
+			wantModelID: "4",
+		},
+		{
+			name: "quantization suffix stripped - awq",
+			req: llmresolver.Request{
+				ModelNames:    []string{"llama2-awq"},
+				ContextLength: 4096,
+			},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:            "5",
+					Name:          "llama2",
+					ContextLength: 4096,
+					CanChatFlag:   true,
+					Backends:      []string{"b5"},
+				},
+			},
+			wantModelID: "5",
+		},
+		{
+			name: "multiple model names, first not found, second found",
+			req: llmresolver.Request{
+				ModelNames:    []string{"nonexistent", "llama2"},
+				ContextLength: 4096,
+			},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:            "6",
+					Name:          "llama2",
+					ContextLength: 4096,
+					CanChatFlag:   true,
+					Backends:      []string{"b6"},
+				},
+			},
+			wantModelID: "6",
+		},
+		{
+			name: "empty model names (any allowed)",
+			req: llmresolver.Request{
+				ContextLength: 4096,
+			},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:            "7",
+					Name:          "llama2",
+					ContextLength: 4096,
+					CanChatFlag:   true,
+					Backends:      []string{"b7"},
+				},
+			},
+			wantModelID: "7",
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +277,29 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 			resolver: llmresolver.Randomly,
 			wantErr:  nil,
 		},
+		{
+			name:     "case-insensitive match after normalization",
+			embedReq: llmresolver.EmbedRequest{ModelName: "Text-Embed-Model"},
+			providers: []modelprovider.Provider{
+				providerEmbedOK, // Name: "text-embed-model"
+			},
+			resolver: llmresolver.Randomly,
+			wantErr:  nil,
+		},
+		{
+			name:     "quantization suffix stripped - awq",
+			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model-awq"},
+			providers: []modelprovider.Provider{
+				&modelprovider.MockProvider{
+					ID:           "p5",
+					Name:         "text-embed-model",
+					CanEmbedFlag: true,
+					Backends:     []string{"b5"},
+				},
+			},
+			resolver: llmresolver.Randomly,
+			wantErr:  nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -227,6 +334,31 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 				if client == nil {
 					t.Errorf("ResolveEmbed() client is nil, want non-nil client")
 				}
+			}
+		})
+	}
+}
+
+func TestUnitNormalizeModelName(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"Llama2:latest", "llama2"},
+		{"org/llama2-70b", "llama270b"},
+		{"llama2-70b-AWQ", "llama270b"},
+		{"llama2_70b-fp16", "llama270b"},
+		{"text-embed-model:33m", "textembedmodel"},
+		{"smollm2:135m", "smollm2"},
+		{"gpt-j-6b", "gptj6b"},
+		{"mistral-7b-instruct-v0.1", "mistral7binstructv01"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			got := llmresolver.NormalizeModelName(c.input)
+			if got != c.expected {
+				t.Errorf("NormalizeModelName(%q) = %q, want %q", c.input, got, c.expected)
 			}
 		})
 	}

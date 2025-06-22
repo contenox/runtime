@@ -9,7 +9,7 @@ def test_create_backend(base_url, admin_session, request):
     payload = {
         "name": "Test backend",
         "baseUrl": ollama_url,
-        "type": "Ollama",
+        "type": "ollama",
     }
 
     # Step 1: Create backend

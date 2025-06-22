@@ -17,7 +17,7 @@ func TestUnit_Backend_CreatesAndFetchesByID(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "TestBackend",
 		BaseURL: "http://localhost:8080",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 
 	// Create the backend.
@@ -42,7 +42,7 @@ func TestUnit_Backend_UpdatesFieldsCorrectly(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "InitialBackend",
 		BaseURL: "http://initial.url",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 
 	// Create the backend.
@@ -74,7 +74,7 @@ func TestUnit_Backend_DeletesSuccessfully(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "ToDelete",
 		BaseURL: "http://delete.me",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 
 	// Create the backend.
@@ -103,13 +103,13 @@ func TestUnit_Backend_ListReturnsOrderedByCreationTime(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "Backend1",
 		BaseURL: "http://backend1",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 	backend2 := &store.Backend{
 		ID:      uuid.NewString(),
 		Name:    "Backend2",
 		BaseURL: "http://backend2",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 	err = s.CreateBackend(ctx, backend1)
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestUnit_Backend_FetchesByName(t *testing.T) {
 		ID:      uuid.NewString(),
 		Name:    "UniqueBackend",
 		BaseURL: "http://unique",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}
 
 	// Create the backend.

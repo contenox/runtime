@@ -44,7 +44,6 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 		}
 		return nil
 	})
-
 	// Check for API-level errors first (network issues, etc.)
 	if err != nil {
 		return serverops.Message{}, fmt.Errorf("ollama API chat request failed for model %s: %w", c.modelName, err)
@@ -52,7 +51,7 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 
 	// Check if we received any response at all
 	if finalResponse.Message.Role == "" {
-		return serverops.Message{}, fmt.Errorf("no response received from Ollama for model %s", c.modelName)
+		return serverops.Message{}, fmt.Errorf("no response received from ollama for model %s", c.modelName)
 	}
 
 	// Handle completion reasons

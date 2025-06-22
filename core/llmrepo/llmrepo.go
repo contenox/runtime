@@ -100,9 +100,7 @@ func (e *modelManager) GetRuntime(ctx context.Context) modelprovider.RuntimeStat
 		if err != nil {
 			return nil, err
 		}
-		if backendType != "Ollama" && backendType != "" {
-			return nil, fmt.Errorf("unsupported backend-type")
-		}
+
 		return []modelprovider.Provider{provider}, nil
 	}
 }

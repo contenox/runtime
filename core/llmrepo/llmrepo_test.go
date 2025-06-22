@@ -75,7 +75,7 @@ func TestSystem_EmbedAndPromptPipeline(t *testing.T) {
 	t.Run("test get runtime", func(t *testing.T) {
 		runtimeAdapter := embedder.GetRuntime(ctx)
 		require.NotNil(t, runtimeAdapter)
-		providers, err := runtimeAdapter(ctx, "Ollama")
+		providers, err := runtimeAdapter(ctx, "ollama")
 		require.NoError(t, err)
 		require.NotEmpty(t, providers)
 	})

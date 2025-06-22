@@ -39,13 +39,12 @@ func (o *OllamaPromptClient) Prompt(ctx context.Context, prompt string) (string,
 		}
 		return nil
 	})
-
 	if err != nil {
 		return "", fmt.Errorf("ollama generate API call failed for model %s: %w", o.modelName, err)
 	}
 
 	if !finalResponse.Done {
-		return "", fmt.Errorf("no completion received from Ollama for model %s", o.modelName)
+		return "", fmt.Errorf("no completion received from ollama for model %s", o.modelName)
 	}
 
 	switch finalResponse.DoneReason {

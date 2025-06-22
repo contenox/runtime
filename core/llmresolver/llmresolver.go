@@ -18,9 +18,11 @@ var (
 	ErrUnknownModelCapabilities = errors.New("capabilities not known for this model")
 )
 
+var DefaultProviderType string = "ollama"
+
 // Request contains requirements for selecting a model provider.
 type Request struct {
-	Provider      string   // Optional: if empty, uses default provider
+	ProviderTypes []string // Optional: if empty, uses all default providers
 	ModelNames    []string // Optional: if empty, any model is considered
 	ContextLength int      // Minimum required context length; 0 means no requirement
 }
@@ -31,14 +33,22 @@ func filterCandidates(
 	getModels modelprovider.RuntimeState,
 	capCheck func(modelprovider.Provider) bool,
 ) ([]modelprovider.Provider, error) {
-	providerType := req.Provider
-	if providerType == "" {
-		providerType = "ollama"
+	providerTypes := req.ProviderTypes
+	if len(providerTypes) == 0 {
+		providerTypes = []string{"ollama", "vllm"}
 	}
-
-	providers, err := getModels(ctx, providerType)
-	if err != nil {
-		return nil, err
+	var providers []modelprovider.Provider
+	var errs []error
+	for _, providerType := range providerTypes {
+		var err error
+		providers, err = getModels(ctx, providerType)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 1 {
+		// TODO: Implement error handling for one error
+		return nil, fmt.Errorf("failed to get models: %v", errs)
 	}
 	if len(providers) == 0 {
 		return nil, ErrNoAvailableModels
@@ -88,7 +98,7 @@ func filterCandidates(
 		var builder strings.Builder
 
 		builder.WriteString("no models matched requirements:\n")
-		builder.WriteString(fmt.Sprintf("- provider: %q\n", providerType))
+		builder.WriteString(fmt.Sprintf("- provider: %q\n", providerTypes))
 		builder.WriteString(fmt.Sprintf("- model names: %v\n", req.ModelNames))
 		builder.WriteString(fmt.Sprintf("- required context length: %d\n", req.ContextLength))
 
@@ -252,8 +262,8 @@ func Chat(
 }
 
 type EmbedRequest struct {
-	ModelName string
-	Provider  string // Optional. Empty uses default.
+	ModelName    string
+	ProviderType string // Optional. Empty uses default.
 }
 
 // Embed finds a provider supporting embeddings
@@ -266,9 +276,12 @@ func Embed(
 	if embedReq.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
+	if embedReq.ProviderType == "" {
+		embedReq.ProviderType = DefaultProviderType
+	}
 	req := Request{
-		ModelNames: []string{embedReq.ModelName},
-		Provider:   embedReq.Provider,
+		ModelNames:    []string{embedReq.ModelName},
+		ProviderTypes: []string{embedReq.ProviderType},
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanEmbed)
 	if err != nil {
@@ -300,8 +313,8 @@ func Stream(
 }
 
 type PromptRequest struct {
-	ModelName string
-	Provider  string // Optional. Empty uses default.
+	ModelName     string
+	ProviderTypes []string // Optional. Empty uses default.
 }
 
 func PromptExecute(
@@ -313,9 +326,12 @@ func PromptExecute(
 	if reqExec.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
+	if len(reqExec.ProviderTypes) == 0 {
+		reqExec.ProviderTypes = []string{DefaultProviderType, "vllm"}
+	}
 	req := Request{
-		ModelNames: []string{reqExec.ModelName},
-		Provider:   reqExec.Provider,
+		ModelNames:    []string{reqExec.ModelName},
+		ProviderTypes: reqExec.ProviderTypes,
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanPrompt)
 	if err != nil {

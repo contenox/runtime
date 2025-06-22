@@ -70,7 +70,7 @@ func TestSystem_PoolAwareState_ShouldSyncAndDownloadModels(t *testing.T) {
 		ID:      backendID,
 		Name:    "pool-backend",
 		BaseURL: ollamaUrl,
-		Type:    "Ollama",
+		Type:    "ollama",
 	}))
 	require.NoError(t, dbStore.AssignBackendToPool(ctx, poolID, backendID))
 
@@ -134,7 +134,7 @@ func TestSystem_PoolIsolation_ShouldNotLeakModelsAcrossPools(t *testing.T) {
 		ID:      backend1ID,
 		Name:    "pool-1-backend",
 		BaseURL: ollamaUrl,
-		Type:    "Ollama",
+		Type:    "ollama",
 	}))
 	require.NoError(t, dbStore.AssignBackendToPool(ctx, pool1ID, backend1ID))
 
@@ -143,7 +143,7 @@ func TestSystem_PoolIsolation_ShouldNotLeakModelsAcrossPools(t *testing.T) {
 		ID:      backend2ID,
 		Name:    "pool-2-backend",
 		BaseURL: "http://localhost:11435",
-		Type:    "Ollama",
+		Type:    "ollama",
 	}))
 	require.NoError(t, dbStore.AssignBackendToPool(ctx, pool2ID, backend2ID))
 
@@ -189,7 +189,7 @@ func TestPoolBackendRemoval(t *testing.T) {
 		ID:      backendID,
 		Name:    "pool-backend",
 		BaseURL: ollamaUrl,
-		Type:    "Ollama",
+		Type:    "ollama",
 	}))
 	require.NoError(t, dbStore.AssignBackendToPool(ctx, poolID, backendID))
 

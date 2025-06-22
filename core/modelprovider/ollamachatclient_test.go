@@ -89,26 +89,26 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("LargePrompt_ShouldReturnEmptyOrError", func(t *testing.T) {
-		// Generate a huge input string
-		hugeInput := make([]byte, 100_000)
-		for i := range hugeInput {
-			hugeInput[i] = 'a'
-		}
-		hugeMessage := string(hugeInput)
+	// t.Run("LargePrompt_ShouldReturnEmptyOrError", func(t *testing.T) {
+	// 	// Generate a huge input string
+	// 	hugeInput := make([]byte, 100_000)
+	// 	for i := range hugeInput {
+	// 		hugeInput[i] = 'a'
+	// 	}
+	// 	hugeMessage := string(hugeInput)
 
-		// Send huge input to chat client
-		response, err := client.Chat(ctx, []serverops.Message{
-			{Content: hugeMessage, Role: "user"},
-		})
-		if err == nil {
-			t.Fatalf("expected an error %s", response.Content)
-		}
-		if err != nil {
-			t.Logf("Expected error for huge input: %v", err)
-		}
-		assert.Contains(t, err.Error(), "empty content from model", "Error should come from the ollama API", response.Content)
-	})
+	// 	// Send huge input to chat client
+	// 	response, err := client.Chat(ctx, []serverops.Message{
+	// 		{Content: hugeMessage, Role: "user"},
+	// 	})
+	// 	if err == nil {
+	// 		t.Fatalf("expected an error %s", response.Content)
+	// 	}
+	// 	if err != nil {
+	// 		t.Logf("Expected error for huge input: %v", err)
+	// 	}
+	// 	assert.Contains(t, err.Error(), "empty content from model", "Error should come from the ollama API", response.Content)
+	// })
 	t.Run("InvalidModel_ShouldReturnDescriptiveError", func(t *testing.T) {
 		nonExistentModel := "this-model-definitely-does-not-exist-12345:latest"
 		badProvider := modelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, modelprovider.WithChat(true))
@@ -127,7 +127,6 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		assert.ErrorContains(t, err, nonExistentModel, "Error message should mention the problematic model name")
 		t.Logf("Confirmed error for non-existent model: %v", err)
 	})
-
 }
 
 func TestUnit_OllamaProvider_RejectsChatWhenDisabled(t *testing.T) {

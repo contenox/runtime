@@ -38,11 +38,11 @@ export default function BackendsSection({ statusMap }: BackendsSectionProps) {
   const [editingBackend, setEditingBackend] = useState<Backend | null>(null);
   const [name, setName] = useState('');
   const [baseURL, setBaseURL] = useState('');
-  const [configType, setConfigType] = useState('Ollama');
+  const [configType, setConfigType] = useState('ollama');
   const resetForm = () => {
     setName('');
     setBaseURL('');
-    setConfigType('Ollama');
+    setConfigType('ollama');
     setEditingBackend(null);
   };
 

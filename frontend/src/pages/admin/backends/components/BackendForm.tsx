@@ -69,7 +69,10 @@ export default function BackendForm({
         <Select
           value={configType}
           onChange={e => setConfigType(e.target.value)}
-          options={[{ value: 'Ollama', label: 'Ollama' }]}
+          options={[
+            { value: 'ollama', label: 'Ollama' },
+            { value: 'vllm', label: 'vLLM' },
+          ]}
         />
       </FormField>
     </Form>

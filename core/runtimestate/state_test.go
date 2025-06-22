@@ -24,7 +24,7 @@ func TestSystem_RuntimeState_SyncsBackendAndModel(t *testing.T) {
 	require.NoError(t, err)
 	defer cleanup()
 
-	//defer cancel()
+	// defer cancel()
 
 	dbConn, _, cleanupDB, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
 	require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestSystem_RuntimeState_SyncsBackendAndModel(t *testing.T) {
 		ID:      backendID,
 		Name:    "myLLama",
 		BaseURL: uri,
-		Type:    "Ollama",
+		Type:    "ollama",
 	})
 	require.NoError(t, err)
 
@@ -139,7 +139,7 @@ func TestSystem_RuntimeState_RemovesDeletedBackend(t *testing.T) {
 		ID:      backendID,
 		Name:    "test-backend",
 		BaseURL: uri,
-		Type:    "Ollama",
+		Type:    "ollama",
 	}))
 
 	// Append model
@@ -201,7 +201,7 @@ func TestPoolBasedModelAssignment(t *testing.T) {
 		ID:      backendID,
 		Name:    "embed-backend",
 		BaseURL: uri,
-		Type:    "Ollama",
+		Type:    "ollama",
 	})
 	require.NoError(t, err)
 	err = dbStore.AssignBackendToPool(ctx, poolID, backendID)

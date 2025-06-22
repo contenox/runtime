@@ -10,9 +10,7 @@ import (
 	"github.com/contenox/contenox/libs/libdb"
 )
 
-var (
-	ErrInvalidBackend = errors.New("invalid backend data")
-)
+var ErrInvalidBackend = errors.New("invalid backend data")
 
 type Service interface {
 	Create(ctx context.Context, backend *store.Backend) error
@@ -87,8 +85,8 @@ func validate(backend *store.Backend) error {
 	if backend.BaseURL == "" {
 		return fmt.Errorf("%w: baseURL is required", ErrInvalidBackend)
 	}
-	if backend.Type != "Ollama" {
-		return fmt.Errorf("%w: Type is required to be Ollama", ErrInvalidBackend)
+	if backend.Type != "ollama" && backend.Type != "vllm" {
+		return fmt.Errorf("%w: Type is required to be ollama or vllm", ErrInvalidBackend)
 	}
 
 	return nil
