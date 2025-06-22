@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/contenox/contenox/core/serverops"
@@ -16,7 +17,11 @@ import (
 	"github.com/google/uuid"
 )
 
-var JobTypeTelegram string = "telegram"
+var (
+	JobTypeTelegram                string = "telegram"
+	JobTypeTelegramWorkerOffsetKey string = "telegram-worker-offset-key"
+	DefaultLeaseDuration                  = 30 * time.Second
+)
 
 type Worker interface {
 	ReceiveTick(ctx context.Context) error
@@ -48,33 +53,25 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("start transaction: %w", err)
 	}
-	job, err := store.New(tx).PopJobForType(ctx, JobTypeTelegram)
-	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
-		return fmt.Errorf("get last job: %w", err)
-	}
-	var offset int
-	if !errors.Is(err, libdb.ErrNotFound) {
-		var update tgbotapi.Update
-		err = json.Unmarshal(job.Payload, &update)
-		if err != nil {
-			return fmt.Errorf("unmarshal job payload: %w", err)
-		}
-		message := update.Message
-		if message != nil {
-			offset = message.MessageID + 1 // as suggested by the telegram docs
-		}
-	}
-	err = w.runTick(ctx, tx, offset)
+
+	err = w.runTick(ctx, tx)
 	if err != nil {
 		return err
 	}
 	if err := com(ctx); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
-	return err
+	return nil
 }
 
-func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
+func (w *worker) runTick(ctx context.Context, tx libdb.Exec) error {
+	var offset int
+	storeInstance := store.New(tx)
+	err := storeInstance.GetKV(ctx, JobTypeTelegramWorkerOffsetKey, &offset)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return fmt.Errorf("get offset: %w", err)
+	}
+
 	u := tgbotapi.NewUpdate(offset)
 	u.Timeout = 60
 	u.Limit = 5
@@ -87,11 +84,18 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 	if len(updates) == 0 {
 		return nil
 	}
-	storeInstance := store.New(tx)
+
 	jobs := make([]*store.Job, 0, len(updates))
 	for _, update := range updates {
+		// Skip if this is not a message update
+		if update.Message == nil {
+			continue
+		}
+
 		userID := fmt.Sprint(update.SentFrom().ID)
-		subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
+		subjID := fmt.Sprint(update.FromChat().ID) + userID
+
+		// Check/create user
 		_, err := storeInstance.GetUserBySubject(ctx, userID)
 		if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 			return err
@@ -108,15 +112,15 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 				return err
 			}
 		}
+
+		// Check/create message index
 		found := false
 		idxs, err := storeInstance.ListMessageIndices(ctx, userID)
 		if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 			return err
 		}
-		for _, v := range idxs {
-			if v == subjID {
-				found = true
-			}
+		if slices.Contains(idxs, subjID) {
+			found = true
 		}
 		if !found {
 			err := storeInstance.CreateMessageIndex(ctx, subjID, userID)
@@ -124,22 +128,38 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 				return err
 			}
 		}
+
+		// Create job
 		payload, err := json.Marshal(update)
 		if err != nil {
 			return err
 		}
-		jobs = append(jobs,
-			&store.Job{
-				ID:        uuid.NewString(),
-				TaskType:  JobTypeTelegram,
-				CreatedAt: time.Now().UTC(),
-				Operation: "message",
-				Payload:   payload,
-			})
+
+		jobs = append(jobs, &store.Job{
+			ID:        uuid.NewString(),
+			TaskType:  JobTypeTelegram,
+			CreatedAt: time.Now().UTC(),
+			Operation: "message",
+			Payload:   payload,
+			Subject:   subjID,
+		})
 	}
-	err = storeInstance.AppendJobs(ctx, jobs...)
-	if err != nil {
+
+	// Append all jobs at once
+	if err := storeInstance.AppendJobs(ctx, jobs...); err != nil {
 		return fmt.Errorf("append message: %w", err)
+	}
+
+	// Update offset to the last processed update
+	if len(updates) > 0 {
+		lastUpdate := updates[len(updates)-1]
+		offs, err := json.Marshal(lastUpdate.UpdateID + 1)
+		if err != nil {
+			return err
+		}
+		if err := storeInstance.SetKV(ctx, JobTypeTelegramWorkerOffsetKey, offs); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -147,26 +167,61 @@ func (w *worker) runTick(ctx context.Context, tx libdb.Exec, offset int) error {
 
 func (w *worker) ProcessTick(ctx context.Context) error {
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
-	job, err := storeInstance.PopJobForType(ctx, JobTypeTelegram)
+	leaseID := uuid.NewString()
+	// Try to lease a job
+	leasedJob, err := storeInstance.PopJobForType(ctx, JobTypeTelegram)
 	if err != nil {
+		if errors.Is(err, libdb.ErrNotFound) {
+			return nil // No jobs available
+		}
 		return fmt.Errorf("pop job: %w", err)
 	}
-	if job.RetryCount > 30 {
-		return fmt.Errorf("job %s: max retries reached", job.ID)
+
+	// Lease the job
+	leaseDuration := DefaultLeaseDuration
+	err = storeInstance.AppendLeasedJob(ctx, *leasedJob, leaseDuration, leaseID)
+	if err != nil {
+		return fmt.Errorf("lease job: %w", err)
 	}
 
+	// Process the leased job
 	var update tgbotapi.Update
-	if err := json.Unmarshal(job.Payload, &update); err != nil {
+	if err := json.Unmarshal(leasedJob.Payload, &update); err != nil {
+		// If unmarshal fails, mark as failed (won't retry)
+		_ = storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
 		return fmt.Errorf("unmarshal update: %w", err)
 	}
 
-	err = w.Process(ctx, &update)
-	if err != nil {
-		// Only increment retry count and requeue on failure
-		job.RetryCount++
-		if err := storeInstance.AppendJob(ctx, *job); err != nil {
-			// errors = append(errors, fmt.Errorf("requeue job %s: %w", job.ID, err))
+	processErr := w.Process(ctx, &update)
+
+	// Mark job as completed or failed
+	if processErr == nil {
+		// Success - delete the leased job
+		if err := storeInstance.DeleteLeasedJob(ctx, leasedJob.ID); err != nil {
+			return fmt.Errorf("delete leased job: %w", err)
 		}
+	} else {
+		// Failure - handle retry logic
+		if leasedJob.RetryCount >= 30 {
+			// Max retries reached - delete the job
+			_ = storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
+			return fmt.Errorf("job %s: max retries reached", leasedJob.ID)
+		}
+
+		// Requeue with backoff
+		leasedJob.RetryCount++
+		// backoff := time.Duration(leasedJob.RetryCount*leasedJob.RetryCount) * time.Second
+		// leasedJob.ScheduledFor = time.Now().Add(backoff).Unix()
+
+		// Delete the leased job and requeue
+		if err := storeInstance.DeleteLeasedJob(ctx, leasedJob.ID); err != nil {
+			return fmt.Errorf("delete leased job for requeue: %w", err)
+		}
+		if err := storeInstance.AppendJob(ctx, *leasedJob); err != nil {
+			return fmt.Errorf("requeue job: %w", err)
+		}
+
+		return fmt.Errorf("process job failed: %w", processErr)
 	}
 
 	return nil

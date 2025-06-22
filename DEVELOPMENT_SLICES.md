@@ -60,7 +60,7 @@
 - [ ] **Release Infrastructure Setup**
 - [ ] **API Rate Limiting Middleware**
 - [ ] **Package a Persona-Chat Application**
-- [ ] **Telegram bot integrations**
+- [x] **Telegram bot integrations**
 - [x] **Simple OpenAI SDK compatible chat endpoint**
 
 ---
@@ -76,3 +76,4 @@
 - Exportable conversation transcripts
 - Model fine-tuning management dashboard
 - Implement queue based model provider
+- Testing with openAI compatible frontends for chat applications
