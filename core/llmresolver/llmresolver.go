@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 
 	"github.com/contenox/contenox/core/modelprovider"
@@ -41,6 +42,9 @@ func filterCandidates(
 	var errs []error
 	for _, providerType := range providerTypes {
 		var err error
+		if !slices.Contains([]string{"ollama", "vllm"}, providerType) {
+			return nil, fmt.Errorf("unsupported provider type: %s", providerType)
+		}
 		providers, err = getModels(ctx, providerType)
 		if err != nil {
 			errs = append(errs, err)
@@ -254,7 +258,7 @@ func Chat(
 		return nil, "", err
 	}
 	modelName := provider.ModelName()
-	client, err := provider.GetChatConnection(backend)
+	client, err := provider.GetChatConnection(ctx, backend)
 	if err != nil {
 		return nil, "", err
 	}
@@ -291,7 +295,7 @@ func Embed(
 	if err != nil {
 		return nil, fmt.Errorf("failed apply resolver %w", err)
 	}
-	return provider.GetEmbedConnection(backend)
+	return provider.GetEmbedConnection(ctx, backend)
 }
 
 // Stream finds a provider supporting streaming
@@ -309,7 +313,7 @@ func Stream(
 	if err != nil {
 		return nil, err
 	}
-	return provider.GetStreamConnection(backend)
+	return provider.GetStreamConnection(ctx, backend)
 }
 
 type PromptRequest struct {
@@ -341,5 +345,5 @@ func PromptExecute(
 	if err != nil {
 		return nil, err
 	}
-	return provider.GetPromptConnection(backend)
+	return provider.GetPromptConnection(ctx, backend)
 }

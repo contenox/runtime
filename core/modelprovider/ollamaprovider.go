@@ -1,6 +1,7 @@
 package modelprovider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -54,7 +55,7 @@ func (p *OllamaProvider) CanPrompt() bool {
 	return p.SupportsPrompt
 }
 
-func (p *OllamaProvider) GetChatConnection(backendID string) (serverops.LLMChatClient, error) {
+func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support chat", p.GetID(), p.ModelName())
 	}
@@ -77,7 +78,7 @@ func (p *OllamaProvider) GetChatConnection(backendID string) (serverops.LLMChatC
 	return chatClient, nil
 }
 
-func (p *OllamaProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error) {
+func (p *OllamaProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
 	if !p.CanEmbed() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support embeddings", p.GetID(), p.ModelName())
 	}
@@ -98,7 +99,7 @@ func (p *OllamaProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbe
 	return embedClient, nil
 }
 
-func (p *OllamaProvider) GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *OllamaProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}
@@ -119,7 +120,7 @@ func (p *OllamaProvider) GetPromptConnection(backendID string) (serverops.LLMPro
 	return promptClient, nil
 }
 
-func (p *OllamaProvider) GetStreamConnection(backendID string) (serverops.LLMStreamClient, error) {
+func (p *OllamaProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

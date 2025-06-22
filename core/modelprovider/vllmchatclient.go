@@ -29,33 +29,69 @@ type VLLMChatClient struct {
 }
 
 // NewVLLMPromptClient creates a new prompt client
-func NewVLLMPromptClient(baseURL, modelName string, httpClient *http.Client, maxTokens int) *VLLMPromptClient {
+func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client) (*VLLMPromptClient, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &VLLMPromptClient{
+
+	client := &VLLMPromptClient{
 		vLLMClient: vLLMClient{
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
-			maxTokens:  maxTokens,
 		},
 	}
+
+	// Fetch model details
+	details, err := client.GetModelDetails(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model details: %w", err)
+	}
+
+	// Validate model supports prompt completion
+	if !contains(details.Capabilities, "completion") {
+		return nil, fmt.Errorf("model %s does not support prompt completion", modelName)
+	}
+
+	client.maxTokens = details.MaxTokens
+	return client, nil
 }
 
-// NewVLLMChatClient creates a new chat client
-func NewVLLMChatClient(baseURL, modelName string, httpClient *http.Client, maxTokens int) *VLLMChatClient {
+func NewVLLMChatClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client) (*VLLMChatClient, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-	return &VLLMChatClient{
+
+	client := &VLLMChatClient{
 		vLLMClient: vLLMClient{
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
-			maxTokens:  maxTokens,
 		},
 	}
+
+	// Fetch model details
+	details, err := client.GetModelDetails(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model details: %w", err)
+	}
+
+	// Validate model supports chat
+	if !contains(details.Capabilities, "chat") {
+		return nil, fmt.Errorf("model %s does not support chat", modelName)
+	}
+
+	client.maxTokens = details.MaxTokens
+	return client, nil
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // Prompt implements LLMPromptExecClient interface
@@ -223,3 +259,18 @@ var (
 	_ serverops.LLMPromptExecClient = (*VLLMPromptClient)(nil)
 	_ serverops.LLMChatClient       = (*VLLMChatClient)(nil)
 )
+
+func (c *vLLMClient) GetModelDetails(ctx context.Context) (*VllmModelDetails, error) {
+	var details VllmModelDetails
+	if err := c.sendRequest(ctx, "/models", nil, &details); err != nil {
+		return nil, err
+	}
+	return &details, nil
+}
+
+type VllmModelDetails struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	MaxTokens    int      `json:"max_tokens"`
+	Capabilities []string `json:"capabilities"` // e.g., "chat", "completion"
+}

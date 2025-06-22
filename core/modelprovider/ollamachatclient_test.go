@@ -38,7 +38,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 	provider := modelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, modelprovider.WithChat(true))
 	require.True(t, provider.CanChat())
 
-	client, err := provider.GetChatConnection(url)
+	client, err := provider.GetChatConnection(ctx, url)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 	t.Run("SinglePrompt_ShouldReturnAssistantReply", func(t *testing.T) {
@@ -114,7 +114,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		badProvider := modelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, modelprovider.WithChat(true))
 		require.True(t, badProvider.CanChat())
 
-		invalidClient, err := badProvider.GetChatConnection(url)
+		invalidClient, err := badProvider.GetChatConnection(context.Background(), url)
 		require.NoError(t, err, "Getting the client should succeed even if model doesn't exist yet")
 		require.NotNil(t, invalidClient)
 
@@ -136,7 +136,7 @@ func TestUnit_OllamaProvider_RejectsChatWhenDisabled(t *testing.T) {
 
 	provider := modelprovider.NewOllamaModelProvider(modelName, backends, modelprovider.WithChat(false))
 	require.False(t, provider.CanChat(), "Provider should report CanChat as false")
-	client, err := provider.GetChatConnection(dummyURL)
+	client, err := provider.GetChatConnection(context.Background(), dummyURL)
 	require.Error(t, err, "Expected an error when getting chat connection for a non-chat provider")
 	assert.Nil(t, client, "Client should be nil on error")
 	assert.ErrorContains(t, err, "does not support chat", "Error message should indicate lack of chat support")

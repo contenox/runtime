@@ -1,6 +1,8 @@
 package modelprovider
 
 import (
+	"context"
+
 	"github.com/contenox/contenox/core/serverops"
 )
 
@@ -14,8 +16,8 @@ type Provider interface {
 	CanEmbed() bool          // Supports embeddings
 	CanStream() bool         // Supports streaming
 	CanPrompt() bool         // Supports prompting
-	GetChatConnection(backendID string) (serverops.LLMChatClient, error)
-	GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error)
-	GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error)
-	GetStreamConnection(backendID string) (serverops.LLMStreamClient, error)
+	GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error)
+	GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error)
+	GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error)
+	GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error)
 }

@@ -197,7 +197,7 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 	if m, ok := hookCall.Args["models"]; ok {
 		models = strings.Split(strings.ReplaceAll(m, " ", ""), ",")
 	}
-	providerTypes := []string{""}
+	providerTypes := []string{}
 	if pType, ok := hookCall.Args["provider_type"]; ok {
 		providerTypes = append(providerTypes, pType)
 	}

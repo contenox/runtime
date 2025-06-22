@@ -630,7 +630,7 @@ func (env *Environment) GetEmbedConnection(provider modelprovider.Provider) (ser
 		return nil, fmt.Errorf("baseURL is empty")
 	}
 
-	return provider.GetEmbedConnection(baseURL)
+	return provider.GetEmbedConnection(env.Ctx, baseURL)
 }
 
 func (env *Environment) GetPromptConnection(provider modelprovider.Provider) (serverops.LLMPromptExecClient, error) {
@@ -663,7 +663,7 @@ func (env *Environment) GetPromptConnection(provider modelprovider.Provider) (se
 		return nil, fmt.Errorf("baseURL is empty")
 	}
 
-	return provider.GetPromptConnection(baseURL)
+	return provider.GetPromptConnection(env.Ctx, baseURL)
 }
 
 func (env *Environment) GetDBInstance() libdb.DBManager {

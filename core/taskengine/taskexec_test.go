@@ -81,7 +81,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, provider.CanPrompt())
 	require.GreaterOrEqual(t, len(provider.GetBackendIDs()), 1)
-	prompt, err := provider.GetPromptConnection(provider.GetBackendIDs()[0])
+	prompt, err := provider.GetPromptConnection(ctx, provider.GetBackendIDs()[0])
 	require.NoError(t, err)
 	resp, err := prompt.Prompt(ctx, "say hi!")
 	require.NoError(t, err)

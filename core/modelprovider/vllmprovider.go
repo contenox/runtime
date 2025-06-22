@@ -1,6 +1,7 @@
 package modelprovider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -81,7 +82,7 @@ func (p *vLLMProvider) CanPrompt() bool {
 	return p.SupportsPrompt
 }
 
-func (p *vLLMProvider) GetChatConnection(backendID string) (serverops.LLMChatClient, error) {
+func (p *vLLMProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support chat", p.GetID(), p.ModelName())
 	}
@@ -91,30 +92,27 @@ func (p *vLLMProvider) GetChatConnection(backendID string) (serverops.LLMChatCli
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	maxTokens := int(vllmContextLengths[p.ModelName()] / 10)
-
-	return NewVLLMChatClient(backendID, p.ModelName(), http.DefaultClient, maxTokens), nil
+	return NewVLLMChatClient(ctx, backendID, p.ModelName(), http.DefaultClient)
 }
 
-func (p *vLLMProvider) GetPromptConnection(backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}
-	maxTokens := int(vllmContextLengths[p.ModelName()] / 10)
 
 	// Validate backend URL
 	if _, err := url.Parse(backendID); err != nil {
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	return NewVLLMPromptClient(backendID, p.ModelName(), http.DefaultClient, maxTokens), nil
+	return NewVLLMPromptClient(ctx, backendID, p.ModelName(), http.DefaultClient)
 }
 
-func (p *vLLMProvider) GetEmbedConnection(backendID string) (serverops.LLMEmbedClient, error) {
+func (p *vLLMProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
 	return nil, fmt.Errorf("embedding not supported by vLLM provider")
 }
 
-func (p *vLLMProvider) GetStreamConnection(backendID string) (serverops.LLMStreamClient, error) {
+func (p *vLLMProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
 	return nil, fmt.Errorf("streaming not implemented for vLLM provider")
 }
 
