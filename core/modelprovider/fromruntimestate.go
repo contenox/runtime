@@ -10,24 +10,46 @@ import (
 type RuntimeState func(ctx context.Context, backendType string) ([]Provider, error)
 
 func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.LLMState) RuntimeState {
-	models := make(map[string][]string)
+	// Create a two-level map: backendType -> modelName -> []baseURLs
+	modelsByBackendType := make(map[string]map[string][]string)
+
 	for _, state := range runtime {
+		backendType := state.Backend.Type
+		baseURL := state.Backend.BaseURL
+
+		if _, ok := modelsByBackendType[backendType]; !ok {
+			modelsByBackendType[backendType] = make(map[string][]string)
+		}
+
 		for _, model := range state.PulledModels {
-			models[model.Model] = append(models[model.Model], state.Backend.BaseURL)
+			modelName := model.Model
+			modelsByBackendType[backendType][modelName] = append(
+				modelsByBackendType[backendType][modelName],
+				baseURL,
+			)
 		}
 	}
-	res := []Provider{}
-	for model, backends := range models {
-		provider := NewOllamaModelProvider(model, backends)
-		res = append(res, provider)
-	}
-	return func(ctx context.Context, backendType string) ([]Provider, error) {
+
+	// Create all providers grouped by backend type
+	providersByType := make(map[string][]Provider)
+
+	for backendType, modelMap := range modelsByBackendType {
 		var providers []Provider
-		for _, provider := range res {
-			// if provider.BackendType() == backendType { // TODO: Implement backend type filtering
-			providers = append(providers, provider)
-			// }
+
+		for modelName, baseURLs := range modelMap {
+			switch backendType {
+			case "ollama":
+				providers = append(providers, NewOllamaModelProvider(modelName, baseURLs))
+			case "vllm":
+				providers = append(providers, NewVLLMModelProvider(modelName, baseURLs))
+			}
 		}
-		return providers, nil
+
+		providersByType[backendType] = providers
+	}
+
+	// Return the runtime state function that filters by backend type
+	return func(ctx context.Context, backendType string) ([]Provider, error) {
+		return providersByType[backendType], nil
 	}
 }

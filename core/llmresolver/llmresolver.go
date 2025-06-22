@@ -33,7 +33,7 @@ func filterCandidates(
 ) ([]modelprovider.Provider, error) {
 	providerType := req.Provider
 	if providerType == "" {
-		providerType = "Ollama" // Default provider
+		providerType = "ollama"
 	}
 
 	providers, err := getModels(ctx, providerType)
@@ -52,18 +52,20 @@ func filterCandidates(
 	if len(req.ModelNames) > 0 {
 		// Check preferred models in order of priority
 		for _, preferredModel := range req.ModelNames {
-			basePreferred := parseModelName(preferredModel)
+			// Use normalized model names for matching
+			normalizedPreferred := NormalizeModelName(preferredModel)
 
 			for _, p := range providers {
 				if seenProviders[p.GetID()] {
 					continue
 				}
 
-				// Match either base or full name
-				currentBase := parseModelName(p.ModelName())
+				// Normalize provider's model name for comparison
+				currentNormalized := NormalizeModelName(p.ModelName())
 				currentFull := p.ModelName()
 
-				if currentBase != basePreferred && currentFull != preferredModel {
+				// Match either normalized or full name
+				if currentNormalized != normalizedPreferred && currentFull != preferredModel {
 					continue
 				}
 
@@ -197,12 +199,34 @@ func validateProvider(p modelprovider.Provider, minContext int, capCheck func(mo
 	return capCheck(p)
 }
 
-// parseModelName extracts the base model name before the first colon
-func parseModelName(modelName string) string {
-	if parts := strings.SplitN(modelName, ":", 2); len(parts) > 0 {
-		return parts[0]
+// NormalizeModelName standardizes model names for comparison
+func NormalizeModelName(modelName string) string {
+	// Convert to lowercase for case-insensitive comparison
+	normalized := strings.ToLower(modelName)
+
+	// Remove common prefixes and suffixes
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "_", "")
+	normalized = strings.ReplaceAll(normalized, ".", "")
+
+	// Remove organization prefix if present
+	if parts := strings.Split(normalized, "/"); len(parts) > 1 {
+		normalized = parts[1]
 	}
-	return modelName
+
+	// Remove quantization suffixes
+	normalized = strings.ReplaceAll(normalized, "awq", "")
+	normalized = strings.ReplaceAll(normalized, "gptq", "")
+	normalized = strings.ReplaceAll(normalized, "4bit", "")
+	normalized = strings.ReplaceAll(normalized, "fp16", "")
+
+	// Remove version numbers
+	if idx := strings.LastIndex(normalized, ":"); idx != -1 {
+		normalized = normalized[:idx]
+	}
+
+	return normalized
 }
 
 func Chat(
