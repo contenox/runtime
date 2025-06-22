@@ -14,8 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
-var ErrUserAlreadyExists = errors.New("user already exists")
-var ErrTokenGenerationFailed = errors.New("failed to generate token")
+var (
+	ErrUserAlreadyExists     = errors.New("user already exists")
+	ErrTokenGenerationFailed = errors.New("failed to generate token")
+)
 
 type Service interface {
 	GetUserFromContext(ctx context.Context) (*store.User, error)
@@ -43,7 +45,8 @@ func New(db libdb.DBManager, config *serverops.Config) Service {
 		securityEnabledFlag = true
 	}
 
-	return &service{dbInstance: db,
+	return &service{
+		dbInstance:      db,
 		securityEnabled: securityEnabledFlag,
 		serverSecret:    config.JWTSecret,
 		signingKey:      config.SigningKey,
@@ -78,7 +81,9 @@ func (s *service) Login(ctx context.Context, email, password string) (*Result, e
 	if err != nil {
 		return nil, err
 	}
-
+	if user.HashedPassword == "" {
+		return nil, errors.New("direct login for this user is disabled")
+	}
 	passed, err := serverops.CheckPassword(password, user.HashedPassword, user.Salt, s.signingKey)
 	if err != nil || !passed {
 		return nil, errors.New("invalid credentials")
