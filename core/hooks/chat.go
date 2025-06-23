@@ -206,7 +206,7 @@ func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dat
 	}
 
 	// Process through LLM
-	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, 0, providerTypes, models...) // TODO: pass context length
+	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, providerTypes, models...)
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("chat failed: %w", err)
 	}

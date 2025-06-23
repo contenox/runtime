@@ -25,7 +25,7 @@ var DefaultProviderType string = "ollama"
 type Request struct {
 	ProviderTypes []string // Optional: if empty, uses all default providers
 	ModelNames    []string // Optional: if empty, any model is considered
-	ContextLength int      // Minimum required context length; 0 means no requirement
+	ContextLength int      // Minimum required context length
 }
 
 func filterCandidates(
@@ -37,6 +37,12 @@ func filterCandidates(
 	providerTypes := req.ProviderTypes
 	if len(providerTypes) == 0 {
 		providerTypes = []string{"ollama", "vllm"}
+	}
+	if req.ContextLength == 0 {
+		return nil, fmt.Errorf("context length must be greater than 0")
+	}
+	if req.ContextLength < 0 {
+		return nil, fmt.Errorf("context length must be non-negative")
 	}
 	var providers []modelprovider.Provider
 	var errs []error

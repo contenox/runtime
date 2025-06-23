@@ -195,7 +195,7 @@ var (
 	}
 
 	modelContextLengthsFullNames = map[string]int{
-		"smollm2:135m":       100000, // TODO: check if it's correct:30m
+		"smollm2:135m":       1024,
 		"codellama:34b-100k": 100000,
 		"mixtral-8x7b":       32768,
 	}

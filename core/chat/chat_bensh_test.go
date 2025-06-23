@@ -43,7 +43,7 @@ func BenchmarkChatExec(b *testing.B) {
 	b.Log("Warmup")
 	_, _, _, _, warmupErr := manager.ChatExec(ctx, []serverops.Message{
 		{Role: "user", Content: initialUserMessage},
-	}, 0, []string{"ollama"}, modelName)
+	}, []string{"ollama"}, modelName)
 	require.NoError(b, warmupErr)
 
 	// Start short conversation
@@ -60,7 +60,7 @@ func BenchmarkChatExec(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		start := time.Now()
 
-		resp, inputTok, outputTok, _, err := manager.ChatExec(ctx, convo, 0, []string{"ollama"}, modelName)
+		resp, inputTok, outputTok, _, err := manager.ChatExec(ctx, convo, []string{"ollama"}, modelName)
 		require.NoError(b, err)
 		require.NotNil(b, resp)
 		require.Greater(b, inputTok+outputTok, 0)

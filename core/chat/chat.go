@@ -141,7 +141,7 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 //   - Assistant response message
 //   - Number of input tokens
 //   - Number of output tokens
-func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, contextLength int, providerTypes []string, preferredModelNames ...string) (*serverops.Message, int, int, string, error) {
+func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, providerTypes []string, preferredModelNames ...string) (*serverops.Message, int, int, string, error) {
 	if len(messages) == 0 {
 		return nil, 0, 0, "", errors.New("no messages provided")
 	}
@@ -170,7 +170,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, co
 
 	}
 	chatClient, model, err := llmresolver.Chat(ctx, llmresolver.Request{
-		ContextLength: contextLength,
+		ContextLength: inputtokens,
 		ModelNames:    preferredModelNames,
 		ProviderTypes: providerTypes,
 	}, modelprovider.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
