@@ -100,7 +100,13 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
-
+	if req.Message == "" {
+		_ = serverops.Error(w, r, fmt.Errorf("message is required"), serverops.CreateOperation)
+		return
+	}
+	if len(req.Models) == 0 {
+		req.Models = []string{}
+	}
 	reply, _, _, err := h.service.Chat(ctx, chatID.String(), req.Message, req.Models...)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)

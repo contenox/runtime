@@ -41,19 +41,11 @@ func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpCli
 			modelName:  modelName,
 		},
 	}
-
-	// Fetch model details
-	details, err := client.GetModelDetails(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get model details: %w", err)
+	client.maxTokens = 2048
+	if _, ok := vllmContextLengths[modelName]; ok {
+		client.maxTokens = min(vllmContextLengths[modelName], client.maxTokens)
 	}
 
-	// Validate model supports prompt completion
-	if !contains(details.Capabilities, "completion") {
-		return nil, fmt.Errorf("model %s does not support prompt completion", modelName)
-	}
-
-	client.maxTokens = details.MaxTokens
 	return client, nil
 }
 
@@ -70,28 +62,11 @@ func NewVLLMChatClient(ctx context.Context, baseURL, modelName string, httpClien
 		},
 	}
 
-	// Fetch model details
-	details, err := client.GetModelDetails(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get model details: %w", err)
+	client.maxTokens = 2048
+	if _, ok := vllmContextLengths[modelName]; ok {
+		client.maxTokens = min(vllmContextLengths[modelName], client.maxTokens)
 	}
-
-	// Validate model supports chat
-	if !contains(details.Capabilities, "chat") {
-		return nil, fmt.Errorf("model %s does not support chat", modelName)
-	}
-
-	client.maxTokens = details.MaxTokens
 	return client, nil
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
 }
 
 // Prompt implements LLMPromptExecClient interface
@@ -104,7 +79,7 @@ func (c *VLLMPromptClient) Prompt(ctx context.Context, prompt string) (string, e
 	}
 
 	var response completionResponse
-	if err := c.sendRequest(ctx, "/completions", request, &response); err != nil {
+	if err := c.sendRequest(ctx, "/v1/completions", request, &response); err != nil {
 		return "", err
 	}
 
@@ -138,7 +113,7 @@ func (c *VLLMChatClient) Chat(ctx context.Context, messages []serverops.Message)
 	}
 
 	var response chatResponse
-	if err := c.sendRequest(ctx, "/chat/completions", request, &response); err != nil {
+	if err := c.sendRequest(ctx, "/v1/chat/completions", request, &response); err != nil {
 		return serverops.Message{}, err
 	}
 

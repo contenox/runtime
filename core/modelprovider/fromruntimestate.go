@@ -2,6 +2,7 @@ package modelprovider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/contenox/contenox/core/runtimestate"
 )
@@ -32,7 +33,7 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 
 	// Create all providers grouped by backend type
 	providersByType := make(map[string][]Provider)
-
+	var errC error
 	for backendType, modelMap := range modelsByBackendType {
 		var providers []Provider
 
@@ -41,7 +42,10 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 			case "ollama":
 				providers = append(providers, NewOllamaModelProvider(modelName, baseURLs))
 			case "vllm":
-				providers = append(providers, NewVLLMModelProvider(modelName, baseURLs))
+				provider := NewVLLMModelProvider(modelName, baseURLs)
+				providers = append(providers, provider)
+			default:
+				errC = fmt.Errorf("SERVER BUG: unsupported backend type: %s", backendType)
 			}
 		}
 
@@ -50,6 +54,6 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 
 	// Return the runtime state function that filters by backend type
 	return func(ctx context.Context, backendType string) ([]Provider, error) {
-		return providersByType[backendType], nil
+		return providersByType[backendType], errC
 	}
 }
