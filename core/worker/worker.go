@@ -3,13 +3,12 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/contenox/contenox/core/llmexec"
-	"github.com/contenox/contenox/core/modelprovider"
-	"github.com/contenox/contenox/core/serverops"
+	"github.com/google/uuid"
 	"github.com/js402/contenox/contenox/libkv"
 )
 
@@ -18,124 +17,174 @@ const (
 	ttl              = 5 * time.Minute
 )
 
-type JobHandler func(context.Context, []byte) ([]byte, error)
+type (
+	TaskHandler         func(context.Context, *llmexec.Job) (*llmexec.Output, error)
+	BackendCapabilities func(context.Context, *llmexec.Job) bool
+)
 
-type CommonWorker struct {
+type Worker struct {
 	kv       libkv.KVManager
-	handlers map[llmexec.TaskType]JobHandler
+	canTake  map[llmexec.TaskType]BackendCapabilities
+	handlers map[llmexec.TaskType]TaskHandler
 }
 
-func (w *CommonWorker) Start(ctx context.Context) {
-	log.Println("Worker started")
-	ticker := time.NewTicker(jobCheckInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Worker shutting down...")
-			return
-		case <-ticker.C:
-			w.processJobs(ctx)
-		}
-	}
-}
-
-func (w *CommonWorker) processJobs(ctx context.Context) {
-	exec, err := w.kv.Operation(ctx)
+func (w *Worker) ProcessJob(ctx context.Context) error {
+	execOnKV, err := w.kv.Operation(ctx)
 	if err != nil {
-		log.Printf("KV operation failed: %v", err)
-		return
+		return err
 	}
 
-	keys, _ := exec.List(ctx)
+	keys, err := execOnKV.List(ctx)
+	if err != nil {
+		return err
+	}
+	leaserID := []byte("worker-" + uuid.New().String())
 	for _, key := range keys {
 		if strings.HasSuffix(key, ":pending") {
-			w.processJob(ctx, exec, key)
+			baseKey := strings.TrimSuffix(key, ":pending")
+			parts := strings.Split(baseKey, ":")
+			taskType := llmexec.TaskType(parts[0])
+			jobRaw, err := execOnKV.Get(ctx, []byte(key))
+			if err != nil {
+				return err
+			}
+			job := &llmexec.Job{}
+			if err := json.Unmarshal(jobRaw, job); err != nil {
+				return err
+			}
+			if !w.canTake[taskType](ctx, job) {
+				continue
+			}
+			err = execOnKV.Set(ctx, libkv.KeyValue{
+				Key:   []byte(baseKey + ":leased"),
+				Value: leaserID,
+				TTL:   time.Now().UTC().Add(ttl),
+			})
+			if err != nil {
+				return err
+			}
+			defer func() {
+				err := execOnKV.Delete(ctx, []byte(baseKey+":leased"))
+				if err != nil {
+					// log.Printf("failed to delete lease: %v", err)
+				}
+			}()
+			err = w.processJob(ctx, execOnKV, key)
+			if err != nil {
+				return err
+			}
+			break
 		}
 	}
+	return nil
 }
 
-func (w *CommonWorker) processJob(ctx context.Context, exec libkv.KVExec, key string) {
-	key = strings.TrimSuffix(key, ":pending")
-	parts := strings.Split(key, ":")
-	if len(parts) < 2 {
-		return
-	}
+func (w *Worker) processJob(ctx context.Context, exec libkv.KVExec, key string) error {
+	baseKey := strings.TrimSuffix(key, ":pending")
+	parts := strings.Split(baseKey, ":")
 
 	taskType := llmexec.TaskType(parts[0])
-	jobID := parts[1]
-	doneKey := key + ":done"
+	doneKey := baseKey + ":done"
 
+	// Skip if already processed
 	if exists, _ := exec.Exists(ctx, []byte(doneKey)); exists {
-		return
+		return fmt.Errorf("job already processed")
 	}
 
+	// Get job data
+	data, err := exec.Get(ctx, []byte(key))
+	if err != nil {
+		return err
+	}
+
+	var job llmexec.Job
+	if err := json.Unmarshal(data, &job); err != nil {
+		return err
+	}
+
+	// Process job
 	handler, ok := w.handlers[taskType]
 	if !ok {
-		log.Printf("No handler for task type: %s", taskType)
-		return
+		return fmt.Errorf("no handler for task type: %s", taskType)
 	}
 
-	pendingKey := key + ":pending"
-	data, err := exec.Get(ctx, []byte(pendingKey))
+	result, err := handler(ctx, &job)
 	if err != nil {
-		log.Printf("Failed to get job data: %v", err)
-		return
+		return err
 	}
 
-	result, err := handler(ctx, data)
+	// Store result
+	resultData, err := json.Marshal(result)
 	if err != nil {
-		log.Printf("Job processing failed: %v", err)
-		return
+		return err
 	}
 
 	if err := exec.Set(ctx, libkv.KeyValue{
 		Key:   []byte(doneKey),
-		Value: result,
+		Value: resultData,
 		TTL:   time.Now().Add(ttl),
 	}); err != nil {
-		log.Printf("Failed to set result: %v", err)
-		return
+		return err
 	}
 
-	exec.Delete(ctx, []byte(pendingKey))
-	log.Printf("Processed %s job: %s", taskType, jobID)
+	// Cleanup
+	if err := exec.Delete(ctx, []byte(key)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewOllamaWorker(
 	kv libkv.KVManager,
-	chat *modelprovider.OllamaChatClient,
-	embed *modelprovider.OllamaEmbedClient,
-	prompt *modelprovider.OllamaPromptClient,
-) *CommonWorker {
-	return &CommonWorker{
+	chat llmexec.LLMChatClient,
+	embed llmexec.LLMEmbedClient,
+	prompt llmexec.LLMPromptExecClient,
+) *Worker {
+	return &Worker{
 		kv: kv,
-		handlers: map[llmexec.TaskType]JobHandler{
-			llmexec.Chat: func(ctx context.Context, data []byte) ([]byte, error) {
-				var messages []serverops.Message
-				if err := json.Unmarshal(data, &messages); err != nil {
-					return nil, err
-				}
-				resp, err := chat.Chat(ctx, messages)
+		handlers: map[llmexec.TaskType]TaskHandler{
+			llmexec.Chat: func(ctx context.Context, job *llmexec.Job) (*llmexec.Output, error) {
+				msg, metrics, err := chat.Chat(ctx, job.Messages, job.Args)
 				if err != nil {
 					return nil, err
 				}
-				return json.Marshal(resp)
+				return &llmexec.Output{
+					ID:            job.ID,
+					TaskType:      job.TaskType,
+					OutputMessage: msg,
+					Metrics:       metrics,
+					Args:          job.Args,
+				}, nil
 			},
-			llmexec.Embed: func(ctx context.Context, data []byte) ([]byte, error) {
-				embeddings, err := embed.Embed(ctx, string(data))
+			llmexec.Embed: func(ctx context.Context, job *llmexec.Job) (*llmexec.Output, error) {
+				embeddings, err := embed.Embed(ctx, job.Prompt)
 				if err != nil {
 					return nil, err
 				}
-				return json.Marshal(embeddings)
+				embeddings32 := make([]float32, len(embeddings))
+				for i := range embeddings {
+					embeddings32[i] = float32(embeddings[i])
+				}
+				return &llmexec.Output{
+					ID:         job.ID,
+					TaskType:   job.TaskType,
+					Embeddings: embeddings32,
+					Args:       job.Args,
+				}, nil
 			},
-			llmexec.Prompt: func(ctx context.Context, data []byte) ([]byte, error) {
-				prompt, err := prompt.Prompt(ctx, string(data))
+			llmexec.Prompt: func(ctx context.Context, job *llmexec.Job) (*llmexec.Output, error) {
+				output, metrics, err := prompt.Prompt(ctx, job.Prompt, job.Args)
 				if err != nil {
 					return nil, err
 				}
-				return []byte(prompt), nil
+				return &llmexec.Output{
+					ID:       job.ID,
+					TaskType: job.TaskType,
+					Output:   output,
+					Metrics:  metrics,
+					Args:     job.Args,
+				}, nil
 			},
 		},
 	}
@@ -143,26 +192,37 @@ func NewOllamaWorker(
 
 func NewVLLMWorker(
 	kv libkv.KVManager,
-	chat *modelprovider.VLLMChatClient,
-	prompt *modelprovider.VLLMPromptClient,
-) *CommonWorker {
-	return &CommonWorker{
+	chat llmexec.LLMChatClient,
+	prompt llmexec.LLMPromptExecClient,
+) *Worker {
+	return &Worker{
 		kv: kv,
-		handlers: map[llmexec.TaskType]JobHandler{
-			llmexec.Chat: func(ctx context.Context, data []byte) ([]byte, error) {
-				var messages []serverops.Message
-				if err := json.Unmarshal(data, &messages); err != nil {
-					return nil, err
-				}
-				resp, err := chat.Chat(ctx, messages)
+		handlers: map[llmexec.TaskType]TaskHandler{
+			llmexec.Chat: func(ctx context.Context, job *llmexec.Job) (*llmexec.Output, error) {
+				msg, metrics, err := chat.Chat(ctx, job.Messages, job.Args)
 				if err != nil {
 					return nil, err
 				}
-				return json.Marshal(resp)
+				return &llmexec.Output{
+					ID:            job.ID,
+					TaskType:      job.TaskType,
+					OutputMessage: msg,
+					Metrics:       metrics,
+					Args:          job.Args,
+				}, nil
 			},
-			llmexec.Prompt: func(ctx context.Context, data []byte) ([]byte, error) {
-				resp, err := prompt.Prompt(ctx, string(data))
-				return []byte(resp), err
+			llmexec.Prompt: func(ctx context.Context, job *llmexec.Job) (*llmexec.Output, error) {
+				output, metrics, err := prompt.Prompt(ctx, job.Prompt, job.Args)
+				if err != nil {
+					return nil, err
+				}
+				return &llmexec.Output{
+					ID:       job.ID,
+					TaskType: job.TaskType,
+					Output:   output,
+					Metrics:  metrics,
+					Args:     job.Args,
+				}, nil
 			},
 		},
 	}

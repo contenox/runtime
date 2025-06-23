@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/js402/contenox/contenox/libkv"
 )
 
-var ErrJobPending = errors.New("job pending")
+var (
+	ErrJobPending      = errors.New("job pending")
+	ErrInvalidTaskType = errors.New("invalid task type")
+)
 
 type TaskType string
 
@@ -22,22 +24,68 @@ const (
 	Prompt TaskType = "prompt"
 )
 
+type Job struct {
+	ID       string    `json:"id"`
+	TaskType TaskType  `json:"task_type"`
+	Messages []Message `json:"messages"`
+	Prompt   string    `json:"prompt"`
+	Args
+}
+
+type Metrics struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
 type Args struct {
 	MaxOutputTokens int      `json:"max_output_tokens"`
 	ProviderTypes   []string `json:"provider_types"`
 	ModelNames      []string `json:"model_names"`
 }
 
-type LLMExecBroker struct {
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// Client interfaces for different capabilities
+type LLMChatClient interface {
+	Chat(ctx context.Context, Messages []Message, args Args) (Message, Metrics, error)
+}
+
+type LLMEmbedClient interface {
+	Embed(ctx context.Context, prompt string) ([]float64, error)
+}
+
+type LLMStreamClient interface {
+	Stream(ctx context.Context, prompt string, args Args) (<-chan string, error)
+}
+
+type LLMPromptExecClient interface {
+	Prompt(ctx context.Context, prompt string, args Args) (string, Metrics, error)
+}
+
+type Output struct {
+	ID            string    `json:"id"`
+	TaskType      TaskType  `json:"task_type"`
+	OutputMessage Message   `json:"output_message"`
+	Embeddings    []float32 `json:"embeddings"`
+	Prompt        string    `json:"prompt"`
+	Output        string    `json:"output"`
+	Metrics
+	Args
+}
+
+type Broker struct {
 	kv libkv.KVManager
 }
 
-func (b *LLMExecBroker) executeTask(
+func (b *Broker) executeTask(
 	ctx context.Context,
 	taskType TaskType,
 	id string,
-	inputData []byte,
-) ([]byte, error) {
+	job Job,
+) (*Output, error) {
 	execKV, err := b.kv.Operation(ctx)
 	if err != nil {
 		return nil, err
@@ -47,7 +95,10 @@ func (b *LLMExecBroker) executeTask(
 	if exists, _ := execKV.Exists(ctx, []byte(pendingKey)); exists {
 		return nil, ErrJobPending
 	}
-
+	inputData, err := json.Marshal(job)
+	if err != nil {
+		return nil, err
+	}
 	if err := execKV.Set(ctx, libkv.KeyValue{
 		Key:   []byte(pendingKey),
 		Value: inputData,
@@ -68,40 +119,62 @@ func (b *LLMExecBroker) executeTask(
 		result, err = execKV.Get(ctx, []byte(doneKey))
 		return err
 	})
-
-	return result, err
+	if err != nil {
+		return nil, err
+	}
+	output := &Output{}
+	if err := json.Unmarshal(result, output); err != nil {
+		return nil, err
+	}
+	return output, nil
 }
 
-func (b *LLMExecBroker) Chat(ctx context.Context, id string, messages []serverops.Message) (serverops.Message, error) {
-	data, err := json.Marshal(messages)
-	if err != nil {
-		return serverops.Message{}, err
+func (b *Broker) Chat(ctx context.Context, id string, messages []Message, args Args) (Message, Metrics, error) {
+	job := &Job{
+		ID:       id,
+		Messages: messages,
+		Args:     args,
+	}
+	if job.TaskType != Chat {
+		return Message{}, Metrics{}, ErrInvalidTaskType
 	}
 
-	result, err := b.executeTask(ctx, Chat, id, data)
+	result, err := b.executeTask(ctx, Chat, id, *job)
 	if err != nil {
-		return serverops.Message{}, err
+		return Message{}, Metrics{}, err
 	}
 
-	var msg serverops.Message
-	return msg, json.Unmarshal(result, &msg)
+	return result.OutputMessage, result.Metrics, nil
 }
 
-func (b *LLMExecBroker) Embed(ctx context.Context, id string, prompt string) ([]float64, error) {
-	result, err := b.executeTask(ctx, Embed, id, []byte(prompt))
+func (b *Broker) Embed(ctx context.Context, id string, prompt string) ([]float32, error) {
+	job := &Job{
+		ID:       id,
+		Prompt:   prompt,
+		TaskType: Embed,
+	}
+	result, err := b.executeTask(ctx, Embed, id, *job)
 	if err != nil {
 		return nil, err
 	}
 
-	var embeddings []float64
-	return embeddings, json.Unmarshal(result, &embeddings)
+	return result.Embeddings, nil
 }
 
-func (b *LLMExecBroker) Prompt(ctx context.Context, id string, prompt string) (string, error) {
-	result, err := b.executeTask(ctx, Prompt, id, []byte(prompt))
-	return string(result), err
+func (b *Broker) Prompt(ctx context.Context, id string, prompt string) (string, Metrics, error) {
+	job := &Job{
+		ID:       id,
+		Prompt:   prompt,
+		TaskType: Prompt,
+	}
+	result, err := b.executeTask(ctx, Prompt, id, *job)
+	if err != nil {
+		return "", Metrics{}, err
+	}
+
+	return result.Output, result.Metrics, nil
 }
 
-func NewLLMExecBroker(kv libkv.KVManager) *LLMExecBroker {
-	return &LLMExecBroker{kv: kv}
+func NewLLMExecBroker(kv libkv.KVManager) *Broker {
+	return &Broker{kv: kv}
 }
