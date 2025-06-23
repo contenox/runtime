@@ -3,6 +3,7 @@ package libkv
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 var (
@@ -22,6 +23,7 @@ type KVManager interface {
 type KeyValue struct {
 	Key   []byte
 	Value []byte
+	TTL   time.Time
 }
 
 // KVExec represents the basic key-value operations.

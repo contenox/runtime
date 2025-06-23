@@ -17,6 +17,8 @@ replace github.com/contenox/contenox/libs/libroutine => ../libs/libroutine
 
 replace github.com/contenox/contenox/libs/libtestenv => ../libs/libtestenv
 
+replace github.com/js402/contenox/contenox/libkv => ../libs/libkv
+
 require (
 	dario.cat/mergo v1.0.1
 	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000
@@ -27,6 +29,7 @@ require (
 	github.com/contenox/contenox/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
+	github.com/js402/contenox/contenox/libkv v0.0.0-00010101000000-000000000000
 	github.com/lib/pq v1.10.9
 	github.com/ollama/ollama v0.6.7
 	github.com/stretchr/testify v1.10.0
@@ -80,6 +83,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/testcontainers/testcontainers-go/modules/nats v0.36.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
+	github.com/testcontainers/testcontainers-go/modules/valkey v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

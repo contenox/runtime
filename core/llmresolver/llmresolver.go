@@ -243,27 +243,27 @@ func NormalizeModelName(modelName string) string {
 	return normalized
 }
 
-func Chat(
-	ctx context.Context,
-	req Request,
-	getModels modelprovider.RuntimeState,
-	resolver Policy,
-) (serverops.LLMChatClient, string, error) {
-	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
-	if err != nil {
-		return nil, "", err
-	}
-	provider, backend, err := resolver(candidates)
-	if err != nil {
-		return nil, "", err
-	}
-	modelName := provider.ModelName()
-	client, err := provider.GetChatConnection(ctx, backend)
-	if err != nil {
-		return nil, "", err
-	}
-	return client, modelName, nil
-}
+// func Chat(
+// 	ctx context.Context,
+// 	req Request,
+// 	getModels modelprovider.RuntimeState,
+// 	resolver Policy,
+// ) (serverops.LLMChatClient, string, error) {
+// 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
+// 	if err != nil {
+// 		return nil, "", err
+// 	}
+// 	provider, backend, err := resolver(candidates)
+// 	if err != nil {
+// 		return nil, "", err
+// 	}
+// 	modelName := provider.ModelName()
+// 	client, err := provider.GetChatConnection(ctx, backend)
+// 	if err != nil {
+// 		return nil, "", err
+// 	}
+// 	return client, modelName, nil
+// }
 
 type EmbedRequest struct {
 	ModelName    string
