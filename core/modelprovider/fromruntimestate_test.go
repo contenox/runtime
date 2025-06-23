@@ -88,7 +88,7 @@ func TestUnit_ModelProviderAdapter_SetsCorrectModelCapabilities(t *testing.T) {
 
 	// 3. Get the providers created by the adapter
 	// Pass a dummy type, as the adapter's returned function ignores it currently
-	providers, err := adapterFunc(ctx, "")
+	providers, err := adapterFunc(ctx, "ollama")
 	require.NoError(t, err)
 	require.Len(t, providers, 3, "Should create one provider per unique model")
 

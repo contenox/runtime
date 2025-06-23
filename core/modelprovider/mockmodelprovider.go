@@ -89,5 +89,5 @@ type MockPromptClient struct {
 }
 
 func (m *MockPromptClient) Prompt(ctx context.Context, prompt string) (string, error) {
-	return "", nil
+	return prompt, nil
 }

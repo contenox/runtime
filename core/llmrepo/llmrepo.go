@@ -96,7 +96,7 @@ type modelManager struct {
 func (e *modelManager) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
 	provider, err := e.GetProvider(ctx)
 
-	return func(ctx context.Context, backendType string) ([]modelprovider.Provider, error) {
+	return func(ctx context.Context, backendTypes ...string) ([]modelprovider.Provider, error) {
 		if err != nil {
 			return nil, err
 		}

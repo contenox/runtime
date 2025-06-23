@@ -19,7 +19,6 @@ import (
 )
 
 func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
-	// mockClient := &serverops.MockPromptExecClient{}
 	mockProvider := &modelprovider.MockProvider{
 		Name:          "mock-model",
 		CanPromptFlag: true,
@@ -39,10 +38,9 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Type: taskengine.RawString,
 	}
 
-	output, _, raw, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
+	output, _, _, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
 	require.NoError(t, err)
-	require.Equal(t, "prompted response for: hello", output)
-	require.Equal(t, "prompted response for: hello", raw)
+	require.Equal(t, "hello", output)
 }
 
 func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {

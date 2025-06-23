@@ -2,13 +2,14 @@ package modelprovider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/contenox/contenox/core/runtimestate"
 )
 
 // RuntimeState retrieves available model providers for a specific backend type
-type RuntimeState func(ctx context.Context, backendType string) ([]Provider, error)
+type RuntimeState func(ctx context.Context, backendTypes ...string) ([]Provider, error)
 
 func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.LLMState) RuntimeState {
 	// Create a two-level map: backendType -> modelName -> []baseURLs
@@ -53,7 +54,18 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 	}
 
 	// Return the runtime state function that filters by backend type
-	return func(ctx context.Context, backendType string) ([]Provider, error) {
-		return providersByType[backendType], errC
+	return func(ctx context.Context, backendTypes ...string) ([]Provider, error) {
+		if len(backendTypes) == 0 {
+			return nil, errors.New("no backend types specified")
+		}
+
+		var filteredProviders []Provider
+		for _, backendType := range backendTypes {
+			if providers, ok := providersByType[backendType]; ok {
+				filteredProviders = append(filteredProviders, providers...)
+			}
+		}
+
+		return filteredProviders, errC
 	}
 }

@@ -18,12 +18,11 @@ func (m *MockModelRepo) GetProvider(ctx context.Context) (modelprovider.Provider
 	return m.Provider, nil
 }
 
+// TODO: Implement GetRuntime method
 func (m *MockModelRepo) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
-	return func(_ context.Context, providerType string) ([]modelprovider.Provider, error) {
-		// Match on provider type if specified
-		if providerType == "" || providerType == "ollama" {
-			return []modelprovider.Provider{m.Provider}, nil
-		}
-		return []modelprovider.Provider{}, nil
+	return func(_ context.Context, providerTypes ...string) ([]modelprovider.Provider, error) {
+		return []modelprovider.Provider{
+			m.Provider,
+		}, nil
 	}
 }

@@ -20,7 +20,7 @@ import (
 )
 
 func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(t.Context(), serverops.NoopTracker{}).
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(t.Context(), serverops.NewLogActivityTracker(slog.Default())).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").

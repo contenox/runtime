@@ -36,8 +36,10 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 			wantModelID: "1",
 		},
 		{
-			name:      "no models available",
-			req:       llmresolver.Request{},
+			name: "no models available",
+			req: llmresolver.Request{
+				ContextLength: 1,
+			},
 			providers: []modelprovider.Provider{},
 			wantErr:   llmresolver.ErrNoAvailableModels,
 		},
@@ -57,7 +59,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 		{
 			name: "model exists but name mismatch",
 			req: llmresolver.Request{
-				ModelNames: []string{"smollm2:135m"},
+				ModelNames:    []string{"smollm2:135m"},
+				ContextLength: 1,
 			},
 			providers: []modelprovider.Provider{
 				&modelprovider.MockProvider{
@@ -157,7 +160,7 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getModels := func(_ context.Context, _ string) ([]modelprovider.Provider, error) {
+			getModels := func(_ context.Context, _ ...string) ([]modelprovider.Provider, error) {
 				return tt.providers, nil
 			}
 
@@ -304,7 +307,7 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getModels := func(_ context.Context, providerType string) ([]modelprovider.Provider, error) {
+			getModels := func(_ context.Context, providerTypes ...string) ([]modelprovider.Provider, error) {
 				return tt.providers, nil
 			}
 

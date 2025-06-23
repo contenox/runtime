@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"slices"
 	"strings"
 
 	"github.com/contenox/contenox/core/modelprovider"
@@ -38,27 +37,9 @@ func filterCandidates(
 	if len(providerTypes) == 0 {
 		providerTypes = []string{"ollama", "vllm"}
 	}
-	if req.ContextLength == 0 {
-		return nil, fmt.Errorf("context length must be greater than 0")
-	}
-	if req.ContextLength < 0 {
-		return nil, fmt.Errorf("context length must be non-negative")
-	}
-	var providers []modelprovider.Provider
-	var errs []error
-	for _, providerType := range providerTypes {
-		var err error
-		if !slices.Contains([]string{"ollama", "vllm"}, providerType) {
-			return nil, fmt.Errorf("unsupported provider type: %s", providerType)
-		}
-		providers, err = getModels(ctx, providerType)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-	if len(errs) > 1 {
-		// TODO: Implement error handling for one error
-		return nil, fmt.Errorf("failed to get models: %v", errs)
+	providers, err := getModels(ctx, providerTypes...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get models: %w", err)
 	}
 	if len(providers) == 0 {
 		return nil, ErrNoAvailableModels
@@ -262,6 +243,12 @@ func Chat(
 	provider, backend, err := resolver(candidates)
 	if err != nil {
 		return nil, "", err
+	}
+	if req.ContextLength == 0 {
+		return nil, "", fmt.Errorf("context length must be greater than 0")
+	}
+	if req.ContextLength < 0 {
+		return nil, "", fmt.Errorf("context length must be non-negative")
 	}
 	modelName := provider.ModelName()
 	client, err := provider.GetChatConnection(ctx, backend)
