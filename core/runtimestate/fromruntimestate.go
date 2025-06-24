@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/contenox/contenox/libs/libmodelprovider"
 )
@@ -41,7 +42,7 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]LLMState) Prov
 		for modelName, baseURLs := range modelMap {
 			switch backendType {
 			case "ollama":
-				providers = append(providers, libmodelprovider.NewOllamaModelProvider(modelName, baseURLs))
+				providers = append(providers, libmodelprovider.NewOllamaModelProvider(modelName, baseURLs, http.DefaultClient))
 			case "vllm":
 				provider := libmodelprovider.NewVLLMModelProvider(modelName, baseURLs)
 				providers = append(providers, provider)

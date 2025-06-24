@@ -109,7 +109,7 @@ func (c *VLLMChatClient) Chat(ctx context.Context, messages []Message, options .
 	request := chatRequest{
 		Model:       c.modelName,
 		Messages:    messages,
-		Temperature: 0.5,
+		Temperature: 0.7,
 		MaxTokens:   c.maxTokens,
 	}
 
