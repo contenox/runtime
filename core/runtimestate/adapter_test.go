@@ -35,7 +35,7 @@ func TestUnit_ModelProviderAdapter_ReturnsExpectedProviders(t *testing.T) {
 		},
 	}
 
-	adapter := runtimestate.ModelProviderAdapter(context.Background(), runtime)
+	adapter := runtimestate.BetterProviderAdapter(context.Background(), runtime)
 
 	providers, err := adapter(context.Background(), "ollama")
 	if err != nil {
@@ -83,7 +83,7 @@ func TestUnit_ModelProviderAdapter_SetsCorrectModelCapabilities(t *testing.T) {
 	}
 
 	// 2. Get the adapter function (which currently hardcodes WithChat(true))
-	adapterFunc := runtimestate.ModelProviderAdapter(ctx, runtime)
+	adapterFunc := runtimestate.BetterProviderAdapter(ctx, runtime)
 
 	// 3. Get the providers created by the adapter
 	// Pass a dummy type, as the adapter's returned function ignores it currently

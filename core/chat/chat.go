@@ -167,13 +167,12 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 		if err != nil {
 			return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w %w", err, err2)
 		}
-
 	}
 	chatClient, model, err := llmresolver.Chat(ctx, llmresolver.Request{
 		ContextLength: inputtokens,
 		ModelNames:    preferredModelNames,
 		ProviderTypes: providerTypes,
-	}, runtimestate.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
+	}, runtimestate.BetterProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
 	}

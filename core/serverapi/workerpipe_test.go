@@ -160,7 +160,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	// sanity check
 	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 		ModelName: config.EmbedModel,
-	}, runtimestate.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
+	}, runtimestate.BetterProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
 	}
