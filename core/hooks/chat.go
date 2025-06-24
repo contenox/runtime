@@ -128,10 +128,7 @@ func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time
 	}
 
 	for _, oarm := range openAIHistory.Messages {
-		history.Messages = append(history.Messages, taskengine.Message{
-			Role:    oarm.Role,
-			Content: oarm.Content,
-		})
+		history.Messages = append(history.Messages, taskengine.Message(oarm))
 	}
 
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, "appended", nil
