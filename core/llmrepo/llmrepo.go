@@ -14,7 +14,7 @@ import (
 
 type ModelRepo interface {
 	GetProvider(ctx context.Context) (modelprovider.Provider, error)
-	GetRuntime(ctx context.Context) modelprovider.RuntimeState
+	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
 }
 
 func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
@@ -93,7 +93,7 @@ type modelManager struct {
 }
 
 // GetRuntime implements Embedder.
-func (e *modelManager) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
+func (e *modelManager) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
 	provider, err := e.GetProvider(ctx)
 
 	return func(ctx context.Context, backendTypes ...string) ([]modelprovider.Provider, error) {

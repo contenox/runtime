@@ -13,7 +13,7 @@ import (
 
 	"github.com/contenox/contenox/core/indexrepo"
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverapi"
 	"github.com/contenox/contenox/core/serverapi/dispatchapi"
 	"github.com/contenox/contenox/core/serverapi/filesapi"
@@ -160,7 +160,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	// sanity check
 	client, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
 		ModelName: config.EmbedModel,
-	}, modelprovider.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
+	}, runtimestate.ModelProviderAdapter(ctx, testenv.State()), llmresolver.Randomly)
 	if err != nil {
 		t.Fatalf("failed to resolve embed: %v", err)
 	}

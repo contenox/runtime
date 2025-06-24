@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 )
 
@@ -30,7 +31,7 @@ type Request struct {
 func filterCandidates(
 	ctx context.Context,
 	req Request,
-	getModels modelprovider.RuntimeState,
+	getModels runtimestate.ProviderFromRuntimeState,
 	capCheck func(modelprovider.Provider) bool,
 ) ([]modelprovider.Provider, error) {
 	providerTypes := req.ProviderTypes
@@ -233,7 +234,7 @@ func NormalizeModelName(modelName string) string {
 func Chat(
 	ctx context.Context,
 	req Request,
-	getModels modelprovider.RuntimeState,
+	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (serverops.LLMChatClient, string, error) {
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
@@ -267,7 +268,7 @@ type EmbedRequest struct {
 func Embed(
 	ctx context.Context,
 	embedReq EmbedRequest,
-	getModels modelprovider.RuntimeState,
+	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (serverops.LLMEmbedClient, error) {
 	if embedReq.ModelName == "" {
@@ -295,7 +296,7 @@ func Embed(
 func Stream(
 	ctx context.Context,
 	req Request,
-	getModels modelprovider.RuntimeState,
+	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (serverops.LLMStreamClient, error) {
 	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanStream)
@@ -317,7 +318,7 @@ type PromptRequest struct {
 func PromptExecute(
 	ctx context.Context,
 	reqExec PromptRequest,
-	getModels modelprovider.RuntimeState,
+	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (serverops.LLMPromptExecClient, error) {
 	if reqExec.ModelName == "" {

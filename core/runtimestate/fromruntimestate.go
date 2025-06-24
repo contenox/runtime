@@ -1,17 +1,17 @@
-package modelprovider
+package runtimestate
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	"github.com/contenox/contenox/core/runtimestate"
+	"github.com/contenox/contenox/core/modelprovider"
 )
 
-// RuntimeState retrieves available model providers for a specific backend type
-type RuntimeState func(ctx context.Context, backendTypes ...string) ([]Provider, error)
+// ProviderFromRuntimeState retrieves available model providers for a specific backend type
+type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) ([]modelprovider.Provider, error)
 
-func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.LLMState) RuntimeState {
+func ModelProviderAdapter(ctx context.Context, runtime map[string]LLMState) ProviderFromRuntimeState {
 	// Create a two-level map: backendType -> modelName -> []baseURLs
 	modelsByBackendType := make(map[string]map[string][]string)
 
@@ -33,17 +33,17 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 	}
 
 	// Create all providers grouped by backend type
-	providersByType := make(map[string][]Provider)
+	providersByType := make(map[string][]modelprovider.Provider)
 	var errC error
 	for backendType, modelMap := range modelsByBackendType {
-		var providers []Provider
+		var providers []modelprovider.Provider
 
 		for modelName, baseURLs := range modelMap {
 			switch backendType {
 			case "ollama":
-				providers = append(providers, NewOllamaModelProvider(modelName, baseURLs))
+				providers = append(providers, modelprovider.NewOllamaModelProvider(modelName, baseURLs))
 			case "vllm":
-				provider := NewVLLMModelProvider(modelName, baseURLs)
+				provider := modelprovider.NewVLLMModelProvider(modelName, baseURLs)
 				providers = append(providers, provider)
 			default:
 				errC = fmt.Errorf("SERVER BUG: unsupported backend type: %s", backendType)
@@ -54,12 +54,12 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]runtimestate.L
 	}
 
 	// Return the runtime state function that filters by backend type
-	return func(ctx context.Context, backendTypes ...string) ([]Provider, error) {
+	return func(ctx context.Context, backendTypes ...string) ([]modelprovider.Provider, error) {
 		if len(backendTypes) == 0 {
 			return nil, errors.New("no backend types specified")
 		}
 
-		var filteredProviders []Provider
+		var filteredProviders []modelprovider.Provider
 		for _, backendType := range backendTypes {
 			if providers, ok := providersByType[backendType]; ok {
 				filteredProviders = append(filteredProviders, providers...)

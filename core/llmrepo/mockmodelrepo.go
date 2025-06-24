@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/core/runtimestate"
 )
 
 type MockModelRepo struct {
@@ -19,7 +20,7 @@ func (m *MockModelRepo) GetProvider(ctx context.Context) (modelprovider.Provider
 }
 
 // TODO: Implement GetRuntime method
-func (m *MockModelRepo) GetRuntime(ctx context.Context) modelprovider.RuntimeState {
+func (m *MockModelRepo) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
 	return func(_ context.Context, providerTypes ...string) ([]modelprovider.Provider, error) {
 		return []modelprovider.Provider{
 			m.Provider,

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -173,7 +172,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, pr
 		ContextLength: inputtokens,
 		ModelNames:    preferredModelNames,
 		ProviderTypes: providerTypes,
-	}, modelprovider.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
+	}, runtimestate.ModelProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
 	}
