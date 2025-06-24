@@ -2,8 +2,6 @@ package taskengine
 
 import (
 	"fmt"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 // TaskType defines the expected output format of a task.
@@ -316,10 +314,15 @@ type SearchResult struct {
 }
 
 type ChatHistory struct {
-	Messages     []serverops.Message `json:"messages"`
-	Model        string              `json:"model"`
-	InputTokens  int                 `json:"inputTokens"`
-	OutputTokens int                 `json:"outputTokens"`
+	Messages     []Message `json:"messages"`
+	Model        string    `json:"model"`
+	InputTokens  int       `json:"inputTokens"`
+	OutputTokens int       `json:"outputTokens"`
+}
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type OpenAIChatRequest struct {

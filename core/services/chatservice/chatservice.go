@@ -11,6 +11,7 @@ import (
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/core/tasksrecipes"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 	"github.com/google/uuid"
 )
 
@@ -44,7 +45,7 @@ func New(
 }
 
 type ChatInstance struct {
-	Messages []serverops.Message
+	Messages []libmodelprovider.Message
 
 	CreatedAt time.Time
 }
@@ -149,9 +150,9 @@ func (s *service) GetChatHistory(ctx context.Context, id string) ([]ChatMessage,
 	}
 
 	// Convert stored messages into the api.Message slice.
-	var messages []serverops.Message
+	var messages []libmodelprovider.Message
 	for _, msg := range conversation {
-		var parsedMsg serverops.Message
+		var parsedMsg libmodelprovider.Message
 		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
 			return nil, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
 		}

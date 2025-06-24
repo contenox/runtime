@@ -1,11 +1,9 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
 	"fmt"
 	"net/http"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 var _ Provider = (*GeminiProvider)(nil)
@@ -102,7 +100,7 @@ func (p *GeminiProvider) CanPrompt() bool {
 }
 
 // GetChatConnection returns an LLMChatClient for the specified backend ID.
-func (p *GeminiProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
+func (p *GeminiProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("model %s does not support chat interactions", p.modelName)
 	}
@@ -118,7 +116,7 @@ func (p *GeminiProvider) GetChatConnection(ctx context.Context, backendID string
 }
 
 // GetPromptConnection returns an LLMPromptExecClient for the specified backend ID.
-func (p *GeminiProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *GeminiProvider) GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("model %s does not support prompt interactions", p.modelName)
 	}
@@ -134,7 +132,7 @@ func (p *GeminiProvider) GetPromptConnection(ctx context.Context, backendID stri
 }
 
 // GetEmbedConnection returns an LLMEmbedClient for the specified backend ID.
-func (p *GeminiProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
+func (p *GeminiProvider) GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error) {
 	if !p.CanEmbed() {
 		return nil, fmt.Errorf("model %s does not support embedding interactions", p.modelName)
 	}
@@ -149,7 +147,7 @@ func (p *GeminiProvider) GetEmbedConnection(ctx context.Context, backendID strin
 }
 
 // GetStreamConnection returns an LLMStreamClient for the specified backend ID.
-func (p *GeminiProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
+func (p *GeminiProvider) GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error) {
 	if !p.CanStream() {
 		return nil, fmt.Errorf("model %s does not support streaming interactions", p.modelName)
 	}
@@ -232,7 +230,7 @@ type geminiEmbedContentResponse struct {
 	} `json:"embedding"`
 }
 
-func convertToGeminiMessages(messages []serverops.Message) []geminiContent {
+func convertToGeminiMessages(messages []Message) []geminiContent {
 	geminiMsgs := make([]geminiContent, len(messages))
 	for i, msg := range messages {
 		// Gemini API expects "user" and "model" roles

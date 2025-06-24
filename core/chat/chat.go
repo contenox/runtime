@@ -11,10 +11,11 @@ import (
 
 	"github.com/contenox/contenox/core/llmresolver"
 	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
@@ -39,7 +40,7 @@ func New(
 
 // AddInstruction inserts a system message into an existing chat.
 func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, message string) error {
-	msg := serverops.Message{
+	msg := taskengine.Message{
 		Role:    "system",
 		Content: message,
 	}
@@ -60,8 +61,8 @@ func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, 
 }
 
 // AppendMessage appends a message to an existing message slice.
-func (m *Manager) AppendMessage(ctx context.Context, messages []serverops.Message, message string, role string) ([]serverops.Message, error) {
-	userMsg := serverops.Message{
+func (m *Manager) AppendMessage(ctx context.Context, messages []taskengine.Message, message string, role string) ([]taskengine.Message, error) {
+	userMsg := taskengine.Message{
 		Role:    role,
 		Content: message,
 	}
@@ -71,15 +72,15 @@ func (m *Manager) AppendMessage(ctx context.Context, messages []serverops.Messag
 }
 
 // ListMessages retrieves all stored messages for a given subject ID.
-func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID string) ([]serverops.Message, error) {
+func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID string) ([]taskengine.Message, error) {
 	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
 	if err != nil {
 		return nil, err
 	}
 	// Convert stored messages into the api.Message slice.
-	var messages []serverops.Message
+	var messages []taskengine.Message
 	for _, msg := range conversation {
-		var parsedMsg serverops.Message
+		var parsedMsg taskengine.Message
 		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
 			return nil, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
 		}
@@ -90,7 +91,7 @@ func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID str
 }
 
 // AppendMessages stores a user message and the assistant response to the database.
-func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *serverops.Message, responseMessage *serverops.Message) error {
+func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *taskengine.Message, responseMessage *taskengine.Message) error {
 	if beginTime.IsZero() {
 		return fmt.Errorf("beginTime cannot be zero")
 	}
@@ -140,7 +141,7 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 //   - Assistant response message
 //   - Number of input tokens
 //   - Number of output tokens
-func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, providerTypes []string, preferredModelNames ...string) (*serverops.Message, int, int, string, error) {
+func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, providerTypes []string, preferredModelNames ...string) (*taskengine.Message, int, int, string, error) {
 	if len(messages) == 0 {
 		return nil, 0, 0, "", errors.New("no messages provided")
 	}
@@ -176,7 +177,14 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, pr
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
 	}
-	responseMessage, err := chatClient.Chat(ctx, messages)
+	var convMessages []libmodelprovider.Message
+	for _, m2 := range messages {
+		convMessages = append(convMessages, libmodelprovider.Message{
+			Role:    m2.Role,
+			Content: m2.Content,
+		})
+	}
+	responseMessage, err := chatClient.Chat(ctx, convMessages)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to chat %w", err)
 	}
@@ -184,7 +192,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, pr
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
 	}
-	assistantMsgData := serverops.Message{
+	assistantMsgData := taskengine.Message{
 		Role:    responseMessage.Role,
 		Content: responseMessage.Content,
 	}
@@ -192,7 +200,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []serverops.Message, pr
 }
 
 // CalculateContextSize estimates the token count for the chat prompt history.
-func (m *Manager) CalculateContextSize(ctx context.Context, messages []serverops.Message, baseModels ...string) (int, error) {
+func (m *Manager) CalculateContextSize(ctx context.Context, messages []taskengine.Message, baseModels ...string) (int, error) {
 	var prompt string
 	for _, m := range messages {
 		if m.Role == "user" {

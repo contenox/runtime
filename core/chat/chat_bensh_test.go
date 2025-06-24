@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 
@@ -41,13 +42,13 @@ func BenchmarkChatExec(b *testing.B) {
 	manager := chat.New(backendState, tokenizer)
 
 	b.Log("Warmup")
-	_, _, _, _, warmupErr := manager.ChatExec(ctx, []serverops.Message{
+	_, _, _, _, warmupErr := manager.ChatExec(ctx, []taskengine.Message{
 		{Role: "user", Content: initialUserMessage},
 	}, []string{"ollama"}, modelName)
 	require.NoError(b, warmupErr)
 
 	// Start short conversation
-	convo := []serverops.Message{
+	convo := []taskengine.Message{
 		{Role: "user", Content: initialUserMessage},
 	}
 
@@ -69,7 +70,7 @@ func BenchmarkChatExec(b *testing.B) {
 
 		// Simulate next turn in conversation
 		convo = append(convo, *resp)
-		convo = append(convo, serverops.Message{Role: "user", Content: "Can you tell me more?"})
+		convo = append(convo, taskengine.Message{Role: "user", Content: "Can you tell me more?"})
 
 		// Track metrics
 		atomic.AddInt64(&totalInputTokens, int64(inputTok))

@@ -19,19 +19,22 @@ replace github.com/contenox/contenox/libs/libtestenv => ../libs/libtestenv
 
 replace github.com/js402/contenox/contenox/libkv => ../libs/libkv
 
+replace github.com/contenox/contenox/libs/libmodelprovider => ../libs/libmodelprovider
+
 require (
 	dario.cat/mergo v1.0.1
 	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/libs/libmodelprovider v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libroutine v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/js402/contenox/contenox/libkv v0.0.0-00010101000000-000000000000
 	github.com/lib/pq v1.10.9
-	github.com/ollama/ollama v0.6.7
+	github.com/ollama/ollama v0.9.2
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/vdaas/vald-client-go v1.7.16

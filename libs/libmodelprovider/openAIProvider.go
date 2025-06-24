@@ -1,4 +1,4 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"bytes"
@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 var _ Provider = (*OpenAIProvider)(nil)
@@ -105,7 +103,7 @@ func (p *OpenAIProvider) CanPrompt() bool {
 	return p.canPrompt
 }
 
-func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
+func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("model %s does not support chat interactions", p.modelName)
 	}
@@ -120,7 +118,7 @@ func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string
 	}, nil
 }
 
-func (p *OpenAIProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *OpenAIProvider) GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("model %s does not support prompt (legacy completion) interactions. Consider using Chat API", p.modelName)
 	}
@@ -138,7 +136,7 @@ func (p *OpenAIProvider) GetPromptConnection(ctx context.Context, backendID stri
 	}, nil
 }
 
-func (p *OpenAIProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
+func (p *OpenAIProvider) GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error) {
 	if !p.CanEmbed() {
 		return nil, fmt.Errorf("model %s does not support embedding interactions", p.modelName)
 	}
@@ -152,7 +150,7 @@ func (p *OpenAIProvider) GetEmbedConnection(ctx context.Context, backendID strin
 	}, nil
 }
 
-func (p *OpenAIProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
+func (p *OpenAIProvider) GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error) {
 	if !p.CanStream() {
 		return nil, fmt.Errorf("model %s does not support streaming interactions", p.modelName)
 	}
@@ -182,7 +180,7 @@ type openAIPromptClient struct {
 func (c *openAIPromptClient) Prompt(ctx context.Context, prompt string) (string, error) {
 	request := openAIChatRequest{
 		Model:       c.modelName,
-		Messages:    []serverops.Message{{Role: "user", Content: prompt}},
+		Messages:    []Message{{Role: "user", Content: prompt}},
 		Temperature: 0.7,
 		MaxTokens:   c.maxTokens,
 	}
@@ -207,7 +205,7 @@ type openAIChatClient struct {
 	openAIClient
 }
 
-func (c *openAIChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
+func (c *openAIChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
 	request := openAIChatRequest{
 		Model:       c.modelName,
 		Messages:    messages,
@@ -217,16 +215,16 @@ func (c *openAIChatClient) Chat(ctx context.Context, messages []serverops.Messag
 
 	var response openAIChatResponse
 	if err := c.sendRequest(ctx, "/chat/completions", request, &response); err != nil {
-		return serverops.Message{}, err
+		return Message{}, err
 	}
 
 	if len(response.Choices) == 0 {
-		return serverops.Message{}, fmt.Errorf("no chat choices returned from OpenAI for model %s", c.modelName)
+		return Message{}, fmt.Errorf("no chat choices returned from OpenAI for model %s", c.modelName)
 	}
 
 	choice := response.Choices[0]
 	if choice.Message.Content == "" {
-		return serverops.Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, choice.FinishReason)
+		return Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, choice.FinishReason)
 	}
 	return choice.Message, nil
 }
@@ -314,11 +312,11 @@ func (c *openAIClient) sendRequest(ctx context.Context, endpoint string, request
 }
 
 type openAIChatRequest struct {
-	Model       string              `json:"model"`
-	Messages    []serverops.Message `json:"messages"`
-	Temperature float64             `json:"temperature,omitempty"`
-	MaxTokens   int                 `json:"max_tokens,omitempty"`
-	Stream      bool                `json:"stream,omitempty"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Temperature float64   `json:"temperature,omitempty"`
+	MaxTokens   int       `json:"max_tokens,omitempty"`
+	Stream      bool      `json:"stream,omitempty"`
 }
 
 type openAIChatResponse struct {
@@ -326,9 +324,9 @@ type openAIChatResponse struct {
 	Object  string `json:"object"`
 	Created int    `json:"created"`
 	Choices []struct {
-		Index        int               `json:"index"`
-		Message      serverops.Message `json:"message"`
-		FinishReason string            `json:"finish_reason"`
+		Index        int     `json:"index"`
+		Message      Message `json:"message"`
+		FinishReason string  `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -343,9 +341,9 @@ type openAIChatStreamResponseChunk struct {
 	Created int    `json:"created"`
 	Model   string `json:"model"`
 	Choices []struct {
-		Index        int               `json:"index"`
-		Delta        serverops.Message `json:"delta"` // Delta contains partial content
-		FinishReason string            `json:"finish_reason"`
+		Index        int     `json:"index"`
+		Delta        Message `json:"delta"` // Delta contains partial content
+		FinishReason string  `json:"finish_reason"`
 	} `json:"choices"`
 	// TODO: usage is only present in the last chunk when stream_options={"include_usage": true}
 	// Usage *struct {

@@ -1,10 +1,8 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
 	"fmt"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 // MockProvider implements the Provider interface for testing
@@ -51,19 +49,19 @@ func (m *MockProvider) CanPrompt() bool {
 	return m.CanPromptFlag
 }
 
-func (m *MockProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
+func (m *MockProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	return &MockChatClient{ProviderID: m.ID}, nil
 }
 
-func (m *MockProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
+func (m *MockProvider) GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error) {
 	return &MockEmbedClient{ProviderID: m.ID}, nil
 }
 
-func (m *MockProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
+func (m *MockProvider) GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *MockProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
+func (m *MockProvider) GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error) {
 	return &MockPromptClient{ProviderID: m.ID}, nil
 }
 
@@ -72,8 +70,8 @@ type MockChatClient struct {
 	ProviderID string
 }
 
-func (m *MockChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
-	return serverops.Message{}, nil
+func (m *MockChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
+	return Message{}, nil
 }
 
 type MockEmbedClient struct {

@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 type geminiClient struct {
@@ -65,7 +63,7 @@ type geminiChatClient struct {
 	geminiClient
 }
 
-func (c *geminiChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
+func (c *geminiChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
 	geminiMessages := convertToGeminiMessages(messages)
 
 	request := geminiGenerateContentRequest{
@@ -79,22 +77,22 @@ func (c *geminiChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	endpoint := fmt.Sprintf("/models/%s:generateContent", c.modelName)
 	var response geminiGenerateContentResponse
 	if err := c.sendRequest(ctx, endpoint, request, &response); err != nil {
-		return serverops.Message{}, err
+		return Message{}, err
 	}
 
 	if len(response.Candidates) == 0 {
-		return serverops.Message{}, fmt.Errorf("no candidates returned from Gemini for model %s", c.modelName)
+		return Message{}, fmt.Errorf("no candidates returned from Gemini for model %s", c.modelName)
 	}
 
 	candidate := response.Candidates[0]
 	if len(candidate.Content.Parts) == 0 || candidate.Content.Parts[0].Text == "" {
 		if len(candidate.FinishReason) > 0 {
-			return serverops.Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, candidate.FinishReason[0])
+			return Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, candidate.FinishReason[0])
 		}
-		return serverops.Message{}, fmt.Errorf("empty content from model %s", c.modelName)
+		return Message{}, fmt.Errorf("empty content from model %s", c.modelName)
 	}
 
-	return serverops.Message{Role: "model", Content: candidate.Content.Parts[0].Text}, nil
+	return Message{Role: "model", Content: candidate.Content.Parts[0].Text}, nil
 }
 
 // geminiEmbedClient implements serverops.LLMEmbedClient

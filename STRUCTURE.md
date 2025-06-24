@@ -39,10 +39,8 @@ Provides shared utilities, interfaces, and implementations for operational conce
 │   │   ├── llmresolver.go
 │   │   └── llmresolver_test.go
 │   ├── main.go
-│   ├── modelprovider
-│   │   ├── fromruntimestate.go
-│   │   ├── fromruntimestate_test.go
-│   │   ├── mockmodelprovider.go
+│   ├── ...
+│   │   ├── ...
 │   ├── taskengine
 │   │   ├── taskenv.go
 │   │   ├── taskexec.go
@@ -150,8 +148,8 @@ Handles resolving and providing access to Large Language Models (LLMs). The pres
 │   ├── modelprovider
 │   │   ├── fromruntimestate.go
 │   │   ├── fromruntimestate_test.go
-│   │   ├── mockmodelprovider.go
-│   │   ├── modelprovider.go
+│   │   ├── mocklibmodelprovider.go
+│   │   ├── libmodelprovider.go
 │   │   ├── ollamachatclient.go
 │   │   └── ollamachatclient_test.go
 ```

@@ -1,4 +1,4 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 // vLLMProvider implements the Provider interface for vLLM models
@@ -83,7 +81,7 @@ func (p *vLLMProvider) CanPrompt() bool {
 	return p.SupportsPrompt
 }
 
-func (p *vLLMProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
+func (p *vLLMProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support chat", p.GetID(), p.ModelName())
 	}
@@ -96,7 +94,7 @@ func (p *vLLMProvider) GetChatConnection(ctx context.Context, backendID string) 
 	return NewVLLMChatClient(ctx, backendID, p.ModelName(), http.DefaultClient, p.authToken)
 }
 
-func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}
@@ -109,11 +107,11 @@ func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string
 	return NewVLLMPromptClient(ctx, backendID, p.ModelName(), http.DefaultClient, p.authToken)
 }
 
-func (p *vLLMProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
+func (p *vLLMProvider) GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error) {
 	return nil, fmt.Errorf("embedding not supported by vLLM provider")
 }
 
-func (p *vLLMProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
+func (p *vLLMProvider) GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error) {
 	return nil, fmt.Errorf("streaming not implemented for vLLM provider")
 }
 

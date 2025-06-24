@@ -10,6 +10,7 @@ import (
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/contenox/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,7 +59,7 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("AppendMessage_adds_user_message_to_history", func(t *testing.T) {
-		initial := []serverops.Message{
+		initial := []taskengine.Message{
 			{Role: "system", Content: systemMessage},
 		}
 
@@ -79,11 +80,11 @@ func TestManagerSystem(t *testing.T) {
 
 	t.Run("AppendMessages_persists_user_and_assistant_messages", func(t *testing.T) {
 		beginTime := time.Now().UTC()
-		inputMsg := &serverops.Message{
+		inputMsg := &taskengine.Message{
 			Role:    "user",
 			Content: userMessage,
 		}
-		responseMsg := &serverops.Message{
+		responseMsg := &taskengine.Message{
 			Role:    "assistant",
 			Content: "The capital of France is Paris.",
 		}
@@ -101,7 +102,7 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("ChatExec_runs_llm_with_chat_history_and_returns_response", func(t *testing.T) {
-		history := []serverops.Message{
+		history := []taskengine.Message{
 			{Role: "system", Content: systemMessage},
 			{Role: "user", Content: userMessage},
 		}
@@ -123,7 +124,7 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("ChatExec_fails_when_last_message_is_not_user", func(t *testing.T) {
-		history := []serverops.Message{
+		history := []taskengine.Message{
 			{Role: "assistant", Content: "I don't know."},
 		}
 		resp, _, _, _, err := manager.ChatExec(ctx, history, []string{"ollama"}, "smollm2:135m")
@@ -133,7 +134,7 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("CalculateContextSize_estimates_token_count_for_prompt", func(t *testing.T) {
-		history := []serverops.Message{
+		history := []taskengine.Message{
 			{Role: "user", Content: "What is life?"},
 			{Role: "user", Content: "Explain quantum physics."},
 		}

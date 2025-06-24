@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/modelprovider"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 )
 
 func TestUnit_ChatModelResolution(t *testing.T) {
 	tests := []struct {
 		name        string
 		req         llmresolver.Request
-		providers   []modelprovider.Provider
+		providers   []libmodelprovider.Provider
 		wantErr     error
 		wantModelID string
 	}{
@@ -24,8 +24,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"llama2:latest"},
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "1",
 					Name:          "llama2:latest",
 					ContextLength: 4096,
@@ -40,7 +40,7 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 			req: llmresolver.Request{
 				ContextLength: 1,
 			},
-			providers: []modelprovider.Provider{},
+			providers: []libmodelprovider.Provider{},
 			wantErr:   llmresolver.ErrNoAvailableModels,
 		},
 		{
@@ -48,8 +48,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 			req: llmresolver.Request{
 				ContextLength: 8000,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ContextLength: 4096,
 					CanChatFlag:   true,
 				},
@@ -62,8 +62,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"smollm2:135m"},
 				ContextLength: 1,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "2",
 					Name:          "smollm2",
 					ContextLength: 4096,
@@ -78,8 +78,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"llama2:7b"},
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "3",
 					Name:          "llama2",
 					ContextLength: 4096,
@@ -95,8 +95,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"Llama2"},
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "4",
 					Name:          "llama2",
 					ContextLength: 4096,
@@ -112,8 +112,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"llama2-awq"},
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "5",
 					Name:          "llama2",
 					ContextLength: 4096,
@@ -129,8 +129,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 				ModelNames:    []string{"nonexistent", "llama2"},
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "6",
 					Name:          "llama2",
 					ContextLength: 4096,
@@ -145,8 +145,8 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 			req: llmresolver.Request{
 				ContextLength: 4096,
 			},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:            "7",
 					Name:          "llama2",
 					ContextLength: 4096,
@@ -160,7 +160,7 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getModels := func(_ context.Context, _ ...string) ([]modelprovider.Provider, error) {
+			getModels := func(_ context.Context, _ ...string) ([]libmodelprovider.Provider, error) {
 				return tt.providers, nil
 			}
 
@@ -174,19 +174,19 @@ func TestUnit_ChatModelResolution(t *testing.T) {
 
 func TestUnit_EmbedModelResolution(t *testing.T) {
 	// Define common providers used in tests
-	providerEmbedOK := &modelprovider.MockProvider{
+	providerEmbedOK := &libmodelprovider.MockProvider{
 		ID:           "p1",
 		Name:         "text-embed-model",
 		CanEmbedFlag: true,
 		Backends:     []string{"b1"},
 	}
-	providerEmbedNoBackends := &modelprovider.MockProvider{
+	providerEmbedNoBackends := &libmodelprovider.MockProvider{
 		ID:           "p2",
 		Name:         "text-embed-model",
 		CanEmbedFlag: true,
 		Backends:     []string{}, // No backends
 	}
-	providerEmbedCannotEmbed := &modelprovider.MockProvider{
+	providerEmbedCannotEmbed := &libmodelprovider.MockProvider{
 		ID:           "p4",
 		Name:         "text-embed-model",
 		CanEmbedFlag: false, // Cannot embed
@@ -196,7 +196,7 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 	tests := []struct {
 		name      string
 		embedReq  llmresolver.EmbedRequest
-		providers []modelprovider.Provider
+		providers []libmodelprovider.Provider
 		resolver  llmresolver.Policy
 		wantErr   error
 		wantMsg   string
@@ -204,14 +204,14 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:      "happy path - exact model match",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
-			providers: []modelprovider.Provider{providerEmbedOK},
+			providers: []libmodelprovider.Provider{providerEmbedOK},
 			resolver:  llmresolver.Randomly,
 			wantErr:   nil,
 		},
 		{
 			name:      "error - model name required",
 			embedReq:  llmresolver.EmbedRequest{ModelName: ""},
-			providers: []modelprovider.Provider{providerEmbedOK},
+			providers: []libmodelprovider.Provider{providerEmbedOK},
 			resolver:  llmresolver.Randomly,
 			wantErr:   fmt.Errorf("model name is required"),
 			wantMsg:   "model name is required",
@@ -219,28 +219,28 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:      "error - no models available",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
-			providers: []modelprovider.Provider{},
+			providers: []libmodelprovider.Provider{},
 			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoAvailableModels,
 		},
 		{
 			name:      "error - no satisfactory model (name mismatch)",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "non-existent-model"},
-			providers: []modelprovider.Provider{providerEmbedOK},
+			providers: []libmodelprovider.Provider{providerEmbedOK},
 			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoSatisfactoryModel,
 		},
 		{
 			name:      "error - no satisfactory model (capability mismatch)",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
-			providers: []modelprovider.Provider{providerEmbedCannotEmbed},
+			providers: []libmodelprovider.Provider{providerEmbedCannotEmbed},
 			resolver:  llmresolver.Randomly,
 			wantErr:   llmresolver.ErrNoSatisfactoryModel,
 		},
 		{
 			name:      "error - selected provider has no backends",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
-			providers: []modelprovider.Provider{providerEmbedNoBackends},
+			providers: []libmodelprovider.Provider{providerEmbedNoBackends},
 			resolver:  llmresolver.Randomly,
 			// Error comes from selectRandomBackend called by ResolveRandomly
 			wantErr: llmresolver.ErrNoSatisfactoryModel,
@@ -248,15 +248,15 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:      "multiple candidates - resolver selects one",
 			embedReq:  llmresolver.EmbedRequest{ModelName: "text-embed-model"},
-			providers: []modelprovider.Provider{providerEmbedOK, &modelprovider.MockProvider{ID: "p6", Name: "text-embed-model", CanEmbedFlag: true, Backends: []string{"b6"}}},
+			providers: []libmodelprovider.Provider{providerEmbedOK, &libmodelprovider.MockProvider{ID: "p6", Name: "text-embed-model", CanEmbedFlag: true, Backends: []string{"b6"}}},
 			resolver:  llmresolver.Randomly,
 			wantErr:   nil,
 		},
 		{
 			name:     "model name with tag matches base",
 			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model:33m"},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:           "p3",
 					Name:         "text-embed-model",
 					CanEmbedFlag: true,
@@ -269,8 +269,8 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:     "exact model match with tag",
 			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model:33m"},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:           "p4",
 					Name:         "text-embed-model:33m",
 					CanEmbedFlag: true,
@@ -283,7 +283,7 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:     "case-insensitive match after normalization",
 			embedReq: llmresolver.EmbedRequest{ModelName: "Text-Embed-Model"},
-			providers: []modelprovider.Provider{
+			providers: []libmodelprovider.Provider{
 				providerEmbedOK, // Name: "text-embed-model"
 			},
 			resolver: llmresolver.Randomly,
@@ -292,8 +292,8 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 		{
 			name:     "quantization suffix stripped - awq",
 			embedReq: llmresolver.EmbedRequest{ModelName: "text-embed-model-awq"},
-			providers: []modelprovider.Provider{
-				&modelprovider.MockProvider{
+			providers: []libmodelprovider.Provider{
+				&libmodelprovider.MockProvider{
 					ID:           "p5",
 					Name:         "text-embed-model",
 					CanEmbedFlag: true,
@@ -307,7 +307,7 @@ func TestUnit_EmbedModelResolution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getModels := func(_ context.Context, providerTypes ...string) ([]modelprovider.Provider, error) {
+			getModels := func(_ context.Context, providerTypes ...string) ([]libmodelprovider.Provider, error) {
 				return tt.providers, nil
 			}
 

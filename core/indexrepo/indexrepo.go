@@ -7,10 +7,10 @@ import (
 
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/serverops/vectors"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 )
 
 type Args struct {
@@ -188,7 +188,7 @@ func IngestChunks(
 }
 
 // Helper function for text embedding
-func embedText(ctx context.Context, embedClient serverops.LLMEmbedClient, text string) ([]float32, error) {
+func embedText(ctx context.Context, embedClient libmodelprovider.LLMEmbedClient, text string) ([]float32, error) {
 	vectorData, err := embedClient.Embed(ctx, text)
 	if err != nil {
 		return nil, fmt.Errorf("embedding failed: %w", err)

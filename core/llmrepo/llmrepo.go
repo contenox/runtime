@@ -5,15 +5,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 )
 
 type ModelRepo interface {
-	GetProvider(ctx context.Context) (modelprovider.Provider, error)
+	GetProvider(ctx context.Context) (libmodelprovider.Provider, error)
 	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
 }
 
@@ -96,16 +96,16 @@ type modelManager struct {
 func (e *modelManager) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
 	provider, err := e.GetProvider(ctx)
 
-	return func(ctx context.Context, backendTypes ...string) ([]modelprovider.Provider, error) {
+	return func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
 		if err != nil {
 			return nil, err
 		}
 
-		return []modelprovider.Provider{provider}, nil
+		return []libmodelprovider.Provider{provider}, nil
 	}
 }
 
-func (e *modelManager) GetProvider(ctx context.Context) (modelprovider.Provider, error) {
+func (e *modelManager) GetProvider(ctx context.Context) (libmodelprovider.Provider, error) {
 	backends := map[string]store.Backend{}
 
 	for _, v := range e.runtime.Get(ctx) {
@@ -129,9 +129,9 @@ func (e *modelManager) GetProvider(ctx context.Context) (modelprovider.Provider,
 	if len(results) == 0 {
 		return nil, errors.New("no backends found")
 	}
-	provider := modelprovider.NewOllamaModelProvider(e.model.Model, results,
-		modelprovider.WithEmbed(e.embed),
-		modelprovider.WithPrompt(e.prompt))
+	provider := libmodelprovider.NewOllamaModelProvider(e.model.Model, results,
+		libmodelprovider.WithEmbed(e.embed),
+		libmodelprovider.WithPrompt(e.prompt))
 	return provider, nil
 }
 

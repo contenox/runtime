@@ -1,4 +1,4 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/ollama/ollama/api"
 )
 
@@ -55,7 +54,7 @@ func (p *OllamaProvider) CanPrompt() bool {
 	return p.SupportsPrompt
 }
 
-func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error) {
+func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	if !p.CanChat() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support chat", p.GetID(), p.ModelName())
 	}
@@ -78,7 +77,7 @@ func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string
 	return chatClient, nil
 }
 
-func (p *OllamaProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
+func (p *OllamaProvider) GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error) {
 	if !p.CanEmbed() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support embeddings", p.GetID(), p.ModelName())
 	}
@@ -99,7 +98,7 @@ func (p *OllamaProvider) GetEmbedConnection(ctx context.Context, backendID strin
 	return embedClient, nil
 }
 
-func (p *OllamaProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
+func (p *OllamaProvider) GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error) {
 	if !p.CanPrompt() {
 		return nil, fmt.Errorf("provider %s (model %s) does not support prompting", p.GetID(), p.ModelName())
 	}
@@ -120,7 +119,7 @@ func (p *OllamaProvider) GetPromptConnection(ctx context.Context, backendID stri
 	return promptClient, nil
 }
 
-func (p *OllamaProvider) GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error) {
+func (p *OllamaProvider) GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 

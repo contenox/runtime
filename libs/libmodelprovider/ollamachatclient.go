@@ -1,10 +1,9 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/ollama/ollama/api"
 )
 
@@ -14,9 +13,9 @@ type OllamaChatClient struct {
 	backendURL   string      // backend URL
 }
 
-var _ serverops.LLMChatClient = (*OllamaChatClient)(nil)
+var _ LLMChatClient = (*OllamaChatClient)(nil)
 
-func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
+func (c *OllamaChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
 	apiMessages := make([]api.Message, 0, len(messages))
 	for _, msg := range messages {
 		apiMessages = append(apiMessages, api.Message{
@@ -46,26 +45,26 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	})
 	// Check for API-level errors first (network issues, etc.)
 	if err != nil {
-		return serverops.Message{}, fmt.Errorf("ollama API chat request failed for model %s: %w", c.modelName, err)
+		return Message{}, fmt.Errorf("ollama API chat request failed for model %s: %w", c.modelName, err)
 	}
 
 	// Check if we received any response at all
 	if finalResponse.Message.Role == "" {
-		return serverops.Message{}, fmt.Errorf("no response received from ollama for model %s", c.modelName)
+		return Message{}, fmt.Errorf("no response received from ollama for model %s", c.modelName)
 	}
 
 	// Handle completion reasons
 	switch finalResponse.DoneReason {
 	case "error":
 		// Server-side error during generation
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"ollama generation error for model %s: %s",
 			c.modelName,
 			finalResponse.Message.Content,
 		)
 	case "length":
 		// Treat token limit hits as application errors
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"token limit reached for model %s (partial response: %q)",
 			c.modelName,
 			finalResponse.Message.Content,
@@ -73,14 +72,14 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	case "stop":
 		// Normal completion, but ensure content exists
 		if finalResponse.Message.Content == "" {
-			return serverops.Message{}, fmt.Errorf(
+			return Message{}, fmt.Errorf(
 				"empty content from model %s despite normal completion",
 				c.modelName,
 			)
 		}
 	default:
 		// Unknown completion reason
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"unexpected completion reason %q for model %s",
 			finalResponse.DoneReason,
 			c.modelName,
@@ -88,7 +87,7 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []serverops.Messag
 	}
 
 	// Successful response
-	return serverops.Message{
+	return Message{
 		Role:    finalResponse.Message.Role,
 		Content: content,
 	}, nil

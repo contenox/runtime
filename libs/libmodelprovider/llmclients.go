@@ -1,4 +1,4 @@
-package serverops
+package libmodelprovider
 
 import "context"
 

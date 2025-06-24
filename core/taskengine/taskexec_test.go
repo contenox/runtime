@@ -10,16 +10,16 @@ import (
 	"github.com/contenox/contenox/core/hooks"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
-	mockProvider := &modelprovider.MockProvider{
+	mockProvider := &libmodelprovider.MockProvider{
 		Name:          "mock-model",
 		CanPromptFlag: true,
 		ContextLength: 2048,

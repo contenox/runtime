@@ -1,9 +1,7 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 // Provider is a provider of backend instances capable of executing requests with this Model.
@@ -16,8 +14,8 @@ type Provider interface {
 	CanEmbed() bool          // Supports embeddings
 	CanStream() bool         // Supports streaming
 	CanPrompt() bool         // Supports prompting
-	GetChatConnection(ctx context.Context, backendID string) (serverops.LLMChatClient, error)
-	GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error)
-	GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error)
-	GetStreamConnection(ctx context.Context, backendID string) (serverops.LLMStreamClient, error)
+	GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error)
+	GetPromptConnection(ctx context.Context, backendID string) (LLMPromptExecClient, error)
+	GetEmbedConnection(ctx context.Context, backendID string) (LLMEmbedClient, error)
+	GetStreamConnection(ctx context.Context, backendID string) (LLMStreamClient, error)
 }

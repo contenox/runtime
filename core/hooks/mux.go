@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/taskengine"
 )
 
@@ -92,7 +91,7 @@ func (m *Mux) Exec(ctx context.Context, startTime time.Time, input any, dataType
 	if chatHist != nil {
 		if resultStr, ok := result.(string); ok {
 			// Append only assistant response (user message already exists)
-			chatHist.Messages = append(chatHist.Messages, serverops.Message{
+			chatHist.Messages = append(chatHist.Messages, taskengine.Message{
 				Role:    "system",
 				Content: resultStr,
 			})

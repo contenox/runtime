@@ -1,4 +1,4 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"bytes"
@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 // Base client configuration
@@ -107,7 +105,7 @@ func (c *VLLMPromptClient) Prompt(ctx context.Context, prompt string) (string, e
 }
 
 // Chat implements LLMChatClient interface
-func (c *VLLMChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
+func (c *VLLMChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
 	request := chatRequest{
 		Model:       c.modelName,
 		Messages:    messages,
@@ -117,34 +115,34 @@ func (c *VLLMChatClient) Chat(ctx context.Context, messages []serverops.Message)
 
 	var response chatResponse
 	if err := c.sendRequest(ctx, "/v1/chat/completions", request, &response); err != nil {
-		return serverops.Message{}, err
+		return Message{}, err
 	}
 
 	if len(response.Choices) == 0 {
-		return serverops.Message{}, fmt.Errorf("no chat choices returned from vLLM for model %s", c.modelName)
+		return Message{}, fmt.Errorf("no chat choices returned from vLLM for model %s", c.modelName)
 	}
 
 	choice := response.Choices[0]
 	switch choice.FinishReason {
 	case "stop":
 		if choice.Message.Content == "" {
-			return serverops.Message{}, fmt.Errorf("empty content from model %s despite normal completion", c.modelName)
+			return Message{}, fmt.Errorf("empty content from model %s despite normal completion", c.modelName)
 		}
 		return choice.Message, nil
 	case "length":
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"token limit reached for model %s (partial response: %q)",
 			c.modelName,
 			choice.Message.Content,
 		)
 	case "content_filter":
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"content filtered for model %s (partial response: %q)",
 			c.modelName,
 			choice.Message.Content,
 		)
 	default:
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"unexpected completion reason %q for model %s",
 			choice.FinishReason,
 			c.modelName,
@@ -211,10 +209,10 @@ type completionResponse struct {
 }
 
 type chatRequest struct {
-	Model       string              `json:"model"`
-	Messages    []serverops.Message `json:"messages"`
-	Temperature float64             `json:"temperature"`
-	MaxTokens   int                 `json:"max_tokens"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Temperature float64   `json:"temperature"`
+	MaxTokens   int       `json:"max_tokens"`
 }
 
 type chatResponse struct {
@@ -222,9 +220,9 @@ type chatResponse struct {
 	Object  string `json:"object"`
 	Created int    `json:"created"`
 	Choices []struct {
-		Index        int               `json:"index"`
-		Message      serverops.Message `json:"message"`
-		FinishReason string            `json:"finish_reason"`
+		Index        int     `json:"index"`
+		Message      Message `json:"message"`
+		FinishReason string  `json:"finish_reason"`
 	} `json:"choices"`
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
@@ -234,6 +232,6 @@ type chatResponse struct {
 }
 
 var (
-	_ serverops.LLMPromptExecClient = (*VLLMPromptClient)(nil)
-	_ serverops.LLMChatClient       = (*VLLMChatClient)(nil)
+	_ LLMPromptExecClient = (*VLLMPromptClient)(nil)
+	_ LLMChatClient       = (*VLLMChatClient)(nil)
 )

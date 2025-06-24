@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -20,6 +19,7 @@ import (
 	"github.com/contenox/contenox/core/services/userservice"
 	"github.com/contenox/contenox/libs/libbus"
 	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 	"github.com/contenox/contenox/libs/libroutine"
 	"github.com/contenox/contenox/libs/libtestenv"
 	"github.com/google/uuid"
@@ -599,7 +599,7 @@ func (env *Environment) NewEmbedder(config *serverops.Config) (llmrepo.ModelRepo
 	return repo, err
 }
 
-func (env *Environment) GetEmbedConnection(provider modelprovider.Provider) (serverops.LLMEmbedClient, error) {
+func (env *Environment) GetEmbedConnection(provider libmodelprovider.Provider) (libmodelprovider.LLMEmbedClient, error) {
 	if env.Err != nil {
 		return nil, env.Err
 	}
@@ -633,7 +633,7 @@ func (env *Environment) GetEmbedConnection(provider modelprovider.Provider) (ser
 	return provider.GetEmbedConnection(env.Ctx, baseURL)
 }
 
-func (env *Environment) GetPromptConnection(provider modelprovider.Provider) (serverops.LLMPromptExecClient, error) {
+func (env *Environment) GetPromptConnection(provider libmodelprovider.Provider) (libmodelprovider.LLMPromptExecClient, error) {
 	if env.Err != nil {
 		return nil, env.Err
 	}

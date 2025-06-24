@@ -1,10 +1,9 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/ollama/ollama/api"
 )
 
@@ -63,4 +62,4 @@ func (o *OllamaPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	return content, nil
 }
 
-var _ serverops.LLMPromptExecClient = (*OllamaPromptClient)(nil)
+var _ LLMPromptExecClient = (*OllamaPromptClient)(nil)

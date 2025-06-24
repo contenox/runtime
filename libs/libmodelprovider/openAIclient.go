@@ -1,4 +1,4 @@
-package modelprovider
+package libmodelprovider
 
 import (
 	"bytes"
@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-
-	"github.com/contenox/contenox/core/serverops"
 )
 
 type OpenAIClient struct {
@@ -66,7 +64,7 @@ func NewOpenAIChatClient(ctx context.Context, apiKey, modelName string, httpClie
 func (c *OpenAIPromptClient) Prompt(ctx context.Context, prompt string) (string, error) {
 	request := openAIChatRequest{
 		Model:       c.modelName,
-		Messages:    []serverops.Message{{Role: "user", Content: prompt}},
+		Messages:    []Message{{Role: "user", Content: prompt}},
 		Temperature: 0.5,
 		MaxTokens:   c.maxTokens,
 	}
@@ -96,7 +94,7 @@ func (c *OpenAIPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	}
 }
 
-func (c *OpenAIChatClient) Chat(ctx context.Context, messages []serverops.Message) (serverops.Message, error) {
+func (c *OpenAIChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
 	request := openAIChatRequest{
 		Model:       c.modelName,
 		Messages:    messages,
@@ -106,34 +104,34 @@ func (c *OpenAIChatClient) Chat(ctx context.Context, messages []serverops.Messag
 
 	var response openAIChatResponse
 	if err := c.sendRequest(ctx, "/chat/completions", request, &response); err != nil {
-		return serverops.Message{}, err
+		return Message{}, err
 	}
 
 	if len(response.Choices) == 0 {
-		return serverops.Message{}, fmt.Errorf("no chat choices returned from OpenAI for model %s", c.modelName)
+		return Message{}, fmt.Errorf("no chat choices returned from OpenAI for model %s", c.modelName)
 	}
 
 	choice := response.Choices[0]
 	switch choice.FinishReason {
 	case "stop":
 		if choice.Message.Content == "" {
-			return serverops.Message{}, fmt.Errorf("empty content from model %s despite normal completion", c.modelName)
+			return Message{}, fmt.Errorf("empty content from model %s despite normal completion", c.modelName)
 		}
 		return choice.Message, nil
 	case "length":
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"token limit reached for model %s (partial response: %q)",
 			c.modelName,
 			choice.Message.Content,
 		)
 	case "content_filter":
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"content filtered for model %s (partial response: %q)",
 			c.modelName,
 			choice.Message.Content,
 		)
 	default:
-		return serverops.Message{}, fmt.Errorf(
+		return Message{}, fmt.Errorf(
 			"unexpected completion reason %q for model %s",
 			choice.FinishReason,
 			c.modelName,
@@ -189,6 +187,6 @@ func (c *OpenAIClient) sendRequest(ctx context.Context, endpoint string, request
 }
 
 var (
-	_ serverops.LLMPromptExecClient = (*OpenAIPromptClient)(nil)
-	_ serverops.LLMChatClient       = (*OpenAIChatClient)(nil)
+	_ LLMPromptExecClient = (*OpenAIPromptClient)(nil)
+	_ LLMChatClient       = (*OpenAIChatClient)(nil)
 )

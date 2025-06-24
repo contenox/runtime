@@ -8,9 +8,8 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/contenox/contenox/core/modelprovider"
 	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/contenox/libs/libmodelprovider"
 )
 
 var (
@@ -32,8 +31,8 @@ func filterCandidates(
 	ctx context.Context,
 	req Request,
 	getModels runtimestate.ProviderFromRuntimeState,
-	capCheck func(modelprovider.Provider) bool,
-) ([]modelprovider.Provider, error) {
+	capCheck func(libmodelprovider.Provider) bool,
+) ([]libmodelprovider.Provider, error) {
 	providerTypes := req.ProviderTypes
 	if len(providerTypes) == 0 {
 		providerTypes = []string{"ollama", "vllm"}
@@ -48,7 +47,7 @@ func filterCandidates(
 
 	// Use a map to track seen providers by ID to prevent duplicates
 	seenProviders := make(map[string]bool)
-	var candidates []modelprovider.Provider
+	var candidates []libmodelprovider.Provider
 
 	// Handle model name preferences
 	if len(req.ModelNames) > 0 {
@@ -106,7 +105,7 @@ func filterCandidates(
 	return candidates, nil
 }
 
-type Policy func(candidates []modelprovider.Provider) (modelprovider.Provider, string, error)
+type Policy func(candidates []libmodelprovider.Provider) (libmodelprovider.Provider, string, error)
 
 const (
 	StrategyRandom      = "random"
@@ -129,7 +128,7 @@ func PolicyFromString(name string) (Policy, error) {
 	}
 }
 
-func Randomly(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+func Randomly(candidates []libmodelprovider.Provider) (libmodelprovider.Provider, string, error) {
 	provider, err := selectRandomProvider(candidates)
 	if err != nil {
 		return nil, "", err
@@ -143,7 +142,7 @@ func Randomly(candidates []modelprovider.Provider) (modelprovider.Provider, stri
 	return provider, backend, nil
 }
 
-func selectRandomProvider(candidates []modelprovider.Provider) (modelprovider.Provider, error) {
+func selectRandomProvider(candidates []libmodelprovider.Provider) (libmodelprovider.Provider, error) {
 	if len(candidates) == 0 {
 		return nil, ErrNoSatisfactoryModel
 	}
@@ -151,7 +150,7 @@ func selectRandomProvider(candidates []modelprovider.Provider) (modelprovider.Pr
 	return candidates[rand.Intn(len(candidates))], nil
 }
 
-func selectRandomBackend(provider modelprovider.Provider) (string, error) {
+func selectRandomBackend(provider libmodelprovider.Provider) (string, error) {
 	if provider == nil {
 		return "", ErrNoSatisfactoryModel
 	}
@@ -164,12 +163,12 @@ func selectRandomBackend(provider modelprovider.Provider) (string, error) {
 	return backendIDs[rand.Intn(len(backendIDs))], nil
 }
 
-func HighestContext(candidates []modelprovider.Provider) (modelprovider.Provider, string, error) {
+func HighestContext(candidates []libmodelprovider.Provider) (libmodelprovider.Provider, string, error) {
 	if len(candidates) == 0 {
 		return nil, "", ErrNoSatisfactoryModel
 	}
 
-	var bestProvider modelprovider.Provider = nil
+	var bestProvider libmodelprovider.Provider = nil
 	maxContextLength := -1
 
 	for _, p := range candidates {
@@ -194,7 +193,7 @@ func HighestContext(candidates []modelprovider.Provider) (modelprovider.Provider
 }
 
 // validateProvider checks if a provider meets requirements
-func validateProvider(p modelprovider.Provider, minContext int, capCheck func(modelprovider.Provider) bool) bool {
+func validateProvider(p libmodelprovider.Provider, minContext int, capCheck func(libmodelprovider.Provider) bool) bool {
 	if minContext > 0 && p.GetContextLength() < minContext {
 		return false
 	}
@@ -236,8 +235,8 @@ func Chat(
 	req Request,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
-) (serverops.LLMChatClient, string, error) {
-	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanChat)
+) (libmodelprovider.LLMChatClient, string, error) {
+	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanChat)
 	if err != nil {
 		return nil, "", err
 	}
@@ -270,7 +269,7 @@ func Embed(
 	embedReq EmbedRequest,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
-) (serverops.LLMEmbedClient, error) {
+) (libmodelprovider.LLMEmbedClient, error) {
 	if embedReq.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
@@ -281,7 +280,7 @@ func Embed(
 		ModelNames:    []string{embedReq.ModelName},
 		ProviderTypes: []string{embedReq.ProviderType},
 	}
-	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanEmbed)
+	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanEmbed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter candidates %w", err)
 	}
@@ -298,8 +297,8 @@ func Stream(
 	req Request,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
-) (serverops.LLMStreamClient, error) {
-	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanStream)
+) (libmodelprovider.LLMStreamClient, error) {
+	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanStream)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +319,7 @@ func PromptExecute(
 	reqExec PromptRequest,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
-) (serverops.LLMPromptExecClient, error) {
+) (libmodelprovider.LLMPromptExecClient, error) {
 	if reqExec.ModelName == "" {
 		return nil, fmt.Errorf("model name is required")
 	}
@@ -331,7 +330,7 @@ func PromptExecute(
 		ModelNames:    []string{reqExec.ModelName},
 		ProviderTypes: reqExec.ProviderTypes,
 	}
-	candidates, err := filterCandidates(ctx, req, getModels, modelprovider.Provider.CanPrompt)
+	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanPrompt)
 	if err != nil {
 		return nil, err
 	}

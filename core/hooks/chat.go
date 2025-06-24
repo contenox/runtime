@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libdb"
 	"github.com/google/uuid"
@@ -125,11 +124,11 @@ func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
 	}
 	history := taskengine.ChatHistory{
-		Messages: []serverops.Message{},
+		Messages: []taskengine.Message{},
 	}
 
 	for _, oarm := range openAIHistory.Messages {
-		history.Messages = append(history.Messages, serverops.Message{
+		history.Messages = append(history.Messages, taskengine.Message{
 			Role:    oarm.Role,
 			Content: oarm.Content,
 		})
@@ -242,7 +241,7 @@ func (h *Chat) ConvertToOpenAIResponse(
 	}
 
 	// Find the last assistant message
-	var lastAsstMessage *serverops.Message
+	var lastAsstMessage *taskengine.Message
 	for i := len(history.Messages) - 1; i >= 0; i-- {
 		if history.Messages[i].Role == "assistant" {
 			lastAsstMessage = &history.Messages[i]
