@@ -2,16 +2,60 @@ package runtimestate
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/contenox/contenox/libs/libmodelprovider"
 )
 
-// ProviderFromRuntimeState retrieves available model providers for a specific backend type
+// ProviderConfig holds configuration for cloud providers
+type ProviderConfig struct {
+	APIKey    string
+	ModelName string
+}
+
+// ProviderFromRuntimeState retrieves available model providers
 type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error)
 
+// NewProviderAdapter creates a unified provider adapter that includes:
+// 1. Self-hosted providers (Ollama, vLLM) from runtime state
+// 2. Cloud providers (Gemini, OpenAI) from configuration
+func NewProviderAdapter(
+	ctx context.Context,
+	runtime map[string]LLMState,
+	geminiConfigs []ProviderConfig,
+	openaiConfigs []ProviderConfig,
+) ProviderFromRuntimeState {
+	// Create self-hosted providers from runtime state
+	selfHostedProviderFn := ModelProviderAdapter(ctx, runtime)
+
+	// Create cloud providers from configuration
+	cloudProviders := createCloudProviders(geminiConfigs, openaiConfigs)
+
+	return func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
+		var providers []libmodelprovider.Provider
+
+		// Get self-hosted providers
+		if selfHostedProviderFn != nil {
+			selfHosted, err := selfHostedProviderFn(ctx, backendTypes...)
+			if err != nil {
+				return nil, fmt.Errorf("error getting self-hosted providers: %w", err)
+			}
+			providers = append(providers, selfHosted...)
+		}
+
+		// Add cloud providers for requested types
+		for _, t := range backendTypes {
+			if cloudProvidersForType, ok := cloudProviders[t]; ok {
+				providers = append(providers, cloudProvidersForType...)
+			}
+		}
+
+		return providers, nil
+	}
+}
+
+// ModelProviderAdapter creates providers for self-hosted backends (Ollama, vLLM)
 func ModelProviderAdapter(ctx context.Context, runtime map[string]LLMState) ProviderFromRuntimeState {
 	// Create a two-level map: backendType -> modelName -> []baseURLs
 	modelsByBackendType := make(map[string]map[string][]string)
@@ -33,40 +77,54 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]LLMState) Prov
 		}
 	}
 
-	// Create all providers grouped by backend type
+	// Create providers grouped by backend type
 	providersByType := make(map[string][]libmodelprovider.Provider)
-	var errC error
 	for backendType, modelMap := range modelsByBackendType {
-		var providers []libmodelprovider.Provider
-
 		for modelName, baseURLs := range modelMap {
 			switch backendType {
 			case "ollama":
-				providers = append(providers, libmodelprovider.NewOllamaModelProvider(modelName, baseURLs, http.DefaultClient))
+				providersByType["ollama"] = append(providersByType["ollama"],
+					libmodelprovider.NewOllamaModelProvider(modelName, baseURLs, http.DefaultClient))
 			case "vllm":
-				provider := libmodelprovider.NewVLLMModelProvider(modelName, baseURLs, http.DefaultClient)
-				providers = append(providers, provider)
-			default:
-				errC = fmt.Errorf("SERVER BUG: unsupported backend type: %s", backendType)
+				providersByType["vllm"] = append(providersByType["vllm"],
+					libmodelprovider.NewVLLMModelProvider(modelName, baseURLs, http.DefaultClient))
 			}
 		}
-
-		providersByType[backendType] = providers
 	}
 
-	// Return the runtime state function that filters by backend type
 	return func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
-		if len(backendTypes) == 0 {
-			return nil, errors.New("no backend types specified")
-		}
-
-		var filteredProviders []libmodelprovider.Provider
+		var providers []libmodelprovider.Provider
 		for _, backendType := range backendTypes {
-			if providers, ok := providersByType[backendType]; ok {
-				filteredProviders = append(filteredProviders, providers...)
+			if typeProviders, ok := providersByType[backendType]; ok {
+				providers = append(providers, typeProviders...)
 			}
 		}
-
-		return filteredProviders, errC
+		return providers, nil
 	}
+}
+
+// createCloudProviders creates providers for cloud-based services (Gemini, OpenAI)
+func createCloudProviders(
+	geminiConfigs []ProviderConfig,
+	openaiConfigs []ProviderConfig,
+) map[string][]libmodelprovider.Provider {
+	cloudProviders := make(map[string][]libmodelprovider.Provider)
+
+	// Create Gemini providers
+	for _, config := range geminiConfigs {
+		provider, err := libmodelprovider.NewGeminiProvider(config.APIKey, config.ModelName, http.DefaultClient)
+		if err == nil {
+			cloudProviders["gemini"] = append(cloudProviders["gemini"], provider)
+		}
+	}
+
+	// Create OpenAI providers
+	for _, config := range openaiConfigs {
+		provider, err := libmodelprovider.NewOpenAIProvider(config.APIKey, config.ModelName, http.DefaultClient)
+		if err == nil {
+			cloudProviders["openai"] = append(cloudProviders["openai"], provider)
+		}
+	}
+
+	return cloudProviders
 }
