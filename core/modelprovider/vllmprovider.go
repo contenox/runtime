@@ -19,7 +19,8 @@ type vLLMProvider struct {
 	SupportsEmbed  bool
 	SupportsStream bool
 	SupportsPrompt bool
-	Backends       []string // Base URLs to vLLM instances (e.g., "http://vllm-server:8000/v1")
+	Backends       []string // Base URLs to vLLM instances (e.g., "http://vllm-server:8000")
+	authToken      string
 }
 
 // NewVLLMModelProvider creates a new vLLM model provider
@@ -36,9 +37,9 @@ func NewVLLMModelProvider(modelName string, backends []string, opts ...VLLMOptio
 		ID:             "vllm:" + modelName,
 		ContextLength:  contextLength,
 		SupportsChat:   canChat,
-		SupportsEmbed:  false, // vLLM doesn't support embeddings by default
-		SupportsStream: false, // Skipped for now
-		SupportsPrompt: true,  // Always support prompt execution
+		SupportsEmbed:  false, // vLLM doesn't support embeddings
+		SupportsStream: false,
+		SupportsPrompt: true,
 		Backends:       backends,
 	}
 
@@ -92,7 +93,7 @@ func (p *vLLMProvider) GetChatConnection(ctx context.Context, backendID string) 
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	return NewVLLMChatClient(ctx, backendID, p.ModelName(), http.DefaultClient)
+	return NewVLLMChatClient(ctx, backendID, p.ModelName(), http.DefaultClient, p.authToken)
 }
 
 func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string) (serverops.LLMPromptExecClient, error) {
@@ -105,7 +106,7 @@ func (p *vLLMProvider) GetPromptConnection(ctx context.Context, backendID string
 		return nil, fmt.Errorf("invalid backend URL '%s': %w", backendID, err)
 	}
 
-	return NewVLLMPromptClient(ctx, backendID, p.ModelName(), http.DefaultClient)
+	return NewVLLMPromptClient(ctx, backendID, p.ModelName(), http.DefaultClient, p.authToken)
 }
 
 func (p *vLLMProvider) GetEmbedConnection(ctx context.Context, backendID string) (serverops.LLMEmbedClient, error) {
@@ -233,5 +234,11 @@ func WithVLLMContextLength(length int) VLLMOption {
 func WithVLLMPromptSupport(supports bool) VLLMOption {
 	return func(p *vLLMProvider) {
 		p.SupportsPrompt = supports
+	}
+}
+
+func WithVLLMAuthToken(token string) VLLMOption {
+	return func(p *vLLMProvider) {
+		p.authToken = token
 	}
 }

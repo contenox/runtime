@@ -16,6 +16,7 @@ type vLLMClient struct {
 	httpClient *http.Client
 	modelName  string
 	maxTokens  int
+	apiKey     string
 }
 
 // VLLMPromptClient handles prompt execution
@@ -29,7 +30,7 @@ type VLLMChatClient struct {
 }
 
 // NewVLLMPromptClient creates a new prompt client
-func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client) (*VLLMPromptClient, error) {
+func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client, apiKey string) (*VLLMPromptClient, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -39,6 +40,7 @@ func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpCli
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
+			apiKey:     apiKey,
 		},
 	}
 	client.maxTokens = 2048
@@ -49,7 +51,7 @@ func NewVLLMPromptClient(ctx context.Context, baseURL, modelName string, httpCli
 	return client, nil
 }
 
-func NewVLLMChatClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client) (*VLLMChatClient, error) {
+func NewVLLMChatClient(ctx context.Context, baseURL, modelName string, httpClient *http.Client, apiKey string) (*VLLMChatClient, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -59,6 +61,7 @@ func NewVLLMChatClient(ctx context.Context, baseURL, modelName string, httpClien
 			baseURL:    baseURL,
 			httpClient: httpClient,
 			modelName:  modelName,
+			apiKey:     apiKey,
 		},
 	}
 
@@ -149,7 +152,6 @@ func (c *VLLMChatClient) Chat(ctx context.Context, messages []serverops.Message)
 	}
 }
 
-// Shared request handling method
 func (c *vLLMClient) sendRequest(ctx context.Context, endpoint string, request interface{}, response interface{}) error {
 	url := c.baseURL + endpoint
 
@@ -163,6 +165,9 @@ func (c *vLLMClient) sendRequest(ctx context.Context, endpoint string, request i
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -181,7 +186,6 @@ func (c *vLLMClient) sendRequest(ctx context.Context, endpoint string, request i
 	return nil
 }
 
-// Request/response structures for vLLM API
 type completionRequest struct {
 	Model       string  `json:"model"`
 	Prompt      string  `json:"prompt"`
@@ -229,23 +233,7 @@ type chatResponse struct {
 	} `json:"usage"`
 }
 
-// Interface implementation guarantees
 var (
 	_ serverops.LLMPromptExecClient = (*VLLMPromptClient)(nil)
 	_ serverops.LLMChatClient       = (*VLLMChatClient)(nil)
 )
-
-func (c *vLLMClient) GetModelDetails(ctx context.Context) (*VllmModelDetails, error) {
-	var details VllmModelDetails
-	if err := c.sendRequest(ctx, "/models", nil, &details); err != nil {
-		return nil, err
-	}
-	return &details, nil
-}
-
-type VllmModelDetails struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	MaxTokens    int      `json:"max_tokens"`
-	Capabilities []string `json:"capabilities"` // e.g., "chat", "completion"
-}
