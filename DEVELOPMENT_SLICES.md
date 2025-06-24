@@ -80,3 +80,5 @@
 - Implement queue based model provider
 - Testing with openAI compatible frontends for chat applications
 - Multiple Telegram-Bot integrations via UI
+- Adding userdefined frontend-connectors
+- Adding a way to upload tasks to attach them to connectors

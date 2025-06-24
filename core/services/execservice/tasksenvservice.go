@@ -11,6 +11,7 @@ import (
 
 type TasksEnvService interface {
 	Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error)
+	AttachToConnector(ctx context.Context, connectorID string, chain *taskengine.ChainDefinition) error
 	serverops.ServiceMeta
 	taskengine.HookRegistry
 }
@@ -33,12 +34,17 @@ func (s *tasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDe
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
-	//TODO: check permission view? why not exec?
+	// TODO: check permission view? why not exec?
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
 		return nil, err
 	}
 
 	return s.environmentExec.ExecEnv(ctx, chain, input, taskengine.DataTypeAny)
+}
+
+// AttachToConnector implements TasksEnvService.
+func (s *tasksEnvService) AttachToConnector(ctx context.Context, connectorID string, chain *taskengine.ChainDefinition) error {
+	panic("unimplemented")
 }
 
 func (s *tasksEnvService) GetServiceName() string {

@@ -1,6 +1,7 @@
 package execapi
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/contenox/contenox/core/serverops"
@@ -14,6 +15,7 @@ func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService execse
 		taskService:   taskService,
 	}
 	mux.HandleFunc("POST /execute", f.execute)
+	mux.HandleFunc("POST /tasks/attach/connector/{id}", f.attachToConnector)
 	mux.HandleFunc("POST /tasks", f.tasks)
 	mux.HandleFunc("GET /supported", f.supported)
 }
@@ -56,6 +58,26 @@ func (tm *taskManager) tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
+}
+
+func (tm *taskManager) attachToConnector(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		_ = serverops.Error(w, r, errors.New("missing id"), serverops.ExecuteOperation)
+		return
+	}
+	req, err := serverops.Decode[taskExec](r)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
+		return
+	}
+
+	err = tm.taskService.AttachToConnector(r.Context(), id, req.Chain)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
+		return
+	}
+	_ = serverops.Encode(w, r, http.StatusOK, map[string]string{"message": "taskchain was attached"})
 }
 
 func (tm *taskManager) supported(w http.ResponseWriter, r *http.Request) {

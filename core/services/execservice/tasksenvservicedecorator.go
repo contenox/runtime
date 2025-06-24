@@ -51,6 +51,11 @@ func (d *activityTrackerTaskEnvDecorator) Supports(ctx context.Context) ([]strin
 	return d.service.Supports(ctx)
 }
 
+// AttachToConnector implements TasksEnvService.
+func (d *activityTrackerTaskEnvDecorator) AttachToConnector(ctx context.Context, connectorID string, chain *taskengine.ChainDefinition) error {
+	panic("unimplemented")
+}
+
 func EnvWithActivityTracker(service TasksEnvService, tracker serverops.ActivityTracker) TasksEnvService {
 	return &activityTrackerTaskEnvDecorator{
 		service: service,
