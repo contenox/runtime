@@ -19,10 +19,11 @@ type vLLMProvider struct {
 	SupportsPrompt bool
 	Backends       []string // Base URLs to vLLM instances (e.g., "http://vllm-server:8000")
 	authToken      string
+	client         *http.Client
 }
 
 // NewVLLMModelProvider creates a new vLLM model provider
-func NewVLLMModelProvider(modelName string, backends []string, opts ...VLLMOption) Provider {
+func NewVLLMModelProvider(modelName string, backends []string, client *http.Client, opts ...VLLMOption) Provider {
 	// Determine capabilities based on model type
 	baseModel := parsevLLMModelName(modelName)
 	contextLength := vllmContextLengths[baseModel]
@@ -39,6 +40,7 @@ func NewVLLMModelProvider(modelName string, backends []string, opts ...VLLMOptio
 		SupportsStream: false,
 		SupportsPrompt: true,
 		Backends:       backends,
+		client:         client,
 	}
 
 	// Apply options

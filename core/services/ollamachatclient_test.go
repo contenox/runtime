@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/contenox/contenox/core/serverops"
@@ -35,7 +36,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		url = state.Backend.BaseURL
 	}
 	require.NotEmpty(t, url, "Failed to get backend URL from test setup")
-	provider := libmodelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, libmodelprovider.WithChat(true))
+	provider := libmodelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, http.DefaultClient, libmodelprovider.WithChat(true))
 	require.True(t, provider.CanChat())
 
 	client, err := provider.GetChatConnection(ctx, url)
@@ -111,7 +112,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 	// })
 	t.Run("InvalidModel_ShouldReturnDescriptiveError", func(t *testing.T) {
 		nonExistentModel := "this-model-definitely-does-not-exist-12345:latest"
-		badProvider := libmodelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, libmodelprovider.WithChat(true))
+		badProvider := libmodelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, http.DefaultClient, libmodelprovider.WithChat(true))
 		require.True(t, badProvider.CanChat())
 
 		invalidClient, err := badProvider.GetChatConnection(context.Background(), url)
@@ -134,7 +135,7 @@ func TestUnit_OllamaProvider_RejectsChatWhenDisabled(t *testing.T) {
 	backends := []string{dummyURL}
 	modelName := "smollm2:135m"
 
-	provider := libmodelprovider.NewOllamaModelProvider(modelName, backends, libmodelprovider.WithChat(false))
+	provider := libmodelprovider.NewOllamaModelProvider(modelName, backends, http.DefaultClient, libmodelprovider.WithChat(false))
 	require.False(t, provider.CanChat(), "Provider should report CanChat as false")
 	client, err := provider.GetChatConnection(context.Background(), dummyURL)
 	require.Error(t, err, "Expected an error when getting chat connection for a non-chat provider")

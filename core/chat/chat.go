@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/contenox/contenox/core/llmresolver"
@@ -185,7 +184,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 			Content: m2.Content,
 		})
 	}
-	responseMessage, err := chatClient.Chat(ctx, convMessages, http.DefaultClient)
+	responseMessage, err := chatClient.Chat(ctx, convMessages)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to chat %w", err)
 	}

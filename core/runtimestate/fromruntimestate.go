@@ -44,7 +44,7 @@ func ModelProviderAdapter(ctx context.Context, runtime map[string]LLMState) Prov
 			case "ollama":
 				providers = append(providers, libmodelprovider.NewOllamaModelProvider(modelName, baseURLs, http.DefaultClient))
 			case "vllm":
-				provider := libmodelprovider.NewVLLMModelProvider(modelName, baseURLs)
+				provider := libmodelprovider.NewVLLMModelProvider(modelName, baseURLs, http.DefaultClient)
 				providers = append(providers, provider)
 			default:
 				errC = fmt.Errorf("SERVER BUG: unsupported backend type: %s", backendType)
