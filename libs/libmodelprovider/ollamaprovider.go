@@ -19,6 +19,7 @@ type OllamaProvider struct {
 	SupportsEmbed  bool
 	SupportsStream bool
 	SupportsPrompt bool
+	httpClient     *http.Client
 	Backends       []string // assuming that Backend IDs are urls to the instance
 }
 
@@ -63,8 +64,7 @@ func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string
 		// Consider logging the error too
 		return nil, fmt.Errorf("invalid backend URL '%s' for provider %s: %w", backendID, p.GetID(), err)
 	}
-	// TODO: Consider using a configurable http.Client with timeouts
-	httpClient := http.DefaultClient
+	httpClient := p.httpClient
 	ollamaAPIClient := api.NewClient(u, httpClient)
 
 	// Create and return the wrapper client
@@ -85,8 +85,7 @@ func (p *OllamaProvider) GetEmbedConnection(ctx context.Context, backendID strin
 	if err != nil {
 		return nil, fmt.Errorf("invalid backend URL '%s' for provider %s: %w", backendID, p.GetID(), err)
 	}
-	// TODO: Consider using a configurable http.Client with timeouts
-	httpClient := http.DefaultClient
+	httpClient := p.httpClient
 	ollamaAPIClient := api.NewClient(u, httpClient)
 
 	embedClient := &OllamaEmbedClient{
@@ -106,8 +105,7 @@ func (p *OllamaProvider) GetPromptConnection(ctx context.Context, backendID stri
 	if err != nil {
 		return nil, fmt.Errorf("invalid backend URL '%s' for provider %s: %w", backendID, p.GetID(), err)
 	}
-	// TODO: Consider using a configurable http.Client with timeouts
-	httpClient := http.DefaultClient
+	httpClient := p.httpClient
 	ollamaAPIClient := api.NewClient(u, httpClient)
 
 	promptClient := &OllamaPromptClient{
@@ -125,7 +123,7 @@ func (p *OllamaProvider) GetStreamConnection(ctx context.Context, backendID stri
 
 type OllamaOption func(*OllamaProvider)
 
-func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption) Provider {
+func NewOllamaModelProvider(name string, backends []string, httpClient *http.Client, opts ...OllamaOption) Provider {
 	// Define defaults based on model name
 	nameForMatching := name
 	if c := strings.Split(name, ":"); len(c) >= 2 && c[1] == "latest" {
@@ -146,6 +144,7 @@ func NewOllamaModelProvider(name string, backends []string, opts ...OllamaOption
 		SupportsStream: canStream,
 		SupportsPrompt: canPrompt,
 		Backends:       backends,
+		httpClient:     httpClient,
 	}
 
 	for _, opt := range opts {

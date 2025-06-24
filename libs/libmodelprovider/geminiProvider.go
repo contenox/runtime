@@ -21,7 +21,7 @@ type GeminiProvider struct {
 	canStream     bool
 }
 
-func NewGeminiProvider(id, apiKey, modelName string, httpClient *http.Client) (*GeminiProvider, error) {
+func NewGeminiProvider(apiKey, modelName string, httpClient *http.Client) (*GeminiProvider, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -40,7 +40,7 @@ func NewGeminiProvider(id, apiKey, modelName string, httpClient *http.Client) (*
 		canChat = true
 		canPrompt = true
 		canStream = true
-		// Context length for multimodal models is more complex (image tokens)
+		// Note: context length for multimodal models is more complex (image tokens)
 		contextLength = 4096
 	case "embedding-001":
 		canEmbed = true
@@ -51,7 +51,7 @@ func NewGeminiProvider(id, apiKey, modelName string, httpClient *http.Client) (*
 	default:
 		return nil, fmt.Errorf("unsupported Gemini model: %s", modelName)
 	}
-
+	id := fmt.Sprintf("gemini-%s", modelName)
 	return &GeminiProvider{
 		id:            id,
 		apiKey:        apiKey,
@@ -194,7 +194,7 @@ type geminiSafetySetting struct {
 }
 
 type geminiTool struct {
-	FunctionDeclarations []interface{} `json:"functionDeclarations"`
+	FunctionDeclarations []any `json:"functionDeclarations"`
 }
 
 // Gemini GenerateContent (Chat/Prompt) API response
@@ -216,7 +216,7 @@ type geminiGenerateContentResponse struct {
 	PromptFeedback struct {
 		BlockReason   string                `json:"blockReason,omitempty"`
 		SafetyRatings []geminiSafetySetting `json:"safetyRatings,omitempty"`
-	} `json:"promptFeedback,omitempty"`
+	}
 }
 
 type geminiEmbedContentRequest struct {

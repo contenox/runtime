@@ -15,7 +15,7 @@ type OllamaChatClient struct {
 
 var _ LLMChatClient = (*OllamaChatClient)(nil)
 
-func (c *OllamaChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
+func (c *OllamaChatClient) Chat(ctx context.Context, messages []Message, options ...ChatOption) (Message, error) {
 	apiMessages := make([]api.Message, 0, len(messages))
 	for _, msg := range messages {
 		apiMessages = append(apiMessages, api.Message{

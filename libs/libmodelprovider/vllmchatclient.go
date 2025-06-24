@@ -105,7 +105,7 @@ func (c *VLLMPromptClient) Prompt(ctx context.Context, prompt string) (string, e
 }
 
 // Chat implements LLMChatClient interface
-func (c *VLLMChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
+func (c *VLLMChatClient) Chat(ctx context.Context, messages []Message, options ...ChatOption) (Message, error) {
 	request := chatRequest{
 		Model:       c.modelName,
 		Messages:    messages,

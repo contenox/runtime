@@ -63,7 +63,7 @@ type geminiChatClient struct {
 	geminiClient
 }
 
-func (c *geminiChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
+func (c *geminiChatClient) Chat(ctx context.Context, messages []Message, options ...ChatOption) (Message, error) {
 	geminiMessages := convertToGeminiMessages(messages)
 
 	request := geminiGenerateContentRequest{
@@ -124,78 +124,11 @@ type geminiStreamClient struct {
 	geminiClient
 }
 
-func (c *geminiStreamClient) Stream(ctx context.Context, prompt string) (<-chan string, error) {
-	geminiMessages := []geminiContent{
-		{
-			Role:  "user",
-			Parts: []geminiPart{{Text: prompt}},
-		},
-	}
-
-	request := geminiGenerateContentRequest{
-		Contents: geminiMessages,
-		GenerationConfig: &geminiGenerationConfig{
-			Temperature:     0.7,
-			MaxOutputTokens: c.maxTokens,
-		},
-	}
-
-	endpoint := fmt.Sprintf("/models/%s:streamGenerateContent", c.modelName)
-	fullURL := fmt.Sprintf("%s%s?key=%s", c.baseURL, endpoint, c.apiKey)
-
-	reqBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request for streaming: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create streaming request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed for streaming for model %s: %w", c.modelName, err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gemini API streaming returned non-200 status: %d, body: %s for model %s", resp.StatusCode, string(bodyBytes), c.modelName)
-	}
-
-	output := make(chan string)
-	go func() {
-		defer resp.Body.Close()
-		defer close(output)
-
-		decoder := json.NewDecoder(resp.Body)
-		for {
-			select {
-			case <-ctx.Done():
-				return // Context cancelled, stop streaming
-			default:
-				var chunk geminiGenerateContentResponse
-				if err := decoder.Decode(&chunk); err != nil {
-					if err == io.EOF {
-						return // Stream finished
-					}
-					// TODO: Log other errors, but try to continue if possible or break
-					return
-				}
-
-				if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 && chunk.Candidates[0].Content.Parts[0].Text != "" {
-					output <- chunk.Candidates[0].Content.Parts[0].Text
-				}
-			}
-		}
-	}()
-
-	return output, nil
+func (c *geminiStreamClient) Stream(ctx context.Context, prompt string) (<-chan *StreamParcel, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
-func (c *geminiClient) sendRequest(ctx context.Context, endpoint string, request interface{}, response interface{}) error {
+func (c *geminiClient) sendRequest(ctx context.Context, endpoint string, request any, response any) error {
 	fullURL := fmt.Sprintf("%s%s?key=%s", c.baseURL, endpoint, c.apiKey)
 
 	var reqBody io.Reader

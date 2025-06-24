@@ -70,7 +70,7 @@ type MockChatClient struct {
 	ProviderID string
 }
 
-func (m *MockChatClient) Chat(ctx context.Context, messages []Message) (Message, error) {
+func (m *MockChatClient) Chat(ctx context.Context, messages []Message, options ...ChatOption) (Message, error) {
 	return Message{}, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
@@ -129,7 +130,7 @@ func (e *modelManager) GetProvider(ctx context.Context) (libmodelprovider.Provid
 	if len(results) == 0 {
 		return nil, errors.New("no backends found")
 	}
-	provider := libmodelprovider.NewOllamaModelProvider(e.model.Model, results,
+	provider := libmodelprovider.NewOllamaModelProvider(e.model.Model, results, http.DefaultClient,
 		libmodelprovider.WithEmbed(e.embed),
 		libmodelprovider.WithPrompt(e.prompt))
 	return provider, nil

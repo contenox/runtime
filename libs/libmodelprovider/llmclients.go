@@ -7,9 +7,19 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+type ChatOption interface {
+	SetTemperature(float64)
+	SetMaxTokens(int)
+}
+
+type StreamParcel struct {
+	Data  string
+	Error error
+}
+
 // Client interfaces for different capabilities
 type LLMChatClient interface {
-	Chat(ctx context.Context, Messages []Message) (Message, error)
+	Chat(ctx context.Context, Messages []Message, opts ...ChatOption) (Message, error)
 }
 
 type LLMEmbedClient interface {
@@ -17,7 +27,7 @@ type LLMEmbedClient interface {
 }
 
 type LLMStreamClient interface {
-	Stream(ctx context.Context, prompt string) (<-chan string, error)
+	Stream(ctx context.Context, prompt string) (<-chan *StreamParcel, error)
 }
 
 type LLMPromptExecClient interface {
