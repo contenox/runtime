@@ -62,7 +62,7 @@
 - [ ] **Package a Persona-Chat Application**
 - [x] **Telegram bot integrations**
 - [x] **Simple OpenAI SDK compatible chat endpoint**
-- [ ] **vLLM Integration**
+- [x] **vLLM Integration**
 
 ---
 
