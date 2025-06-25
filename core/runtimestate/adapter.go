@@ -99,7 +99,7 @@ func LocalProviderAdapter(ctx context.Context, runtime map[string]LLMState) Prov
 
 // createCloudProviders creates providers for cloud-based services (Gemini, OpenAI)
 func createCloudProviders(
-	configs ...ProviderConfig,
+	configs ...serverops.ProviderConfig,
 ) map[string][]libmodelprovider.Provider {
 	cloudProviders := make(map[string][]libmodelprovider.Provider)
 	if len(configs) == 0 {
