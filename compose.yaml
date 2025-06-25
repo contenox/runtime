@@ -28,7 +28,7 @@ services:
       context: ./
       dockerfile: Dockerfile.tokenizer
     environment:
-      - PRELOAD_MODELS=granite-embedding-30m,phi-3
+      - PRELOAD_MODELS=granite-embedding-30m,tiny
       - TOKENIZER_TIMEOUT=30s
       - FALLBACK_MODEL=granite-embedding-30m
       - USE_DEFAULT_URLS=true

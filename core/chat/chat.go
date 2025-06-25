@@ -157,7 +157,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 		}
 		var err2 error
 		retryFunc := func(ctx context.Context) error {
-			inputtokens, err2 = m.tokenizer.CountTokens(ctx, "phi-3", msg.Content)
+			inputtokens, err2 = m.tokenizer.CountTokens(ctx, "tiny", msg.Content)
 			if err2 != nil {
 				fmt.Printf("Retrying token count due to error: %v\n", err2)
 			}
