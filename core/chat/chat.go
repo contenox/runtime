@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/contenox/core/localcache"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
@@ -24,6 +25,7 @@ import (
 // Manager coordinates chat message management and LLM execution.
 type Manager struct {
 	state     *runtimestate.State
+	settings  *localcache.Config
 	tokenizer tokenizerservice.Tokenizer
 }
 
@@ -31,10 +33,12 @@ type Manager struct {
 func New(
 	state *runtimestate.State,
 	tokenizer tokenizerservice.Tokenizer,
+	// settings *localcache.Config,
 ) *Manager {
 	return &Manager{
 		state:     state,
 		tokenizer: tokenizer,
+		// settings:  settings, // Todo:
 	}
 }
 

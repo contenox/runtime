@@ -19,18 +19,18 @@ type data struct {
 	Added time.Time
 }
 
-type RuntimeConfig struct {
+type Config struct {
 	mu         sync.RWMutex
 	cache      map[string]data
 	dbInstance libdb.DBManager
 	prefix     string
 }
 
-func NewRuntimeConfig(dbInstance libdb.DBManager, prefix string) *RuntimeConfig {
+func NewRuntimeConfig(dbInstance libdb.DBManager, prefix string) *Config {
 	if prefix == "*" {
 		prefix = ""
 	}
-	return &RuntimeConfig{
+	return &Config{
 		cache:      make(map[string]data),
 		dbInstance: dbInstance,
 		prefix:     prefix,
@@ -39,7 +39,7 @@ func NewRuntimeConfig(dbInstance libdb.DBManager, prefix string) *RuntimeConfig 
 
 // Get returns the cached value directly without checking DB.
 // Assumes the cache is always warm and up-to-date (via ProcessTick).
-func (r *RuntimeConfig) Get(ctx context.Context, key string, out any) error {
+func (r *Config) Get(ctx context.Context, key string, out any) error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -52,7 +52,7 @@ func (r *RuntimeConfig) Get(ctx context.Context, key string, out any) error {
 }
 
 // ProcessTick fully replaces the cache by fetching all KV pairs from the DB.
-func (r *RuntimeConfig) ProcessTick(ctx context.Context) error {
+func (r *Config) ProcessTick(ctx context.Context) error {
 	storeInstance := store.New(r.dbInstance.WithoutTransaction())
 	var kvPairs []*store.KV
 	var err error
