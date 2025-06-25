@@ -65,10 +65,7 @@ func (r *Config) ProcessTick(ctx context.Context) error {
 		return err
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.cache = make(map[string]data)
+	cache := make(map[string]data)
 	now := time.Now().UTC()
 	for _, kv := range kvPairs {
 		r.cache[kv.Key] = data{
@@ -76,6 +73,11 @@ func (r *Config) ProcessTick(ctx context.Context) error {
 			Added: now,
 		}
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.cache = cache
 
 	return nil
 }
