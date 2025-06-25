@@ -1,4 +1,4 @@
-package localcache
+package kv
 
 import (
 	"context"
@@ -10,7 +10,7 @@ type MockSettingsRepo struct {
 	GetFunc func(ctx context.Context, key string, out any) error
 }
 
-var _ SettingsRepo = (*MockSettingsRepo)(nil) // Ensures it satisfies the interface
+var _ Repo = (*MockSettingsRepo)(nil) // Ensures it satisfies the interface
 
 func (m *MockSettingsRepo) Get(ctx context.Context, key string, out any) error {
 	if m.GetFunc != nil {

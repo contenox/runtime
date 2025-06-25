@@ -1,4 +1,4 @@
-package localcache
+package kv
 
 import (
 	"context"
@@ -26,12 +26,12 @@ type Config struct {
 	prefix     string
 }
 
-type SettingsRepo interface {
+type Repo interface {
 	Get(ctx context.Context, key string, out any) error
 	ProcessTick(ctx context.Context) error
 }
 
-func NewRuntimeConfig(dbInstance libdb.DBManager, prefix string) SettingsRepo {
+func NewLocalCache(dbInstance libdb.DBManager, prefix string) Repo {
 	if prefix == "*" {
 		prefix = ""
 	}

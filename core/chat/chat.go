@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/contenox/core/kv"
 	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/localcache"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
@@ -26,7 +26,7 @@ import (
 // Manager coordinates chat message management and LLM execution.
 type Manager struct {
 	state     *runtimestate.State
-	settings  localcache.SettingsRepo
+	settings  kv.Repo
 	tokenizer tokenizerservice.Tokenizer
 }
 
@@ -34,7 +34,7 @@ type Manager struct {
 func New(
 	state *runtimestate.State,
 	tokenizer tokenizerservice.Tokenizer,
-	settings localcache.SettingsRepo,
+	settings kv.Repo,
 ) *Manager {
 	return &Manager{
 		state:     state,
@@ -176,11 +176,11 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 	geminiConfig := &serverops.ProviderConfig{}
 	openaiConfig := &serverops.ProviderConfig{}
 	err := m.settings.Get(ctx, serverops.GeminiKey, geminiConfig)
-	if err != nil && !errors.Is(err, localcache.ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, kv.ErrKeyNotFound) {
 		return nil, 0, 0, "", fmt.Errorf("failed to get gemini config %w", err)
 	}
 	err = m.settings.Get(ctx, serverops.OpenaiKey, openaiConfig)
-	if err != nil && !errors.Is(err, localcache.ErrKeyNotFound) {
+	if err != nil && !errors.Is(err, kv.ErrKeyNotFound) {
 		return nil, 0, 0, "", fmt.Errorf("failed to get openai config %w", err)
 	}
 	providers := []serverops.ProviderConfig{}

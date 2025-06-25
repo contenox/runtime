@@ -14,6 +14,7 @@ import (
 	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/hookrecipes"
 	"github.com/contenox/contenox/core/hooks"
+	"github.com/contenox/contenox/core/kv"
 	"github.com/contenox/contenox/core/llmrepo"
 	"github.com/contenox/contenox/core/runtimestate"
 	"github.com/contenox/contenox/core/serverapi"
@@ -145,7 +146,8 @@ func main() {
 		cleanup()
 		log.Fatalf("initializing tokenizer service failed: %v", err)
 	}
-	chatManager := chat.New(state, tokenizerSvc)
+	settings := kv.NewLocalCache(dbInstance, "test:")
+	chatManager := chat.New(state, tokenizerSvc, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
 	knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
 		SearchHook:     rag,

@@ -9,8 +9,8 @@ import (
 
 	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/hooks"
+	"github.com/contenox/contenox/core/kv"
 	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/localcache"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/chatservice"
 	"github.com/contenox/contenox/core/services/testingsetup"
@@ -40,7 +40,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	require.NoError(t, err)
 
 	tokenizer := tokenizerservice.MockTokenizer{}
-	settings := localcache.NewRuntimeConfig(dbInstance, "test:")
+	settings := kv.NewLocalCache(dbInstance, "test:")
 	manager := chat.New(backendState, tokenizer, settings)
 	chatHook := hooks.NewChatHook(dbInstance, manager)
 	echocmd := hooks.NewEchoHook()

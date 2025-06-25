@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/localcache"
+	"github.com/contenox/contenox/core/kv"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/testingsetup"
 	"github.com/contenox/contenox/core/services/tokenizerservice"
@@ -40,7 +40,7 @@ func BenchmarkChatExec(b *testing.B) {
 	defer cleanup()
 
 	tokenizer := tokenizerservice.MockTokenizer{}
-	settings := localcache.NewRuntimeConfig(tenv.GetDBInstance(), "test:")
+	settings := kv.NewLocalCache(tenv.GetDBInstance(), "test:")
 
 	manager := chat.New(backendState, tokenizer, settings)
 
