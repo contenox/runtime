@@ -16,6 +16,7 @@ import {
   PendingJob,
   Pool,
   SearchResponse,
+  StatusResponse,
   UpdateAccessEntryRequest,
   UpdateUserRequest,
   User,
@@ -136,6 +137,15 @@ export const api = {
     apiFetch<Model[]>(`/api/model-associations/${poolID}/models`),
   listPoolsForModel: (modelID: string) =>
     apiFetch<Pool[]>(`/api/model-associations/${modelID}/pools`),
+
+  // Add to the api object:
+  configureProvider: (
+    provider: 'openai' | 'gemini',
+    data: { apiKey: string; modelName?: string },
+  ) => apiFetch<StatusResponse>(`/api/providers/${provider}/configure`, options('POST', data)),
+
+  getProviderStatus: (provider: 'openai' | 'gemini') =>
+    apiFetch<StatusResponse>(`/api/providers/${provider}/status`),
 
   // Access Entries
   getAccessEntries: (expand?: boolean, identity?: string) => {

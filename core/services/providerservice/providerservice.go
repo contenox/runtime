@@ -44,7 +44,7 @@ const (
 )
 
 type ProviderConfig struct {
-	APIKey    string
+	APIKey    string // TODO: Implement encryption before saving
 	ModelName string
 	Type      string
 }

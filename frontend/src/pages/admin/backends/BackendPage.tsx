@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';
 import BackendsSection from './components/BackendsSection';
+import CloudProvidersSection from './components/CloudProvidersSection';
 import PoolsSection from './components/PoolsSection';
 
 export default function BackendsPage() {
@@ -20,6 +21,11 @@ export default function BackendsPage() {
       id: 'pools',
       label: t('pools.manage_title'),
       content: <PoolsSection />,
+    },
+    {
+      id: 'cloud-providers',
+      label: t('cloud_providers.title'),
+      content: <CloudProvidersSection />,
     },
     {
       id: 'state',

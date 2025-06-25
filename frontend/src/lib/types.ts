@@ -17,6 +17,12 @@ export type SearchResult = {
   fileMeta: FileResponse;
 };
 
+export type StatusResponse = {
+  configured: boolean;
+  updatedAt: string;
+  provider: string;
+};
+
 export type SearchResponse = {
   results: SearchResult[];
 };
