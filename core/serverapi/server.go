@@ -18,6 +18,7 @@ import (
 	"github.com/contenox/contenox/core/serverapi/filesapi"
 	"github.com/contenox/contenox/core/serverapi/indexapi"
 	"github.com/contenox/contenox/core/serverapi/poolapi"
+	providersapi "github.com/contenox/contenox/core/serverapi/providerapi"
 	"github.com/contenox/contenox/core/serverapi/systemapi"
 	"github.com/contenox/contenox/core/serverapi/usersapi"
 	"github.com/contenox/contenox/core/serverops"
@@ -32,6 +33,7 @@ import (
 	"github.com/contenox/contenox/core/services/indexservice"
 	"github.com/contenox/contenox/core/services/modelservice"
 	"github.com/contenox/contenox/core/services/poolservice"
+	"github.com/contenox/contenox/core/services/providerservice"
 	"github.com/contenox/contenox/core/services/userservice"
 	"github.com/contenox/contenox/core/taskengine"
 	"github.com/contenox/contenox/libs/libauth"
@@ -124,6 +126,9 @@ func New(
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
+	providerService := providerservice.New(dbInstance)
+	providersapi.AddProviderRoutes(mux, config, providerService)
+
 	handler = enableCORS(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
@@ -139,6 +144,7 @@ func New(
 		indexService,
 		dispatchService,
 		execService,
+		providerService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

@@ -2,13 +2,17 @@ package providersapi
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/services/providerservice"
+	"github.com/contenox/contenox/libs/libdb"
 )
 
-func AddProviderRoutes(mux *http.ServeMux, providerService providerservice.Service) {
+func AddProviderRoutes(mux *http.ServeMux, config *serverops.Config, providerService providerservice.Service) {
 	p := &providerManager{providerService: providerService}
 
 	mux.HandleFunc("POST /providers/openai/configure", p.configure("openai"))
@@ -37,12 +41,12 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req ConfigureRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			_ = serverops.Error(w, r, err, serverops.CreateOperation)
 			return
 		}
 
 		if req.APIKey == "" {
-			http.Error(w, "API key is required", http.StatusBadRequest)
+			_ = serverops.Error(w, r, fmt.Errorf("api key is required"), serverops.CreateOperation)
 			return
 		}
 
@@ -53,27 +57,31 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 		}
 
 		if err := p.providerService.SetProviderConfig(r.Context(), providerType, cfg); err != nil {
-			http.Error(w, "Failed to save API key", http.StatusInternalServerError)
+			_ = serverops.Error(w, r, err, serverops.CreateOperation)
 			return
 		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
+		_ = serverops.Encode(w, r, http.StatusOK, StatusResponse{
+			Configured: true,
+			Provider:   providerType,
+		})
 	}
 }
 
 func (p *providerManager) status(providerType string) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, err := p.providerService.GetProviderConfig(r.Context(), providerType)
-		if err != nil {
-			json.NewEncoder(w).Encode(StatusResponse{
+		if errors.Is(err, libdb.ErrNotFound) {
+			_ = serverops.Encode(w, r, http.StatusOK, StatusResponse{
 				Configured: false,
 				Provider:   providerType,
 			})
 			return
 		}
-
-		json.NewEncoder(w).Encode(StatusResponse{
+		if err != nil {
+			_ = serverops.Error(w, r, err, serverops.GetOperation)
+			return
+		}
+		_ = serverops.Encode(w, r, http.StatusOK, StatusResponse{
 			Configured: true,
 			Provider:   providerType,
 		})
