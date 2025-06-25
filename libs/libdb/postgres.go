@@ -57,7 +57,7 @@ func (sm *postgresDBManager) WithTransaction(ctx context.Context, onRollback ...
 	tx, err := sm.dbInstance.BeginTx(ctx, nil)
 	if err != nil {
 		// Use translateError on the raw error, wrap with ErrTxFailed context
-		return nil, nil, nil, fmt.Errorf("%w: begin transaction failed: %w", ErrTxFailed, translateError(err))
+		return nil, nil, func() error { return nil }, fmt.Errorf("%w: begin transaction failed: %w", ErrTxFailed, translateError(err))
 	}
 
 	// Executor bound to the transaction
