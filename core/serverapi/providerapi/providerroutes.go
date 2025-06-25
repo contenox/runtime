@@ -50,7 +50,7 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 			return
 		}
 
-		cfg := &providerservice.ProviderConfig{
+		cfg := &serverops.ProviderConfig{
 			APIKey:    req.APIKey,
 			ModelName: req.ModelName,
 			Type:      providerType,

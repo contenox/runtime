@@ -5,15 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/libs/libmodelprovider"
 )
-
-// ProviderConfig holds configuration for cloud providers
-type ProviderConfig struct {
-	APIKey    string
-	ModelName string
-	Type      string
-}
 
 // ProviderFromRuntimeState retrieves available model providers
 type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error)
@@ -24,7 +18,7 @@ type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) 
 func BetterProviderAdapter(
 	ctx context.Context,
 	runtime map[string]LLMState,
-	configs ...ProviderConfig,
+	configs ...serverops.ProviderConfig,
 ) ProviderFromRuntimeState {
 	// Create self-hosted providers from runtime state
 	selfHostedProviderFn := LocalProviderAdapter(ctx, runtime)

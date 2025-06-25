@@ -11,10 +11,10 @@ import (
 )
 
 type Service interface {
-	SetProviderConfig(ctx context.Context, providerType string, config *ProviderConfig) error
-	GetProviderConfig(ctx context.Context, providerType string) (*ProviderConfig, error)
+	SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error
+	GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error)
 	DeleteProviderConfig(ctx context.Context, providerType string) error
-	ListProviderConfigs(ctx context.Context) ([]*ProviderConfig, error)
+	ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error)
 	GetServiceName() string
 	GetServiceGroup() string
 }
@@ -37,19 +37,7 @@ func New(dbInstance libdb.DBManager) Service {
 	return &service{dbInstance: dbInstance}
 }
 
-const (
-	ProviderKeyPrefix = "cloud-provider:"
-	OpenaiKey         = ProviderKeyPrefix + "openai"
-	GeminiKey         = ProviderKeyPrefix + "gemini"
-)
-
-type ProviderConfig struct {
-	APIKey    string // TODO: Implement encryption before saving
-	ModelName string
-	Type      string
-}
-
-func (s *service) SetProviderConfig(ctx context.Context, providerType string, config *ProviderConfig) error {
+func (s *service) SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
@@ -61,7 +49,7 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, co
 	if providerType != "openai" && providerType != "gemini" {
 		return fmt.Errorf("invalid provider type: %s", providerType)
 	}
-	key := ProviderKeyPrefix + providerType
+	key := serverops.ProviderKeyPrefix + providerType
 	config.Type = providerType
 	data, err := json.Marshal(config)
 	if err != nil {
@@ -70,13 +58,13 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, co
 	return storeInstance.SetKV(ctx, key, data)
 }
 
-func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*ProviderConfig, error) {
+func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	var config ProviderConfig
-	key := ProviderKeyPrefix + providerType
+	var config serverops.ProviderConfig
+	key := serverops.ProviderKeyPrefix + providerType
 	storeInstance := store.New(tx)
 	err := storeInstance.GetKV(ctx, key, &config)
 	if err != nil {
@@ -92,25 +80,25 @@ func (s *service) DeleteProviderConfig(ctx context.Context, providerType string)
 	}
 	storeInstance := store.New(tx)
 
-	key := ProviderKeyPrefix + providerType
+	key := serverops.ProviderKeyPrefix + providerType
 	return storeInstance.DeleteKV(ctx, key)
 }
 
-func (s *service) ListProviderConfigs(ctx context.Context) ([]*ProviderConfig, error) {
+func (s *service) ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	storeInstance := store.New(tx)
 
-	kvs, err := storeInstance.ListKVPrefix(ctx, ProviderKeyPrefix)
+	kvs, err := storeInstance.ListKVPrefix(ctx, serverops.ProviderKeyPrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	var configs []*ProviderConfig
+	var configs []*serverops.ProviderConfig
 	for _, kv := range kvs {
-		var config ProviderConfig
+		var config serverops.ProviderConfig
 		if err := json.Unmarshal(kv.Value, &config); err == nil {
 			configs = append(configs, &config)
 		}

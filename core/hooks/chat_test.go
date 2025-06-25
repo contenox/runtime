@@ -6,6 +6,7 @@ import (
 
 	"github.com/contenox/contenox/core/chat"
 	"github.com/contenox/contenox/core/hooks"
+	"github.com/contenox/contenox/core/localcache"
 	"github.com/contenox/contenox/core/serverops"
 	"github.com/contenox/contenox/core/serverops/store"
 	"github.com/contenox/contenox/core/services/testingsetup"
@@ -38,7 +39,8 @@ func TestSystemChatHooks(t *testing.T) {
 
 	// Initialize chat manager with mock tokenizer
 	tokenizer := tokenizerservice.MockTokenizer{}
-	chatManager := chat.New(backendState, tokenizer)
+	settings := localcache.NewRuntimeConfig(dbInstance, "test:")
+	chatManager := chat.New(backendState, tokenizer, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
 	// Generate unique subject ID for this test session
 	subjectID := uuid.New().String()

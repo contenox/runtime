@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+const (
+	ProviderKeyPrefix = "cloud-provider:"
+	OpenaiKey         = ProviderKeyPrefix + "openai"
+	GeminiKey         = ProviderKeyPrefix + "gemini"
+)
+
+type ProviderConfig struct {
+	APIKey    string // TODO: Implement encryption before saving
+	ModelName string
+	Type      string
+}
+
 var CoreVersion = "CORE-UNSET-dev"
 
 const (
