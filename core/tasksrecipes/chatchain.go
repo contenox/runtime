@@ -1,6 +1,10 @@
 package tasksrecipes
 
-import "github.com/contenox/runtime-mvp/core/taskengine"
+import (
+	"strings"
+
+	"github.com/contenox/runtime-mvp/core/taskengine"
+)
 
 func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
@@ -22,11 +26,9 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 				},
 			},
 			{
-				ID:              "execute_model_on_messages",
-				Description:     "Run inference using selected LLM",
-				Type:            taskengine.Hook,
-				PreferredModels: []string{model},
-				LLMProvider:     llmProvider,
+				ID:          "execute_model_on_messages",
+				Description: "Run inference using selected LLM",
+				Type:        taskengine.Hook,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "convert_history_to_openai"},
@@ -34,7 +36,10 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 				},
 				Hook: &taskengine.HookCall{
 					Type: "execute_model_on_messages",
-					Args: map[string]string{},
+					Args: map[string]string{
+						"model":    model,
+						"provider": llmProvider,
+					},
 				},
 			},
 			{
@@ -106,11 +111,9 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
-				ID:              "execute_model_on_messages",
-				Description:     "Run inference using selected LLM",
-				Type:            taskengine.Hook,
-				PreferredModels: req.PreferredModelNames,
-				LLMProvider:     req.Provider,
+				ID:          "execute_model_on_messages",
+				Description: "Run inference using selected LLM",
+				Type:        taskengine.Hook,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "persist_input_output"},
@@ -120,6 +123,8 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 					Type: "execute_model_on_messages",
 					Args: map[string]string{
 						"subject_id": req.SubjectID,
+						"models":     strings.Join(req.PreferredModelNames, ","),
+						"provider":   req.Provider,
 					},
 				},
 			},

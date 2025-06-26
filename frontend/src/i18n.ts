@@ -222,6 +222,10 @@ const resources = {
         loading_error: 'Error loading models.',
         interface_title: 'Chat Interface',
         personal_chat_list_title: 'Your Chats',
+        provider: 'Provider',
+        models: 'Models',
+        default_provider: 'Default Provider',
+        default_model: 'Default Model',
       },
       users: {
         manage_title: 'Manage Users',

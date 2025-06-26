@@ -81,8 +81,15 @@ export const api = {
   // Chats
   createChat: ({ model }: Partial<ChatSession>) =>
     apiFetch<Partial<ChatSession>>('/api/chats', options('POST', { model })),
-  sendMessage: (id: string, message: string) =>
-    apiFetch<ChatMessage[]>(`/api/chats/${id}/chat`, options('POST', { message })),
+  sendMessage: (id: string, message: string, provider?: string, models?: string[]) =>
+    apiFetch<ChatMessage[]>(
+      `/api/chats/${id}/chat`,
+      options('POST', {
+        message,
+        provider,
+        models: models || [],
+      }),
+    ),
 
   sendInstruction: (id: string, instruction: string) =>
     apiFetch<ChatMessage[]>(`/api/chats/${id}/instruction`, options('POST', { instruction })),

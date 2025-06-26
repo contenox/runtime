@@ -1,4 +1,4 @@
-import { Button, P, Panel, Section } from '@contenox/ui';
+import { Button, P, Panel, Section, Select } from '@contenox/ui';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -11,12 +11,23 @@ import {
 import { ChatInterface } from './components/ChatInterface';
 import { MessageInputForm } from './components/MessageInputForm';
 
+// Define available providers and models
+const PROVIDERS = [
+  { value: '', label: t('chat.default_provider') },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'ollama', label: 'Ollama' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'vllm', label: 'vLLM' },
+];
+
 export default function ChatPage() {
   const { chatId: paramChatId } = useParams<{ chatId: string }>();
   const [message, setMessage] = useState('');
   const [instruction, setInstruction] = useState('');
   const [chatId, setChatId] = useState<string | null>(paramChatId || null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState('');
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
   useEffect(() => {
     if (paramChatId) setChatId(paramChatId);
@@ -50,7 +61,20 @@ export default function ChatPage() {
     e.preventDefault();
     setOperationError(null);
     if (!message.trim()) return;
-    sendMessage(message);
+
+    const payload: { message: string; provider?: string; models?: string[] } = {
+      message: message,
+    };
+
+    if (selectedProvider) {
+      payload.provider = selectedProvider;
+    }
+
+    if (selectedModels.length > 0) {
+      payload.models = selectedModels;
+    }
+
+    sendMessage(payload);
     setMessage('');
   };
 
@@ -76,12 +100,22 @@ export default function ChatPage() {
         buttonLabel={t('chat.send_button')}
       />
       {chatId ? (
-        <Panel className="max-h-55 overflow-auto">
-          {operationError && <Panel variant="error"> {operationError}</Panel>}
-          {chatHistory && Array.isArray(chatHistory) && (
-            <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />
-          )}
-        </Panel>
+        <>
+          <Panel className="flex gap-4 p-4">
+            <Select
+              options={PROVIDERS}
+              value={selectedProvider}
+              onChange={e => setSelectedProvider(e.target.value)}
+              className="w-48"
+            />
+          </Panel>
+          <Panel className="max-h-55 overflow-auto">
+            {operationError && <Panel variant="error"> {operationError}</Panel>}
+            {chatHistory && Array.isArray(chatHistory) && (
+              <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />
+            )}
+          </Panel>
+        </>
       ) : (
         <div className="flex flex-grow flex-col items-center justify-center">
           {' '}

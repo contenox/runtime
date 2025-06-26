@@ -205,15 +205,6 @@ type ChainTask struct {
 	// Optional for all task types.
 	Timeout string `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 
-	// PreferredModels optionally lists preferred LLM models for this task.
-	// Ignored for Hook tasks.
-	// Example: ["gpt-4", "claude-2"]
-	PreferredModels []string `yaml:"preferred_models,omitempty" json:"preferred_models,omitempty"`
-
-	// LLMProvider optionally specifies the LLM provider for this task.
-	// Example: "openai", "gemini", "vllm", "ollama"
-	LLMProvider string `yaml:"llm_provider,omitempty" json:"llm_provider,omitempty"`
-
 	// RetryOnFailure sets how many times to retry this task on failure.
 	// Applies to all task types including Hooks.
 	// Default: 0 (no retries)

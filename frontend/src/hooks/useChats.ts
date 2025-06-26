@@ -30,8 +30,13 @@ export function useChatHistory(id: string) {
 
 export function useSendMessage(chatId: string) {
   const queryClient = useQueryClient();
-  return useMutation<ChatMessage[], Error, string>({
-    mutationFn: message => api.sendMessage(chatId, message),
+  return useMutation<
+    ChatMessage[],
+    Error,
+    { message: string; provider?: string; models?: string[] } // Inline type definition
+  >({
+    mutationFn: ({ message, provider, models }) =>
+      api.sendMessage(chatId, message, provider, models),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: chatKeys.history(chatId) });
     },

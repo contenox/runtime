@@ -68,7 +68,6 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 							{Goto: taskengine.TermEnd, Operator: "default"},
 						},
 					},
-					PreferredModels: []string{config.TasksModel},
 				},
 			},
 		}, "Hello, world!")
