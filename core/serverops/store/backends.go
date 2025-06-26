@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	_ "github.com/lib/pq"
 )
 

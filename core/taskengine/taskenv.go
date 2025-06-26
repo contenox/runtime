@@ -10,8 +10,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/serverops"
 )
 
 const (

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/services/testingsetup"
-	"github.com/contenox/contenox/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/services/testingsetup"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

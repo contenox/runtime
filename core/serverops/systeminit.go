@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libdb"
 )
 
 func InitEmbedPool(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Pool, error) {

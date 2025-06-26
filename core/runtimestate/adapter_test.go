@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/ollama/ollama/api"
 	"github.com/stretchr/testify/require"
 )

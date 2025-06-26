@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/services/execservice"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/services/execservice"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 func AddExecRoutes(mux *http.ServeMux, _ *serverops.Config, promptService execservice.ExecService, taskService execservice.TasksEnvService) {

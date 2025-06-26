@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/poolservice"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/poolservice"
 )
 
 func AddPoolRoutes(mux *http.ServeMux, _ *serverops.Config, poolService poolservice.Service) {

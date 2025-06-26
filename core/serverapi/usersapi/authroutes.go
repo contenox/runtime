@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/services/userservice"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/services/userservice"
 )
 
 const (
@@ -27,7 +27,6 @@ func AddAuthRoutes(mux *http.ServeMux, userService userservice.Service) {
 	mux.HandleFunc("POST /ui/logout", a.uiLogout)
 	mux.HandleFunc("POST /ui/register", a.uiRegister)
 	mux.HandleFunc("POST /ui/token_refresh", a.uiTokenRefresh)
-
 }
 
 type authManager struct {

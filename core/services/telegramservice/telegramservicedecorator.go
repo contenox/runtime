@@ -3,7 +3,7 @@ package telegramservice
 import (
 	"context"
 
-	"github.com/contenox/contenox/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 

@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/hooks"
-	"github.com/contenox/contenox/core/indexrepo"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/vectors"
-	"github.com/contenox/contenox/core/services/testingsetup"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/hooks"
+	"github.com/contenox/runtime-mvp/core/indexrepo"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/vectors"
+	"github.com/contenox/runtime-mvp/core/services/testingsetup"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

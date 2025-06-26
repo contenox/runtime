@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops/vectors"
+	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 )
 
 func TestSystem_Vectors_SetupLocalInstanceSucceeds(t *testing.T) {

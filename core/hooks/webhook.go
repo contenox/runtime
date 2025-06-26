@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 // WebCaller makes HTTP requests to external services

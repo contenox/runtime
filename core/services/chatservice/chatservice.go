@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/core/tasksrecipes"
-	"github.com/contenox/contenox/libs/libdb"
-	"github.com/contenox/contenox/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/tasksrecipes"
+	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 	"github.com/google/uuid"
 )
 
@@ -211,9 +212,20 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-
-	// Build chain with subject ID and model
-	chain := tasksrecipes.BuildOpenAIChatChain(req.Model)
+	provider := ""
+	if strings.HasPrefix(req.Model, "openai") {
+		provider = "openai"
+	}
+	if strings.HasPrefix(req.Model, "ollama") {
+		provider = "ollama"
+	}
+	if strings.HasPrefix(req.Model, "gemini") {
+		provider = "gemini"
+	}
+	if strings.HasPrefix(req.Model, "vllm") {
+		provider = "vllm"
+	}
+	chain := tasksrecipes.BuildOpenAIChatChain(req.Model, provider)
 
 	// Use correct data type
 	result, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)

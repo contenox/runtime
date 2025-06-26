@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"dario.cat/mergo"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
 )
 

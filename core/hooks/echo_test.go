@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/hooks"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/hooks"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/stretchr/testify/assert"
 )
 

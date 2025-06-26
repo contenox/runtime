@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/libs/libollama"
+	"github.com/contenox/runtime-mvp/libs/libollama"
 )
 
 // Helper function to report operations per second

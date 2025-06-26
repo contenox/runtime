@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 func NewSearchThenResolveHook(searchThenResolveHook SearchThenResolveHook) taskengine.HookRepo {

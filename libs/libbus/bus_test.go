@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/libs/libbus"
+	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/stretchr/testify/require"
 )
 

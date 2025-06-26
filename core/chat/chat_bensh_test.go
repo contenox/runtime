@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/kv"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/services/testingsetup"
-	"github.com/contenox/contenox/core/services/tokenizerservice"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/chat"
+	"github.com/contenox/runtime-mvp/core/kv"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/services/testingsetup"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

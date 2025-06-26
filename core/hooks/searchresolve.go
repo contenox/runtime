@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type SearchResolve struct {

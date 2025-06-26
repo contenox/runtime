@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libauth"
-	"github.com/contenox/contenox/libs/libcipher"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libauth"
+	"github.com/contenox/runtime-mvp/libs/libcipher"
 )
 
 const DefaultServerGroup = "server"

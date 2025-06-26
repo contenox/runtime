@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"testing"
 
+	"github.com/contenox/runtime-mvp/libs/libcipher"
 	"github.com/google/uuid"
-	"github.com/contenox/contenox/libs/libcipher"
 )
 
 func TestNewHash(t *testing.T) {

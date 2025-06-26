@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 // ErrKeyNotFound is returned when a key is not found in the cache.

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/contenox/core/chat"
-	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/chat"
+	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
 )
 

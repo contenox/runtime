@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/downloadservice"
-	"github.com/contenox/contenox/core/services/modelservice"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/downloadservice"
+	"github.com/contenox/runtime-mvp/core/services/modelservice"
 )
 
 func AddModelRoutes(mux *http.ServeMux, _ *serverops.Config, modelService modelservice.Service, dwService downloadservice.Service) {

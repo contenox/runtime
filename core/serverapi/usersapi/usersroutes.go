@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/userservice"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/userservice"
 )
 
 func AddUserRoutes(mux *http.ServeMux, config *serverops.Config, userService userservice.Service) {

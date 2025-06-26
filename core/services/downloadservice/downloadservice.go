@@ -6,14 +6,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libbus"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libbus"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
-var _ serverops.ServiceMeta = &service{}
-var _ Service = &service{}
+var (
+	_ serverops.ServiceMeta = &service{}
+	_ Service               = &service{}
+)
 
 type Service interface {
 	CurrentDownloadQueueState(ctx context.Context) ([]Job, error)

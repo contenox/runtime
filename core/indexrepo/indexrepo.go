@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/serverops/vectors"
-	"github.com/contenox/contenox/libs/libdb"
-	"github.com/contenox/contenox/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/serverops/vectors"
+	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 type Args struct {

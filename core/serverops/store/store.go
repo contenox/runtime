@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/libs/libauth"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libauth"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/stretchr/testify/require"
 )
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/contenox/contenox/libs/libtestenv"
+	"github.com/contenox/runtime-mvp/libs/libtestenv"
 	"github.com/stretchr/testify/require"
 )
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/libs/libollama"
+	"github.com/contenox/runtime-mvp/libs/libollama"
 	"github.com/stretchr/testify/require"
 )
 

@@ -6,7 +6,7 @@ go 1.24.1
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/contenox/contenox/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
+	github.com/contenox/runtime-mvp/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
 	github.com/ollama/ollama v0.6.5
 	github.com/stretchr/testify v1.10.0
 )

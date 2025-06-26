@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/contenox/contenox/core/hookrecipes"
+	"github.com/contenox/runtime-mvp/core/hookrecipes"
 )
 
 func TestParsePrefixedArgs(t *testing.T) {

@@ -9,16 +9,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/core/kv"
-	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/tokenizerservice"
-	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/libs/libdb"
-	"github.com/contenox/contenox/libs/libmodelprovider"
-	"github.com/contenox/contenox/libs/libroutine"
+	"github.com/contenox/runtime-mvp/core/kv"
+	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
+	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
 )
@@ -209,7 +209,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to chat %w", err)
 	}
-	outputtokens, err := m.tokenizer.CountTokens(ctx, "phi-3", responseMessage.Content)
+	outputtokens, err := m.tokenizer.CountTokens(ctx, "tiny", responseMessage.Content)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
 	}

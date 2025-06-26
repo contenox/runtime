@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
 

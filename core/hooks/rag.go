@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/contenox/contenox/core/indexrepo"
-	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/serverops/vectors"
-	"github.com/contenox/contenox/core/taskengine"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/indexrepo"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/serverops/vectors"
+	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type Search struct {

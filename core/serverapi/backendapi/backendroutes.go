@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/core/services/backendservice"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/backendservice"
 	"github.com/google/uuid"
 	"github.com/ollama/ollama/api"
 )

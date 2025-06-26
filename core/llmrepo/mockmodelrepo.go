@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 type MockModelRepo struct {

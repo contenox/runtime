@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libbus"
-	"github.com/contenox/contenox/libs/libdb"
-	"github.com/contenox/contenox/libs/libroutine"
-	"github.com/contenox/contenox/libs/libtestenv"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libbus"
+	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libroutine"
+	"github.com/contenox/runtime-mvp/libs/libtestenv"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

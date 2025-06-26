@@ -1,4 +1,4 @@
-github.com/contenox/contenox/libs/libauth v0.0.0-20250626094131-df93eea0ce6a h1:kmuceaXsc6a/rV5uJaroLySMimHyzQV77YKY6LYEI3o=
-github.com/contenox/contenox/libs/libauth v0.0.0-20250626094131-df93eea0ce6a/go.mod h1:aTfE9DMObn/5TSdFyNFAGNm74c5vFHIWgAhuFrxquR4=
+github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a h1:kmuceaXsc6a/rV5uJaroLySMimHyzQV77YKY6LYEI3o=
+github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a/go.mod h1:aTfE9DMObn/5TSdFyNFAGNm74c5vFHIWgAhuFrxquR4=
 github.com/golang-jwt/jwt/v5 v5.2.2 h1:Rl4B7itRWVtYIHFrSNd7vhTiz9UpLdi6gZhZ3wEeDy8=
 github.com/golang-jwt/jwt/v5 v5.2.2/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=

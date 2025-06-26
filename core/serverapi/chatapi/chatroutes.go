@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/contenox/contenox/core/runtimestate"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/services/chatservice"
-	"github.com/contenox/contenox/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/services/chatservice"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/google/uuid"
 )
 

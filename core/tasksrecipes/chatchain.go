@@ -1,8 +1,8 @@
 package tasksrecipes
 
-import "github.com/contenox/contenox/core/taskengine"
+import "github.com/contenox/runtime-mvp/core/taskengine"
 
-func BuildOpenAIChatChain(model string) *taskengine.ChainDefinition {
+func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		ID:          "openai_chat_chain",
 		Description: "OpenAI Style chat processing pipeline with hooks",
@@ -26,6 +26,7 @@ func BuildOpenAIChatChain(model string) *taskengine.ChainDefinition {
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
 				PreferredModels: []string{model},
+				LLMProvider:     llmProvider,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "convert_history_to_openai"},

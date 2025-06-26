@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 // CreateAccessEntry creates a new access control entry

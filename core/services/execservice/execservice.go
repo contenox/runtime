@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/llmresolver"
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
-	"github.com/contenox/contenox/libs/libdb"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
 )
 
@@ -43,7 +43,7 @@ func (s *execService) Execute(ctx context.Context, request *TaskRequest) (*TaskR
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
-	//TODO: check permission view? why not exec?
+	// TODO: check permission view? why not exec?
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
 		return nil, err
 	}

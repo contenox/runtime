@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/contenox/core/llmrepo"
-	"github.com/contenox/contenox/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/llmresolver"
 )
 
 // TaskExecutor defines the interface for executing a individual tasks.

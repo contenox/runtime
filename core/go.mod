@@ -3,34 +3,33 @@ module github.com/contenox/runtime-mvp/core
 go 1.24.1
 
 // libauth libbus  libcipher  libdb  libkv  libollama  libroutine libtestenv
-replace github.com/contenox/contenox/libs/libauth => ../libs/libauth
+replace github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
 
-replace github.com/contenox/contenox/libs/libbus => ../libs/libbus
+replace github.com/contenox/runtime-mvp/libs/libbus => ../libs/libbus
 
-replace github.com/contenox/contenox/libs/libcipher => ../libs/libcipher
+replace github.com/contenox/runtime-mvp/libs/libcipher => ../libs/libcipher
 
-replace github.com/contenox/contenox/libs/libdb => ../libs/libdb
+replace github.com/contenox/runtime-mvp/libs/libdb => ../libs/libdb
 
-replace github.com/contenox/contenox/libs/libkv => ../libs/libkv
+replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
 
-replace github.com/contenox/contenox/libs/libroutine => ../libs/libroutine
+replace github.com/contenox/runtime-mvp/libs/libroutine => ../libs/libroutine
 
-replace github.com/contenox/contenox/libs/libtestenv => ../libs/libtestenv
+replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 
 replace github.com/js402/contenox/contenox/libkv => ../libs/libkv
 
-replace github.com/contenox/contenox/libs/libmodelprovider => ../libs/libmodelprovider
+replace github.com/contenox/runtime-mvp/libs/libmodelprovider => ../libs/libmodelprovider
 
 require (
 	dario.cat/mergo v1.0.1
-	github.com/contenox/contenox/core v0.0.0-20250626094131-df93eea0ce6a
-	github.com/contenox/contenox/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
-	github.com/contenox/contenox/libs/libbus v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libmodelprovider v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libroutine v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libtestenv v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
+	github.com/contenox/runtime-mvp/libs/libbus v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libmodelprovider v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libroutine v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9

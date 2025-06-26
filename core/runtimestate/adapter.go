@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 // ProviderFromRuntimeState retrieves available model providers

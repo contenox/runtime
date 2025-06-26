@@ -3,8 +3,8 @@ package poolservice
 import (
 	"context"
 
-	"github.com/contenox/contenox/core/serverops"
-	"github.com/contenox/contenox/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 )
 
 type activityTrackerDecorator struct {

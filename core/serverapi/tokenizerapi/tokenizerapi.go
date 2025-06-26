@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/contenox/core/serverapi/tokenizerapi/proto"
-	"github.com/contenox/contenox/core/services/tokenizerservice"
+	"github.com/contenox/runtime-mvp/core/serverapi/tokenizerapi/proto"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
