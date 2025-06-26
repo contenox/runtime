@@ -57,7 +57,13 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 	}
 }
 
-func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine.ChainDefinition {
+type BuildChatChainReq struct {
+	SubjectID           string
+	PreferredModelNames []string
+	Provider            string
+}
+
+func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		ID:          "chat_chain",
 		Description: "Standard chat processing pipeline with hooks",
@@ -69,7 +75,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				Hook: &taskengine.HookCall{
 					Type: "append_user_message",
 					Args: map[string]string{
-						"subject_id": subjectID,
+						"subject_id": req.SubjectID,
 					},
 				},
 				Transition: taskengine.TaskTransition{
@@ -85,7 +91,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				Hook: &taskengine.HookCall{
 					Type: "command_router",
 					Args: map[string]string{
-						"subject_id": subjectID,
+						"subject_id": req.SubjectID,
 					},
 				},
 				Transition: taskengine.TaskTransition{
@@ -103,7 +109,8 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				ID:              "execute_model_on_messages",
 				Description:     "Run inference using selected LLM",
 				Type:            taskengine.Hook,
-				PreferredModels: preferredModelNames,
+				PreferredModels: req.PreferredModelNames,
+				LLMProvider:     req.Provider,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "persist_input_output"},
@@ -112,7 +119,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				Hook: &taskengine.HookCall{
 					Type: "execute_model_on_messages",
 					Args: map[string]string{
-						"subject_id": subjectID,
+						"subject_id": req.SubjectID,
 					},
 				},
 			},
@@ -123,7 +130,7 @@ func BuildChatChain(subjectID string, preferredModelNames ...string) *taskengine
 				Hook: &taskengine.HookCall{
 					Type: "persist_input_output",
 					Args: map[string]string{
-						"subject_id": subjectID,
+						"subject_id": req.SubjectID,
 					},
 				},
 				Transition: taskengine.TaskTransition{

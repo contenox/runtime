@@ -2,7 +2,6 @@ package chatservice
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -14,49 +13,48 @@ type activityTrackerDecorator struct {
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
+func (d *activityTrackerDecorator) NewInstance(ctx context.Context, subject string) (string, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"create",
 		"chat-session",
 		"subject", subject,
-		"preferred_models", fmt.Sprintf("%v", preferredModels),
 	)
 	defer endFn()
 
-	sessionID, err := d.service.NewInstance(ctx, subject, preferredModels...)
+	sessionID, err := d.service.NewInstance(ctx, subject)
 	if err != nil {
 		reportErrFn(err)
 		return "", err
 	}
 
 	reportChangeFn(sessionID, map[string]interface{}{
-		"id":               sessionID,
-		"subject":          subject,
-		"preferred_models": preferredModels,
+		"id":      sessionID,
+		"subject": subject,
 	})
 
 	return sessionID, nil
 }
 
-func (d *activityTrackerDecorator) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
+func (d *activityTrackerDecorator) Chat(ctx context.Context, req ChatRequest) (string, int, int, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"chat",
 		"message",
-		"subject_id", subjectID,
-		"models", preferredModelNames,
+		"subject_id", req.SubjectID,
+		"models", req.PreferredModelNames,
+		"provider", req.Provider,
 	)
 	defer endFn()
 
-	response, tokencount, outputtokencount, err := d.service.Chat(ctx, subjectID, message, preferredModelNames...)
+	response, tokencount, outputtokencount, err := d.service.Chat(ctx, req)
 	if err != nil {
 		reportErrFn(err)
 		return "", 0, 0, err
 	}
 
-	reportChangeFn(subjectID, map[string]interface{}{
-		"user_message":       message,
+	reportChangeFn(req.SubjectID, map[string]interface{}{
+		"user_message":       req.Message,
 		"response":           response,
 		"input_token_count":  tokencount,
 		"output_token_count": outputtokencount,

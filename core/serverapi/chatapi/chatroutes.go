@@ -28,7 +28,6 @@ type chatManagerHandler struct {
 }
 
 type newChatInstanceRequest struct {
-	Model   string `json:"model"`
 	Subject string `json:"subject"`
 }
 
@@ -40,7 +39,7 @@ func (h *chatManagerHandler) createChat(w http.ResponseWriter, r *http.Request) 
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
-	chatID, err := h.service.NewInstance(ctx, req.Subject, req.Model)
+	chatID, err := h.service.NewInstance(ctx, req.Subject)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
@@ -82,8 +81,9 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 }
 
 type chatRequest struct {
-	Message string   `json:"message"`
-	Models  []string `json:"models"`
+	Message  string   `json:"message"`
+	Models   []string `json:"models"`
+	Provider string   `json:"provider"`
 }
 
 func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +107,13 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	if len(req.Models) == 0 {
 		req.Models = []string{}
 	}
-	reply, _, _, err := h.service.Chat(ctx, chatID.String(), req.Message, req.Models...)
+	reqConv := chatservice.ChatRequest{
+		SubjectID:           chatID.String(),
+		Message:             req.Message,
+		PreferredModelNames: req.Models,
+		Provider:            req.Provider,
+	}
+	reply, _, _, err := h.service.Chat(ctx, reqConv)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return

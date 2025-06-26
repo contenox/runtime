@@ -250,7 +250,9 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 	text := update.Message.Text
 	subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
 
-	chain := tasksrecipes.BuildChatChain(subjID)
+	chain := tasksrecipes.BuildChatChain(tasksrecipes.BuildChatChainReq{
+		SubjectID: subjID,
+	})
 	result, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)

@@ -18,9 +18,9 @@ import (
 
 type Service interface {
 	GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error)
-	Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error)
+	Chat(ctx context.Context, req ChatRequest) (string, int, int, error)
 	ListChats(ctx context.Context) ([]ChatSession, error)
-	NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error)
+	NewInstance(ctx context.Context, subject string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
 	OpenAIChat
 	serverops.ServiceMeta
@@ -58,8 +58,8 @@ type ChatSession struct {
 	LastMessage *ChatMessage `json:"lastMessage,omitempty"`
 }
 
-// NewInstance creates a new chat instance after verifying that the user is authorized to start a chat for the given model.
-func (s *service) NewInstance(ctx context.Context, subject string, preferredModels ...string) (string, error) {
+// NewInstance creates a new chat instance after verifying that the user is authorized to start a chat.
+func (s *service) NewInstance(ctx context.Context, subject string) (string, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", err
@@ -97,17 +97,27 @@ func (s *service) AddInstruction(ctx context.Context, subjectID string, message 
 	return nil
 }
 
-func (s *service) Chat(ctx context.Context, subjectID string, message string, preferredModelNames ...string) (string, int, int, error) {
+type ChatRequest struct {
+	SubjectID           string
+	Message             string
+	PreferredModelNames []string
+	Provider            string
+}
+
+func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", 0, 0, err
 	}
 
 	// Use raw string as input
-	input := message
-
+	input := req.Message
 	// Build or load chain definition
-	chain := tasksrecipes.BuildChatChain(subjectID, preferredModelNames...)
+	chain := tasksrecipes.BuildChatChain(tasksrecipes.BuildChatChainReq{
+		SubjectID:           req.SubjectID,
+		PreferredModelNames: req.PreferredModelNames,
+		Provider:            req.Provider,
+	})
 
 	// Run the chain using the environment executor
 	result, err := s.env.ExecEnv(ctx, chain, input, taskengine.DataTypeString)

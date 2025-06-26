@@ -1,5 +1,5 @@
 services:
-  backend:
+  runtime-mvp:
     build:
       context: ./
       dockerfile: Dockerfile.core
@@ -74,7 +74,7 @@ services:
       context: ./
       dockerfile: Dockerfile.worker
     depends_on:
-      backend:
+      runtime-mvp:
         condition: service_healthy
     environment:
       API_BASE_URL: http://backend:8080/api

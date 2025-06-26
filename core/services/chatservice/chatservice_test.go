@@ -70,7 +70,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		manager := chatservice.New(dbInstance, environmentExec)
 
 		// Test valid model
-		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
+		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
 		require.NotEqual(t, uuid.Nil, id)
 	})
@@ -78,9 +78,14 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	t.Run("simple chat interaction tests", func(t *testing.T) {
 		manager := chatservice.New(dbInstance, environmentExec)
 
-		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
+		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
-		response, _, _, err := manager.Chat(ctx, id, "what is the capital of england?", "smollm2:135m")
+		req := chatservice.ChatRequest{
+			SubjectID:           id,
+			Message:             "what is the capital of england?",
+			PreferredModelNames: []string{"smollm2:135m"},
+		}
+		response, _, _, err := manager.Chat(ctx, req)
 		require.NoError(t, err)
 		responseLower := strings.ToLower(response)
 		println(responseLower)
@@ -90,9 +95,14 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	t.Run("simple echo command interaction tests", func(t *testing.T) {
 		manager := chatservice.New(dbInstance, environmentExec)
 
-		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
+		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
-		response, _, _, err := manager.Chat(ctx, id, "/echo hello world! 123", "smollm2:135m")
+		req := chatservice.ChatRequest{
+			SubjectID:           id,
+			Message:             "/echo hello world! 123",
+			PreferredModelNames: []string{"smollm2:135m"},
+		}
+		response, _, _, err := manager.Chat(ctx, req)
 		require.NoError(t, err)
 		responseLower := strings.ToLower(response)
 		println(responseLower)
@@ -103,7 +113,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		manager := chatservice.New(dbInstance, environmentExec)
 
 		// Create new chat instance
-		id, err := manager.NewInstance(ctx, "user1", "smollm2:135m")
+		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
 
 		// Verify initial empty history
@@ -113,7 +123,12 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 		// First interaction
 		userMessage1 := "What's the capital of France?"
-		_, _, _, err = manager.Chat(ctx, id, userMessage1, "smollm2:135m")
+		req := chatservice.ChatRequest{
+			SubjectID:           id,
+			Message:             userMessage1,
+			PreferredModelNames: []string{"smollm2:135m"},
+		}
+		_, _, _, err = manager.Chat(ctx, req)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond)
 		// Verify first pair of messages
@@ -139,7 +154,12 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 		// Second interaction
 		userMessage2 := "What about Germany?"
-		_, _, _, err = manager.Chat(ctx, id, userMessage2, "smollm2:135m")
+		req = chatservice.ChatRequest{
+			SubjectID:           id,
+			Message:             userMessage2,
+			PreferredModelNames: []string{"smollm2:135m"},
+		}
+		_, _, _, err = manager.Chat(ctx, req)
 		require.NoError(t, err)
 
 		// Verify updated history
@@ -174,10 +194,9 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
 		manager := chatservice.New(dbInstance, environmentExec)
 
-		model := "smollm2:135m"
 		subject := "user-long-convo"
 
-		instanceID, err := manager.NewInstance(ctx, subject, model)
+		instanceID, err := manager.NewInstance(ctx, subject)
 		require.NoError(t, err, "Failed to create new chat instance")
 		require.NotEqual(t, uuid.Nil, instanceID, "Instance ID should not be nil")
 
@@ -201,7 +220,12 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		for i, userMsg := range userMessages {
 			t.Logf("====================================================================================\n")
 			t.Logf("Sending message %d: %s \n", i+1, userMsg)
-			response, inputtokenCount, outputtokencount, err := manager.Chat(ctx, instanceID, userMsg, model)
+			req := chatservice.ChatRequest{
+				SubjectID:           instanceID,
+				Message:             userMsg,
+				PreferredModelNames: []string{"smollm2:135m"},
+			}
+			response, inputtokenCount, outputtokencount, err := manager.Chat(ctx, req)
 			tokens += inputtokenCount + outputtokencount
 			require.NoError(t, err, "Chat interaction failed for message %d", i+1)
 			require.NotEmpty(t, response, "Assistant response should not be empty for message %d", i+1)
