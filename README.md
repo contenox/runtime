@@ -40,7 +40,7 @@ This MVP combines several technologies and architectural patterns to deliver the
 
 Key components include:
 
-- **Task Engine**: Configurable engine supporting branching, retries, and model routing.
+- **Task Engine**: Configurable chain engine supporting branching, retries, and model routing.
 - **Hook System**: Extensible side-effect execution (e.g., send email, call API).
 - **RAG Pipeline**: Document parsing → embedding → vector storage → retrieval.
 - **Security Model**: JWT tokens, BFF pattern, access control.
