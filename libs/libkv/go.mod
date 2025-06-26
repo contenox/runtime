@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libkv
+module github.com/contenox/runtime-mvp/libs/libkv
 
 go 1.24.1
 

@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libmodelprovider
+module github.com/contenox/runtime-mvp/libs/libmodelprovider
 
 go 1.24.1
 

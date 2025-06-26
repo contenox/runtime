@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libollama
+module github.com/contenox/runtime-mvp/libs/libollama
 
 go 1.24.1
 
@@ -6,6 +6,7 @@ go 1.24.1
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
+	github.com/contenox/contenox/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
 	github.com/ollama/ollama v0.6.5
 	github.com/stretchr/testify v1.10.0
 )
@@ -34,9 +35,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

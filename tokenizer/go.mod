@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/tokenizer
+module github.com/contenox/runtime-mvp/tokenizer
 
 go 1.24.1
 
@@ -15,8 +15,9 @@ replace (
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303144028-a0af3efb3deb
 
 require (
-	github.com/contenox/contenox/core v0.0.0-00010101000000-000000000000
-	github.com/contenox/contenox/libs/libollama v0.0.0-20250415134247-d9ea7c0520f3
+	github.com/contenox/contenox/core v0.0.0-20250626094131-df93eea0ce6a
+	github.com/contenox/contenox/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
+	github.com/contenox/contenox/tokenizer v0.0.0-20250626094131-df93eea0ce6a
 	google.golang.org/grpc v1.72.0
 )
 
@@ -35,7 +36,7 @@ require (
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000 // indirect
+	github.com/contenox/contenox/libs/libauth v0.0.0-20250626094131-df93eea0ce6a // indirect
 	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
 	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect

@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libbus
+module github.com/contenox/runtime-mvp/libs/libbus
 
 go 1.24.1
 

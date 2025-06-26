@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/core
+module github.com/contenox/runtime-mvp/core
 
 go 1.24.1
 
@@ -23,7 +23,8 @@ replace github.com/contenox/contenox/libs/libmodelprovider => ../libs/libmodelpr
 
 require (
 	dario.cat/mergo v1.0.1
-	github.com/contenox/contenox/libs/libauth v0.0.0-00010101000000-000000000000
+	github.com/contenox/contenox/core v0.0.0-20250626094131-df93eea0ce6a
+	github.com/contenox/contenox/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/contenox/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/contenox/contenox/libs/libdb v0.0.0-00010101000000-000000000000
@@ -32,7 +33,6 @@ require (
 	github.com/contenox/contenox/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
-	github.com/js402/contenox/contenox/libkv v0.0.0-00010101000000-000000000000
 	github.com/lib/pq v1.10.9
 	github.com/ollama/ollama v0.9.2
 	github.com/stretchr/testify v1.10.0
@@ -86,7 +86,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/testcontainers/testcontainers-go/modules/nats v0.36.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/valkey v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

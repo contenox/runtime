@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libdb
+module github.com/contenox/runtime-mvp/libs/libdb
 
 go 1.24.1
 

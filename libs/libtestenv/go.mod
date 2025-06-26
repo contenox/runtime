@@ -1,4 +1,4 @@
-module github.com/contenox/contenox/libs/libtestenv
+module github.com/contenox/runtime-mvp/libs/libtestenv
 
 go 1.24.1
 
