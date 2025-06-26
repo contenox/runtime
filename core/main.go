@@ -146,7 +146,12 @@ func main() {
 		cleanup()
 		log.Fatalf("initializing tokenizer service failed: %v", err)
 	}
-	settings := kv.NewLocalCache(dbInstance, "test:")
+	settings := kv.NewLocalCache(dbInstance, "")
+	breakerSettings := libroutine.NewRoutine(3, time.Second*10)
+	triggerChan := make(chan struct{})
+	go breakerSettings.Loop(ctx, time.Second*3, triggerChan, settings.ProcessTick, func(err error) {
+		// log.Printf("error in settings.ProcessTick: %v", err)
+	})
 	chatManager := chat.New(state, tokenizerSvc, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
 	knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
