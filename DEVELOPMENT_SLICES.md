@@ -55,6 +55,9 @@
 - [x] **RAG-Enhanced Chat Interface**
 - [x] **Chat with Task Command Execution Support**
 - [x] **Registration Route for Persona Chat Users**
+- [x] **OpenAI driver Integration**
+- [x] **Gemeni driver Integration**
+- [ ] **Persona Chat Application Packaging**
 - [ ] **Release Processes**
 - [ ] **Observability Integration**
 - [ ] **Release Infrastructure Setup**
