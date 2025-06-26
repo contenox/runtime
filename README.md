@@ -1,4 +1,4 @@
-# contenox/runtime-MVP
+# contenox/runtime-mvp
 
 > *A runtime engine to power agent-based applications, semantic search systems, and LLM-powered automation*
 
