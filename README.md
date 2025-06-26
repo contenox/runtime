@@ -68,20 +68,3 @@ make ui-run    # Run frontend dev server
 Access the UI at `http://localhost:8080` and register as `admin@admin.com`.
 
 ---
-
-## 🤝 Contributing & Exploring
-
-We welcome explorers — especially those interested in:
-
-- Building agent-based applications
-- Extending task chains and hook recipes
-- Improving semantic search pipelines
-- Designing better UI experiences for AI workflows
-
-Whether you're trying out a demo deployment, joining a challenge, or just digging into the code, this MVP is your entry point to understanding what contenox aims to become.
-
----
-
-## 📄 License
-
-Apache 2.0
