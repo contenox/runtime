@@ -32,7 +32,7 @@ run: down build
 	docker compose up -d
 
 logs: run
-	docker compose logs -f backend
+	docker compose logs -f runtime-mvp
 
 yarn-wipe:
 	echo "Removing Yarn PnP files..."
