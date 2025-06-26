@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/kv"
@@ -194,6 +195,7 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 		ContextLength: inputtokens,
 		ModelNames:    preferredModelNames,
 		ProviderTypes: providerTypes,
+		Tracker:       serverops.NewLogActivityTracker(slog.Default()),
 	}, runtimestate.BetterProviderAdapter(ctx, m.state.Get(ctx), providers...), llmresolver.Randomly)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)

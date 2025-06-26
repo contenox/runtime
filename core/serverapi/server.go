@@ -127,6 +127,7 @@ func New(
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
 	providerService := providerservice.New(dbInstance)
+	providerService = providerservice.WithActivityTracker(providerService, serverops.NewLogActivityTracker(slog.Default()))
 	providersapi.AddProviderRoutes(mux, config, providerService)
 
 	handler = enableCORS(config, handler)

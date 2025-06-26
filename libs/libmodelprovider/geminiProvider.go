@@ -42,6 +42,11 @@ func NewGeminiProvider(apiKey, modelName string, httpClient *http.Client) (*Gemi
 		canStream = true
 		// Note: context length for multimodal models is more complex (image tokens)
 		contextLength = 4096
+	case "gemini-flash":
+		canChat = true
+		canPrompt = true
+		canStream = true
+		contextLength = 32768
 	case "embedding-001":
 		canEmbed = true
 		contextLength = 2048

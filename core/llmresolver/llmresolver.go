@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -25,6 +26,7 @@ type Request struct {
 	ProviderTypes []string // Optional: if empty, uses all default providers
 	ModelNames    []string // Optional: if empty, any model is considered
 	ContextLength int      // Minimum required context length
+	Tracker       serverops.ActivityTracker
 }
 
 func filterCandidates(
@@ -236,23 +238,44 @@ func Chat(
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMChatClient, string, error) {
+	tracker := req.Tracker
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	reportErr, _, endFn := tracker.Start(
+		ctx,
+		"resolve",
+		"chat_model",
+		"provider_types", req.ProviderTypes,
+		"model_names", req.ModelNames,
+		"context_length", req.ContextLength,
+	)
+	defer endFn()
+
 	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanChat)
 	if err != nil {
+		reportErr(err)
 		return nil, "", err
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
+		reportErr(err)
 		return nil, "", err
 	}
 	if req.ContextLength == 0 {
-		return nil, "", fmt.Errorf("context length must be greater than 0")
+		err = fmt.Errorf("context length must be greater than 0")
+		reportErr(err)
+		return nil, "", err
 	}
 	if req.ContextLength < 0 {
-		return nil, "", fmt.Errorf("context length must be non-negative")
+		err = fmt.Errorf("context length must be non-negative")
+		reportErr(err)
+		return nil, "", err
 	}
 	modelName := provider.ModelName()
 	client, err := provider.GetChatConnection(ctx, backend)
 	if err != nil {
+		reportErr(err)
 		return nil, "", err
 	}
 	return client, modelName, nil
@@ -261,17 +284,32 @@ func Chat(
 type EmbedRequest struct {
 	ModelName    string
 	ProviderType string // Optional. Empty uses default.
+	tracker      serverops.ActivityTracker
 }
 
-// Embed finds a provider supporting embeddings
 func Embed(
 	ctx context.Context,
 	embedReq EmbedRequest,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMEmbedClient, error) {
+	tracker := embedReq.tracker
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	reportErr, _, endFn := tracker.Start(
+		ctx,
+		"resolve",
+		"embed_model",
+		"model_name", embedReq.ModelName,
+		"provider_type", embedReq.ProviderType,
+	)
+	defer endFn()
+
 	if embedReq.ModelName == "" {
-		return nil, fmt.Errorf("model name is required")
+		err := fmt.Errorf("model name is required")
+		reportErr(err)
+		return nil, err
 	}
 	if embedReq.ProviderType == "" {
 		embedReq.ProviderType = DefaultProviderType
@@ -282,28 +320,45 @@ func Embed(
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanEmbed)
 	if err != nil {
+		reportErr(err)
 		return nil, fmt.Errorf("failed to filter candidates %w", err)
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
+		reportErr(err)
 		return nil, fmt.Errorf("failed apply resolver %w", err)
 	}
 	return provider.GetEmbedConnection(ctx, backend)
 }
 
-// Stream finds a provider supporting streaming
 func Stream(
 	ctx context.Context,
 	req Request,
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMStreamClient, error) {
+	tracker := req.Tracker
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	reportErr, _, endFn := tracker.Start(
+		ctx,
+		"resolve",
+		"stream_model",
+		"provider_types", req.ProviderTypes,
+		"model_names", req.ModelNames,
+		"context_length", req.ContextLength,
+	)
+	defer endFn()
+
 	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanStream)
 	if err != nil {
+		reportErr(err)
 		return nil, err
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
+		reportErr(err)
 		return nil, err
 	}
 	return provider.GetStreamConnection(ctx, backend)
@@ -312,6 +367,7 @@ func Stream(
 type PromptRequest struct {
 	ModelName     string
 	ProviderTypes []string // Optional. Empty uses default.
+	Tracker       serverops.ActivityTracker
 }
 
 func PromptExecute(
@@ -320,8 +376,23 @@ func PromptExecute(
 	getModels runtimestate.ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMPromptExecClient, error) {
+	tracker := reqExec.Tracker
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	reportErr, _, endFn := tracker.Start(
+		ctx,
+		"resolve",
+		"prompt_model",
+		"model_name", reqExec.ModelName,
+		"provider_types", reqExec.ProviderTypes,
+	)
+	defer endFn()
+
 	if reqExec.ModelName == "" {
-		return nil, fmt.Errorf("model name is required")
+		err := fmt.Errorf("model name is required")
+		reportErr(err)
+		return nil, err
 	}
 	if len(reqExec.ProviderTypes) == 0 {
 		reqExec.ProviderTypes = []string{DefaultProviderType, "vllm"}
@@ -332,10 +403,12 @@ func PromptExecute(
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanPrompt)
 	if err != nil {
+		reportErr(err)
 		return nil, err
 	}
 	provider, backend, err := resolver(candidates)
 	if err != nil {
+		reportErr(err)
 		return nil, err
 	}
 	return provider.GetPromptConnection(ctx, backend)

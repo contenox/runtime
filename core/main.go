@@ -150,7 +150,7 @@ func main() {
 	breakerSettings := libroutine.NewRoutine(3, time.Second*10)
 	triggerChan := make(chan struct{})
 	go breakerSettings.Loop(ctx, time.Second*3, triggerChan, settings.ProcessTick, func(err error) {
-		// log.Printf("error in settings.ProcessTick: %v", err)
+		log.Printf("SERVER Error in settings.ProcessTick: %v", err)
 	})
 	chatManager := chat.New(state, tokenizerSvc, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
