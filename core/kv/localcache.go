@@ -74,12 +74,11 @@ func (r *Config) ProcessTick(ctx context.Context) error {
 	cache := make(map[string]data)
 	now := time.Now().UTC()
 	for _, kv := range kvPairs {
-		r.cache[kv.Key] = data{
+		cache[kv.Key] = data{
 			Value: kv.Value,
 			Added: now,
 		}
 	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

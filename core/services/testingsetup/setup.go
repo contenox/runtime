@@ -439,44 +439,44 @@ type Environment struct {
 }
 
 func (builder *Builder) Build() *Environment {
-	if builder.Err != nil {
-		return &Environment{
-			Ctx:         builder.ctx,
-			state:       nil,
-			dbManager:   nil,
-			cleanups:    nil,
-			Err:         builder.Err,
-			triggerChan: builder.triggerChan,
-			backends:    builder.backends,
-			tracker:     builder.tracker,
-		}
-	}
-	if builder.state == nil {
-		builder.Err = fmt.Errorf("state is nil")
-		return &Environment{
-			Ctx:         builder.ctx,
-			state:       nil,
-			dbManager:   nil,
-			cleanups:    nil,
-			Err:         builder.Err,
-			triggerChan: builder.triggerChan,
-			backends:    builder.backends,
-			tracker:     builder.tracker,
-		}
-	}
-	if builder.dbManager == nil {
-		builder.Err = fmt.Errorf("dbManager is nil")
-		return &Environment{
-			Ctx:         builder.ctx,
-			state:       nil,
-			dbManager:   nil,
-			cleanups:    nil,
-			Err:         builder.Err,
-			triggerChan: builder.triggerChan,
-			backends:    builder.backends,
-			tracker:     builder.tracker,
-		}
-	}
+	// if builder.Err != nil {
+	// 	return &Environment{
+	// 		Ctx:         builder.ctx,
+	// 		state:       nil,
+	// 		dbManager:   nil,
+	// 		cleanups:    nil,
+	// 		Err:         builder.Err,
+	// 		triggerChan: builder.triggerChan,
+	// 		backends:    builder.backends,
+	// 		tracker:     builder.tracker,
+	// 	}
+	// }
+	// if builder.state == nil {
+	// 	builder.Err = fmt.Errorf("state is nil")
+	// 	return &Environment{
+	// 		Ctx:         builder.ctx,
+	// 		state:       nil,
+	// 		dbManager:   nil,
+	// 		cleanups:    nil,
+	// 		Err:         builder.Err,
+	// 		triggerChan: builder.triggerChan,
+	// 		backends:    builder.backends,
+	// 		tracker:     builder.tracker,
+	// 	}
+	// }
+	// if builder.dbManager == nil {
+	// 	builder.Err = fmt.Errorf("dbManager is nil")
+	// 	return &Environment{
+	// 		Ctx:         builder.ctx,
+	// 		state:       nil,
+	// 		dbManager:   nil,
+	// 		cleanups:    nil,
+	// 		Err:         builder.Err,
+	// 		triggerChan: builder.triggerChan,
+	// 		backends:    builder.backends,
+	// 		tracker:     builder.tracker,
+	// 	}
+	// }
 	return &Environment{
 		Ctx:         builder.ctx,
 		state:       builder.state,
