@@ -27,7 +27,6 @@ export default function ChatPage() {
   const [chatId, setChatId] = useState<string | null>(paramChatId || null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState('');
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
   useEffect(() => {
     if (paramChatId) setChatId(paramChatId);
@@ -68,10 +67,6 @@ export default function ChatPage() {
 
     if (selectedProvider) {
       payload.provider = selectedProvider;
-    }
-
-    if (selectedModels.length > 0) {
-      payload.models = selectedModels;
     }
 
     sendMessage(payload);
