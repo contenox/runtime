@@ -27,8 +27,7 @@ type providerManager struct {
 }
 
 type ConfigureRequest struct {
-	APIKey    string `json:"apiKey"`
-	ModelName string `json:"modelName,omitempty"`
+	APIKey string `json:"apiKey"`
 }
 
 type StatusResponse struct {
@@ -51,9 +50,8 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 		}
 
 		cfg := &serverops.ProviderConfig{
-			APIKey:    req.APIKey,
-			ModelName: req.ModelName,
-			Type:      providerType,
+			APIKey: req.APIKey,
+			Type:   providerType,
 		}
 
 		if err := p.providerService.SetProviderConfig(r.Context(), providerType, cfg); err != nil {

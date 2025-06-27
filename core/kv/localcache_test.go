@@ -28,7 +28,7 @@ func testSetup(t *testing.T, prefix string) (context.Context, store.Store, kv.Re
 	return ctx, storeInstance, cache
 }
 
-func TestKV_CacheOperations(t *testing.T) {
+func TestUnitKV_CacheOperations(t *testing.T) {
 	ctx, s, cache := testSetup(t, "")
 
 	t.Run("Empty cache returns not found", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestKV_CacheOperations(t *testing.T) {
 	})
 }
 
-func TestKV_PrefixFiltering(t *testing.T) {
+func TestUnitKV_PrefixFiltering(t *testing.T) {
 	prefix := "prefix-" + uuid.NewString()
 	ctx, s, cache := testSetup(t, prefix)
 
@@ -154,7 +154,7 @@ func TestKV_PrefixFiltering(t *testing.T) {
 	}
 }
 
-func TestKV_Concurrency(t *testing.T) {
+func TestUnitKV_Concurrency(t *testing.T) {
 	ctx, s, cache := testSetup(t, "")
 	key := "concurrent-" + uuid.NewString()
 
@@ -204,7 +204,7 @@ func TestKV_Concurrency(t *testing.T) {
 	})
 }
 
-func TestKV_ErrorHandling(t *testing.T) {
+func TestUnitKV_ErrorHandling(t *testing.T) {
 	ctx, _, cache := testSetup(t, "")
 
 	t.Run("Invalid output type", func(t *testing.T) {

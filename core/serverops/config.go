@@ -15,9 +15,8 @@ const (
 )
 
 type ProviderConfig struct {
-	APIKey    string // TODO: Implement encryption before saving
-	ModelName string
-	Type      string
+	APIKey string // TODO: Implement encryption before saving
+	Type   string
 }
 
 var CoreVersion = "CORE-UNSET-dev"

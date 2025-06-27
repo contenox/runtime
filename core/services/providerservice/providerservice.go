@@ -30,7 +30,7 @@ func (s *service) GetServiceGroup() string {
 
 // GetServiceName implements Service.
 func (s *service) GetServiceName() string {
-	return "provider-service"
+	return "providerservice"
 }
 
 func New(dbInstance libdb.DBManager) Service {

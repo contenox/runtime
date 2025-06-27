@@ -184,19 +184,12 @@ func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, p
 	if err != nil && !errors.Is(err, kv.ErrKeyNotFound) {
 		return nil, 0, 0, "", fmt.Errorf("failed to get openai config %w", err)
 	}
-	providers := []serverops.ProviderConfig{}
-	if openaiConfig.Type != "" {
-		providers = append(providers, *openaiConfig)
-	}
-	if geminiConfig.Type != "" {
-		providers = append(providers, *geminiConfig)
-	}
 	chatClient, model, err := llmresolver.Chat(ctx, llmresolver.Request{
 		ContextLength: inputtokens,
 		ModelNames:    preferredModelNames,
 		ProviderTypes: providerTypes,
 		Tracker:       serverops.NewLogActivityTracker(slog.Default()),
-	}, runtimestate.BetterProviderAdapter(ctx, m.state.Get(ctx), providers...), llmresolver.Randomly)
+	}, runtimestate.LocalProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
 	}

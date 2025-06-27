@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
@@ -331,6 +332,10 @@ func (s *State) processBackend(ctx context.Context, backend *store.Backend, decl
 		s.processOllamaBackend(ctx, backend, declaredModels)
 	case "vllm":
 		s.processVLLMBackend(ctx, backend, declaredModels)
+	case "gemeni":
+		s.processGemeniBackend(ctx, backend, declaredModels)
+	case "openai":
+		s.processOpenAIBackend(ctx, backend, declaredModels)
 	default:
 		brokenService := &LLMState{
 			ID:      backend.ID,
@@ -571,4 +576,162 @@ func (s *State) processVLLMBackend(ctx context.Context, backend *store.Backend, 
 		PulledModels: pulledModels,
 		Backend:      *backend,
 	})
+}
+
+func (s *State) processGemeniBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
+	stateInstance := &LLMState{
+		ID:      backend.ID,
+		Name:    backend.Name,
+		Backend: *backend,
+	}
+
+	// Retrieve API key configuration
+	cfg := serverops.ProviderConfig{}
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	if err := storeInstance.GetKV(ctx, serverops.GeminiKey, &cfg); err != nil {
+		if errors.Is(err, libdb.ErrNotFound) {
+			stateInstance.Error = "API key not configured"
+		} else {
+			stateInstance.Error = fmt.Sprintf("Failed to retrieve API key configuration: %v", err)
+		}
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Prepare HTTP request
+	client := &http.Client{Timeout: 10 * time.Second}
+	reqURL := fmt.Sprintf("%s/v1beta/models?key=%s",
+		strings.TrimSuffix(backend.BaseURL, "/"),
+		url.QueryEscape(cfg.APIKey),
+	)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		stateInstance.Error = fmt.Sprintf("Request creation failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Execute request
+	resp, err := client.Do(req)
+	if err != nil {
+		stateInstance.Error = fmt.Sprintf("HTTP request failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Handle non-200 responses
+	if resp.StatusCode != http.StatusOK {
+		stateInstance.Error = fmt.Sprintf("API returned %d", resp.StatusCode)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Parse response
+	var geminiResponse struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&geminiResponse); err != nil {
+		stateInstance.Error = fmt.Sprintf("Response parsing failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Extract model names
+	modelNames := make([]string, 0, len(models))
+	pulledModels := make([]api.ListModelResponse, 0, len(geminiResponse.Models))
+	for _, m := range models {
+		modelNames = append(modelNames, m.Model)
+	}
+	for _, model := range geminiResponse.Models {
+		pulledModels = append(pulledModels, api.ListModelResponse{
+			Model: model.Name,
+			Name:  model.Name,
+		})
+	}
+
+	// Update state
+	stateInstance.Models = modelNames
+	stateInstance.PulledModels = pulledModels
+	s.state.Store(backend.ID, stateInstance)
+}
+
+func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
+	stateInstance := &LLMState{
+		ID:      backend.ID,
+		Name:    backend.Name,
+		Backend: *backend,
+	}
+
+	// Retrieve API key configuration
+	cfg := serverops.ProviderConfig{}
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	if err := storeInstance.GetKV(ctx, serverops.OpenaiKey, &cfg); err != nil {
+		if errors.Is(err, libdb.ErrNotFound) {
+			stateInstance.Error = "API key not configured"
+		} else {
+			stateInstance.Error = fmt.Sprintf("Failed to retrieve API key configuration: %v", err)
+		}
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Prepare HTTP request
+	client := &http.Client{Timeout: 10 * time.Second}
+	reqURL := strings.TrimSuffix(backend.BaseURL, "/") + "/v1/models"
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		stateInstance.Error = fmt.Sprintf("Request creation failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+
+	// Execute request
+	resp, err := client.Do(req)
+	if err != nil {
+		stateInstance.Error = fmt.Sprintf("HTTP request failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Handle non-200 responses
+	if resp.StatusCode != http.StatusOK {
+		stateInstance.Error = fmt.Sprintf("API returned %d", resp.StatusCode)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Parse response
+	var openAIResponse struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&openAIResponse); err != nil {
+		stateInstance.Error = fmt.Sprintf("Response parsing failed: %v", err)
+		s.state.Store(backend.ID, stateInstance)
+		return
+	}
+
+	// Extract model names
+	modelNames := make([]string, 0, len(models))
+	pulledModels := make([]api.ListModelResponse, 0, len(openAIResponse.Data))
+	for _, m := range models {
+		modelNames = append(modelNames, m.Model)
+	}
+	for _, model := range openAIResponse.Data {
+		pulledModels = append(pulledModels, api.ListModelResponse{
+			Model: model.ID,
+			Name:  model.ID,
+		})
+	}
+
+	// Update state
+	stateInstance.Models = modelNames
+	stateInstance.PulledModels = pulledModels
+	s.state.Store(backend.ID, stateInstance)
 }
