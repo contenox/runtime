@@ -315,6 +315,26 @@ func (s *State) syncBackends(ctx context.Context) error {
 
 // Helper method to process backends and collect their IDs
 func (s *State) processBackends(ctx context.Context, backends []*store.Backend, models []*store.Model, currentIDs map[string]struct{}) {
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	cfg := serverops.ProviderConfig{}
+	if err := storeInstance.GetKV(ctx, serverops.GeminiKey, &cfg); err == nil {
+		backends = append(backends, &store.Backend{
+			ID:      "gemeni",
+			Name:    "gemeni",
+			BaseURL: "https://generativelanguage.googleapis.com",
+			Type:    "gemini",
+		})
+	}
+	cfg = serverops.ProviderConfig{}
+	if err := storeInstance.GetKV(ctx, serverops.OpenaiKey, &cfg); err == nil {
+		backends = append(backends, &store.Backend{
+			ID:      "openai",
+			Name:    "openai",
+			BaseURL: "https://api.openai.com",
+			Type:    "openai",
+		})
+	}
+
 	for _, backend := range backends {
 		currentIDs[backend.ID] = struct{}{}
 		s.processBackend(ctx, backend, models)

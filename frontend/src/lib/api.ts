@@ -146,10 +146,8 @@ export const api = {
     apiFetch<Pool[]>(`/api/model-associations/${modelID}/pools`),
 
   // Add to the api object:
-  configureProvider: (
-    provider: 'openai' | 'gemini',
-    data: { apiKey: string; modelName?: string },
-  ) => apiFetch<StatusResponse>(`/api/providers/${provider}/configure`, options('POST', data)),
+  configureProvider: (provider: 'openai' | 'gemini', data: { apiKey: string }) =>
+    apiFetch<StatusResponse>(`/api/providers/${provider}/configure`, options('POST', data)),
 
   getProviderStatus: (provider: 'openai' | 'gemini') =>
     apiFetch<StatusResponse>(`/api/providers/${provider}/status`),

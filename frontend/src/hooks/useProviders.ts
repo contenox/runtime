@@ -12,7 +12,6 @@ export function useProviderStatus(provider: 'openai' | 'gemini') {
 
 export function useConfigureProvider(provider: 'openai' | 'gemini') {
   return useMutation({
-    mutationFn: (data: { apiKey: string; modelName?: string }) =>
-      api.configureProvider(provider, data),
+    mutationFn: (data: { apiKey: string }) => api.configureProvider(provider, data),
   });
 }

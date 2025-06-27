@@ -10,19 +10,15 @@ type ProviderFormProps = {
 export default function ProviderForm({ provider }: ProviderFormProps) {
   const { t } = useTranslation();
   const [apiKey, setApiKey] = useState('');
-  const [modelName, setModelName] = useState('');
   const { data: status, isLoading, error } = useProviderStatus(provider);
   const configureMutation = useConfigureProvider(provider);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    configureMutation.mutate({ apiKey, modelName });
-  };
 
   return (
     <Form
       title={t('cloud_providers.form_title')}
-      onSubmit={handleSubmit}
+      onSubmit={() => {
+        configureMutation.mutate({ apiKey });
+      }}
       actions={
         <Button type="submit" variant="primary" disabled={configureMutation.isPending}>
           {configureMutation.isPending
@@ -39,14 +35,6 @@ export default function ProviderForm({ provider }: ProviderFormProps) {
           value={apiKey}
           onChange={e => setApiKey(e.target.value)}
           placeholder={t('cloud_providers.api_key_placeholder')}
-        />
-      </FormField>
-
-      <FormField label={t('cloud_providers.model_name')}>
-        <Input
-          value={modelName}
-          onChange={e => setModelName(e.target.value)}
-          placeholder={t('cloud_providers.model_name_placeholder')}
         />
       </FormField>
 
