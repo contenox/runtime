@@ -38,7 +38,7 @@ func (c *geminiPromptClient) Prompt(ctx context.Context, prompt string) (string,
 		},
 	}
 
-	endpoint := fmt.Sprintf("/models/%s:generateContent", c.modelName)
+	endpoint := fmt.Sprintf("/v1beta/models/%s:generateContent", c.modelName)
 	var response geminiGenerateContentResponse
 	if err := c.sendRequest(ctx, endpoint, request, &response); err != nil {
 		return "", err
@@ -52,7 +52,7 @@ func (c *geminiPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	if len(candidate.Content.Parts) == 0 || candidate.Content.Parts[0].Text == "" {
 		// Check for specific finish reasons for more informative errors
 		if len(candidate.FinishReason) > 0 {
-			return "", fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, candidate.FinishReason[0])
+			return "", fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %v", c.modelName, candidate.FinishReason)
 		}
 		return "", fmt.Errorf("empty content from model %s", c.modelName)
 	}
@@ -74,7 +74,7 @@ func (c *geminiChatClient) Chat(ctx context.Context, messages []Message, options
 		},
 	}
 
-	endpoint := fmt.Sprintf("/models/%s:generateContent", c.modelName)
+	endpoint := fmt.Sprintf("/v1beta/models/%s:generateContent", c.modelName)
 	var response geminiGenerateContentResponse
 	if err := c.sendRequest(ctx, endpoint, request, &response); err != nil {
 		return Message{}, err
@@ -87,12 +87,12 @@ func (c *geminiChatClient) Chat(ctx context.Context, messages []Message, options
 	candidate := response.Candidates[0]
 	if len(candidate.Content.Parts) == 0 || candidate.Content.Parts[0].Text == "" {
 		if len(candidate.FinishReason) > 0 {
-			return Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %s", c.modelName, candidate.FinishReason[0])
+			return Message{}, fmt.Errorf("empty content from model %s despite normal completion. Finish reason: %v", c.modelName, candidate.FinishReason)
 		}
 		return Message{}, fmt.Errorf("empty content from model %s", c.modelName)
 	}
 
-	return Message{Role: "model", Content: candidate.Content.Parts[0].Text}, nil
+	return Message{Role: "assistant", Content: candidate.Content.Parts[0].Text}, nil
 }
 
 // geminiEmbedClient implements serverops.LLMEmbedClient
@@ -108,7 +108,7 @@ func (c *geminiEmbedClient) Embed(ctx context.Context, prompt string) ([]float64
 		},
 	}
 
-	endpoint := fmt.Sprintf("/models/%s:embedContent", c.modelName)
+	endpoint := fmt.Sprintf("/v1beta/models/%s:embedContent", c.modelName)
 	var response geminiEmbedContentResponse
 	if err := c.sendRequest(ctx, endpoint, request, &response); err != nil {
 		return nil, err

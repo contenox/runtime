@@ -201,6 +201,7 @@ func (s *State) Get(ctx context.Context) map[string]LLMState {
 		if err != nil {
 			// log.Printf("failed to unmarshal backend: %v", err)
 		}
+		backendCopy.apiKey = backend.apiKey
 		state[backend.ID] = backendCopy
 		return true
 	})

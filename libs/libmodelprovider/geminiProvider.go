@@ -26,7 +26,7 @@ func NewGeminiProvider(apiKey string, modelName string, baseURLs []string, httpC
 		httpClient = http.DefaultClient
 	}
 	if len(baseURLs) == 0 {
-		baseURLs = []string{"https://generativelanguage.googleapis.com/v1"}
+		baseURLs = []string{"https://generativelanguage.googleapis.com"}
 	}
 	var canChat, canPrompt, canEmbed, canStream bool
 	contextLength := 32768
@@ -43,7 +43,7 @@ func NewGeminiProvider(apiKey string, modelName string, baseURLs []string, httpC
 	return &GeminiProvider{
 		id:            id,
 		apiKey:        apiKey,
-		modelName:     "gemini-2.5-flash",
+		modelName:     "gemini-2.5-flash", // we always use the same model for now
 		baseURL:       apiBaseURL,
 		httpClient:    httpClient,
 		contextLength: contextLength,
@@ -189,7 +189,7 @@ type geminiTool struct {
 type geminiGenerateContentResponse struct {
 	Candidates []struct {
 		Content          geminiContent         `json:"content"`
-		FinishReason     []string              `json:"finishReason,omitempty"`
+		FinishReason     string                `json:"finishReason,omitempty"`
 		SafetyRatings    []geminiSafetySetting `json:"safetyRatings,omitempty"`
 		CitationMetadata *struct {
 			Citations []struct {
@@ -223,7 +223,7 @@ func convertToGeminiMessages(messages []Message) []geminiContent {
 	for i, msg := range messages {
 		// Gemini API expects "user" and "model" roles
 		role := msg.Role
-		if role == "assistant" { // TODO: convert common 'assistant' role to 'model'
+		if role == "assistant" {
 			role = "model"
 		}
 		geminiMsgs[i] = geminiContent{

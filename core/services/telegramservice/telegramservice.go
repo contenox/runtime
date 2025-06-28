@@ -21,6 +21,7 @@ var (
 	JobTypeTelegram                string = "telegram"
 	JobTypeTelegramWorkerOffsetKey string = "telegram-worker-offset-key"
 	DefaultLeaseDuration                  = 30 * time.Second
+	provider                       string = "gemini"
 )
 
 type Worker interface {
@@ -252,6 +253,7 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 
 	chain := tasksrecipes.BuildChatChain(tasksrecipes.BuildChatChainReq{
 		SubjectID: subjID,
+		Provider:  provider,
 	})
 	result, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)
 	if err != nil {

@@ -19,6 +19,20 @@ type ProviderConfig struct {
 	Type   string
 }
 
+func (pc ProviderConfig) MarshalJSON() ([]byte, error) {
+	type Alias ProviderConfig
+
+	maskedConfig := struct {
+		APIKey string `json:"APIKey"`
+		Type   string `json:"Type"`
+	}{
+		APIKey: "********",
+		Type:   pc.Type,
+	}
+
+	return json.Marshal(maskedConfig)
+}
+
 var CoreVersion = "CORE-UNSET-dev"
 
 const (
