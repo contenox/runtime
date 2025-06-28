@@ -58,14 +58,16 @@
 - [x] **OpenAI driver Integration**
 - [x] **Gemeni driver Integration**
 - [ ] **Persona Chat Application Packaging**
-- [ ] **Release Processes**
-- [ ] **Observability Integration**
-- [ ] **Release Infrastructure Setup**
-- [ ] **API Rate Limiting Middleware**
 - [ ] **Package a Persona-Chat Application**
+- [x] **Release Processes**
+- [ ] **Observability Integration**
+- [ ] **API Rate Limiting Middleware**
+- [x] **Release Infrastructure Setup**
 - [x] **Telegram bot integrations**
 - [x] **Simple OpenAI SDK compatible chat endpoint**
 - [x] **vLLM Integration**
+
+Note: Formal release processes are not part of the MVP as they will be implemented in the re-architecture phase.
 
 ---
 
