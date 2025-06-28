@@ -315,26 +315,6 @@ func (s *State) syncBackends(ctx context.Context) error {
 
 // Helper method to process backends and collect their IDs
 func (s *State) processBackends(ctx context.Context, backends []*store.Backend, models []*store.Model, currentIDs map[string]struct{}) {
-	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	cfg := serverops.ProviderConfig{}
-	if err := storeInstance.GetKV(ctx, serverops.GeminiKey, &cfg); err == nil {
-		backends = append(backends, &store.Backend{
-			ID:      "gemeni",
-			Name:    "gemeni",
-			BaseURL: "https://generativelanguage.googleapis.com",
-			Type:    "gemini",
-		})
-	}
-	cfg = serverops.ProviderConfig{}
-	if err := storeInstance.GetKV(ctx, serverops.OpenaiKey, &cfg); err == nil {
-		backends = append(backends, &store.Backend{
-			ID:      "openai",
-			Name:    "openai",
-			BaseURL: "https://api.openai.com",
-			Type:    "openai",
-		})
-	}
-
 	for _, backend := range backends {
 		currentIDs[backend.ID] = struct{}{}
 		s.processBackend(ctx, backend, models)
@@ -352,8 +332,8 @@ func (s *State) processBackend(ctx context.Context, backend *store.Backend, decl
 		s.processOllamaBackend(ctx, backend, declaredModels)
 	case "vllm":
 		s.processVLLMBackend(ctx, backend, declaredModels)
-	case "gemeni":
-		s.processGemeniBackend(ctx, backend, declaredModels)
+	case "gemini":
+		s.processGeminiBackend(ctx, backend, declaredModels)
 	case "openai":
 		s.processOpenAIBackend(ctx, backend, declaredModels)
 	default:
@@ -598,7 +578,7 @@ func (s *State) processVLLMBackend(ctx context.Context, backend *store.Backend, 
 	})
 }
 
-func (s *State) processGemeniBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
+func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
 	stateInstance := &LLMState{
 		ID:      backend.ID,
 		Name:    backend.Name,
