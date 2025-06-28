@@ -21,7 +21,7 @@ type OpenAIProvider struct {
 	canStream     bool
 }
 
-func NewOpenAIProvider(apiKey, modelName string, httpClient *http.Client) (*OpenAIProvider, error) {
+func NewOpenAIProvider(apiKey, modelName string, backendURLs []string, httpClient *http.Client) *OpenAIProvider {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -40,12 +40,14 @@ func NewOpenAIProvider(apiKey, modelName string, httpClient *http.Client) (*Open
 	promptModels := map[string]bool{
 		"gpt-3.5-turbo-instruct": true,
 	}
-
+	if len(backendURLs) == 0 {
+		backendURLs = []string{"https://api.openai.com/v1"}
+	}
 	provider := &OpenAIProvider{
 		id:            "openai",
 		apiKey:        apiKey,
 		modelName:     modelName,
-		baseURL:       "https://api.openai.com/v1",
+		baseURL:       backendURLs[0],
 		httpClient:    httpClient,
 		contextLength: 8192,
 		canChat:       chatModels[modelName],
@@ -65,7 +67,7 @@ func NewOpenAIProvider(apiKey, modelName string, httpClient *http.Client) (*Open
 		provider.contextLength = 8192
 	}
 
-	return provider, nil
+	return provider
 }
 
 func (p *OpenAIProvider) GetBackendIDs() []string {

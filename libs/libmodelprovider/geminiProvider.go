@@ -21,46 +21,29 @@ type GeminiProvider struct {
 	canStream     bool
 }
 
-func NewGeminiProvider(apiKey, modelName string, httpClient *http.Client) (*GeminiProvider, error) {
+func NewGeminiProvider(apiKey string, modelName string, baseURLs []string, httpClient *http.Client) *GeminiProvider {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
-
+	if len(baseURLs) == 0 {
+		baseURLs = []string{"https://generativelanguage.googleapis.com/v1"}
+	}
 	var canChat, canPrompt, canEmbed, canStream bool
 	contextLength := 32768
-	apiBaseURL := "https://generativelanguage.googleapis.com/v1"
+	apiBaseURL := baseURLs[0]
 
 	switch modelName {
-	case "gemini-pro":
-		canChat = true
-		canPrompt = true
-		canStream = true
-		contextLength = 32768
-	case "gemini-pro-vision":
-		canChat = true
-		canPrompt = true
-		canStream = true
-		// Note: context length for multimodal models is more complex (image tokens)
-		contextLength = 4096
-	case "gemini-flash":
-		canChat = true
-		canPrompt = true
-		canStream = true
-		contextLength = 32768
-	case "embedding-001":
-		canEmbed = true
-		contextLength = 2048
-	case "text-embedding-004":
-		canEmbed = true
-		contextLength = 3072
 	default:
-		return nil, fmt.Errorf("unsupported Gemini model: %s", modelName)
+		canChat = true
+		canPrompt = true
+		canStream = true
+		contextLength = 32768
 	}
 	id := fmt.Sprintf("gemini-%s", modelName)
 	return &GeminiProvider{
 		id:            id,
 		apiKey:        apiKey,
-		modelName:     modelName,
+		modelName:     "gemini-2.5-flash",
 		baseURL:       apiBaseURL,
 		httpClient:    httpClient,
 		contextLength: contextLength,
@@ -68,7 +51,7 @@ func NewGeminiProvider(apiKey, modelName string, httpClient *http.Client) (*Gemi
 		canPrompt:     canPrompt,
 		canEmbed:      canEmbed,
 		canStream:     canStream,
-	}, nil
+	}
 }
 
 func (p *GeminiProvider) GetBackendIDs() []string {
@@ -111,11 +94,11 @@ func (p *GeminiProvider) GetChatConnection(ctx context.Context, backendID string
 	}
 	return &geminiChatClient{
 		geminiClient: geminiClient{
-			apiKey:     p.apiKey,
 			modelName:  p.modelName,
 			baseURL:    p.baseURL,
 			httpClient: p.httpClient,
 			maxTokens:  p.contextLength, // Max output tokens derived from context length
+			apiKey:     p.apiKey,
 		},
 	}, nil
 }
@@ -127,11 +110,11 @@ func (p *GeminiProvider) GetPromptConnection(ctx context.Context, backendID stri
 	}
 	return &geminiPromptClient{
 		geminiClient: geminiClient{
-			apiKey:     p.apiKey,
 			modelName:  p.modelName,
 			baseURL:    p.baseURL,
 			httpClient: p.httpClient,
 			maxTokens:  p.contextLength,
+			apiKey:     p.apiKey,
 		},
 	}, nil
 }
@@ -143,10 +126,10 @@ func (p *GeminiProvider) GetEmbedConnection(ctx context.Context, backendID strin
 	}
 	return &geminiEmbedClient{
 		geminiClient: geminiClient{
-			apiKey:     p.apiKey,
 			modelName:  p.modelName,
 			baseURL:    p.baseURL,
 			httpClient: p.httpClient,
+			apiKey:     p.apiKey,
 		},
 	}, nil
 }
@@ -158,11 +141,11 @@ func (p *GeminiProvider) GetStreamConnection(ctx context.Context, backendID stri
 	}
 	return &geminiStreamClient{
 		geminiClient: geminiClient{
-			apiKey:     p.apiKey,
 			modelName:  p.modelName,
 			baseURL:    p.baseURL,
 			httpClient: p.httpClient,
 			maxTokens:  p.contextLength,
+			apiKey:     p.apiKey,
 		},
 	}, nil
 }

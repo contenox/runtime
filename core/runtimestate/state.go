@@ -32,6 +32,12 @@ type LLMState struct {
 	// Error stores a description of the last encountered error when
 	// interacting with or reconciling this backend's state, if any.
 	Error string `json:"error,omitempty"`
+	// APIKey stores the API key used for authentication with the backend.
+	apiKey string
+}
+
+func (s *LLMState) GetAPIKey() string {
+	return s.apiKey
 }
 
 // State manages the overall runtime status of multiple LLM backends.
@@ -578,11 +584,12 @@ func (s *State) processVLLMBackend(ctx context.Context, backend *store.Backend, 
 	})
 }
 
-func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
+func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend, _ []*store.Model) {
 	stateInstance := &LLMState{
 		ID:      backend.ID,
 		Name:    backend.Name,
 		Backend: *backend,
+		apiKey:  "",
 	}
 
 	// Retrieve API key configuration
@@ -638,12 +645,14 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
-
-	// Extract model names
-	modelNames := make([]string, 0, len(models))
+	modelNames := make([]string, 0, len(geminiResponse.Models))
 	pulledModels := make([]api.ListModelResponse, 0, len(geminiResponse.Models))
-	for _, m := range models {
-		modelNames = append(modelNames, m.Model)
+	for _, m := range geminiResponse.Models {
+		modelNames = append(modelNames, m.Name)
+		pulledModels = append(pulledModels, api.ListModelResponse{
+			Name:  m.Name,
+			Model: m.Name,
+		})
 	}
 	for _, model := range geminiResponse.Models {
 		pulledModels = append(pulledModels, api.ListModelResponse{
@@ -655,10 +664,11 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 	// Update state
 	stateInstance.Models = modelNames
 	stateInstance.PulledModels = pulledModels
+	stateInstance.apiKey = cfg.APIKey
 	s.state.Store(backend.ID, stateInstance)
 }
 
-func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend, models []*store.Model) {
+func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend, _ []*store.Model) {
 	stateInstance := &LLMState{
 		ID:      backend.ID,
 		Name:    backend.Name,
@@ -718,10 +728,10 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend
 	}
 
 	// Extract model names
-	modelNames := make([]string, 0, len(models))
+	modelNames := make([]string, 0, len(openAIResponse.Data))
 	pulledModels := make([]api.ListModelResponse, 0, len(openAIResponse.Data))
-	for _, m := range models {
-		modelNames = append(modelNames, m.Model)
+	for _, m := range openAIResponse.Data {
+		modelNames = append(modelNames, m.ID)
 	}
 	for _, model := range openAIResponse.Data {
 		pulledModels = append(pulledModels, api.ListModelResponse{
@@ -733,5 +743,6 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend
 	// Update state
 	stateInstance.Models = modelNames
 	stateInstance.PulledModels = pulledModels
+	stateInstance.apiKey = cfg.APIKey
 	s.state.Store(backend.ID, stateInstance)
 }

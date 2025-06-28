@@ -38,7 +38,11 @@ func New(dbInstance libdb.DBManager) Service {
 }
 
 func (s *service) SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error {
-	tx := s.dbInstance.WithoutTransaction()
+	tx, com, r, err := s.dbInstance.WithTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer r()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
@@ -55,7 +59,31 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, co
 	if err != nil {
 		return err
 	}
-	return storeInstance.SetKV(ctx, key, data)
+	err = storeInstance.SetKV(ctx, key, data)
+	if err != nil {
+		return err
+	}
+	backendUrl := ""
+	if providerType == "openai" {
+		backendUrl = "https://api.openai.com/v1"
+	}
+	if providerType == "gemini" {
+		backendUrl = "https://generativelanguage.googleapis.com"
+	}
+	err = storeInstance.CreateBackend(ctx, &store.Backend{
+		ID:      providerType,
+		Name:    providerType,
+		BaseURL: backendUrl,
+		Type:    providerType,
+	})
+	if err != nil {
+		return err
+	}
+	err = com(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {
