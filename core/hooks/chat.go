@@ -27,7 +27,7 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 		"convert_openai_to_history",
 		"append_system_message",
 		"execute_model_on_messages",
-		"persist_input_output",
+		"persist_messages",
 		"convert_history_to_openai",
 	}, nil
 }
@@ -54,7 +54,7 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 		return h.ChatExec, nil
 	case "convert_history_to_openai":
 		return h.ConvertToOpenAIResponse, nil
-	case "persist_input_output":
+	case "persist_messages":
 		return h.PersistMessages, nil
 	default:
 		return nil, fmt.Errorf("unknown hook: %s", name)

@@ -105,7 +105,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 						{
 							Operator: "equals",
 							When:     "echo",
-							Goto:     "persist_input_output",
+							Goto:     "persist_messages",
 						},
 					},
 				},
@@ -116,7 +116,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Type:        taskengine.Hook,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_input_output"},
+						{Operator: "default", Goto: "persist_messages"},
 					},
 				},
 				Hook: &taskengine.HookCall{
@@ -129,11 +129,11 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
-				ID:          "persist_input_output",
+				ID:          "persist_messages",
 				Description: "Persist the conversation",
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
-					Type: "persist_input_output",
+					Type: "persist_messages",
 					Args: map[string]string{
 						"subject_id": req.SubjectID,
 					},

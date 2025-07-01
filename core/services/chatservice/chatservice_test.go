@@ -55,7 +55,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		"command_router":            hookMux,
 		"append_user_message":       chatHook,
 		"execute_model_on_messages": chatHook,
-		"persist_input_output":      chatHook,
+		"persist_messages":          chatHook,
 	})
 
 	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks)

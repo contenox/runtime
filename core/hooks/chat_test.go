@@ -105,7 +105,7 @@ func TestSystemChatHooks(t *testing.T) {
 		require.NotEmpty(t, updatedMessages[1].Content)
 
 		hookCall = &taskengine.HookCall{
-			Type: "persist_input_output",
+			Type: "persist_messages",
 			Args: map[string]string{"subject_id": subjectID},
 		}
 

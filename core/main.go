@@ -179,7 +179,7 @@ func main() {
 		"convert_history_to_openai": chatHook,
 		"append_system_message":     chatHook,
 		"execute_model_on_messages": chatHook,
-		"persist_input_output":      chatHook,
+		"persist_messages":          chatHook,
 	})
 	exec, err := taskengine.NewExec(ctx, execRepo, hooks)
 	if err != nil {
