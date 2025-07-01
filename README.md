@@ -24,9 +24,7 @@ Secondary aim of the MVP is to demonstrate the capacity and performance of the s
 
 ---
 
-## 🔌 Architecture Overview
-
-This MVP combines several technologies and architectural patterns to deliver these capabilities.
+## 🔌 Architecture
 
 | Layer | Technology |
 |-------|------------|
@@ -45,11 +43,9 @@ Key components include:
 - **RAG Pipeline**: Document parsing → embedding → vector storage → retrieval.
 - **Security Model**: JWT tokens, BFF pattern, access control.
 
-The architecture is intentionally modular, allowing for future separation into microservices and standalone tools.
-
 ---
 
-## 🛠️ Developer Experience
+## 🛠️ Development
 
 This project includes tooling and structure to help developers explore and extend the system.
 
@@ -65,6 +61,6 @@ make run       # Start all services
 make ui-run    # Run frontend dev server
 ```
 
-Access the UI at `http://localhost:8080` and register as `admin@admin.com`.
+Access the UI at `http://localhost:8081` and register as `admin@admin.com`.
 
 ---

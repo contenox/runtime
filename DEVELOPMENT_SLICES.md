@@ -44,7 +44,7 @@
 
 ---
 
-### 📅 June 2025 – Packaging a Chat Application
+### 📅 June 2025 – Taskengine & core
 
 #### Goals:
 - Package a chat application with persona support
@@ -57,17 +57,21 @@
 - [x] **Registration Route for Persona Chat Users**
 - [x] **OpenAI driver Integration**
 - [x] **Gemeni driver Integration**
-- [ ] **Persona Chat Application Packaging**
-- [ ] **Package a Persona-Chat Application**
 - [x] **Release Processes**
-- [ ] **Observability Integration**
-- [ ] **API Rate Limiting Middleware**
 - [x] **Release Infrastructure Setup**
 - [x] **Telegram bot integrations**
 - [x] **Simple OpenAI SDK compatible chat endpoint**
 - [x] **vLLM Integration**
 
-Note: Formal release processes are not part of the MVP as they will be implemented in the re-architecture phase.
+Notes:
+- Formal release processes are not part of the MVP as they will be implemented in the re-architecture phase.
+- Packaging the platform as a Application for Persona based chat was moved to the next cycle.
+
+### 📅 July 2025 – Building a demo application
+- [ ] **Persona Chat Application Packaging**
+- [ ] **Package a Persona-Chat Application**
+- [ ] **Observability Integration**
+- [ ] **API Rate Limiting Middleware**
 
 ---
 
@@ -87,3 +91,4 @@ Note: Formal release processes are not part of the MVP as they will be implement
 - Multiple Telegram-Bot integrations via UI
 - Adding userdefined frontend-connectors
 - Adding a way to upload tasks to attach them to connectors
+- Sticky session routing policy
