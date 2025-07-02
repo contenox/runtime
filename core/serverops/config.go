@@ -15,7 +15,7 @@ const (
 )
 
 type ProviderConfig struct {
-	APIKey string // TODO: Implement encryption before saving
+	APIKey string
 	Type   string
 }
 
@@ -26,7 +26,7 @@ func (pc ProviderConfig) MarshalJSON() ([]byte, error) {
 		APIKey string `json:"APIKey"`
 		Type   string `json:"Type"`
 	}{
-		APIKey: "********",
+		APIKey: pc.APIKey, // TODO: Implement encryption here
 		Type:   pc.Type,
 	}
 

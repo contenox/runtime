@@ -609,9 +609,8 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 
 	// Prepare HTTP request
 	client := &http.Client{Timeout: 10 * time.Second}
-	reqURL := fmt.Sprintf("%s/v1beta/models?key=%s",
-		strings.TrimSuffix(backend.BaseURL, "/"),
-		url.QueryEscape(cfg.APIKey),
+	reqURL := fmt.Sprintf("%s/v1beta/models",
+		backend.BaseURL,
 	)
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
@@ -620,6 +619,7 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 		return
 	}
 
+	req.Header.Set("X-Goog-Api-Key", cfg.APIKey)
 	// Execute request
 	resp, err := client.Do(req)
 	if err != nil {

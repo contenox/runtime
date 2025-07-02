@@ -129,7 +129,7 @@ func (c *geminiStreamClient) Stream(ctx context.Context, prompt string) (<-chan 
 }
 
 func (c *geminiClient) sendRequest(ctx context.Context, endpoint string, request any, response any) error {
-	fullURL := fmt.Sprintf("%s%s?key=%s", c.baseURL, endpoint, c.apiKey)
+	fullURL := fmt.Sprintf("%s%s", c.baseURL, endpoint)
 
 	var reqBody io.Reader
 	if request != nil {
@@ -145,6 +145,7 @@ func (c *geminiClient) sendRequest(ctx context.Context, endpoint string, request
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
