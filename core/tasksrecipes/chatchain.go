@@ -95,7 +95,10 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
 					Type: "preappend_message_to_history",
-					Args: map[string]string{},
+					Args: map[string]string{
+						"role":    "system",
+						"message": "You are a helpful assistant. Part of a larger system named \"contenox\".",
+					},
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{

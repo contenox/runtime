@@ -294,10 +294,12 @@ type Store interface {
 	UpdateFile(ctx context.Context, file *File) error
 	DeleteFile(ctx context.Context, id string) error
 	ListFiles(ctx context.Context) ([]string, error)
+
 	EstimateFileCount(ctx context.Context) (int64, error)
 	EnforceMaxFileCount(ctx context.Context, maxCount int64) error
 
 	SetKV(ctx context.Context, key string, value json.RawMessage) error
+	UpdateKV(ctx context.Context, key string, value json.RawMessage) error
 	GetKV(ctx context.Context, key string, out interface{}) error
 	DeleteKV(ctx context.Context, key string) error
 	ListKV(ctx context.Context) ([]*KV, error)

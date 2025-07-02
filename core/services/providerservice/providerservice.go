@@ -3,6 +3,7 @@ package providerservice
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -11,7 +12,7 @@ import (
 )
 
 type Service interface {
-	SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error
+	SetProviderConfig(ctx context.Context, providerType string, upsert bool, config *serverops.ProviderConfig) error
 	GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error)
 	DeleteProviderConfig(ctx context.Context, providerType string) error
 	ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error)
@@ -37,7 +38,7 @@ func New(dbInstance libdb.DBManager) Service {
 	return &service{dbInstance: dbInstance}
 }
 
-func (s *service) SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error {
+func (s *service) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
 	tx, com, r, err := s.dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return err
@@ -59,7 +60,23 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, co
 	if err != nil {
 		return err
 	}
-	err = storeInstance.SetKV(ctx, key, data)
+	dbOp := func(ctx context.Context, key string, value json.RawMessage) error {
+		return storeInstance.SetKV(ctx, key, value)
+	}
+	if replace {
+		dbOp = func(ctx context.Context, key string, value json.RawMessage) error {
+			var lConfig *serverops.ProviderConfig
+			err := storeInstance.GetKV(ctx, key, lConfig)
+			if errors.Is(err, libdb.ErrNotFound) {
+				return storeInstance.SetKV(ctx, key, value)
+			}
+			if err != nil {
+				return err
+			}
+			return storeInstance.UpdateKV(ctx, key, value)
+		}
+	}
+	err = dbOp(ctx, key, data)
 	if err != nil {
 		return err
 	}

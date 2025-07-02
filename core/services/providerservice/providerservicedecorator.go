@@ -11,20 +11,24 @@ type activityTrackerDecorator struct {
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, providerType string, config *serverops.ProviderConfig) error {
+func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"set",
 		"provider_config",
 		"provider_type", providerType,
+		"replace", replace,
 	)
 	defer endFn()
 
-	err := d.service.SetProviderConfig(ctx, providerType, config)
+	err := d.service.SetProviderConfig(ctx, providerType, replace, config)
 	if err != nil {
 		reportErrFn(err)
 	} else {
-		reportChangeFn(providerType, config)
+		var configMasked serverops.ProviderConfig
+		configMasked.Type = config.Type
+		configMasked.APIKey = "********"
+		reportChangeFn(providerType, configMasked)
 	}
 
 	return err

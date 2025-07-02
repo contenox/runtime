@@ -19,7 +19,6 @@ export type SearchResult = {
 
 export type StatusResponse = {
   configured: boolean;
-  updatedAt: string;
   provider: string;
 };
 

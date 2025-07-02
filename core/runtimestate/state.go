@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -628,9 +629,14 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 	}
 	defer resp.Body.Close()
 
-	// Handle non-200 responses
+	// Handle non-200 responses and read body for debugging
 	if resp.StatusCode != http.StatusOK {
-		stateInstance.Error = fmt.Sprintf("API returned %d", resp.StatusCode)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if readErr != nil {
+			bodyStr = fmt.Sprintf("<failed to read body: %v>", readErr)
+		}
+		stateInstance.Error = fmt.Sprintf("API returned %d: %s", resp.StatusCode, bodyStr)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -642,10 +648,16 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 		} `json:"models"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&geminiResponse); err != nil {
-		stateInstance.Error = fmt.Sprintf("Response parsing failed: %v", err)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		bodyStr := string(bodyBytes)
+		if readErr != nil {
+			bodyStr = fmt.Sprintf("<failed to read body: %v>", readErr)
+		}
+		stateInstance.Error = fmt.Sprintf("Response parsing failed: %v | Raw response: %s", err, bodyStr)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
+
 	modelNames := make([]string, 0, len(geminiResponse.Models))
 	pulledModels := make([]api.ListModelResponse, 0, len(geminiResponse.Models))
 	for _, m := range geminiResponse.Models {
@@ -653,12 +665,6 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 		pulledModels = append(pulledModels, api.ListModelResponse{
 			Name:  m.Name,
 			Model: m.Name,
-		})
-	}
-	for _, model := range geminiResponse.Models {
-		pulledModels = append(pulledModels, api.ListModelResponse{
-			Model: model.Name,
-			Name:  model.Name,
 		})
 	}
 

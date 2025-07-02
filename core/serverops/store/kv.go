@@ -27,6 +27,24 @@ func (s *store) SetKV(ctx context.Context, key string, value json.RawMessage) er
 	return err
 }
 
+func (s *store) UpdateKV(ctx context.Context, key string, value json.RawMessage) error {
+	now := time.Now().UTC()
+
+	result, err := s.Exec.ExecContext(ctx, `
+        UPDATE kv
+        SET value = $2, updated_at = $3
+        WHERE key = $1`,
+		key,
+		value,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update key-value pair: %w", err)
+	}
+
+	return checkRowsAffected(result)
+}
+
 func (s *store) GetKV(ctx context.Context, key string, out interface{}) error {
 	var kv KV
 	err := s.Exec.QueryRowContext(ctx, `

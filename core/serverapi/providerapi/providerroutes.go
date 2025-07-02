@@ -28,6 +28,7 @@ type providerManager struct {
 
 type ConfigureRequest struct {
 	APIKey string `json:"apiKey"`
+	Upsert bool   `json:"upsert"`
 }
 
 type StatusResponse struct {
@@ -54,7 +55,7 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 			Type:   providerType,
 		}
 
-		if err := p.providerService.SetProviderConfig(r.Context(), providerType, cfg); err != nil {
+		if err := p.providerService.SetProviderConfig(r.Context(), providerType, req.Upsert, cfg); err != nil {
 			_ = serverops.Error(w, r, err, serverops.CreateOperation)
 			return
 		}

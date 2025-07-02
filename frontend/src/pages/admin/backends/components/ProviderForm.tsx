@@ -17,7 +17,7 @@ export default function ProviderForm({ provider }: ProviderFormProps) {
     <Form
       title={t('cloud_providers.form_title')}
       onSubmit={() => {
-        configureMutation.mutate({ apiKey });
+        configureMutation.mutate({ apiKey, upsert: true });
       }}
       actions={
         <Button type="submit" variant="primary" disabled={configureMutation.isPending}>
@@ -42,9 +42,7 @@ export default function ProviderForm({ provider }: ProviderFormProps) {
         <Panel variant={status.configured ? 'flat' : 'flat'}>
           {' '}
           {status.configured
-            ? t('cloud_providers.status_configured', {
-                updatedAt: new Date(status.updatedAt).toLocaleString(),
-              })
+            ? t('cloud_providers.status_configured')
             : t('cloud_providers.status_not_configured')}
         </Panel>
       )}

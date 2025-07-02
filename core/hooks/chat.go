@@ -24,7 +24,7 @@ type Chat struct {
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		"append_user_message",
-		"prepended_message",
+		"preappend_message_to_history",
 		"convert_openai_to_history",
 		"append_system_message",
 		"execute_model_on_messages",
