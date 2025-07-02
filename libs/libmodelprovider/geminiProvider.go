@@ -150,23 +150,35 @@ func (p *GeminiProvider) GetStreamConnection(ctx context.Context, backendID stri
 	}, nil
 }
 
+// geminiPart represents a part of the content, typically text.
 type geminiPart struct {
 	Text string `json:"text,omitempty"`
 	// TODO: for multimodal inputs, other fields like inlineData, fileData would go here
 }
 
+// geminiContent represents a conversational turn with a role and parts.
 type geminiContent struct {
-	Role  string       `json:"role"` // TODO: "user" or "model"
+	Role  string       `json:"role"` // "user" or "model"
 	Parts []geminiPart `json:"parts"`
 }
 
-type geminiGenerateContentRequest struct {
-	Contents         []geminiContent         `json:"contents"`
-	GenerationConfig *geminiGenerationConfig `json:"generationConfig,omitempty"`
-	SafetySettings   []geminiSafetySetting   `json:"safetySettings,omitempty"`
-	Tools            []geminiTool            `json:"tools,omitempty"`
+// geminiSystemInstruction represents the system-level instructions for the model.
+type geminiSystemInstruction struct {
+	Parts []geminiPart `json:"parts"`
 }
 
+// geminiGenerateContentRequest is the request payload for the Gemini generateContent API.
+type geminiGenerateContentRequest struct {
+	// SystemInstruction provides instructions to the model that apply to the entire request.
+	// This is separate from the conversational turns in 'Contents'.
+	SystemInstruction *geminiSystemInstruction `json:"system_instruction,omitempty"`
+	Contents          []geminiContent          `json:"contents"`
+	GenerationConfig  *geminiGenerationConfig  `json:"generationConfig,omitempty"`
+	SafetySettings    []geminiSafetySetting    `json:"safetySettings,omitempty"`
+	Tools             []geminiTool             `json:"tools,omitempty"`
+}
+
+// geminiGenerationConfig defines parameters for text generation.
 type geminiGenerationConfig struct {
 	Temperature     float64  `json:"temperature,omitempty"`
 	TopP            float64  `json:"topP,omitempty"`
@@ -176,11 +188,13 @@ type geminiGenerationConfig struct {
 	StopSequences   []string `json:"stopSequences,omitempty"`
 }
 
+// geminiSafetySetting defines safety categories and their thresholds.
 type geminiSafetySetting struct {
 	Category  string `json:"category"`
 	Threshold string `json:"threshold"`
 }
 
+// geminiTool defines tools (e.g., function declarations) that the model can use.
 type geminiTool struct {
 	FunctionDeclarations []any `json:"functionDeclarations"`
 }
@@ -207,29 +221,41 @@ type geminiGenerateContentResponse struct {
 	}
 }
 
+// geminiEmbedContentRequest is the request payload for the Gemini embedContent API.
 type geminiEmbedContentRequest struct {
 	Model   string        `json:"model"`
 	Content geminiContent `json:"content"`
 }
 
+// geminiEmbedContentResponse is the response payload for the Gemini embedContent API.
 type geminiEmbedContentResponse struct {
 	Embedding struct {
 		Values []float64 `json:"values"`
 	} `json:"embedding"`
 }
 
-func convertToGeminiMessages(messages []Message) []geminiContent {
-	geminiMsgs := make([]geminiContent, len(messages))
-	for i, msg := range messages {
-		// Gemini API expects "user" and "model" roles
-		role := msg.Role
-		if role == "assistant" {
-			role = "model"
-		}
-		geminiMsgs[i] = geminiContent{
-			Role:  role,
-			Parts: []geminiPart{{Text: msg.Content}},
+// convertToGeminiMessages converts a slice of generic Message types to geminiContent,
+// separating system instructions into a dedicated return value.
+func convertToGeminiMessages(messages []Message) ([]geminiContent, geminiSystemInstruction) {
+	geminiMsgs := make([]geminiContent, 0) // Initialize with 0 length as we might filter out system messages
+	systemInstruction := geminiSystemInstruction{
+		Parts: []geminiPart{},
+	}
+	for _, msg := range messages {
+		// Gemini API expects "user" and "model" roles for conversational turns.
+		// System instructions are handled separately.
+		if msg.Role == "system" {
+			systemInstruction.Parts = append(systemInstruction.Parts, geminiPart{Text: msg.Content})
+		} else {
+			role := msg.Role
+			if role == "assistant" {
+				role = "model"
+			}
+			geminiMsgs = append(geminiMsgs, geminiContent{
+				Role:  role,
+				Parts: []geminiPart{{Text: msg.Content}},
+			})
 		}
 	}
-	return geminiMsgs
+	return geminiMsgs, systemInstruction
 }

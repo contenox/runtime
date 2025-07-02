@@ -64,10 +64,11 @@ type geminiChatClient struct {
 }
 
 func (c *geminiChatClient) Chat(ctx context.Context, messages []Message, options ...ChatOption) (Message, error) {
-	geminiMessages := convertToGeminiMessages(messages)
+	geminiMessages, systemInstruction := convertToGeminiMessages(messages)
 
 	request := geminiGenerateContentRequest{
-		Contents: geminiMessages,
+		SystemInstruction: &systemInstruction,
+		Contents:          geminiMessages,
 		GenerationConfig: &geminiGenerationConfig{
 			Temperature:     0.7, // Default temperature
 			MaxOutputTokens: c.maxTokens,
