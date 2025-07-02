@@ -85,6 +85,22 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "preappend_message_to_history"},
+					},
+				},
+			},
+			{
+				ID:          "preappend_message_to_history",
+				Description: "Add system level instructions to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "preappend_message_to_history",
+					Args: map[string]string{
+						"subject_id": req.SubjectID,
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "mux_input"},
 					},
 				},
