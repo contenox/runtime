@@ -47,6 +47,8 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 	switch name {
 	case "append_user_message":
 		return h.AppendUserInputToChathistory, nil
+	case "preappend_message_to_history":
+		return h.PrependMessage, nil
 	case "convert_openai_to_history":
 		return h.AppendOpenAIChatToChathistory, nil
 	case "append_system_message":
@@ -313,7 +315,7 @@ func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input a
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, messages[len(messages)-1].Content, nil
 }
 
-func (h *Chat) PrependSystemMessage(
+func (h *Chat) PrependMessage(
 	ctx context.Context,
 	startTime time.Time,
 	input any,
