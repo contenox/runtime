@@ -15,7 +15,7 @@ export default function ProviderForm({ provider }: ProviderFormProps) {
 
   return (
     <Form
-      title={t('cloud_providers.form_title')}
+      // title={t('cloud_providers.form_title')}
       onSubmit={() => {
         configureMutation.mutate({ apiKey, upsert: true });
       }}

@@ -30,7 +30,7 @@ export function ModelStatusDisplay({
       </Span>
     );
   } else if (isPulled) {
-    statusElement = <Span>{t('backends.status.downloaded', 'Downloaded')}</Span>;
+    statusElement = <Span>{t('backends.status.ready', 'Ready')}</Span>;
   } else {
     statusElement = <Span>{t('backends.status.not_downloaded', 'Not Downloaded')}</Span>;
   }

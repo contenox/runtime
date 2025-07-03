@@ -121,7 +121,7 @@ const resources = {
         api_key_placeholder: 'Enter your API key',
         model_name: 'Model Name',
         model_name_placeholder: 'Optional model name',
-        status_configured: 'Configured (last updated: {{updatedAt}})',
+        status_configured: 'Configured',
         status_not_configured: 'Not configured',
       },
       backends: {
