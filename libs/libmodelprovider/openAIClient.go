@@ -53,7 +53,7 @@ func (c *openAIChatClient) Chat(ctx context.Context, messages []Message, options
 	request := openAIChatRequest{
 		Model:       c.modelName,
 		Messages:    messages,
-		Temperature: 0.7,
+		Temperature: 0.5,
 		MaxTokens:   c.maxTokens,
 	}
 
