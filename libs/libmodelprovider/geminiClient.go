@@ -33,7 +33,7 @@ func (c *geminiPromptClient) Prompt(ctx context.Context, prompt string) (string,
 	request := geminiGenerateContentRequest{
 		Contents: geminiMessages,
 		GenerationConfig: &geminiGenerationConfig{
-			Temperature:     0.3,
+			Temperature:     0.5,
 			MaxOutputTokens: c.maxTokens,
 		},
 	}
