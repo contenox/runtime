@@ -3,12 +3,51 @@ package tasksrecipes
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
 	"strings"
 
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
+
+const (
+	OpenAIChatChainID   = "openai_chat_chain"
+	StandardChatChainID = "chat_chain"
+)
+
+func initializeDefaultChains(ctx context.Context, cfg *serverops.Config, db libdb.DBManager) error {
+	// Create chains with proper IDs
+	chains := []*taskengine.ChainDefinition{
+		BuildOpenAIChatChain(cfg.TasksModel, "ollama"),
+		BuildChatChain(BuildChatChainReq{
+			PreferredModelNames: []string{cfg.TasksModel},
+			Provider:            "ollama",
+		}),
+	}
+	tx, comm, end, err := db.WithTransaction(ctx)
+	defer end()
+	if err != nil {
+		return err
+	}
+	// Store chains
+	for _, chain := range chains {
+		var value any
+		err := store.New(tx).GetKV(ctx, chain.ID, &value)
+		if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+			return fmt.Errorf("failed to retrieve chain %s: %v", chain.ID, err)
+		}
+		if errors.Is(err, libdb.ErrNotFound) {
+			if err := SetChainDefinition(ctx, tx, chain); err != nil {
+				log.Printf("failed to initialize chain %s: %v", chain.ID, err)
+			}
+		}
+	}
+	return comm(ctx)
+}
 
 func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{

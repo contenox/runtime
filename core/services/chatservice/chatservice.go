@@ -110,22 +110,36 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 		return "", 0, 0, err
 	}
 
-	// Use raw string as input
-	input := req.Message
-	// Build or load chain definition
-	chain := tasksrecipes.BuildChatChain(tasksrecipes.BuildChatChainReq{
-		SubjectID:           req.SubjectID,
-		PreferredModelNames: req.PreferredModelNames,
-		Provider:            req.Provider,
-	})
+	// Retrieve chain from store
+	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, tasksrecipes.StandardChatChainID)
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("failed to get chain: %w", err)
+	}
 
-	// Run the chain using the environment executor
-	result, err := s.env.ExecEnv(ctx, chain, input, taskengine.DataTypeString)
+	// Update chain parameters
+	for i := range chain.Tasks {
+		task := &chain.Tasks[i]
+		if task.Hook == nil {
+			continue
+		}
+
+		switch task.ID {
+		case "append_user_message":
+			task.Hook.Args["subject_id"] = req.SubjectID
+		case "execute_model_on_messages":
+			task.Hook.Args["subject_id"] = req.SubjectID
+			task.Hook.Args["models"] = strings.Join(req.PreferredModelNames, ",")
+			task.Hook.Args["provider"] = req.Provider
+		}
+	}
+
+	// Execute chain
+	result, err := s.env.ExecEnv(ctx, chain, req.Message, taskengine.DataTypeString)
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("chain execution failed: %w", err)
 	}
 
-	// Extract final assistant message
+	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
 		return "", 0, 0, fmt.Errorf("unexpected result from chain")
