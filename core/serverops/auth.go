@@ -13,8 +13,10 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libcipher"
 )
 
-const DefaultServerGroup = "server"
-const DefaultDefaultServiceGroup = "admin_panel"
+const (
+	DefaultServerGroup         = "server"
+	DefaultDefaultServiceGroup = "admin_panel"
+)
 
 var DefaultAdminUser string = "admin@admin.com"
 
@@ -62,7 +64,6 @@ func CheckResourceAuthorization(ctx context.Context, storeInstance store.Store, 
 		}
 	}
 	return nil
-
 }
 
 func checkAuth(ctx context.Context, identity, resource string, requiredPermission store.Permission, secret string, storeInstance store.Store) (bool, error) {
