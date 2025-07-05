@@ -19,7 +19,7 @@ const (
 	StandardChatChainID = "chat_chain"
 )
 
-func initializeDefaultChains(ctx context.Context, cfg *serverops.Config, db libdb.DBManager) error {
+func InitializeDefaultChains(ctx context.Context, cfg *serverops.Config, db libdb.DBManager) error {
 	// Create chains with proper IDs
 	chains := []*taskengine.ChainDefinition{
 		BuildOpenAIChatChain(cfg.TasksModel, "ollama"),

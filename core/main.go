@@ -24,6 +24,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/telegramservice"
 	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
@@ -195,6 +196,10 @@ func main() {
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)
+	}
+	err = tasksrecipes.InitializeDefaultChains(ctx, config, dbInstance)
+	if err != nil {
+		log.Fatalf("initializing default tasks failed: %v", err)
 	}
 	if config.TelegramToken != "" {
 		bootOffset := 0

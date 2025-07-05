@@ -130,6 +130,8 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 			task.Hook.Args["subject_id"] = req.SubjectID
 			task.Hook.Args["models"] = strings.Join(req.PreferredModelNames, ",")
 			task.Hook.Args["provider"] = req.Provider
+		case "persist_messages":
+			task.Hook.Args["subject_id"] = req.SubjectID
 		}
 	}
 
