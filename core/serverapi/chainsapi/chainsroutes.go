@@ -10,7 +10,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
-func AddChainRoutes(mux *http.ServeMux, chainService chainservice.Service) {
+func AddChainRoutes(mux *http.ServeMux, config *serverops.Config, chainService chainservice.Service) {
 	s := &service{service: chainService}
 
 	mux.HandleFunc("POST /chains", s.set)

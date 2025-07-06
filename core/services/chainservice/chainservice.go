@@ -2,7 +2,6 @@ package chainservice
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -11,8 +10,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
-
-var ErrInvalidChain = errors.New("invalid chain definition")
 
 type Service interface {
 	serverops.ServiceMeta
@@ -70,10 +67,10 @@ func (s *service) Delete(ctx context.Context, id string) error {
 
 func validateChain(chain *taskengine.ChainDefinition) error {
 	if chain.ID == "" {
-		return fmt.Errorf("%w: chain ID is required", ErrInvalidChain)
+		return fmt.Errorf("%w: chain ID is required", serverops.ErrInvalidChain)
 	}
 	if len(chain.Tasks) == 0 {
-		return fmt.Errorf("%w: chain must have at least one task", ErrInvalidChain)
+		return fmt.Errorf("%w: chain must have at least one task", serverops.ErrInvalidChain)
 	}
 	return nil
 }

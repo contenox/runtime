@@ -282,3 +282,24 @@ def wait_for_model_in_backend(base_url, admin_session):
                 time.sleep(poll_interval)
 
     return _wait_for_model
+
+@pytest.fixture
+def create_test_chain(base_url, admin_session):
+    """Fixture to create test chain and clean up after"""
+    payload = {
+        "id": "test-chain-" + str(uuid.uuid4())[:8],
+        "tasks": [{"id": "task1", "type": "llm"}]
+    }
+
+    response = requests.post(f"{base_url}/chains",
+                           json=payload,
+                           headers=admin_session)
+    assert response.status_code == 201
+
+    yield response.json()
+
+    # Teardown
+    requests.delete(
+        f"{base_url}/chains/{payload['id']}",
+        headers=admin_session
+    )

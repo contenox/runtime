@@ -10,17 +10,21 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
-var ErrInvalidParameterValue = errors.New("serverops: invalid parameter value type")
-var ErrBadPathValue = errors.New("serverops: bad path value")
-var ErrImmutableModel = errors.New("serverops: immutable model")
-var ErrImmutablePool = errors.New("serverops: immutable pool")
-var ErrMissingParameter = errors.New("serverops: missing parameter")
+var (
+	ErrInvalidParameterValue = errors.New("serverops: invalid parameter value type")
+	ErrBadPathValue          = errors.New("serverops: bad path value")
+	ErrImmutableModel        = errors.New("serverops: immutable model")
+	ErrImmutablePool         = errors.New("serverops: immutable pool")
+	ErrMissingParameter      = errors.New("serverops: missing parameter")
+)
 
 // ErrFileSizeLimitExceeded indicates the specific file exceeded its allowed size limit.
 var ErrFileSizeLimitExceeded = errors.New("serverops: file size limit exceeded")
 
 // ErrFileEmpty indicates an attempt to upload an empty file.
 var ErrFileEmpty = errors.New("serverops: file cannot be empty")
+
+var ErrInvalidChain = errors.New("invalid chain definition")
 
 type Operation uint16
 
@@ -140,6 +144,10 @@ func mapErrorToStatus(op Operation, err error) int {
 		return http.StatusForbidden // 403
 	}
 	if errors.Is(err, ErrMissingParameter) {
+		return http.StatusBadRequest // 400
+	}
+
+	if errors.Is(err, ErrInvalidChain) {
 		return http.StatusBadRequest // 400
 	}
 

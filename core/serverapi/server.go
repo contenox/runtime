@@ -12,6 +12,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverapi/backendapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/chainsapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chatapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/dispatchapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/execapi"
@@ -25,6 +26,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
 	"github.com/contenox/runtime-mvp/core/services/backendservice"
+	"github.com/contenox/runtime-mvp/core/services/chainservice"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
 	"github.com/contenox/runtime-mvp/core/services/downloadservice"
@@ -130,6 +132,8 @@ func New(
 	providerService = providerservice.WithActivityTracker(providerService, serverops.NewLogActivityTracker(slog.Default()))
 	providersapi.AddProviderRoutes(mux, config, providerService)
 
+	chainService := chainservice.New(dbInstance)
+	chainsapi.AddChainRoutes(mux, config, chainService)
 	handler = enableCORS(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
@@ -146,6 +150,7 @@ func New(
 		dispatchService,
 		execService,
 		providerService,
+		chainService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {
