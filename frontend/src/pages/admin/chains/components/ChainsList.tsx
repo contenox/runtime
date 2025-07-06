@@ -59,7 +59,7 @@ export default function ChainsList() {
 
         return (
           <TableRow key={chain.id}>
-            <TableCell className="font-mono">{chain.id}</TableCell>
+            <TableCell>{chain.id}</TableCell>
             <TableCell>{chain.description}</TableCell>
             <TableCell>
               <ChainStatusBadge isDefault={isDefault} />

@@ -15,6 +15,7 @@ type Service interface {
 	serverops.ServiceMeta
 	Set(ctx context.Context, chain *taskengine.ChainDefinition) error
 	Get(ctx context.Context, id string) (*taskengine.ChainDefinition, error)
+	Update(ctx context.Context, chain *taskengine.ChainDefinition) error
 	List(ctx context.Context) ([]*taskengine.ChainDefinition, error)
 	Delete(ctx context.Context, id string) error
 }
@@ -47,6 +48,17 @@ func (s *service) Get(ctx context.Context, id string) (*taskengine.ChainDefiniti
 		return nil, err
 	}
 	return tasksrecipes.GetChainDefinition(ctx, tx, id)
+}
+
+func (s *service) Update(ctx context.Context, chain *taskengine.ChainDefinition) error {
+	if err := validateChain(chain); err != nil {
+		return err
+	}
+	tx := s.dbInstance.WithoutTransaction()
+	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+		return err
+	}
+	return tasksrecipes.SetChainDefinition(ctx, tx, chain)
 }
 
 func (s *service) List(ctx context.Context) ([]*taskengine.ChainDefinition, error) {

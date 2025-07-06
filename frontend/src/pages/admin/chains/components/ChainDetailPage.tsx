@@ -1,9 +1,8 @@
-import { GridLayout, H2, Panel, Section, Spinner } from '@contenox/ui';
+import { GridLayout, Panel, Section, Spinner } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { useChain } from '../../../../hooks/useChains';
 import ChainEditor from './ChainEditor';
-import ChainPreview from './ChainPreview';
 
 export default function ChainDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,13 +23,8 @@ export default function ChainDetailPage() {
 
   return (
     <GridLayout variant="body">
-      <Section>
-        <H2 className="mb-4">{t('chains.editor_title', { id: chain.id })}</H2>
+      <Section title={t('chains.editor_title', { id: chain.id })}>
         <ChainEditor chain={chain} />
-      </Section>
-
-      <Section>
-        <ChainPreview chain={chain} />
       </Section>
     </GridLayout>
   );

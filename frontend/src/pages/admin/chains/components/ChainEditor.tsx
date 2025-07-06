@@ -1,4 +1,4 @@
-import { Button, Card, FormField, Label, Spinner, Textarea } from '@contenox/ui';
+import { Button, Card, FormField, Label, Panel, Spinner, Textarea } from '@contenox/ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useUpdateChain } from '../../../../hooks/useChains';
@@ -28,15 +28,22 @@ export default function ChainEditor({ chain }: ChainEditorProps) {
   };
 
   return (
-    <Card variant="surface" className="p-4">
+    <Card variant="bordered" className="p-4">
+      {/* Show general mutation error */}
+      {updateChain.error && (
+        <Panel variant="error" className="mb-4">
+          {updateChain.error.message}
+        </Panel>
+      )}
+
       <div className="mb-4">
-        <Label className="mb-2 block">{t('chains.form_id')}</Label>
-        <div className="bg-surface-100 rounded p-2 font-mono">{chain.id}</div>
+        <Label>{t('chains.form_id')}</Label>
+        <div>{chain.id}</div>
       </div>
 
       <div className="mb-4">
-        <Label className="mb-2 block">{t('chains.form_description')}</Label>
-        <div className="bg-surface-100 rounded p-2">{chain.description}</div>
+        <Label>{t('chains.form_description')}</Label>
+        <div>{chain.description}</div>
       </div>
 
       <FormField label={t('chains.form_tasks')} error={tasksError}>

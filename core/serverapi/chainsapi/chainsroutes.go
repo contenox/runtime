@@ -15,6 +15,7 @@ func AddChainRoutes(mux *http.ServeMux, config *serverops.Config, chainService c
 
 	mux.HandleFunc("POST /chains", s.set)
 	mux.HandleFunc("GET /chains/{id}", s.get)
+	mux.HandleFunc("PUT /chains/{id}", s.update)
 	mux.HandleFunc("GET /chains", s.list)
 	mux.HandleFunc("DELETE /chains/{id}", s.delete)
 }
@@ -83,4 +84,29 @@ func (s *service) delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverops.Encode(w, r, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (s *service) update(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := r.PathValue("id")
+	if id == "" {
+		serverops.Error(w, r, fmt.Errorf("chain ID is required"), serverops.UpdateOperation)
+		return
+	}
+
+	var chain taskengine.ChainDefinition
+	if err := json.NewDecoder(r.Body).Decode(&chain); err != nil {
+		serverops.Error(w, r, err, serverops.UpdateOperation)
+		return
+	}
+
+	// Ensure we are updating the correct chain
+	chain.ID = id
+
+	if err := s.service.Update(ctx, &chain); err != nil {
+		serverops.Error(w, r, err, serverops.UpdateOperation)
+		return
+	}
+
+	serverops.Encode(w, r, http.StatusOK, chain)
 }

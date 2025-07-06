@@ -243,6 +243,16 @@ func SetChainDefinition(ctx context.Context, tx libdb.Exec, chain *taskengine.Ch
 	return s.SetKV(ctx, key, data)
 }
 
+func UpdateChainDefinition(ctx context.Context, tx libdb.Exec, chain *taskengine.ChainDefinition) error {
+	s := store.New(tx)
+	key := ChainKeyPrefix + chain.ID
+	data, err := json.Marshal(chain)
+	if err != nil {
+		return err
+	}
+	return s.UpdateKV(ctx, key, data)
+}
+
 func GetChainDefinition(ctx context.Context, tx libdb.Exec, id string) (*taskengine.ChainDefinition, error) {
 	s := store.New(tx)
 	key := ChainKeyPrefix + id
