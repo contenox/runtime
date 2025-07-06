@@ -72,6 +72,7 @@ Notes:
 - [ ] **Package a Persona-Chat Application**
 - [ ] **Observability Integration**
 - [ ] **API Rate Limiting Middleware**
+- [ ] **Implement Chat moderation**
 
 ---
 
@@ -92,3 +93,4 @@ Notes:
 - Adding userdefined frontend-connectors
 - Adding a way to upload tasks to attach them to connectors
 - Sticky session routing policy
+- Implement MCP compatibility so that MCP servers act as hooks
