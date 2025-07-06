@@ -250,24 +250,47 @@ func (w *worker) processLeasedJob(ctx context.Context, storeInstance store.Store
 func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 	text := update.Message.Text
 	subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
+	tx := w.dbInstance.WithoutTransaction()
+	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, tasksrecipes.StandardChatChainID)
+	if err != nil {
+		return fmt.Errorf("failed to get chain: %w", err)
+	}
 
-	chain := tasksrecipes.BuildChatChain(tasksrecipes.BuildChatChainReq{
-		SubjectID: subjID,
-		Provider:  provider,
-	})
+	// Update chain parameters
+	for i := range chain.Tasks {
+		task := &chain.Tasks[i]
+		if task.Hook == nil {
+			continue
+		}
+
+		switch task.ID {
+		case "append_user_message":
+			task.Hook.Args["subject_id"] = subjID
+		case "execute_model_on_messages":
+			task.Hook.Args["subject_id"] = subjID
+			task.Hook.Args["models"] = "gemini-2.5-flash"
+			task.Hook.Args["provider"] = provider
+		case "persist_messages":
+			task.Hook.Args["subject_id"] = subjID
+		}
+	}
+
+	// Execute chain
 	result, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)
 	}
+
+	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
-		return fmt.Errorf("invalid chat history")
-	}
-	lastMsg := hist.Messages[len(hist.Messages)-1]
-	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
-		return fmt.Errorf("invalid chat history 2")
+		return fmt.Errorf("unexpected result from chain")
 	}
 
+	lastMsg := hist.Messages[len(hist.Messages)-1]
+	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
+		return fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
+	}
 	_, err = w.bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, lastMsg.Content))
 	return err
 }
