@@ -88,3 +88,13 @@ export const execKeys = {
 export const typeKeys = {
   all: ['types'] as const,
 };
+
+export const chainKeys = {
+  all: ['chains'] as const,
+  list: () => [...chainKeys.all, 'list'] as const,
+  detail: (id: string) => [...chainKeys.all, 'detail', id] as const,
+  triggers: (chainId: string) => [...chainKeys.detail(chainId), 'triggers'] as const,
+  tasks: (chainId: string) => [...chainKeys.detail(chainId), 'tasks'] as const,
+  triggerDetail: (chainId: string, triggerId: string) =>
+    [...chainKeys.triggers(chainId), triggerId] as const,
+};

@@ -28,7 +28,7 @@ export default function ModelsSection() {
   if (error) {
     return (
       <Panel variant="error" className="p-4">
-        <p>{t('model.list_error')}</p>
+        <p>{t('model.list_error') + error}</p>
       </Panel>
     );
   }

@@ -3,6 +3,7 @@ import {
   AccessEntry,
   AuthenticatedUser,
   Backend,
+  ChainDefinition,
   ChatMessage,
   ChatSession,
   Exec,
@@ -17,6 +18,7 @@ import {
   Pool,
   SearchResponse,
   StatusResponse,
+  Trigger,
   UpdateAccessEntryRequest,
   UpdateUserRequest,
   User,
@@ -237,4 +239,16 @@ export const api = {
     return apiFetch<SearchResponse>(`/api/search?${params.toString()}`);
   },
   execPrompt: (data: Exec) => apiFetch<ExecResp>(`/api/execute`, options('POST', data)),
+  getChains: () => apiFetch<ChainDefinition[]>('/api/chains'),
+  getChain: (id: string) => apiFetch<ChainDefinition>(`/api/chains/${id}`),
+  createChain: (data: ChainDefinition) =>
+    apiFetch<ChainDefinition>('/api/chains', options('POST', data)),
+  updateChain: (id: string, data: Partial<ChainDefinition>) =>
+    apiFetch<ChainDefinition>(`/api/chains/${id}`, options('PUT', data)),
+  deleteChain: (id: string) => apiFetch<void>(`/api/chains/${id}`, options('DELETE')),
+  getChainTriggers: (chainId: string) => apiFetch<Trigger[]>(`/api/chains/${chainId}/triggers`),
+  addChainTrigger: (chainId: string, data: Trigger) =>
+    apiFetch<Trigger>(`/api/chains/${chainId}/triggers`, options('POST', data)),
+  removeChainTrigger: (chainId: string, triggerId: string) =>
+    apiFetch<void>(`/api/chains/${chainId}/triggers/${triggerId}`, options('DELETE')),
 };

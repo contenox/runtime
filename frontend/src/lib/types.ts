@@ -210,3 +210,73 @@ export type ExecResp = {
   id: string;
   response: string;
 };
+
+export type ChainTaskType =
+  | 'condition_key'
+  | 'parse_number'
+  | 'parse_score'
+  | 'parse_range'
+  | 'raw_string'
+  | 'hook';
+
+export type OperatorTerm =
+  | 'equals'
+  | 'contains'
+  | 'starts_with'
+  | 'ends_with'
+  | '>'
+  | 'gt'
+  | '<'
+  | 'lt'
+  | 'in_range'
+  | 'default';
+
+export type TriggerType = 'manual' | 'keyword' | 'embedding' | 'webhook';
+
+export interface HookCall {
+  type: string;
+  args: Record<string, string>;
+}
+
+export interface TransitionBranch {
+  operator?: OperatorTerm;
+  when: string;
+  goto: string;
+}
+
+export interface TaskTransition {
+  on_failure: string;
+  branches: TransitionBranch[];
+}
+
+export interface ChainTask {
+  id: string;
+  description: string;
+  type: ChainTaskType;
+  valid_conditions?: Record<string, boolean>;
+  hook?: HookCall;
+  print?: string;
+  prompt_template: string;
+  transition: TaskTransition;
+  timeout?: string;
+  retry_on_failure?: number;
+}
+
+export interface Trigger {
+  type: TriggerType;
+  description: string;
+  pattern?: string;
+}
+
+export interface ChainDefinition {
+  id: string;
+  description: string;
+  tasks: ChainTask[];
+  token_limit?: number;
+  routing_strategy?: string;
+}
+
+export interface ChainWithTrigger {
+  triggers?: Trigger[];
+  chain_definition: ChainDefinition;
+}

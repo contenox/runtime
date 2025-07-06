@@ -4,6 +4,7 @@ import {
   Database,
   File,
   Home,
+  Link,
   MessageCircleCode,
   Search,
   Settings,
@@ -12,6 +13,8 @@ import {
 } from 'lucide-react';
 import i18n from '../i18n';
 import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
+import ChainsPage from '../pages/admin/chains/ChainsPage.tsx';
+import ChainDetailPage from '../pages/admin/chains/components/ChainDetailPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
 import ChatsListPage from '../pages/admin/chats/components/ChatListPage.tsx';
 import FilesPage from '../pages/admin/files/FilesPage.tsx';
@@ -98,6 +101,21 @@ export const routes: RouteConfig[] = [
     label: i18n.t('navbar.search'),
     icon: <Search className="h-[1em] w-[1em]" />,
     showInNav: true,
+    protected: true,
+  },
+  {
+    path: '/chains',
+    element: ChainsPage,
+    label: i18n.t('navbar.chains'),
+    icon: <Link className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+  },
+  {
+    path: '/chains/:id',
+    element: ChainDetailPage,
+    label: i18n.t('navbar.chain_detail'),
+    showInNav: false,
     protected: true,
   },
   {

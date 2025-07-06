@@ -5,6 +5,7 @@ import { Label } from "./Label";
 type FormFieldProps = {
   label: string;
   required?: boolean;
+  error?: string;
   children: React.ReactNode;
   className?: string;
 };
@@ -12,6 +13,7 @@ type FormFieldProps = {
 export function FormField({
   label,
   required,
+  error,
   children,
   className,
 }: FormFieldProps) {
@@ -24,6 +26,9 @@ export function FormField({
         )}
       </Label>
       {children}
+      {error && (
+        <p className="text-error dark:text-dark-error text-sm mt-1">{error}</p>
+      )}
     </div>
   );
 }
