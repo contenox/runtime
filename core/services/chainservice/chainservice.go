@@ -58,7 +58,7 @@ func (s *service) Update(ctx context.Context, chain *taskengine.ChainDefinition)
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return err
 	}
-	return tasksrecipes.SetChainDefinition(ctx, tx, chain)
+	return tasksrecipes.UpdateChainDefinition(ctx, tx, chain)
 }
 
 func (s *service) List(ctx context.Context) ([]*taskengine.ChainDefinition, error) {
