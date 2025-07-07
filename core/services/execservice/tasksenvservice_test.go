@@ -58,10 +58,10 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 			TokenLimit:      1000,
 			Tasks: []taskengine.ChainTask{
 				{
-					ID:          "echo-task",
-					Description: "Just echo back the input",
-					Type:        taskengine.RawString,
-					Template:    "echo back the input without any explanation. Input: {{.input}}",
+					ID:             "echo-task",
+					Description:    "Just echo back the input",
+					Type:           taskengine.RawString,
+					PromptTemplate: "echo back the input without any explanation. Input: {{.input}}",
 					Transition: taskengine.TaskTransition{
 						OnFailure: "",
 						Branches: []taskengine.TransitionBranch{

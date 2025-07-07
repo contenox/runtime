@@ -87,6 +87,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	vars := map[string]any{
 		"input": input,
 	}
+	varTypes := map[string]DataType{"input": dataType}
 	startingTime := time.Now().UTC()
 	resolver := llmresolver.Randomly
 	var err error
@@ -111,15 +112,32 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	var outputType DataType = dataType
 	var taskErr error
 	for {
-		// Render prompt template
-		if outputType == DataTypeString && currentTask.Template != "" {
-			output, err = renderTemplate(currentTask.Template, vars)
+		// Determine task input
+		taskInput := output
+		taskInputType := outputType
+
+		if currentTask.InputVar != "" {
+			// Look up specified variable
+			var ok bool
+			taskInput, ok = vars[currentTask.InputVar]
+			if !ok {
+				return nil, fmt.Errorf("task %s: input variable %q not found",
+					currentTask.ID, currentTask.InputVar)
+			}
+			taskInputType, ok = varTypes[currentTask.InputVar]
+			if !ok {
+				return nil, fmt.Errorf("task %s: input variable %q missing type info",
+					currentTask.ID, currentTask.InputVar)
+			}
+		}
+
+		// Render prompt template using the determined input
+		if taskInputType == DataTypeString && currentTask.PromptTemplate != "" {
+			rendered, err := renderTemplate(currentTask.PromptTemplate, vars)
 			if err != nil {
 				return nil, fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
 			}
-			if output == 0 || output == "" {
-				return nil, fmt.Errorf("task %s: template rendered empty string", currentTask.ID)
-			}
+			taskInput = rendered
 		}
 
 		maxRetries := max(currentTask.RetryOnFailure, 0)
@@ -146,7 +164,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, output, outputType)
+			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, taskInput, taskInputType)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
@@ -183,6 +201,8 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		// Update execution variables
 		vars["previous_output"] = output
 		vars[currentTask.ID] = output
+		varTypes["previous_output"] = outputType
+		varTypes[currentTask.ID] = outputType
 
 		// Handle print statement
 		if currentTask.Print != "" {

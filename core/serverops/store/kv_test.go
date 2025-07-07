@@ -213,4 +213,35 @@ func TestUnitKV(t *testing.T) {
 		// Verify the raw JSON is preserved exactly
 		require.JSONEq(t, string(value), string(kv.Value))
 	})
+
+	t.Run("Upsert", func(t *testing.T) {
+		key := "upsert-" + uuid.NewString()
+		initial := json.RawMessage(`{"field1": "initial", "field2": 1}`)
+		updated := json.RawMessage(`{"field1": "updated", "field2": 2}`)
+
+		// Upsert initial value
+		err := s.SetKV(ctx, key, initial)
+		require.NoError(t, err)
+
+		// Verify initial value
+		var tv testValue
+		err = s.GetKV(ctx, key, &tv)
+		require.NoError(t, err)
+		require.Equal(t, testValue{Field1: "initial", Field2: 1}, tv)
+
+		// Upsert updated value
+		err = s.SetKV(ctx, key, updated)
+		require.NoError(t, err)
+
+		// Verify updated value
+		err = s.GetKV(ctx, key, &tv)
+		require.NoError(t, err)
+		require.Equal(t, testValue{Field1: "updated", Field2: 2}, tv)
+
+		// Verify updated_at changed
+		items, err := s.ListKVPrefix(ctx, key)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+		require.True(t, items[0].UpdatedAt.After(items[0].CreatedAt))
+	})
 }

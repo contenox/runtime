@@ -113,3 +113,14 @@ def test_status_unauthorized(base_url, generate_email, register_user):
 
     response = requests.get(url, headers=headers)
     assert_status_code(response, 401)
+
+def test_configure_invalid_provider_fails(base_url, admin_session):
+    """Test that configuring an invalid provider returns 400."""
+    url = f"{base_url}/providers/unknown/configure"
+    payload = {
+        "apiKey": "some-key",
+        "modelName": "some-model"
+    }
+
+    response = requests.post(url, json=payload, headers=admin_session)
+    assert_status_code(response, 400)

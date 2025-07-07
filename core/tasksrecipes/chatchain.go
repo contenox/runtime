@@ -117,9 +117,52 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 		Description: "Standard chat processing pipeline with hooks",
 		Tasks: []taskengine.ChainTask{
 			{
+				ID:             "moderate",
+				Description:    "Moderate the input",
+				Type:           taskengine.ParseNumber,
+				PromptTemplate: "Classify the input as safe (10) or unsafe (0) respond with an numeric value between 0 and 10. Input: {{.input}}",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpLessThan,
+							When:     "5",
+							Goto:     "reject_request",
+						},
+						{
+							Operator: "default",
+							Goto:     "append_user_message",
+						},
+					},
+					OnFailure: "request_failed",
+				},
+			},
+			{
+				ID:             "reject_request",
+				Description:    "Reject the request",
+				Type:           taskengine.RawString,
+				PromptTemplate: "respond to the user that request was rejected because the input was flagged: {{.input}}",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: ""},
+					},
+				},
+			},
+			{
+				ID:             "request_failed",
+				Description:    "Reject the request",
+				Type:           taskengine.RawString,
+				PromptTemplate: "respond to the user that classification of the request failed for context the exact input: {{.input}}",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: ""},
+					},
+				},
+			},
+			{
 				ID:          "append_user_message",
 				Description: "Append user message to chat history",
 				Type:        taskengine.Hook,
+				InputVar:    "input",
 				Hook: &taskengine.HookCall{
 					Type: "append_user_message",
 					Args: map[string]string{
@@ -139,8 +182,10 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Hook: &taskengine.HookCall{
 					Type: "preappend_message_to_history",
 					Args: map[string]string{
-						"role":    "system",
-						"message": "You are a helpful assistant. Part of a larger system named \"contenox\".",
+						"role": "system",
+						"message": "You're a helpful assistant in the Contenox system. " +
+							"Respond helpfully and mention available commands (/help, /echo, /search_knowledge) when appropriate. " +
+							"Keep conversation friendly.",
 					},
 				},
 				Transition: taskengine.TaskTransition{

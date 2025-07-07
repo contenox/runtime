@@ -11,6 +11,11 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
+const (
+	ProviderTypeOpenAI = "openai"
+	ProviderTypeGemini = "gemini"
+)
+
 type Service interface {
 	SetProviderConfig(ctx context.Context, providerType string, upsert bool, config *serverops.ProviderConfig) error
 	GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error)
@@ -39,68 +44,77 @@ func New(dbInstance libdb.DBManager) Service {
 }
 
 func (s *service) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
+	// Input validation
+	if providerType != ProviderTypeOpenAI && providerType != ProviderTypeGemini {
+		return fmt.Errorf("invalid provider type: %s", providerType)
+	}
+	if config == nil {
+		return fmt.Errorf("missing config")
+	}
+	if config.APIKey == "" {
+		return fmt.Errorf("missing API key")
+	}
+
 	tx, com, r, err := s.dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return err
 	}
 	defer r()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return err
-	}
+
 	storeInstance := store.New(tx)
-	if config == nil {
-		return fmt.Errorf("missing config")
-	}
-	if providerType != "openai" && providerType != "gemini" {
-		return fmt.Errorf("invalid provider type: %s", providerType)
-	}
 	key := serverops.ProviderKeyPrefix + providerType
+
+	// Check existence if not replacing
+	if !replace {
+		var existing json.RawMessage
+		if err := storeInstance.GetKV(ctx, key, &existing); err == nil {
+			return fmt.Errorf("provider config already exists")
+		} else if !errors.Is(err, libdb.ErrNotFound) {
+			return fmt.Errorf("failed to check existing config: %w", err)
+		}
+	}
+
+	// Prepare and store config
 	config.Type = providerType
 	data, err := json.Marshal(config)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	dbOp := func(ctx context.Context, key string, value json.RawMessage) error {
-		return storeInstance.SetKV(ctx, key, value)
+	if err := storeInstance.SetKV(ctx, key, data); err != nil {
+		return fmt.Errorf("failed to store config: %w", err)
 	}
-	if replace {
-		dbOp = func(ctx context.Context, key string, value json.RawMessage) error {
-			var lConfig *serverops.ProviderConfig
-			err := storeInstance.GetKV(ctx, key, lConfig)
-			if errors.Is(err, libdb.ErrNotFound) {
-				return storeInstance.SetKV(ctx, key, value)
-			}
-			if err != nil {
-				return err
-			}
-			return storeInstance.UpdateKV(ctx, key, value)
-		}
+
+	// Handle backend configuration
+	backendURL := ""
+	switch providerType {
+	case ProviderTypeOpenAI:
+		backendURL = "https://api.openai.com/v1"
+	case ProviderTypeGemini:
+		backendURL = "https://generativelanguage.googleapis.com"
 	}
-	err = dbOp(ctx, key, data)
-	if err != nil {
-		return err
-	}
-	backendUrl := ""
-	if providerType == "openai" {
-		backendUrl = "https://api.openai.com/v1"
-	}
-	if providerType == "gemini" {
-		backendUrl = "https://generativelanguage.googleapis.com"
-	}
-	err = storeInstance.CreateBackend(ctx, &store.Backend{
+
+	// Upsert backend configuration
+	backend := &store.Backend{
 		ID:      providerType,
 		Name:    providerType,
-		BaseURL: backendUrl,
+		BaseURL: backendURL,
 		Type:    providerType,
-	})
-	if err != nil {
-		return err
 	}
-	err = com(ctx)
-	if err != nil {
-		return err
+
+	if _, err := storeInstance.GetBackend(ctx, providerType); errors.Is(err, libdb.ErrNotFound) {
+		if err := storeInstance.CreateBackend(ctx, backend); err != nil {
+			return fmt.Errorf("failed to create backend: %w", err)
+		}
+	} else if err == nil && replace {
+		// Update existing backend if replacing
+		if err := storeInstance.UpdateBackend(ctx, backend); err != nil {
+			return fmt.Errorf("failed to update backend: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check backend existence: %w", err)
 	}
-	return nil
+
+	return com(ctx)
 }
 
 func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {

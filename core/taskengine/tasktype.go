@@ -191,11 +191,16 @@ type ChainTask struct {
 	// Example: "The score is: {{.previous_output}}"
 	Print string `yaml:"print,omitempty" json:"print,omitempty"`
 
-	// Template is the text prompt sent to the LLM.
+	// PromptTemplate is the text prompt sent to the LLM.
 	// It's Required and only applicable for the raw_string type.
 	// Supports template variables from previous task outputs.
 	// Example: "Rate the quality from 1-10: {{.input}}"
-	Template string `yaml:"prompt_template" json:"prompt_template"`
+	PromptTemplate string `yaml:"prompt_template" json:"prompt_template"`
+
+	// InputVar is the name of the variable to use as input for the task.
+	// Example: "input" for the original input.
+	// Each task stores its output in a variable named with it's task id.
+	InputVar string `yaml:"input_var,omitempty" json:"input_var,omitempty"`
 
 	// Transition defines what to do after this task completes.
 	Transition TaskTransition `yaml:"transition" json:"transition"`

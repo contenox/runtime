@@ -24,9 +24,9 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:       "task1",
-				Type:     taskengine.RawString,
-				Template: `What is {{.input}}?`,
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				PromptTemplate: `What is {{.input}}?`,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
@@ -59,7 +59,7 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 			{
 				ID:             "task1",
 				Type:           taskengine.RawString,
-				Template:       `Broken task`,
+				PromptTemplate: `Broken task`,
 				RetryOnFailure: 1,
 				Transition:     taskengine.TaskTransition{},
 			},
@@ -85,9 +85,9 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:       "task1",
-				Type:     taskengine.RawString,
-				Template: `{{.input}}`,
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				PromptTemplate: `{{.input}}`,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "equals", When: "continue", Goto: "task2"},
@@ -95,9 +95,9 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 				},
 			},
 			{
-				ID:       "task2",
-				Type:     taskengine.RawString,
-				Template: `Follow up`,
+				ID:             "task2",
+				Type:           taskengine.RawString,
+				PromptTemplate: `Follow up`,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "equals", When: "continue", Goto: taskengine.TermEnd},
@@ -126,17 +126,17 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:       "task1",
-				Type:     taskengine.RawString,
-				Template: `fail`,
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				PromptTemplate: `fail`,
 				Transition: taskengine.TaskTransition{
 					OnFailure: "task2",
 				},
 			},
 			{
-				ID:       "task2",
-				Type:     taskengine.RawString,
-				Template: `recover`,
+				ID:             "task2",
+				Type:           taskengine.RawString,
+				PromptTemplate: `recover`,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "equals", When: "recovered", Goto: taskengine.TermEnd},
@@ -164,10 +164,10 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:       "task1",
-				Type:     taskengine.RawString,
-				Template: `hi {{.input}}`,
-				Print:    `Output: {{.task1}}`,
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				PromptTemplate: `hi {{.input}}`,
+				Print:          `Output: {{.task1}}`,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "equals", When: "printed-value", Goto: taskengine.TermEnd},
@@ -180,4 +180,200 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 	result, err := env.ExecEnv(context.Background(), chain, "user", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "printed-value", result)
+}
+
+func TestUnit_SimpleEnv_ExecEnv_InputVar_OriginalInput(t *testing.T) {
+	mockExec := &taskengine.MockTaskExecutor{
+		MockOutput:      "processed: hello",
+		MockRawResponse: "processed: hello",
+		MockError:       nil,
+	}
+
+	tracker := serverops.NoopTracker{}
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	require.NoError(t, err)
+
+	chain := &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				InputVar:       "input", // Explicitly use original input
+				PromptTemplate: `Process this: {{.input}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := env.ExecEnv(context.Background(), chain, "hello", taskengine.DataTypeString)
+	require.NoError(t, err)
+	require.Equal(t, "processed: hello", result)
+}
+
+func TestUnit_SimpleEnv_ExecEnv_InputVar_PreviousTaskOutput(t *testing.T) {
+	mockExec := &taskengine.MockTaskExecutor{
+		MockOutputSequence:      []any{"42", "processed: 42"},
+		MockRawResponseSequence: []string{"42", "processed: 42"},
+	}
+
+	tracker := serverops.NoopTracker{}
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	require.NoError(t, err)
+
+	chain := &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:             "transform",
+				Type:           taskengine.ParseNumber,
+				PromptTemplate: `Convert to number: {{.input}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "process"},
+					},
+				},
+			},
+			{
+				ID:             "process",
+				Type:           taskengine.RawString,
+				InputVar:       "transform", // Use output from previous task
+				PromptTemplate: `Process the number: {{.transform}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := env.ExecEnv(context.Background(), chain, "forty-two", taskengine.DataTypeString)
+	require.NoError(t, err)
+	require.Equal(t, "processed: 42", result)
+}
+
+func TestUnit_SimpleEnv_ExecEnv_InputVar_WithModeration(t *testing.T) {
+	mockExec := &taskengine.MockTaskExecutor{
+		MockOutputSequence:      []any{8, "user message stored"},
+		MockRawResponseSequence: []string{"8", "user message stored"},
+	}
+
+	tracker := serverops.NoopTracker{}
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	require.NoError(t, err)
+
+	chain := &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:             "moderate",
+				Type:           taskengine.ParseNumber,
+				PromptTemplate: `Rate safety of: {{.input}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: taskengine.OpGreaterThan, When: "5", Goto: "store"},
+						{Operator: "default", Goto: "reject"},
+					},
+				},
+			},
+			{
+				ID:       "store",
+				Type:     taskengine.Hook,
+				InputVar: "input", // Use original input despite moderation
+				Hook: &taskengine.HookCall{
+					Type: "store_message",
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+			{
+				ID:             "reject",
+				Type:           taskengine.RawString,
+				PromptTemplate: `Rejected: {{.input}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := env.ExecEnv(context.Background(), chain, "safe message", taskengine.DataTypeString)
+	require.NoError(t, err)
+	require.Equal(t, "user message stored", result)
+}
+
+func TestUnit_SimpleEnv_ExecEnv_InputVar_InvalidVariable(t *testing.T) {
+	mockExec := &taskengine.MockTaskExecutor{} // Shouldn't be called
+
+	tracker := serverops.NoopTracker{}
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	require.NoError(t, err)
+
+	chain := &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				InputVar:       "nonexistent",
+				PromptTemplate: `Should fail`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = env.ExecEnv(context.Background(), chain, "test", taskengine.DataTypeString)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "input variable")
+}
+
+func TestUnit_SimpleEnv_ExecEnv_InputVar_DefaultBehavior(t *testing.T) {
+	mockExec := &taskengine.MockTaskExecutor{
+		MockOutputSequence:      []any{"first", "second"},
+		MockRawResponseSequence: []string{"first", "second"},
+	}
+
+	tracker := serverops.NoopTracker{}
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	require.NoError(t, err)
+
+	chain := &taskengine.ChainDefinition{
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:             "task1",
+				Type:           taskengine.RawString,
+				PromptTemplate: `First: {{.input}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "task2"},
+					},
+				},
+			},
+			{
+				ID:   "task2",
+				Type: taskengine.RawString,
+				// No InputVar specified - should use previous output
+				PromptTemplate: `Second: {{.task1}}`,
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := env.ExecEnv(context.Background(), chain, "input", taskengine.DataTypeString)
+	require.NoError(t, err)
+	require.Equal(t, "second", result)
 }
