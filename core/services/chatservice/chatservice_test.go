@@ -58,7 +58,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		"persist_messages":          chatHook,
 	})
 
-	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks)
+	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks, serverops.NoopTracker{})
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}

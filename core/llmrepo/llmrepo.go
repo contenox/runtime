@@ -9,12 +9,14 @@ import (
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 type ModelRepo interface {
 	GetProvider(ctx context.Context) (libmodelprovider.Provider, error)
+	GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error)
 	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
 }
 
@@ -51,7 +53,7 @@ func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb
 	}, com(ctx)
 }
 
-func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
+func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State, tokenizer tokenizerservice.Tokenizer) (ModelRepo, error) {
 	tx, com, r, err := dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -79,6 +81,7 @@ func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb
 		model:      model,
 		dbInstance: dbInstance,
 		runtime:    runtime,
+		tokenizer:  tokenizer,
 		embed:      false,
 		prompt:     true,
 	}, com(ctx)
@@ -89,6 +92,7 @@ type modelManager struct {
 	model      *store.Model
 	dbInstance libdb.DBManager
 	runtime    *runtimestate.State
+	tokenizer  tokenizerservice.Tokenizer
 	embed      bool
 	prompt     bool
 }
@@ -134,6 +138,13 @@ func (e *modelManager) GetProvider(ctx context.Context) (libmodelprovider.Provid
 		libmodelprovider.WithEmbed(e.embed),
 		libmodelprovider.WithPrompt(e.prompt))
 	return provider, nil
+}
+
+func (e *modelManager) GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error) {
+	if e.tokenizer == nil {
+		return nil, errors.New("tokenizer not initialized")
+	}
+	return e.tokenizer, nil
 }
 
 func (e *modelManager) backendIsInPool(ctx context.Context, backendToVerify store.Backend) (bool, error) {

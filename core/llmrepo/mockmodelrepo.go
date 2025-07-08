@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -26,4 +27,11 @@ func (m *MockModelRepo) GetRuntime(ctx context.Context) runtimestate.ProviderFro
 			m.Provider,
 		}, nil
 	}
+}
+
+func (m *MockModelRepo) GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error) {
+	if m.Provider == nil {
+		return nil, fmt.Errorf("provider is nil for prompt execution")
+	}
+	return tokenizerservice.MockTokenizer{}, nil
 }

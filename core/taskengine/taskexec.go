@@ -9,6 +9,8 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 // TaskExecutor defines the interface for executing a individual tasks.
@@ -16,7 +18,7 @@ type TaskExecutor interface {
 	// TaskExec runs a single task and returns output
 	// It consumes a prompt and resolver policy, and returns structured output
 	// TODO: THIS IS NOT TRUE: alongside the raw LLM response.
-	TaskExec(ctx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
+	TaskExec(ctx context.Context, startingTime time.Time, resolver llmresolver.Policy, ctxLength int, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error)
 }
 
 // SimpleExec is a basic implementation of TaskExecutor.
@@ -25,6 +27,7 @@ type TaskExecutor interface {
 type SimpleExec struct {
 	promptExec   llmrepo.ModelRepo
 	hookProvider HookRepo
+	tracker      serverops.ActivityTracker
 }
 
 // NewExec creates a new SimpleExec instance
@@ -32,6 +35,7 @@ func NewExec(
 	_ context.Context,
 	promptExec llmrepo.ModelRepo,
 	hookProvider HookRepo,
+	tracker serverops.ActivityTracker,
 ) (TaskExecutor, error) {
 	if hookProvider == nil {
 		return nil, fmt.Errorf("hook provider is nil")
@@ -42,6 +46,7 @@ func NewExec(
 	return &SimpleExec{
 		hookProvider: hookProvider,
 		promptExec:   promptExec,
+		tracker:      tracker,
 	}, nil
 }
 
@@ -137,7 +142,7 @@ func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, p
 }
 
 // TaskExec dispatches task execution based on the task type.
-func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time, resolver llmresolver.Policy, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
+func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time, resolver llmresolver.Policy, ctxLength int, currentTask *ChainTask, input any, dataType DataType) (any, DataType, string, error) {
 	var transitionEval string
 	var taskErr error
 	var output any = input
@@ -189,6 +194,24 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
 		outputType = DataTypeString
 		output = transitionEval
+	case LLMExecution:
+		if currentTask.LLMExecution == nil {
+			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")
+		}
+		if dataType != DataTypeChatHistory {
+			return nil, DataTypeAny, "", fmt.Errorf("llm_execution requires chat history input")
+		}
+		chatHistory, ok := input.(ChatHistory)
+		if !ok {
+			return nil, DataTypeAny, "", fmt.Errorf("llm_execution requires chat history input")
+		}
+		output, outputType, transitionEval, taskErr = exe.executeLLM(
+			taskCtx,
+			chatHistory,
+			ctxLength,
+			resolver,
+			currentTask.LLMExecution,
+		)
 	case Hook:
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
@@ -200,6 +223,80 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	}
 
 	return output, outputType, transitionEval, taskErr
+}
+
+func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLength int, resolverPolicy llmresolver.Policy, llmCall *LLMExecutionConfig) (any, DataType, string, error) {
+	providers := []string{}
+	if llmCall.Provider != "" {
+		providers = append(providers, llmCall.Provider)
+	}
+	if llmCall.Providers != nil {
+		providers = append(providers, llmCall.Providers...)
+	}
+	tokenizer, err := exe.promptExec.GetTokenizer(ctx)
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
+	}
+	if input.InputTokens <= 0 {
+		prompt := ""
+		for _, m := range input.Messages {
+			prompt += m.Content
+		}
+		inputCount, err := tokenizer.CountTokens(ctx, "tiny", prompt)
+		if err != nil {
+			return nil, DataTypeAny, "", fmt.Errorf("token count failed: %w", err)
+		}
+		input.InputTokens = inputCount
+	}
+	if input.InputTokens > ctxLength {
+		return nil, DataTypeAny, "", fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength)
+	}
+	modelNames := []string{}
+	if llmCall.Model != "" {
+		modelNames = append(modelNames, llmCall.Model)
+	}
+	if llmCall.Models != nil {
+		modelNames = append(modelNames, llmCall.Models...)
+	}
+	client, _, err := llmresolver.Chat(ctx, llmresolver.Request{
+		ProviderTypes: providers,
+		ModelNames:    modelNames,
+		ContextLength: ctxLength,
+		Tracker:       exe.tracker,
+	}, exe.promptExec.GetRuntime(ctx), resolverPolicy)
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("client resolution failed: %w", err)
+	}
+	messagesC := []libmodelprovider.Message{}
+	for _, m := range input.Messages {
+		messagesC = append(messagesC, libmodelprovider.Message{
+			Role:    m.Role,
+			Content: m.Content,
+		})
+	}
+	resp, err := client.Chat(ctx, messagesC)
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("chat failed: %w", err)
+	}
+	input.Messages = append(input.Messages, Message{
+		Role:    resp.Role,
+		Content: resp.Content,
+	})
+	p, err := exe.promptExec.GetProvider(ctx)
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("failed to get provider: %w", err)
+	}
+	modelForTokenization, err := tokenizer.OptimalModel(ctx, p.ModelName())
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("failed to get model for tokenization: %w", err)
+	}
+	outputTokensCount, err := tokenizer.CountTokens(ctx, modelForTokenization, resp.Content)
+	if err != nil {
+		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
+	}
+	input.OutputTokens = outputTokensCount
+
+	return input, DataTypeChatHistory, "executed", nil
 }
 
 func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, input any, dataType DataType, transition string, hook *HookCall) (any, DataType, string, error) {

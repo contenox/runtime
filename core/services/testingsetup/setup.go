@@ -16,6 +16,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
 	"github.com/contenox/runtime-mvp/core/services/fileservice"
 	"github.com/contenox/runtime-mvp/core/services/indexservice"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
@@ -435,6 +436,7 @@ type Environment struct {
 	Err         error
 	backends    []string
 	triggerChan chan struct{}
+	tokenizer   tokenizerservice.Tokenizer
 	tracker     serverops.ActivityTracker
 }
 
@@ -679,8 +681,12 @@ func (env *Environment) NewExecRepo(config *serverops.Config) (llmrepo.ModelRepo
 	if config == nil {
 		return nil, fmt.Errorf("config is nil")
 	}
+	if env.tokenizer == nil {
+		env.Err = fmt.Errorf("tokenizer is nil")
+		return nil, env.Err
+	}
 
-	return llmrepo.NewExecRepo(env.Ctx, config, env.dbManager, env.state)
+	return llmrepo.NewExecRepo(env.Ctx, config, env.dbManager, env.state, env.tokenizer)
 }
 
 func (env *Environment) WaitForModel(model string) *Environment {

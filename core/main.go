@@ -120,7 +120,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state)
+	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
+		ServerAddress: config.TokenizerServiceURL,
+	})
+	if err != nil {
+		cleanup()
+		log.Fatalf("initializing tokenizer service failed: %v", err)
+	}
+
+	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state, tokenizerSvc)
 	if err != nil {
 		log.Fatalf("initializing promptexec failed: %v", err)
 	}
@@ -140,13 +148,6 @@ func main() {
 	webcall := hooks.NewWebCaller()
 	// Hook instances
 	echocmd := hooks.NewEchoHook()
-	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
-		ServerAddress: config.TokenizerServiceURL,
-	})
-	if err != nil {
-		cleanup()
-		log.Fatalf("initializing tokenizer service failed: %v", err)
-	}
 	settings := kv.NewLocalCache(dbInstance, "")
 	breakerSettings := libroutine.NewRoutine(3, time.Second*10)
 	triggerChan := make(chan struct{})
@@ -183,7 +184,7 @@ func main() {
 		"execute_model_on_messages":    chatHook,
 		"persist_messages":             chatHook,
 	})
-	exec, err := taskengine.NewExec(ctx, execRepo, hooks)
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serverops.NewLogActivityTracker(slog.Default()))
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}

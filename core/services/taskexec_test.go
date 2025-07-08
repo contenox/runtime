@@ -31,14 +31,14 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Provider: mockProvider,
 	}
 
-	exec, err := taskengine.NewExec(context.Background(), mockRepo, hooks.NewMockHookRegistry())
+	exec, err := taskengine.NewExec(context.Background(), mockRepo, hooks.NewMockHookRegistry(), &serverops.LogActivityTracker{})
 	require.NoError(t, err)
 
 	task := &taskengine.ChainTask{
 		Type: taskengine.RawString,
 	}
 
-	output, _, _, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, task, "hello", taskengine.DataTypeString)
+	output, _, _, err := exec.TaskExec(context.Background(), time.Now().UTC(), llmresolver.Randomly, 100, task, "hello", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "hello", output)
 }
@@ -68,7 +68,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, &hooks.MockHookRepo{})
+	exec, err := taskengine.NewExec(ctx, execRepo, &hooks.MockHookRepo{}, &serverops.LogActivityTracker{})
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(t, resp)
 	t.Run("simple test-case", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "simple",
 			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
@@ -103,7 +103,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "true", formatted)
 	})
 	t.Run("PromptToNumber", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "number-test",
 			Type: taskengine.ParseNumber,
 		}, "Respond with only the number 10 as a digit, no other text.", taskengine.DataTypeInt)
@@ -112,7 +112,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "10", formatted)
 	})
 	t.Run("PromptToScore", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "score-test",
 			Type: taskengine.ParseScore,
 		}, "Respond with exactly the number 7.5, no other text.", taskengine.DataTypeFloat)
@@ -122,7 +122,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("PromptToRange", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "range-test",
 			Type: taskengine.ParseRange,
 		}, "Echo the Input. Input: 3-5", taskengine.DataTypeString)
@@ -131,7 +131,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		require.Equal(t, "3-5", formatted)
 
 		// Test single number to range conversion
-		response, _, formatted, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "range-single-test",
 			Type: taskengine.ParseRange,
 		}, "Respond with the number 4, no other text.", taskengine.DataTypeString)
@@ -141,7 +141,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ConditionCaseSensitive", func(t *testing.T) {
-		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "condition-case-insensitive",
 			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
@@ -153,7 +153,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ConditionInvalidResponse", func(t *testing.T) {
-		_, _, res, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, res, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "condition-invalid",
 			Type: taskengine.ConditionKey,
 			ValidConditions: map[string]bool{
@@ -167,7 +167,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("RangeReverseNumbers", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "range-reverse-test",
 			Type: taskengine.ParseRange,
 		}, "Echo the Input as is. Input: 5-3", taskengine.DataTypeString)
@@ -177,7 +177,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("ScoreIntegerValue", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "score-integer-test",
 			Type: taskengine.ParseScore,
 		}, "Respond with exactly the number 7, no decimal places or other text.", taskengine.DataTypeString)
@@ -187,7 +187,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("NumberInvalidFloat", func(t *testing.T) {
-		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "number-invalid-test",
 			Type: taskengine.ParseNumber,
 		}, "Respond with '10.5'", taskengine.DataTypeString)
@@ -197,7 +197,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("HookTaskError", func(t *testing.T) {
 		// Test with mock hook
-		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "hooks-implemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
@@ -207,7 +207,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("HookMockTaskNoError", func(t *testing.T) {
 		// Test with mock hook
-		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err = exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "hooks-implemented",
 			Type: taskengine.Hook,
 			Hook: &taskengine.HookCall{Type: "test-hook"},
@@ -217,14 +217,14 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 
 	t.Run("PromptToStringEdgeCases", func(t *testing.T) {
 		// Empty input
-		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		_, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			Type: taskengine.RawString,
 		}, "", taskengine.DataTypeString)
 		require.Error(t, err)
 
 		// Long input
 		longInput := strings.Repeat("repeat this ", 10)
-		output, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		output, _, _, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			Type: taskengine.RawString,
 		}, "Echo exactly this including the repetition: "+longInput, taskengine.DataTypeString)
 		require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	})
 
 	t.Run("NumberWithSpaces", func(t *testing.T) {
-		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, &taskengine.ChainTask{
+		response, _, formatted, err := exec.TaskExec(ctx, time.Now().UTC(), llmresolver.Randomly, 100, &taskengine.ChainTask{
 			ID:   "number-space-test",
 			Type: taskengine.ParseNumber,
 		}, "Respond with ' 42 '", taskengine.DataTypeInt)

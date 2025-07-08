@@ -39,7 +39,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, hooks.NewMockHookRegistry())
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks.NewMockHookRegistry(), &serverops.NoopTracker{})
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}

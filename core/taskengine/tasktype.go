@@ -25,6 +25,8 @@ const (
 	// RawString returns the raw string result from the LLM.
 	RawString TaskType = "raw_string"
 
+	LLMExecution TaskType = "llm_execution"
+
 	// Hook indicates this task should execute an external action rather than calling the LLM.
 	Hook TaskType = "hook"
 )
@@ -143,6 +145,18 @@ func ToOperatorTerm(s string) (OperatorTerm, error) {
 	}
 }
 
+type LLMExecutionConfig struct {
+	Model     string   `yaml:"model" json:"model"`
+	Models    []string `yaml:"models,omitempty" json:"models,omitempty"`
+	Provider  string   `yaml:"provider,omitempty" json:"provider,omitempty"`
+	Providers []string `yaml:"providers,omitempty" json:"providers,omitempty"`
+}
+
+type AppendMessageConfig struct {
+	Role    string `yaml:"role" json:"role"` // user/system/assistant
+	Content string `yaml:"content,omitempty" json:"content,omitempty"`
+}
+
 // HookCall represents an external integration or side-effect triggered during a task.
 // Hooks allow tasks to interact with external systems (e.g., "send_email", "update_db").
 type HookCall struct {
@@ -179,6 +193,9 @@ type ChainTask struct {
 	// Required for ConditionKey tasks, ignored for all other types.
 	// Example: {"yes": true, "no": true} for a yes/no condition.
 	ValidConditions map[string]bool `yaml:"valid_conditions,omitempty" json:"valid_conditions,omitempty"`
+
+	LLMExecution      *LLMExecutionConfig  `yaml:"llm_execution,omitempty" json:"llm_execution,omitempty"`
+	AppendChatMessage *AppendMessageConfig `yaml:"append_chat_message,omitempty" json:"append_chat_message,omitempty"`
 
 	// Hook defines an external action to run.
 	// Required for Hook tasks, must be nil/omitted for all other types.

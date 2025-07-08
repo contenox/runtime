@@ -164,7 +164,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
-			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, currentTask, taskInput, taskInputType)
+			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, int(chain.TokenLimit), currentTask, taskInput, taskInputType)
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
