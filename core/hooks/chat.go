@@ -23,7 +23,6 @@ type Chat struct {
 func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		"append_user_message",
-		"preappend_message_to_history",
 		"convert_openai_to_history",
 		"append_system_message",
 		"persist_messages",
@@ -45,8 +44,6 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 	switch name {
 	case "append_user_message":
 		return h.AppendUserInputToChathistory, nil
-	case "preappend_message_to_history":
-		return h.PrependMessage, nil
 	case "convert_openai_to_history":
 		return h.AppendOpenAIChatToChathistory, nil
 	case "append_system_message":
@@ -265,47 +262,4 @@ func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input a
 	}
 	history.Messages = messages
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, messages[len(messages)-1].Content, nil
-}
-
-func (h *Chat) PrependMessage(
-	ctx context.Context,
-	startTime time.Time,
-	input any,
-	dataType taskengine.DataType,
-	transition string,
-	hookCall *taskengine.HookCall,
-) (int, any, taskengine.DataType, string, error) {
-	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
-			fmt.Errorf("expected chat history, got %v", dataType)
-	}
-
-	history, ok := input.(taskengine.ChatHistory)
-	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
-			fmt.Errorf("invalid input type: expected ChatHistory")
-	}
-
-	message, ok := hookCall.Args["message"]
-	if !ok || message == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
-			fmt.Errorf("missing message argument")
-	}
-
-	role, ok := hookCall.Args["role"]
-	if !ok || role == "" {
-		role = "system"
-	}
-
-	// Prepend new system message
-	newMessage := taskengine.Message{
-		Role:    role,
-		Content: message,
-	}
-
-	updatedMessages := append([]taskengine.Message{newMessage}, history.Messages...)
-	history.Messages = updatedMessages
-
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory,
-		"prepended system message", nil
 }

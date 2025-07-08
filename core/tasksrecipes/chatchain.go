@@ -113,20 +113,58 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 		Description: "Standard chat processing pipeline with hooks",
 		Tasks: []taskengine.ChainTask{
 			{
+				ID:          "append_user_message",
+				Description: "Append user message to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "append_user_message",
+					Args: map[string]string{
+						"subject_id": req.SubjectID,
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "mux_input"},
+					},
+				},
+			},
+			{
+				ID:          "mux_input",
+				Description: "Check for commands like /echo using Mux",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "command_router",
+					Args: map[string]string{
+						"subject_id": req.SubjectID,
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "moderate"},
+						{
+							Operator: "equals",
+							When:     "echo",
+							Goto:     "persist_messages",
+						},
+					},
+				},
+			},
+			{
 				ID:             "moderate",
 				Description:    "Moderate the input",
 				Type:           taskengine.ParseNumber,
 				PromptTemplate: "Classify the input as safe (10) or unsafe (0) respond with an numeric value between 0 and 10. Input: {{.input}}",
+				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
 							Operator: taskengine.OpLessThan,
-							When:     "5",
+							When:     "4",
 							Goto:     "reject_request",
 						},
 						{
 							Operator: "default",
-							Goto:     "append_user_message",
+							Goto:     "execute_model_on_messages",
 						},
 					},
 					OnFailure: "request_failed",
@@ -156,70 +194,17 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
-				ID:          "append_user_message",
-				Description: "Append user message to chat history",
-				Type:        taskengine.Hook,
-				InputVar:    "input",
-				Hook: &taskengine.HookCall{
-					Type: "append_user_message",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "preappend_message_to_history"},
-					},
-				},
-			},
-			{
-				ID:          "preappend_message_to_history",
-				Description: "Add system level instructions to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "preappend_message_to_history",
-					Args: map[string]string{
-						"role": "system",
-						"message": "You're a helpful assistant in the Contenox system. " +
-							"Respond helpfully and mention available commands (/help, /echo, /search_knowledge) when appropriate. " +
-							"Keep conversation friendly.",
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "mux_input"},
-					},
-				},
-			},
-			{
-				ID:          "mux_input",
-				Description: "Check for commands like /echo using Mux",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "command_router",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "execute_model_on_messages"},
-						{
-							Operator: "equals",
-							When:     "echo",
-							Goto:     "persist_messages",
-						},
-					},
-				},
-			},
-			{
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
 				Type:        taskengine.ModelExecution,
+				SystemInstruction: "You're a helpful assistant in the contenox system. " +
+					"Respond helpfully and mention available commands (/help, /echo, /search_knowledge) when appropriate. " +
+					"Keep conversation friendly.",
 				ExecuteModelOnHistory: &taskengine.LLMExecutionConfig{
 					Models:    req.PreferredModelNames,
 					Providers: []string{req.Provider},
 				},
+				InputVar: "append_user_message",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "persist_messages"},

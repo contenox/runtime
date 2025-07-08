@@ -148,68 +148,70 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	var taskErr error
 	var output any = input
 	var outputType DataType = dataType
+
+	// Unified prompt extraction function
+	getPrompt := func() (string, error) {
+		switch outputType {
+		case DataTypeString:
+			prompt, ok := input.(string)
+			if !ok {
+				return "", fmt.Errorf("SEVERBUG: input is not a string")
+			}
+			return prompt, nil
+		case DataTypeChatHistory:
+			history, ok := input.(ChatHistory)
+			if !ok {
+				return "", fmt.Errorf("SEVERBUG: input is not a chat history")
+			}
+			if len(history.Messages) == 0 {
+				return "", fmt.Errorf("SEVERBUG: chat history is empty")
+			}
+			return history.Messages[len(history.Messages)-1].Content, nil
+		default:
+			return "", fmt.Errorf("unsupported input type for task %v: %v", currentTask.Type, outputType)
+		}
+	}
+
 	switch currentTask.Type {
-	case RawString:
-		prompt, ok := input.(string)
-		if !ok {
-			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
+	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange:
+		prompt, err := getPrompt()
+		if err != nil {
+			return nil, DataTypeAny, "", err
 		}
-		if currentTask.SystemInstruction != "" {
-			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt) // TODO: this can be improved
-		}
-		transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
-		output = transitionEval
-		outputType = DataTypeString
-	case ConditionKey:
-		var hit bool
-		prompt, ok := input.(string)
-		if !ok {
-			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
-		}
-		if currentTask.SystemInstruction != "" {
-			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt) // TODO: this can be improved
-		}
-		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ValidConditions, prompt)
-		output = hit
-		outputType = DataTypeBool
-		transitionEval = strconv.FormatBool(hit)
-	case ParseNumber:
-		var number int
-		prompt, ok := input.(string)
-		if !ok {
-			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
-		}
+
 		if currentTask.SystemInstruction != "" {
 			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
 		}
-		number, taskErr = exe.number(taskCtx, resolver, prompt)
-		output = number
-		outputType = DataTypeInt
-		transitionEval = strconv.FormatInt(int64(number), 10)
-	case ParseScore:
-		var score float64
-		prompt, ok := input.(string)
-		if !ok {
-			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
+
+		switch currentTask.Type {
+		case RawString:
+			transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
+			output = transitionEval
+			outputType = DataTypeString
+		case ConditionKey:
+			var hit bool
+			hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ValidConditions, prompt)
+			output = hit
+			outputType = DataTypeBool
+			transitionEval = strconv.FormatBool(hit)
+		case ParseNumber:
+			var number int
+			number, taskErr = exe.number(taskCtx, resolver, prompt)
+			output = number
+			outputType = DataTypeInt
+			transitionEval = strconv.FormatInt(int64(number), 10)
+		case ParseScore:
+			var score float64
+			score, taskErr = exe.score(taskCtx, resolver, prompt)
+			output = score
+			outputType = DataTypeFloat
+			transitionEval = strconv.FormatFloat(score, 'f', 2, 64)
+		case ParseRange:
+			transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
+			outputType = DataTypeString
+			output = transitionEval
 		}
-		if currentTask.SystemInstruction != "" {
-			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
-		}
-		score, taskErr = exe.score(taskCtx, resolver, prompt)
-		output = score
-		outputType = DataTypeFloat
-		transitionEval = strconv.FormatFloat(score, 'f', 2, 64)
-	case ParseRange:
-		prompt, ok := input.(string)
-		if !ok {
-			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
-		}
-		if currentTask.SystemInstruction != "" {
-			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
-		}
-		transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
-		outputType = DataTypeString
-		output = transitionEval
+
 	case ModelExecution:
 		if currentTask.ExecuteModelOnHistory == nil {
 			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")
@@ -222,10 +224,13 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			return nil, DataTypeAny, "", fmt.Errorf("llm_execution requires chat history input")
 		}
 		if currentTask.SystemInstruction != "" {
-			chatHistory.Messages = append(chatHistory.Messages, Message{
-				Role:    "system",
-				Content: currentTask.SystemInstruction,
-			})
+			messages := []Message{
+				{
+					Role:    "system",
+					Content: currentTask.SystemInstruction,
+				},
+			}
+			chatHistory.Messages = append(messages, chatHistory.Messages...)
 		}
 		output, outputType, transitionEval, taskErr = exe.executeLLM(
 			taskCtx,
@@ -234,12 +239,21 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			resolver,
 			currentTask.ExecuteModelOnHistory,
 		)
+
 	case Hook:
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
 		} else {
-			output, outputType, transitionEval, taskErr = exe.hookengine(taskCtx, startingTime, output, outputType, transitionEval, currentTask.Hook)
+			output, outputType, transitionEval, taskErr = exe.hookengine(
+				taskCtx,
+				startingTime,
+				output,
+				outputType,
+				transitionEval,
+				currentTask.Hook,
+			)
 		}
+
 	default:
 		taskErr = fmt.Errorf("unknown task type: %w %s", ErrUnsupportedTaskType, currentTask.Type)
 	}
@@ -271,7 +285,8 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		input.InputTokens = inputCount
 	}
 	if ctxLength > 0 && input.InputTokens > ctxLength {
-		return nil, DataTypeAny, "", fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength)
+		err := fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength)
+		return nil, DataTypeAny, "", err
 	}
 	modelNames := []string{}
 	if llmCall.Model != "" {
@@ -304,7 +319,8 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		resolverPolicy,
 	)
 	if err != nil {
-		return nil, DataTypeAny, "", fmt.Errorf("client resolution failed: %w", err)
+		err = fmt.Errorf("client resolution failed: %w", err)
+		return nil, DataTypeAny, "", err
 	}
 	messagesC := []libmodelprovider.Message{}
 	for _, m := range input.Messages {
@@ -323,15 +339,18 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	})
 	p, err := exe.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
-		return nil, DataTypeAny, "", fmt.Errorf("failed to get provider: %w", err)
+		err = fmt.Errorf("failed to get provider: %w", err)
+		return nil, DataTypeAny, "", err
 	}
 	modelForTokenization, err := tokenizer.OptimalModel(ctx, p.ModelName())
 	if err != nil {
-		return nil, DataTypeAny, "", fmt.Errorf("failed to get model for tokenization: %w", err)
+		err = fmt.Errorf("failed to get model for tokenization: %w", err)
+		return nil, DataTypeAny, "", err
 	}
 	outputTokensCount, err := tokenizer.CountTokens(ctx, modelForTokenization, resp.Content)
 	if err != nil {
-		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
+		err = fmt.Errorf("tokenizer failed: %w", err)
+		return nil, DataTypeAny, "", err
 	}
 	input.OutputTokens = outputTokensCount
 

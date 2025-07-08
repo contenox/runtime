@@ -49,6 +49,10 @@ func (m *MockProvider) CanPrompt() bool {
 	return m.CanPromptFlag
 }
 
+func (m *MockProvider) GetType() string {
+	return "Mock"
+}
+
 func (m *MockProvider) GetChatConnection(ctx context.Context, backendID string) (LLMChatClient, error) {
 	return &MockChatClient{ProviderID: m.ID}, nil
 }

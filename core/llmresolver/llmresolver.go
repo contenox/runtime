@@ -242,7 +242,7 @@ func Chat(
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	reportErr, _, endFn := tracker.Start(
+	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
 		"resolve",
 		"chat_model",
@@ -278,6 +278,11 @@ func Chat(
 		reportErr(err)
 		return nil, "", err
 	}
+	reportChange("selected_provider", map[string]string{
+		"model_name":  modelName,
+		"provider_id": provider.GetID(),
+		"backend_id":  backend,
+	})
 	return client, modelName, nil
 }
 
@@ -297,7 +302,7 @@ func Embed(
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	reportErr, _, endFn := tracker.Start(
+	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
 		"resolve",
 		"embed_model",
@@ -328,6 +333,11 @@ func Embed(
 		reportErr(err)
 		return nil, fmt.Errorf("failed apply resolver %w", err)
 	}
+	reportChange("selected_provider", map[string]string{
+		"model_name":  provider.ModelName(),
+		"provider_id": provider.GetID(),
+		"backend_id":  backend,
+	})
 	return provider.GetEmbedConnection(ctx, backend)
 }
 
@@ -341,7 +351,7 @@ func Stream(
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	reportErr, _, endFn := tracker.Start(
+	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
 		"resolve",
 		"stream_model",
@@ -361,6 +371,11 @@ func Stream(
 		reportErr(err)
 		return nil, err
 	}
+	reportChange("selected_provider", map[string]string{
+		"model_name":  provider.ModelName(),
+		"provider_id": provider.GetID(),
+		"backend_id":  backend,
+	})
 	return provider.GetStreamConnection(ctx, backend)
 }
 
@@ -380,7 +395,7 @@ func PromptExecute(
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	reportErr, _, endFn := tracker.Start(
+	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
 		"resolve",
 		"prompt_model",
@@ -411,5 +426,11 @@ func PromptExecute(
 		reportErr(err)
 		return nil, err
 	}
+	reportChange("selected_provider", map[string]string{
+		"model_name":    provider.ModelName(),
+		"provider_id":   provider.GetID(),
+		"provider_type": provider.GetType(),
+		"backend_id":    backend,
+	})
 	return provider.GetPromptConnection(ctx, backend)
 }

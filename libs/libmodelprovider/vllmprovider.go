@@ -63,6 +63,10 @@ func (p *vLLMProvider) GetID() string {
 	return p.ID
 }
 
+func (p *vLLMProvider) GetType() string {
+	return "vllm"
+}
+
 func (p *vLLMProvider) GetContextLength() int {
 	return p.ContextLength
 }

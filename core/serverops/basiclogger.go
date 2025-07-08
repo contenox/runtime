@@ -27,7 +27,6 @@ func (t *LogActivityTracker) Start(
 	subject string,
 	kvArgs ...any,
 ) (reportErr func(error), reportChange func(string, any), end func()) {
-
 	startTime := time.Now()
 
 	// Generate an operation ID
@@ -37,6 +36,14 @@ func (t *LogActivityTracker) Start(
 		slog.String("subject", subject),
 		slog.String("op_id", opID),
 	}
+	requestID := ""
+	if ctx.Value(ContextKeyRequestID) != nil {
+		value, ok := ctx.Value(ContextKeyRequestID).(string)
+		if ok {
+			requestID = value
+		}
+	}
+	attrs = append(attrs, slog.String("request_id", requestID))
 	arrs := append(attrs, toSlogAttrs(kvArgs...)...)
 	// Initial log entry: start of the operation
 	t.logger.LogAttrs(ctx, slog.LevelInfo, "Operation started",
@@ -52,6 +59,7 @@ func (t *LogActivityTracker) Start(
 				slog.String("subject", subject),
 				slog.String("op_id", opID),
 				slog.Any("error", err),
+				slog.String("request_id", requestID),
 			)
 		}
 	}
@@ -63,6 +71,7 @@ func (t *LogActivityTracker) Start(
 			slog.String("op_id", opID),
 			slog.String("change_id", id),
 			slog.Any("change_data", data),
+			slog.String("request_id", requestID),
 		)
 	}
 
@@ -73,6 +82,7 @@ func (t *LogActivityTracker) Start(
 			slog.String("subject", subject),
 			slog.String("op_id", opID),
 			slog.Duration("duration", duration),
+			slog.String("request_id", requestID),
 		)
 	}
 
@@ -96,3 +106,11 @@ func toSlogAttrs(kvArgs ...any) []slog.Attr {
 func formatTimestamp(t time.Time) string {
 	return t.Format("20060102-150405.000")
 }
+
+type contextKey string
+
+func (c contextKey) String() string {
+	return string(c)
+}
+
+var ContextKeyRequestID = contextKey("request_id")

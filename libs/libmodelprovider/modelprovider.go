@@ -9,6 +9,7 @@ type Provider interface {
 	GetBackendIDs() []string // Available backend instances
 	ModelName() string       // Model name (e.g., "llama2:latest")
 	GetID() string           // unique identifier for the model provider
+	GetType() string         // Type of the model provider
 	GetContextLength() int   // Maximum context length supported
 	CanChat() bool           // Supports chat interactions
 	CanEmbed() bool          // Supports embeddings

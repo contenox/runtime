@@ -35,6 +35,10 @@ func (p *OllamaProvider) GetID() string {
 	return p.ID
 }
 
+func (p *OllamaProvider) GetType() string {
+	return "ollama"
+}
+
 func (p *OllamaProvider) GetContextLength() int {
 	return p.ContextLength
 }
@@ -157,6 +161,7 @@ func NewOllamaModelProvider(name string, backends []string, httpClient *http.Cli
 var (
 	modelContextLengths = map[string]int{
 		"smollm2:135m":       100000,
+		"qwen2.5":            8192,
 		"llama2":             4096,
 		"llama3":             8192,
 		"llama3-70b":         8192,
@@ -177,6 +182,7 @@ var (
 		"dolphin-mixtral":    32768,
 		"qwen2.5:0.5b":       4128,
 		"qwen2.5:1.5b":       8192,
+		"qwen2.5:3b":         8192,
 		"paraphrase-multilingual:278m-mpnet-base-v2-fp16": 278,
 		"llama2-uncensored":   4096,
 		"llama2-70b":          4096,
@@ -196,6 +202,7 @@ var (
 		"smollm2:135m":       1024,
 		"codellama:34b-100k": 100000,
 		"mixtral-8x7b":       32768,
+		"qwen2.5:3b":         8192,
 	}
 
 	canChat = map[string]bool{
@@ -204,12 +211,15 @@ var (
 		"gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
-		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true,
+		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true, "qwen2.5": true, "qwen2.5:3b": true,
 	}
 
 	canEmbed = map[string]bool{
 		"deepseek":              true,
 		"qwen":                  true,
+		"qwen2":                 true,
+		"qwen2.5":               true,
+		"qwen2.5:3b":            true,
 		"all-minilm":            true,
 		"granite-embedding:30m": true,
 		"nomic-embed-text":      true,
@@ -231,6 +241,9 @@ var (
 		"codellama":           true,
 		"gemma":               true,
 		"qwen":                true,
+		"qwen2":               true,
+		"qwen2.5":             true,
+		"qwen2.5:3b":          true,
 		"deepseek":            true,
 		"vicuna":              true,
 		"guanaco":             true,

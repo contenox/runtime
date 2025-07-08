@@ -82,6 +82,10 @@ func (p *OpenAIProvider) GetID() string {
 	return p.id
 }
 
+func (p *OpenAIProvider) GetType() string {
+	return "openai"
+}
+
 func (p *OpenAIProvider) GetContextLength() int {
 	return p.contextLength
 }

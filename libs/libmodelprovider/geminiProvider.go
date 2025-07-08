@@ -66,6 +66,10 @@ func (p *GeminiProvider) GetID() string {
 	return p.id
 }
 
+func (p *GeminiProvider) GetType() string {
+	return "gemini"
+}
+
 func (p *GeminiProvider) GetContextLength() int {
 	return p.contextLength
 }

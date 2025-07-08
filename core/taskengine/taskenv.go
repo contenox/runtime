@@ -37,6 +37,33 @@ const (
 	DataTypeOpenAIChatResponse
 )
 
+func (d *DataType) String() string {
+	switch *d {
+	case DataTypeAny:
+		return "any"
+	case DataTypeString:
+		return "string"
+	case DataTypeBool:
+		return "bool"
+	case DataTypeInt:
+		return "int"
+	case DataTypeFloat:
+		return "float"
+	case DataTypeSearchResults:
+		return "search_results"
+	case DataTypeJSON:
+		return "json"
+	case DataTypeChatHistory:
+		return "chat_history"
+	case DataTypeOpenAIChat:
+		return "openai_chat"
+	case DataTypeOpenAIChatResponse:
+		return "openai_chat_response"
+	default:
+		return "unknown"
+	}
+}
+
 // EnvExecutor defines an environment for executing ChainDefinitions
 type EnvExecutor interface {
 	// ExecEnv executes a chain with input and returns final output

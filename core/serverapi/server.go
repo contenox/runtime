@@ -42,6 +42,7 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
+	"github.com/google/uuid"
 )
 
 func New(
@@ -137,6 +138,7 @@ func New(
 	handler = enableCORS(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
+	handler = requestIDMiddleware(config, handler)
 	handler = JWTMiddleware(config, handler)
 	services := []serverops.ServiceMeta{
 		modelService,
@@ -273,5 +275,13 @@ func jwtRefreshMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 			}
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func requestIDMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := uuid.New().String()
+		ctx := context.WithValue(r.Context(), serverops.ContextKeyRequestID, requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
