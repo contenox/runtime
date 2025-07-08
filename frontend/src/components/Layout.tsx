@@ -16,8 +16,8 @@ type MenuItem = {
 };
 
 type Routes = {
-  menu: MenuItem[];
   nav: MenuItem[];
+  shelf: MenuItem[];
 };
 
 type LayoutProps = {
@@ -29,7 +29,7 @@ type LayoutProps = {
 };
 
 export function Layout({
-  routes: { menu, nav },
+  routes: { nav, shelf },
   defaultOpen = true,
   mainContent,
   className,
@@ -72,7 +72,7 @@ export function Layout({
               <Button onClick={() => navigate('/login')}>{t('common.login')}</Button>
             )
           )}
-          <DropdownMenu isOpen={isNavOpen} setIsOpen={setNavIsOpen} items={menu} />
+          <DropdownMenu isOpen={isNavOpen} setIsOpen={setNavIsOpen} items={shelf} />
         </div>
       </Panel>
 

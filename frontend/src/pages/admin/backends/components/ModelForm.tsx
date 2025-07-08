@@ -15,7 +15,7 @@ export default function ModelForm({ newModel, onSubmit, onChange, isPending }: M
     <Form onSubmit={onSubmit}>
       <Input placeholder={t('model.form_enter_name')} value={newModel} onChange={onChange} />
       <Button type="submit" variant="primary" disabled={isPending}>
-        {isPending ? t('common.declaring') : t('model.declare_instrution')}
+        {isPending ? t('common.declaring') : t('model.declare_instruction')}
       </Button>
     </Form>
   );

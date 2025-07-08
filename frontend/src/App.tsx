@@ -8,18 +8,15 @@ import { routes } from './config/routes';
 import { AuthProvider } from './lib/AuthProvider';
 
 export default function App() {
-  const [navItems, footerItems] = useMemo(() => {
-    return [
-      routes.filter(route => route.showInNav),
-      routes.filter(route => !route.showInNav && !route.system),
-    ];
+  const [navItems, shelfItems] = useMemo(() => {
+    return [routes.filter(route => route.showInNav), routes.filter(route => route.showInShelf)];
   }, []);
 
   return (
     <Router>
       <AuthProvider>
         <Layout
-          routes={{ menu: footerItems, nav: navItems }}
+          routes={{ shelf: shelfItems, nav: navItems }}
           defaultOpen={true}
           mainContent={
             <Routes>

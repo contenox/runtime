@@ -37,6 +37,7 @@ interface RouteConfig {
   showInNav?: boolean;
   system?: boolean;
   protected: boolean;
+  showInShelf?: boolean;
 }
 
 export const routes: RouteConfig[] = [
@@ -47,6 +48,7 @@ export const routes: RouteConfig[] = [
     icon: <Home className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: false,
+    showInShelf: true,
   },
   {
     path: '/backends',
@@ -55,6 +57,7 @@ export const routes: RouteConfig[] = [
     icon: <Database className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/files',
@@ -63,6 +66,7 @@ export const routes: RouteConfig[] = [
     icon: <File className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/jobs',
@@ -71,6 +75,7 @@ export const routes: RouteConfig[] = [
     icon: <Turtle className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/chat/:chatId',
@@ -78,6 +83,7 @@ export const routes: RouteConfig[] = [
     label: i18n.t('navbar.chat'),
     showInNav: false,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/chats',
@@ -86,6 +92,7 @@ export const routes: RouteConfig[] = [
     icon: <MessageCircleCode className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/users',
@@ -94,6 +101,7 @@ export const routes: RouteConfig[] = [
     icon: <User2Icon className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/search',
@@ -102,6 +110,7 @@ export const routes: RouteConfig[] = [
     icon: <Search className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/chains',
@@ -110,6 +119,7 @@ export const routes: RouteConfig[] = [
     icon: <Link className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/chains/:id',
@@ -117,6 +127,7 @@ export const routes: RouteConfig[] = [
     label: i18n.t('navbar.chain_detail'),
     showInNav: false,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/exec',
@@ -125,6 +136,7 @@ export const routes: RouteConfig[] = [
     icon: <ChevronsRight className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
+    showInShelf: false,
   },
   {
     path: '/settings',
@@ -133,13 +145,7 @@ export const routes: RouteConfig[] = [
     icon: <Settings className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
-  },
-  {
-    path: '/demo',
-    element: BackendsPage,
-    label: i18n.t('navbar.demo'),
-    showInNav: false,
-    protected: true,
+    showInShelf: false,
   },
   {
     path: '/about',
@@ -147,6 +153,7 @@ export const routes: RouteConfig[] = [
     label: i18n.t('footer.about'),
     showInNav: false,
     protected: false,
+    showInShelf: true,
   },
   {
     path: '/privacy',
@@ -154,6 +161,7 @@ export const routes: RouteConfig[] = [
     label: i18n.t('footer.privacy'),
     showInNav: false,
     protected: false,
+    showInShelf: true,
   },
   {
     path: LOGIN_ROUTE,
@@ -161,6 +169,7 @@ export const routes: RouteConfig[] = [
     label: i18n.t('login.title'),
     showInNav: false,
     protected: false,
+    showInShelf: false,
   },
   {
     path: '/bye',
@@ -169,6 +178,7 @@ export const routes: RouteConfig[] = [
     showInNav: false,
     system: true,
     protected: false,
+    showInShelf: false,
   },
   {
     path: '*',
@@ -177,5 +187,6 @@ export const routes: RouteConfig[] = [
     showInNav: false,
     system: true,
     protected: false,
+    showInShelf: false,
   },
 ];
