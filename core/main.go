@@ -181,7 +181,6 @@ func main() {
 		"convert_openai_to_history":    chatHook,
 		"convert_history_to_openai":    chatHook,
 		"append_system_message":        chatHook,
-		"execute_model_on_messages":    chatHook,
 		"persist_messages":             chatHook,
 	})
 	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serverops.NewLogActivityTracker(slog.Default()))

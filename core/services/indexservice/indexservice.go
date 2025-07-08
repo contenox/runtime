@@ -227,7 +227,7 @@ func (s *service) findKeywords(ctx context.Context, chunk string) (string, error
 
 	Return a comma-separated list of keywords.`, chunk)
 
-	provider, err := s.promptExec.GetProvider(ctx)
+	provider, err := s.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get provider: %w", err)
 	}
@@ -270,7 +270,7 @@ func (s *service) convertQuestionQuery(ctx context.Context, query string) (strin
 }
 
 func (s *service) executePrompt(ctx context.Context, prompt string) (string, error) {
-	provider, err := s.promptExec.GetProvider(ctx)
+	provider, err := s.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)
 	}

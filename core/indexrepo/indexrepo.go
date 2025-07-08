@@ -41,7 +41,7 @@ func ExecuteVectorSearch(
 		if query == "" {
 			continue
 		}
-		provider, err := embedder.GetProvider(ctx)
+		provider, err := embedder.GetDefaultSystemProvider(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get embedder provider: %w", err)
 		}
@@ -129,7 +129,7 @@ func IngestChunks(
 	augmentStrategy func(ctx context.Context, chunk string) (string, error),
 ) (vectorIDs []string, augmentedMetadata []string, err error) {
 	// Get embedding provider once
-	embedProvider, err := embedder.GetProvider(ctx)
+	embedProvider, err := embedder.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get embedder provider: %w", err)
 	}

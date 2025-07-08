@@ -19,7 +19,7 @@ func BenchmarkEmbedding(b *testing.B) {
 	require.NoError(b, env.AssignBackends(serverops.EmbedPoolID).Err)
 	require.NoError(b, env.WaitForModel(config.EmbedModel).Err)
 
-	provider, err := embedder.GetProvider(env.Ctx)
+	provider, err := embedder.GetDefaultSystemProvider(env.Ctx)
 	require.NoError(b, err)
 
 	embedClient, err := env.GetEmbedConnection(provider)

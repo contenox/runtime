@@ -122,14 +122,13 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 		if task.Hook == nil {
 			continue
 		}
-
+		if task.Type == taskengine.ModelExecution && task.ExecuteModelOnHistory != nil {
+			task.ExecuteModelOnHistory.Models = req.PreferredModelNames
+			task.ExecuteModelOnHistory.Provider = req.Provider
+		}
 		switch task.ID {
 		case "append_user_message":
 			task.Hook.Args["subject_id"] = req.SubjectID
-		case "execute_model_on_messages":
-			task.Hook.Args["subject_id"] = req.SubjectID
-			task.Hook.Args["models"] = strings.Join(req.PreferredModelNames, ",")
-			task.Hook.Args["provider"] = req.Provider
 		case "persist_messages":
 			task.Hook.Args["subject_id"] = req.SubjectID
 		}

@@ -25,7 +25,8 @@ const (
 	// RawString returns the raw string result from the LLM.
 	RawString TaskType = "raw_string"
 
-	LLMExecution TaskType = "llm_execution"
+	// ModelExecution will execute the system default or specified model on a chathistory.
+	ModelExecution TaskType = "model_execution"
 
 	// Hook indicates this task should execute an external action rather than calling the LLM.
 	Hook TaskType = "hook"
@@ -189,13 +190,18 @@ type ChainTask struct {
 	// Type determines how the LLM output (or hook) will be interpreted.
 	Type TaskType `yaml:"type" json:"type"`
 
+	// SystemInstruction provides additional instructions to the LLM, if applicable system level will be used.
+	SystemInstruction string `yaml:"system_instruction,omitempty" json:"system_instruction,omitempty"`
+
 	// ValidConditions defines allowed values for ConditionKey tasks.
 	// Required for ConditionKey tasks, ignored for all other types.
 	// Example: {"yes": true, "no": true} for a yes/no condition.
 	ValidConditions map[string]bool `yaml:"valid_conditions,omitempty" json:"valid_conditions,omitempty"`
 
-	LLMExecution      *LLMExecutionConfig  `yaml:"llm_execution,omitempty" json:"llm_execution,omitempty"`
-	AppendChatMessage *AppendMessageConfig `yaml:"append_chat_message,omitempty" json:"append_chat_message,omitempty"`
+	// ExecuteModelOnHistory defines the configuration for executing a model on the history.
+	// Optional for all task types except Hook where it's rarely used.
+	// Example: {model: "gpt-3.5-turbo", temperature: 0.7}
+	ExecuteModelOnHistory *LLMExecutionConfig `yaml:"execute_model_on_history,omitempty" json:"execute_model_on_history,omitempty"`
 
 	// Hook defines an external action to run.
 	// Required for Hook tasks, must be nil/omitted for all other types.

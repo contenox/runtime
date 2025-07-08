@@ -13,7 +13,7 @@ type MockModelRepo struct {
 	Provider libmodelprovider.Provider
 }
 
-func (m *MockModelRepo) GetProvider(ctx context.Context) (libmodelprovider.Provider, error) {
+func (m *MockModelRepo) GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error) {
 	if m.Provider == nil {
 		return nil, fmt.Errorf("provider is nil for prompt execution")
 	}
@@ -34,4 +34,10 @@ func (m *MockModelRepo) GetTokenizer(ctx context.Context) (tokenizerservice.Toke
 		return nil, fmt.Errorf("provider is nil for prompt execution")
 	}
 	return tokenizerservice.MockTokenizer{}, nil
+}
+
+func (m *MockModelRepo) GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error) {
+	return []libmodelprovider.Provider{
+		m.Provider,
+	}, nil
 }

@@ -5,23 +5,16 @@ package chat
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/kv"
-	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libdb"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
-	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/google/uuid"
-	"github.com/ollama/ollama/api"
 )
 
 // Manager coordinates chat message management and LLM execution.
@@ -138,81 +131,6 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 	}
 
 	return nil
-}
-
-// ChatExec runs the chat history through a selected LLM and returns the assistant's response.
-// Validates that the last message is from the user and uses the preferred model names.
-//
-// Returns:
-//   - Assistant response message
-//   - Number of input tokens
-//   - Number of output tokens
-func (m *Manager) ChatExec(ctx context.Context, messages []taskengine.Message, providerTypes []string, preferredModelNames ...string) (*taskengine.Message, int, int, string, error) {
-	if len(messages) == 0 {
-		return nil, 0, 0, "", errors.New("no messages provided")
-	}
-	if messages[len(messages)-1].Role != "user" && messages[len(messages)-1].Role != "system" {
-		return nil, 0, 0, "", fmt.Errorf("last message must be from user or system was %v", messages[len(messages)-1].Role)
-	}
-	inputtokens := 0
-	convertedMessage := make([]api.Message, len(messages))
-	for i, msg := range messages {
-		convertedMessage[i] = api.Message{
-			Role:    msg.Role,
-			Content: msg.Content,
-		}
-		var err2 error
-		retryFunc := func(ctx context.Context) error {
-			inputtokens, err2 = m.tokenizer.CountTokens(ctx, "tiny", msg.Content)
-			if err2 != nil {
-				fmt.Printf("Retrying token count due to error: %v\n", err2)
-			}
-			return err2
-		}
-		err := libroutine.NewRoutine(6, time.Second*10).ExecuteWithRetry(ctx, time.Second, 10, retryFunc)
-		if err != nil {
-			return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w %w", err, err2)
-		}
-	}
-	geminiConfig := &serverops.ProviderConfig{}
-	openaiConfig := &serverops.ProviderConfig{}
-	err := m.settings.Get(ctx, serverops.GeminiKey, geminiConfig)
-	if err != nil && !errors.Is(err, kv.ErrKeyNotFound) {
-		return nil, 0, 0, "", fmt.Errorf("failed to get gemini config %w", err)
-	}
-	err = m.settings.Get(ctx, serverops.OpenaiKey, openaiConfig)
-	if err != nil && !errors.Is(err, kv.ErrKeyNotFound) {
-		return nil, 0, 0, "", fmt.Errorf("failed to get openai config %w", err)
-	}
-	chatClient, model, err := llmresolver.Chat(ctx, llmresolver.Request{
-		ContextLength: inputtokens,
-		ModelNames:    preferredModelNames,
-		ProviderTypes: providerTypes,
-		Tracker:       serverops.NewLogActivityTracker(slog.Default()),
-	}, runtimestate.LocalProviderAdapter(ctx, m.state.Get(ctx)), llmresolver.Randomly)
-	if err != nil {
-		return nil, 0, 0, "", fmt.Errorf("failed to resolve backend %w", err)
-	}
-	var convMessages []libmodelprovider.Message
-	for _, m2 := range messages {
-		convMessages = append(convMessages, libmodelprovider.Message{
-			Role:    m2.Role,
-			Content: m2.Content,
-		})
-	}
-	responseMessage, err := chatClient.Chat(ctx, convMessages)
-	if err != nil {
-		return nil, 0, 0, "", fmt.Errorf("failed to chat %w", err)
-	}
-	outputtokens, err := m.tokenizer.CountTokens(ctx, "tiny", responseMessage.Content)
-	if err != nil {
-		return nil, 0, 0, "", fmt.Errorf("failed to count tokens %w", err)
-	}
-	assistantMsgData := taskengine.Message{
-		Role:    responseMessage.Role,
-		Content: responseMessage.Content,
-	}
-	return &assistantMsgData, inputtokens, outputtokens, model, nil
 }
 
 // CalculateContextSize estimates the token count for the chat prompt history.

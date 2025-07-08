@@ -9,6 +9,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
@@ -56,7 +57,7 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 	if prompt == "" {
 		return "", fmt.Errorf("unprocessable empty prompt")
 	}
-	provider, err := exe.promptExec.GetProvider(ctx)
+	provider, err := exe.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return "", fmt.Errorf("provider resolution failed: %w", err)
 	}
@@ -153,6 +154,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
+		if currentTask.SystemInstruction != "" {
+			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt) // TODO: this can be improved
+		}
 		transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
 		output = transitionEval
 		outputType = DataTypeString
@@ -161,6 +165,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		prompt, ok := input.(string)
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
+		}
+		if currentTask.SystemInstruction != "" {
+			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt) // TODO: this can be improved
 		}
 		hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ValidConditions, prompt)
 		output = hit
@@ -172,6 +179,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
+		if currentTask.SystemInstruction != "" {
+			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
+		}
 		number, taskErr = exe.number(taskCtx, resolver, prompt)
 		output = number
 		outputType = DataTypeInt
@@ -182,6 +192,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
+		if currentTask.SystemInstruction != "" {
+			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
+		}
 		score, taskErr = exe.score(taskCtx, resolver, prompt)
 		output = score
 		outputType = DataTypeFloat
@@ -191,11 +204,14 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("input is not a string")
 		}
+		if currentTask.SystemInstruction != "" {
+			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
+		}
 		transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
 		outputType = DataTypeString
 		output = transitionEval
-	case LLMExecution:
-		if currentTask.LLMExecution == nil {
+	case ModelExecution:
+		if currentTask.ExecuteModelOnHistory == nil {
 			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")
 		}
 		if dataType != DataTypeChatHistory {
@@ -205,12 +221,18 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if !ok {
 			return nil, DataTypeAny, "", fmt.Errorf("llm_execution requires chat history input")
 		}
+		if currentTask.SystemInstruction != "" {
+			chatHistory.Messages = append(chatHistory.Messages, Message{
+				Role:    "system",
+				Content: currentTask.SystemInstruction,
+			})
+		}
 		output, outputType, transitionEval, taskErr = exe.executeLLM(
 			taskCtx,
 			chatHistory,
 			ctxLength,
 			resolver,
-			currentTask.LLMExecution,
+			currentTask.ExecuteModelOnHistory,
 		)
 	case Hook:
 		if currentTask.Hook == nil {
@@ -226,12 +248,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 }
 
 func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLength int, resolverPolicy llmresolver.Policy, llmCall *LLMExecutionConfig) (any, DataType, string, error) {
-	providers := []string{}
+	providerNames := []string{}
 	if llmCall.Provider != "" {
-		providers = append(providers, llmCall.Provider)
+		providerNames = append(providerNames, llmCall.Provider)
 	}
 	if llmCall.Providers != nil {
-		providers = append(providers, llmCall.Providers...)
+		providerNames = append(providerNames, llmCall.Providers...)
 	}
 	tokenizer, err := exe.promptExec.GetTokenizer(ctx)
 	if err != nil {
@@ -248,7 +270,7 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		}
 		input.InputTokens = inputCount
 	}
-	if input.InputTokens > ctxLength {
+	if ctxLength > 0 && input.InputTokens > ctxLength {
 		return nil, DataTypeAny, "", fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength)
 	}
 	modelNames := []string{}
@@ -258,12 +280,29 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	if llmCall.Models != nil {
 		modelNames = append(modelNames, llmCall.Models...)
 	}
-	client, _, err := llmresolver.Chat(ctx, llmresolver.Request{
-		ProviderTypes: providers,
-		ModelNames:    modelNames,
-		ContextLength: ctxLength,
-		Tracker:       exe.tracker,
-	}, exe.promptExec.GetRuntime(ctx), resolverPolicy)
+	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
+	if len(modelNames) == 0 && len(providerNames) == 0 {
+		runtimeStateResolution = exe.promptExec.GetRuntime(ctx)
+	} else {
+		providers, err := exe.promptExec.GetAvailableProviders(ctx)
+		if err != nil {
+			return nil, DataTypeAny, "", fmt.Errorf("failed to get providers: %w", err)
+		}
+		runtimeStateResolution = func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
+			return providers, nil // Use direct providers list
+		}
+	}
+	// Resolve client using available providers
+	client, _, err := llmresolver.Chat(ctx,
+		llmresolver.Request{
+			ProviderTypes: providerNames,
+			ModelNames:    modelNames,
+			ContextLength: input.InputTokens,
+			Tracker:       exe.tracker,
+		},
+		runtimeStateResolution,
+		resolverPolicy,
+	)
 	if err != nil {
 		return nil, DataTypeAny, "", fmt.Errorf("client resolution failed: %w", err)
 	}
@@ -282,7 +321,7 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		Role:    resp.Role,
 		Content: resp.Content,
 	})
-	p, err := exe.promptExec.GetProvider(ctx)
+	p, err := exe.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return nil, DataTypeAny, "", fmt.Errorf("failed to get provider: %w", err)
 	}

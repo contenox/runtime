@@ -3,7 +3,6 @@ package hooks
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
@@ -27,7 +26,6 @@ func (h *Chat) Supports(ctx context.Context) ([]string, error) {
 		"preappend_message_to_history",
 		"convert_openai_to_history",
 		"append_system_message",
-		"execute_model_on_messages",
 		"persist_messages",
 		"convert_history_to_openai",
 	}, nil
@@ -53,8 +51,6 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 		return h.AppendOpenAIChatToChathistory, nil
 	case "append_system_message":
 		return h.AppendInstructionToChathistory, nil
-	case "execute_model_on_messages":
-		return h.ChatExec, nil
 	case "convert_history_to_openai":
 		return h.ConvertToOpenAIResponse, nil
 	case "persist_messages":
@@ -175,50 +171,6 @@ func (h *Chat) AppendInstructionToChathistory(ctx context.Context, startTime tim
 	}
 
 	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, inputStr, nil
-}
-
-// ChatExec invokes the model to generate a response based on chat history.
-func (h *Chat) ChatExec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
-	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected chat history got %T %v", input, dataType)
-	}
-
-	history, ok := input.(taskengine.ChatHistory)
-	messages := history.Messages
-	if !ok || len(messages) == 0 {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history")
-	}
-
-	models := []string{}
-	if m, ok := hookCall.Args["model"]; ok && m != "" {
-		models = append(models, m)
-	}
-	if m, ok := hookCall.Args["models"]; ok && m != "" {
-		models = strings.Split(strings.ReplaceAll(m, " ", ""), ",")
-	}
-	providerTypes := []string{}
-	if pType, ok := hookCall.Args["provider"]; ok && pType != "" {
-		providerTypes = append(providerTypes, pType)
-	}
-	if pTypes, ok := hookCall.Args["providers"]; ok && pTypes != "" {
-		providerTypes = append(providerTypes, strings.Split(strings.ReplaceAll(pTypes, " ", ""), ",")...)
-	}
-
-	// Process through LLM
-	responseMessage, inputTokens, outputTokens, model, err := h.chatManager.ChatExec(ctx, messages, providerTypes, models...)
-	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("chat failed: %w", err)
-	}
-
-	// Append response to history
-	updatedMessages := append(messages, *responseMessage)
-	history = taskengine.ChatHistory{
-		Messages:     updatedMessages,
-		InputTokens:  inputTokens,
-		OutputTokens: outputTokens,
-		Model:        model,
-	}
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, responseMessage.Content, nil
 }
 
 func (h *Chat) ConvertToOpenAIResponse(

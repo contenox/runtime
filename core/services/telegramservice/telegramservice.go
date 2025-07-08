@@ -262,14 +262,14 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 		if task.Hook == nil {
 			continue
 		}
+		if task.Type == taskengine.ModelExecution && task.ExecuteModelOnHistory != nil {
+			task.ExecuteModelOnHistory.Models = []string{"gemini-2.5-flash"}
+			task.ExecuteModelOnHistory.Providers = []string{provider}
+		}
 
 		switch task.ID {
 		case "append_user_message":
 			task.Hook.Args["subject_id"] = subjID
-		case "execute_model_on_messages":
-			task.Hook.Args["subject_id"] = subjID
-			task.Hook.Args["models"] = "gemini-2.5-flash"
-			task.Hook.Args["provider"] = provider
 		case "persist_messages":
 			task.Hook.Args["subject_id"] = subjID
 		}

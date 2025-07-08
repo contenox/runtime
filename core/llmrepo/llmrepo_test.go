@@ -80,7 +80,7 @@ func TestSystem_EmbedAndPromptPipeline(t *testing.T) {
 		require.NotEmpty(t, providers)
 	})
 	t.Run("test basic embed call", func(t *testing.T) {
-		provider, err := embedder.GetProvider(ctx)
+		provider, err := embedder.GetDefaultSystemProvider(ctx)
 		require.NoError(t, err)
 
 		embedClient, err := env.GetEmbedConnection(provider)
@@ -100,7 +100,7 @@ func TestSystem_EmbedAndPromptPipeline(t *testing.T) {
 		require.NoError(t, env.WaitForModel(config.TasksModel).Err)
 
 		// Get provider and test prompting
-		provider, err := taskEngine.GetProvider(ctx)
+		provider, err := taskEngine.GetDefaultSystemProvider(ctx)
 		require.NoError(t, err)
 
 		promptClient, err := env.GetPromptConnection(provider)
@@ -120,7 +120,7 @@ func TestSystem_EmbedAndPromptPipeline(t *testing.T) {
 		require.NoError(t, env.WaitForModel(config.TasksModel).Err)
 
 		// Get provider and test prompting
-		provider, err := taskEngine.GetProvider(ctx)
+		provider, err := taskEngine.GetDefaultSystemProvider(ctx)
 		require.NoError(t, err)
 
 		execClient, err := env.GetPromptConnection(provider)

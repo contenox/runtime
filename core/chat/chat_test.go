@@ -104,38 +104,6 @@ func TestManagerSystem(t *testing.T) {
 		require.Equal(t, "The capital of France is Paris.", storedMessages[2].Content)
 	})
 
-	t.Run("ChatExec_runs_llm_with_chat_history_and_returns_response", func(t *testing.T) {
-		history := []taskengine.Message{
-			{Role: "system", Content: systemMessage},
-			{Role: "user", Content: userMessage},
-		}
-
-		resp, inputTokens, outputTokens, _, err := manager.ChatExec(ctx, history, []string{"ollama"}, "smollm2:135m")
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		require.Greater(t, inputTokens, 0)
-		require.Greater(t, outputTokens, 0)
-		require.Equal(t, "assistant", resp.Role)
-		require.NotEmpty(t, resp.Content)
-	})
-
-	t.Run("ChatExec_fails_when_no_messages_given", func(t *testing.T) {
-		resp, _, _, _, err := manager.ChatExec(ctx, nil, []string{"ollama"}, "smollm2:135m")
-		require.Error(t, err)
-		require.Nil(t, resp)
-		require.EqualError(t, err, "no messages provided")
-	})
-
-	t.Run("ChatExec_fails_when_last_message_is_not_user", func(t *testing.T) {
-		history := []taskengine.Message{
-			{Role: "assistant", Content: "I don't know."},
-		}
-		resp, _, _, _, err := manager.ChatExec(ctx, history, []string{"ollama"}, "smollm2:135m")
-		require.Error(t, err)
-		require.Nil(t, resp)
-		require.EqualError(t, err, "last message must be from user or system was assistant")
-	})
-
 	t.Run("CalculateContextSize_estimates_token_count_for_prompt", func(t *testing.T) {
 		history := []taskengine.Message{
 			{Role: "user", Content: "What is life?"},

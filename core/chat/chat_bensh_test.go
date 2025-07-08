@@ -1,102 +1,88 @@
 package chat_test
 
-import (
-	"sync/atomic"
-	"testing"
-	"time"
+// func BenchmarkChatExec(b *testing.B) {
+// 	const modelName = "smollm2:135m"
+// 	const initialUserMessage = "What is the capital of France?"
 
-	"github.com/contenox/runtime-mvp/core/chat"
-	"github.com/contenox/runtime-mvp/core/kv"
-	"github.com/contenox/runtime-mvp/core/serverops"
-	"github.com/contenox/runtime-mvp/core/services/testingsetup"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
-	"github.com/contenox/runtime-mvp/core/taskengine"
-	"github.com/stretchr/testify/require"
-)
+// 	// Setup test environment
+// 	tenv := testingsetup.New(b.Context(), serverops.NoopTracker{}).
+// 		WithTriggerChan().
+// 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
+// 		WithDBConn("test").
+// 		WithDBManager().
+// 		WithPubSub().
+// 		WithOllama().
+// 		WithState().
+// 		WithBackend().
+// 		WithModel(modelName).
+// 		RunState().
+// 		RunDownloadManager().
+// 		WithDefaultUser().
+// 		WaitForModel(modelName).
+// 		Build()
 
-func BenchmarkChatExec(b *testing.B) {
-	const modelName = "smollm2:135m"
-	const initialUserMessage = "What is the capital of France?"
+// 	ctx, backendState, _, cleanup, err := tenv.Unzip()
+// 	require.NoError(b, err)
+// 	defer cleanup()
 
-	// Setup test environment
-	tenv := testingsetup.New(b.Context(), serverops.NoopTracker{}).
-		WithTriggerChan().
-		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
-		WithDBConn("test").
-		WithDBManager().
-		WithPubSub().
-		WithOllama().
-		WithState().
-		WithBackend().
-		WithModel(modelName).
-		RunState().
-		RunDownloadManager().
-		WithDefaultUser().
-		WaitForModel(modelName).
-		Build()
+// 	tokenizer := tokenizerservice.MockTokenizer{}
+// 	settings := kv.NewLocalCache(tenv.GetDBInstance(), "test:")
 
-	ctx, backendState, _, cleanup, err := tenv.Unzip()
-	require.NoError(b, err)
-	defer cleanup()
+// 	manager := chat.New(backendState, tokenizer, settings)
 
-	tokenizer := tokenizerservice.MockTokenizer{}
-	settings := kv.NewLocalCache(tenv.GetDBInstance(), "test:")
+// 	b.Log("Warmup")
+// 	_, _, _, _, warmupErr := manager.ChatExec(ctx, []taskengine.Message{
+// 		{Role: "user", Content: initialUserMessage},
+// 	}, []string{"ollama"}, modelName)
+// 	require.NoError(b, warmupErr)
 
-	manager := chat.New(backendState, tokenizer, settings)
+// 	// Start short conversation
+// 	convo := []taskengine.Message{
+// 		{Role: "user", Content: initialUserMessage},
+// 	}
 
-	b.Log("Warmup")
-	_, _, _, _, warmupErr := manager.ChatExec(ctx, []taskengine.Message{
-		{Role: "user", Content: initialUserMessage},
-	}, []string{"ollama"}, modelName)
-	require.NoError(b, warmupErr)
+// 	var totalInputTokens, totalOutputTokens, totalTokens int64
+// 	var totalLatency int64
 
-	// Start short conversation
-	convo := []taskengine.Message{
-		{Role: "user", Content: initialUserMessage},
-	}
+// 	b.ResetTimer()
+// 	b.ReportAllocs()
 
-	var totalInputTokens, totalOutputTokens, totalTokens int64
-	var totalLatency int64
+// 	for i := 0; i < b.N; i++ {
+// 		start := time.Now()
 
-	b.ResetTimer()
-	b.ReportAllocs()
+// 		resp, inputTok, outputTok, _, err := manager.ChatExec(ctx, convo, []string{"ollama"}, modelName)
+// 		require.NoError(b, err)
+// 		require.NotNil(b, resp)
+// 		require.Greater(b, inputTok+outputTok, 0)
 
-	for i := 0; i < b.N; i++ {
-		start := time.Now()
+// 		duration := time.Since(start)
 
-		resp, inputTok, outputTok, _, err := manager.ChatExec(ctx, convo, []string{"ollama"}, modelName)
-		require.NoError(b, err)
-		require.NotNil(b, resp)
-		require.Greater(b, inputTok+outputTok, 0)
+// 		// Simulate next turn in conversation
+// 		convo = append(convo, *resp)
+// 		convo = append(convo, taskengine.Message{Role: "user", Content: "Can you tell me more?"})
 
-		duration := time.Since(start)
+// 		// Track metrics
+// 		atomic.AddInt64(&totalInputTokens, int64(inputTok))
+// 		atomic.AddInt64(&totalOutputTokens, int64(outputTok))
+// 		atomic.AddInt64(&totalTokens, int64(inputTok+outputTok))
+// 		atomic.AddInt64(&totalLatency, duration.Nanoseconds())
 
-		// Simulate next turn in conversation
-		convo = append(convo, *resp)
-		convo = append(convo, taskengine.Message{Role: "user", Content: "Can you tell me more?"})
+// 		// Optional: Log progress every 5 steps
+// 		if i%5 == 0 {
+// 			b.Logf("Iter %d: %.2f tokens/sec", i, float64(totalTokens)/float64(totalLatency)*float64(time.Second))
+// 		}
+// 	}
 
-		// Track metrics
-		atomic.AddInt64(&totalInputTokens, int64(inputTok))
-		atomic.AddInt64(&totalOutputTokens, int64(outputTok))
-		atomic.AddInt64(&totalTokens, int64(inputTok+outputTok))
-		atomic.AddInt64(&totalLatency, duration.Nanoseconds())
+// 	// Final metrics
+// 	latencySeconds := float64(totalLatency) / float64(time.Second)
+// 	tokensPerSecond := float64(totalTokens) / latencySeconds
+// 	reqsPerSecond := float64(b.N) / latencySeconds
+// 	inputTokensPerSecond := float64(totalInputTokens) / latencySeconds
+// 	outputTokensPerSecond := float64(totalOutputTokens) / latencySeconds
 
-		// Optional: Log progress every 5 steps
-		if i%5 == 0 {
-			b.Logf("Iter %d: %.2f tokens/sec", i, float64(totalTokens)/float64(totalLatency)*float64(time.Second))
-		}
-	}
-
-	// Final metrics
-	latencySeconds := float64(totalLatency) / float64(time.Second)
-	tokensPerSecond := float64(totalTokens) / latencySeconds
-	reqsPerSecond := float64(b.N) / latencySeconds
-	inputTokensPerSecond := float64(totalInputTokens) / latencySeconds
-	outputTokensPerSecond := float64(totalOutputTokens) / latencySeconds
-
-	b.ReportMetric(tokensPerSecond, "tokens/sec")
-	b.ReportMetric(inputTokensPerSecond, "inputtokens/sec")
-	b.ReportMetric(outputTokensPerSecond, "outputtokens/sec")
-	b.ReportMetric(reqsPerSecond, "reqs/sec")
-	b.ReportMetric(latencySeconds/float64(b.N), "avg-sec/request")
-}
+// 	b.ReportMetric(tokensPerSecond, "tokens/sec")
+// 	b.ReportMetric(inputTokensPerSecond, "inputtokens/sec")
+// 	b.ReportMetric(outputTokensPerSecond, "outputtokens/sec")
+// 	b.ReportMetric(reqsPerSecond, "reqs/sec")
+// 	b.ReportMetric(latencySeconds/float64(b.N), "avg-sec/request")
+// }

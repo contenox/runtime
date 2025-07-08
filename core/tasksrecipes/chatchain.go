@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
@@ -71,17 +70,14 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 			{
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
-				Type:        taskengine.Hook,
+				Type:        taskengine.ModelExecution,
+				ExecuteModelOnHistory: &taskengine.LLMExecutionConfig{
+					Model:    model,
+					Provider: llmProvider,
+				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "convert_history_to_openai"},
-					},
-				},
-				Hook: &taskengine.HookCall{
-					Type: "execute_model_on_messages",
-					Args: map[string]string{
-						"model":    model,
-						"provider": llmProvider,
 					},
 				},
 			},
@@ -141,6 +137,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Description:    "Reject the request",
 				Type:           taskengine.RawString,
 				PromptTemplate: "respond to the user that request was rejected because the input was flagged: {{.input}}",
+				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: ""},
@@ -218,18 +215,14 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 			{
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
-				Type:        taskengine.Hook,
+				Type:        taskengine.ModelExecution,
+				ExecuteModelOnHistory: &taskengine.LLMExecutionConfig{
+					Models:    req.PreferredModelNames,
+					Providers: []string{req.Provider},
+				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "persist_messages"},
-					},
-				},
-				Hook: &taskengine.HookCall{
-					Type: "execute_model_on_messages",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-						"models":     strings.Join(req.PreferredModelNames, ","),
-						"provider":   req.Provider,
 					},
 				},
 			},

@@ -75,7 +75,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 
-	provider, err := execRepo.GetProvider(ctx)
+	provider, err := execRepo.GetDefaultSystemProvider(ctx)
 	require.NoError(t, err)
 	require.True(t, provider.CanPrompt())
 	require.GreaterOrEqual(t, len(provider.GetBackendIDs()), 1)

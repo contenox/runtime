@@ -52,10 +52,9 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
-		"command_router":            hookMux,
-		"append_user_message":       chatHook,
-		"execute_model_on_messages": chatHook,
-		"persist_messages":          chatHook,
+		"command_router":      hookMux,
+		"append_user_message": chatHook,
+		"persist_messages":    chatHook,
 	})
 
 	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks, serverops.NoopTracker{})

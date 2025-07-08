@@ -15,9 +15,10 @@ import (
 )
 
 type ModelRepo interface {
-	GetProvider(ctx context.Context) (libmodelprovider.Provider, error)
+	GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error)
 	GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error)
 	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
+	GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error)
 }
 
 func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
@@ -99,7 +100,7 @@ type modelManager struct {
 
 // GetRuntime implements Embedder.
 func (e *modelManager) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
-	provider, err := e.GetProvider(ctx)
+	provider, err := e.GetDefaultSystemProvider(ctx)
 
 	return func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
 		if err != nil {
@@ -110,7 +111,7 @@ func (e *modelManager) GetRuntime(ctx context.Context) runtimestate.ProviderFrom
 	}
 }
 
-func (e *modelManager) GetProvider(ctx context.Context) (libmodelprovider.Provider, error) {
+func (e *modelManager) GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error) {
 	backends := map[string]store.Backend{}
 
 	for _, v := range e.runtime.Get(ctx) {
@@ -159,4 +160,35 @@ func (e *modelManager) backendIsInPool(ctx context.Context, backendToVerify stor
 		}
 	}
 	return false, nil
+}
+
+func (e *modelManager) GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error) {
+	backends := map[string]store.Backend{}
+	for _, v := range e.runtime.Get(ctx) {
+		ok, err := e.backendIsInPool(ctx, v.Backend)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		for _, lmr := range v.PulledModels {
+			if lmr.Model == e.model.Model {
+				backends[v.Backend.BaseURL] = v.Backend
+			}
+		}
+	}
+
+	var providers []libmodelprovider.Provider
+	for _, backend := range backends {
+		provider := libmodelprovider.NewOllamaModelProvider(
+			e.model.Model,
+			[]string{backend.BaseURL},
+			http.DefaultClient,
+			libmodelprovider.WithEmbed(e.embed),
+			libmodelprovider.WithPrompt(e.prompt),
+		)
+		providers = append(providers, provider)
+	}
+	return providers, nil
 }

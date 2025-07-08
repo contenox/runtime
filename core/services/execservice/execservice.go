@@ -48,7 +48,7 @@ func (s *execService) Execute(ctx context.Context, request *TaskRequest) (*TaskR
 		return nil, err
 	}
 
-	provider, err := s.promptRepo.GetProvider(ctx)
+	provider, err := s.promptRepo.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider: %w", err)
 	}

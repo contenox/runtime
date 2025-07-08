@@ -93,7 +93,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 
-	provider, err := embedder.GetProvider(testenv.Ctx)
+	provider, err := embedder.GetDefaultSystemProvider(testenv.Ctx)
 	if err != nil {
 		log.Fatalf("initializing embedding provider failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	}()
 
 	// ensure embedder is ready
-	embedderProvider, err := embedder.GetProvider(ctx)
+	embedderProvider, err := embedder.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		t.Fatalf("failed to get embedder provider: %v", err)
 	}
