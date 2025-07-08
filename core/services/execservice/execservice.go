@@ -54,7 +54,7 @@ func (s *execService) Execute(ctx context.Context, request *TaskRequest) (*TaskR
 	}
 
 	promptClient, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelName: provider.ModelName(),
+		ModelNames: []string{provider.ModelName()},
 	}, s.promptRepo.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve prompt client: %w", err)

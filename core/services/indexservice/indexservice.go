@@ -233,7 +233,7 @@ func (s *service) findKeywords(ctx context.Context, chunk string) (string, error
 	}
 
 	promptClient, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelName: provider.ModelName(),
+		ModelNames: []string{provider.ModelName()},
 	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve prompt client for model %s: %w", provider.ModelName(), err)
@@ -276,7 +276,7 @@ func (s *service) executePrompt(ctx context.Context, prompt string) (string, err
 	}
 
 	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelName: provider.ModelName(),
+		ModelNames: []string{provider.ModelName()},
 	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
 	if err != nil {
 		return "", fmt.Errorf("client resolution failed: %w", err)

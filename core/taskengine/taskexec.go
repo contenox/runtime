@@ -53,20 +53,46 @@ func NewExec(
 
 // Prompt resolves a model client using the resolver policy and sends the prompt
 // to be executed. Returns the trimmed response string or an error.
-func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
+func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, prompt string) (string, error) {
 	if prompt == "" {
 		return "", fmt.Errorf("unprocessable empty prompt")
 	}
-	provider, err := exe.promptExec.GetDefaultSystemProvider(ctx)
-	if err != nil {
-		return "", fmt.Errorf("provider resolution failed: %w", err)
+	providerNames := []string{}
+	if llmCall.Provider != "" {
+		providerNames = append(providerNames, llmCall.Provider)
 	}
-	if provider == nil {
-		return "", fmt.Errorf("provider is nil for prompt execution")
+	if llmCall.Providers != nil {
+		providerNames = append(providerNames, llmCall.Providers...)
 	}
-	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelName: provider.ModelName(),
-	}, exe.promptExec.GetRuntime(ctx), resolver)
+	modelNames := []string{}
+	if llmCall.Model != "" {
+		modelNames = append(modelNames, llmCall.Model)
+	}
+	if llmCall.Models != nil {
+		modelNames = append(modelNames, llmCall.Models...)
+	}
+	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
+	if len(modelNames) == 0 && len(providerNames) == 0 {
+		runtimeStateResolution = exe.promptExec.GetRuntime(ctx)
+	} else {
+		providers, err := exe.promptExec.GetAvailableProviders(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to get providers: %w", err)
+		}
+		runtimeStateResolution = func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
+			return providers, nil // Use direct providers list
+		}
+	}
+	// Resolve client using available providers
+	client, err := llmresolver.PromptExecute(ctx,
+		llmresolver.PromptRequest{
+			ProviderTypes: providerNames,
+			ModelNames:    modelNames,
+			Tracker:       exe.tracker,
+		},
+		runtimeStateResolution,
+		resolver,
+	)
 	if err != nil {
 		return "", fmt.Errorf("client resolution failed: %w", err)
 	}
@@ -81,8 +107,8 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 
 // rang executes the prompt and attempts to parse the response as a range string (e.g. "6-8").
 // If the response is a single number, it returns a degenerate range like "6-6".
-func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, prompt string) (string, error) {
-	response, err := exe.Prompt(ctx, resolver, prompt)
+func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, prompt string) (string, error) {
+	response, err := exe.Prompt(ctx, resolver, llmCall, prompt)
 	if err != nil {
 		return "", err
 	}
@@ -116,8 +142,8 @@ func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, pr
 }
 
 // number executes the prompt and parses the response as an integer.
-func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, prompt string) (int, error) {
-	response, err := exe.Prompt(ctx, resolver, prompt)
+func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, prompt string) (int, error) {
+	response, err := exe.Prompt(ctx, resolver, llmCall, prompt)
 	if err != nil {
 		return 0, err
 	}
@@ -129,8 +155,8 @@ func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, 
 }
 
 // score executes the prompt and parses the response as a floating-point score.
-func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, prompt string) (float64, error) {
-	response, err := exe.Prompt(ctx, resolver, prompt)
+func (exe *SimpleExec) score(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, prompt string) (float64, error) {
+	response, err := exe.Prompt(ctx, resolver, llmCall, prompt)
 	if err != nil {
 		return 0, err
 	}
@@ -183,37 +209,41 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			prompt = fmt.Sprintf("%s\n%s", currentTask.SystemInstruction, prompt)
 		}
 
+		if currentTask.ExecuteConfig == nil {
+			currentTask.ExecuteConfig = &LLMExecutionConfig{}
+		}
+
 		switch currentTask.Type {
 		case RawString:
-			transitionEval, taskErr = exe.Prompt(taskCtx, resolver, prompt)
+			transitionEval, taskErr = exe.Prompt(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			output = transitionEval
 			outputType = DataTypeString
 		case ConditionKey:
 			var hit bool
-			hit, taskErr = exe.condition(taskCtx, resolver, currentTask.ValidConditions, prompt)
+			hit, taskErr = exe.condition(taskCtx, resolver, *currentTask.ExecuteConfig, currentTask.ValidConditions, prompt)
 			output = hit
 			outputType = DataTypeBool
 			transitionEval = strconv.FormatBool(hit)
 		case ParseNumber:
 			var number int
-			number, taskErr = exe.number(taskCtx, resolver, prompt)
+			number, taskErr = exe.number(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			output = number
 			outputType = DataTypeInt
 			transitionEval = strconv.FormatInt(int64(number), 10)
 		case ParseScore:
 			var score float64
-			score, taskErr = exe.score(taskCtx, resolver, prompt)
+			score, taskErr = exe.score(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			output = score
 			outputType = DataTypeFloat
 			transitionEval = strconv.FormatFloat(score, 'f', 2, 64)
 		case ParseRange:
-			transitionEval, taskErr = exe.rang(taskCtx, resolver, prompt)
+			transitionEval, taskErr = exe.rang(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			outputType = DataTypeString
 			output = transitionEval
 		}
 
 	case ModelExecution:
-		if currentTask.ExecuteModelOnHistory == nil {
+		if currentTask.ExecuteConfig == nil {
 			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")
 		}
 		if dataType != DataTypeChatHistory {
@@ -237,7 +267,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			chatHistory,
 			ctxLength,
 			resolver,
-			currentTask.ExecuteModelOnHistory,
+			currentTask.ExecuteConfig,
 		)
 
 	case Hook:
@@ -370,8 +400,8 @@ func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, i
 
 // condition executes a prompt and evaluates its result against a provided condition mapping.
 // It returns true/false based on the resolved condition value or fallback heuristics.
-func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, validConditions map[string]bool, prompt string) (bool, error) {
-	response, err := exe.Prompt(ctx, resolver, prompt)
+func (exe *SimpleExec) condition(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, validConditions map[string]bool, prompt string) (bool, error) {
+	response, err := exe.Prompt(ctx, resolver, llmCall, prompt)
 	if err != nil {
 		return false, err
 	}

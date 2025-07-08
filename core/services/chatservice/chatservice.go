@@ -122,9 +122,9 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 		if task.Hook == nil {
 			continue
 		}
-		if task.Type == taskengine.ModelExecution && task.ExecuteModelOnHistory != nil {
-			task.ExecuteModelOnHistory.Models = req.PreferredModelNames
-			task.ExecuteModelOnHistory.Provider = req.Provider
+		if task.Type == taskengine.ModelExecution && task.ExecuteConfig != nil {
+			task.ExecuteConfig.Models = req.PreferredModelNames
+			task.ExecuteConfig.Provider = req.Provider
 		}
 		switch task.ID {
 		case "append_user_message":

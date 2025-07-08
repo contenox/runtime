@@ -71,7 +71,7 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
 				Type:        taskengine.ModelExecution,
-				ExecuteModelOnHistory: &taskengine.LLMExecutionConfig{
+				ExecuteConfig: &taskengine.LLMExecutionConfig{
 					Model:    model,
 					Provider: llmProvider,
 				},
@@ -200,7 +200,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				SystemInstruction: "You're a helpful assistant in the contenox system. " +
 					"Respond helpfully and mention available commands (/help, /echo, /search_knowledge) when appropriate. " +
 					"Keep conversation friendly.",
-				ExecuteModelOnHistory: &taskengine.LLMExecutionConfig{
+				ExecuteConfig: &taskengine.LLMExecutionConfig{
 					Models:    req.PreferredModelNames,
 					Providers: []string{req.Provider},
 				},

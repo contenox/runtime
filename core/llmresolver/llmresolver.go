@@ -380,9 +380,10 @@ func Stream(
 }
 
 type PromptRequest struct {
-	ModelName     string
+	ModelNames    []string
 	ProviderTypes []string // Optional. Empty uses default.
 	Tracker       serverops.ActivityTracker
+	ContextLength int
 }
 
 func PromptExecute(
@@ -399,13 +400,14 @@ func PromptExecute(
 		ctx,
 		"resolve",
 		"prompt_model",
-		"model_name", reqExec.ModelName,
+		"model_names", reqExec.ModelNames,
 		"provider_types", reqExec.ProviderTypes,
+		"context_length", reqExec.ContextLength,
 	)
 	defer endFn()
 
-	if reqExec.ModelName == "" {
-		err := fmt.Errorf("model name is required")
+	if len(reqExec.ModelNames) == 0 {
+		err := fmt.Errorf("at least one model name is required")
 		reportErr(err)
 		return nil, err
 	}
@@ -413,8 +415,9 @@ func PromptExecute(
 		reqExec.ProviderTypes = []string{DefaultProviderType, "vllm"}
 	}
 	req := Request{
-		ModelNames:    []string{reqExec.ModelName},
+		ModelNames:    reqExec.ModelNames,
 		ProviderTypes: reqExec.ProviderTypes,
+		ContextLength: reqExec.ContextLength,
 	}
 	candidates, err := filterCandidates(ctx, req, getModels, libmodelprovider.Provider.CanPrompt)
 	if err != nil {

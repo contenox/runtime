@@ -262,9 +262,9 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 		if task.Hook == nil {
 			continue
 		}
-		if task.Type == taskengine.ModelExecution && task.ExecuteModelOnHistory != nil {
-			task.ExecuteModelOnHistory.Models = []string{"gemini-2.5-flash"}
-			task.ExecuteModelOnHistory.Providers = []string{provider}
+		if task.Type == taskengine.ModelExecution && task.ExecuteConfig != nil {
+			task.ExecuteConfig.Models = []string{"gemini-2.5-flash"}
+			task.ExecuteConfig.Providers = []string{provider}
 		}
 
 		switch task.ID {

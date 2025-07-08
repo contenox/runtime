@@ -198,10 +198,8 @@ type ChainTask struct {
 	// Example: {"yes": true, "no": true} for a yes/no condition.
 	ValidConditions map[string]bool `yaml:"valid_conditions,omitempty" json:"valid_conditions,omitempty"`
 
-	// ExecuteModelOnHistory defines the configuration for executing a model on the history.
-	// Optional for all task types except Hook where it's rarely used.
-	// Example: {model: "gpt-3.5-turbo", temperature: 0.7}
-	ExecuteModelOnHistory *LLMExecutionConfig `yaml:"execute_model_on_history,omitempty" json:"execute_model_on_history,omitempty"`
+	// ExecuteConfig defines the configuration for executing prompt or chat model tasks.
+	ExecuteConfig *LLMExecutionConfig `yaml:"execute_config,omitempty" json:"execute_config,omitempty"`
 
 	// Hook defines an external action to run.
 	// Required for Hook tasks, must be nil/omitted for all other types.
