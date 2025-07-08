@@ -1,4 +1,4 @@
-import { Button, Panel, SidebarToggle, UserMenu } from '@contenox/ui'; // Added Section, removed Scrollable if no longer needed elsewhere
+import { Button, Panel, SidebarToggle, UserMenu } from '@contenox/ui';
 import { ConstructionIcon } from 'lucide-react';
 import React, { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
