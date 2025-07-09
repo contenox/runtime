@@ -1,4 +1,4 @@
-import { Button, P, Panel, Section, Select } from '@contenox/ui';
+import { Button, GridLayout, P, Panel, Section, Select } from '@contenox/ui';
 import { t } from 'i18next';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -8,8 +8,10 @@ import {
   useCreateChat,
   useSendMessage,
 } from '../../../hooks/useChats';
+import { CapturedStateUnit } from '../../../lib/types';
 import { ChatInterface } from './components/ChatInterface';
 import { MessageInputForm } from './components/MessageInputForm';
+import { StateVisualizer } from './components/StateVisualizer';
 
 // Define available providers and models
 const PROVIDERS = [
@@ -27,6 +29,7 @@ export default function ChatPage() {
   const [chatId, setChatId] = useState<string | null>(paramChatId || null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState('');
+  const [latestState, setLatestState] = useState<CapturedStateUnit[]>([]);
 
   useEffect(() => {
     if (paramChatId) setChatId(paramChatId);
@@ -61,15 +64,16 @@ export default function ChatPage() {
     setOperationError(null);
     if (!message.trim()) return;
 
-    const payload: { message: string; provider?: string; models?: string[] } = {
+    const payload = {
       message: message,
+      ...(selectedProvider && { provider: selectedProvider }),
     };
 
-    if (selectedProvider) {
-      payload.provider = selectedProvider;
-    }
-
-    sendMessage(payload);
+    sendMessage(payload, {
+      onSuccess: response => {
+        setLatestState(response.state);
+      },
+    });
     setMessage('');
   };
 
@@ -84,50 +88,55 @@ export default function ChatPage() {
   const handleCreateChat = () => createChat({});
 
   return (
-    <Section>
-      <MessageInputForm
-        title={t('chat.system_input')}
-        value={instruction}
-        onChange={setInstruction}
-        onSubmit={handleSendInstruction}
-        placeholder={t('chat.system_input_placeholder')}
-        isPending={isSendingInstruction}
-        buttonLabel={t('chat.send_button')}
-      />
-      {chatId ? (
-        <>
-          <Panel className="flex gap-4 p-4">
-            <Select
-              options={PROVIDERS}
-              value={selectedProvider}
-              onChange={e => setSelectedProvider(e.target.value)}
-              className="w-48"
-            />
-          </Panel>
-          <Panel className="max-h-55 overflow-auto">
-            {operationError && <Panel variant="error"> {operationError}</Panel>}
-            {chatHistory && Array.isArray(chatHistory) && (
-              <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />
-            )}
-          </Panel>
-        </>
-      ) : (
-        <div className="flex flex-grow flex-col items-center justify-center">
-          {' '}
-          <P className="mb-4">{t('chat.no_chat_selected')}</P>
-          <Button onClick={handleCreateChat}>{t('chat.create_chat')}</Button>
-        </div>
-      )}
-      <MessageInputForm
-        value={message}
-        onChange={setMessage}
-        onSubmit={handleSendMessage}
-        isPending={isSending}
-        title={t('chat.chat_input')}
-      />
-      {isError && (
-        <Panel variant="error"> {createError?.message || t('chat.error_create_chat')}</Panel>
-      )}
-    </Section>
+    <GridLayout variant="body" className="h-full">
+      <Section>
+        <MessageInputForm
+          title={t('chat.system_input')}
+          value={instruction}
+          onChange={setInstruction}
+          onSubmit={handleSendInstruction}
+          placeholder={t('chat.system_input_placeholder')}
+          isPending={isSendingInstruction}
+          buttonLabel={t('chat.send_button')}
+        />
+        {chatId ? (
+          <>
+            <Panel className="flex gap-4 p-4">
+              <Select
+                options={PROVIDERS}
+                value={selectedProvider}
+                onChange={e => setSelectedProvider(e.target.value)}
+                className="w-48"
+              />
+            </Panel>
+            <Panel className="max-h-55 overflow-auto">
+              {operationError && <Panel variant="error"> {operationError}</Panel>}
+              {chatHistory && Array.isArray(chatHistory) && (
+                <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />
+              )}
+            </Panel>
+          </>
+        ) : (
+          <div className="flex flex-grow flex-col items-center justify-center">
+            {' '}
+            <P className="mb-4">{t('chat.no_chat_selected')}</P>
+            <Button onClick={handleCreateChat}>{t('chat.create_chat')}</Button>
+          </div>
+        )}
+        <MessageInputForm
+          value={message}
+          onChange={setMessage}
+          onSubmit={handleSendMessage}
+          isPending={isSending}
+          title={t('chat.chat_input')}
+        />
+        {isError && (
+          <Panel variant="error"> {createError?.message || t('chat.error_create_chat')}</Panel>
+        )}
+      </Section>
+      <Section>
+        <StateVisualizer state={latestState} />
+      </Section>
+    </GridLayout>
   );
 }

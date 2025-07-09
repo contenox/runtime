@@ -76,7 +76,9 @@ func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	resp := map[string]string{}
+	resp := map[string]string{
+		"resp": "instruction added",
+	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }
 
@@ -120,8 +122,8 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
-		"response":             reply,
-		"captured_state_units": capturedStateUnits,
+		"response": reply,
+		"state":    capturedStateUnits,
 	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }

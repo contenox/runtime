@@ -28,13 +28,13 @@ type ExecutionState struct {
 }
 
 type CapturedStateUnit struct {
-	TaskID     string
-	TaskType   string
-	InputType  DataType
-	OutputType DataType
-	Transition string
-	Duration   time.Duration
-	Error      error
+	TaskID     string        `json:"taskID"`
+	TaskType   string        `json:"taskType"`
+	InputType  DataType      `json:"inputType"`
+	OutputType DataType      `json:"outputType"`
+	Transition string        `json:"transition"`
+	Duration   time.Duration `json:"duration"`
+	Error      error         `json:"error"`
 }
 
 type MockInspector struct{}

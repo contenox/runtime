@@ -1,5 +1,6 @@
 import { Card, P, Span } from '@contenox/ui';
 import { t } from 'i18next';
+import { CapturedStateUnit } from '../../../../lib/types';
 import { cn } from '../../../../lib/utils';
 
 interface Message {
@@ -8,6 +9,7 @@ interface Message {
   sentAt: string;
   isUser: boolean;
   isLatest: boolean;
+  state?: CapturedStateUnit[];
 }
 
 type ChatMessageProps = {

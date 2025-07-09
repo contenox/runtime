@@ -59,12 +59,28 @@ export type ChatSession = {
   lastMessage?: ChatMessage;
 };
 
+export type CapturedStateUnit = {
+  taskID: string;
+  taskType: string;
+  inputType: string;
+  outputType: string;
+  transition: string;
+  duration: string;
+  error: string | null;
+};
+
+export type StateResponse = {
+  response: string;
+  state: CapturedStateUnit[];
+};
+
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
   sentAt: string;
   isUser: boolean;
   isLatest: boolean;
+  state?: CapturedStateUnit[];
 };
 
 export type QueueItem = {

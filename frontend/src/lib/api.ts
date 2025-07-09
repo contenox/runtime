@@ -17,6 +17,7 @@ import {
   PendingJob,
   Pool,
   SearchResponse,
+  StateResponse,
   StatusResponse,
   Trigger,
   UpdateAccessEntryRequest,
@@ -83,8 +84,9 @@ export const api = {
   // Chats
   createChat: ({ model }: Partial<ChatSession>) =>
     apiFetch<Partial<ChatSession>>('/api/chats', options('POST', { model })),
+
   sendMessage: (id: string, message: string, provider?: string, models?: string[]) =>
-    apiFetch<ChatMessage[]>(
+    apiFetch<StateResponse>(
       `/api/chats/${id}/chat`,
       options('POST', {
         message,

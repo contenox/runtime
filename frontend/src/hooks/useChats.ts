@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { chatKeys } from '../lib/queryKeys';
-import { ChatMessage, ChatSession } from '../lib/types';
+import { CapturedStateUnit, ChatMessage, ChatSession } from '../lib/types';
 
 export function useChats() {
   return useQuery<ChatSession[]>({
@@ -20,20 +20,20 @@ export function useCreateChat() {
   });
 }
 
-export function useChatHistory(id: string) {
+export function useChatHistory(id: string, options?: { enabled?: boolean }) {
   return useQuery<ChatMessage[]>({
     queryKey: chatKeys.history(id),
     queryFn: () => api.getChatHistory(id),
-    enabled: !!id,
+    enabled: options?.enabled ?? !!id,
   });
 }
 
 export function useSendMessage(chatId: string) {
   const queryClient = useQueryClient();
   return useMutation<
-    ChatMessage[],
+    { response: string; state: CapturedStateUnit[] },
     Error,
-    { message: string; provider?: string; models?: string[] } // Inline type definition
+    { message: string; provider?: string; models?: string[] }
   >({
     mutationFn: ({ message, provider, models }) =>
       api.sendMessage(chatId, message, provider, models),

@@ -1,20 +1,14 @@
 import { Panel, Span, Spinner } from '@contenox/ui';
 import { t } from 'i18next';
+import { ChatMessage as ApiChatMessage } from '../../../../lib/types';
 import { ChatMessage } from './ChatMessage';
 
-interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  sentAt: string;
-  isUser: boolean;
-  isLatest: boolean;
-}
-
 export type ChatInterfaceProps = {
-  chatHistory?: Message[];
+  chatHistory?: ApiChatMessage[];
   isLoading: boolean;
   error: Error | null;
 };
+
 export const ChatInterface = ({ chatHistory, isLoading, error }: ChatInterfaceProps) => {
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -33,7 +27,11 @@ export const ChatInterface = ({ chatHistory, isLoading, error }: ChatInterfacePr
         </Panel>
       )}
 
-      {chatHistory?.map(message => <ChatMessage key={message.sentAt} message={message} />)}
+      {chatHistory?.map(message => (
+        <div key={message.sentAt}>
+          <ChatMessage message={message} />
+        </div>
+      ))}
     </div>
   );
 };
