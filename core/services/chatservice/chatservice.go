@@ -18,7 +18,7 @@ import (
 
 type Service interface {
 	GetChatHistory(ctx context.Context, id string) ([]ChatMessage, error)
-	Chat(ctx context.Context, req ChatRequest) (string, int, int, error)
+	Chat(ctx context.Context, req ChatRequest) (string, int, int, []taskengine.CapturedStateUnit, error)
 	ListChats(ctx context.Context) ([]ChatSession, error)
 	NewInstance(ctx context.Context, subject string) (string, error)
 	AddInstruction(ctx context.Context, id string, message string) error
@@ -90,7 +90,7 @@ func (s *service) AddInstruction(ctx context.Context, subjectID string, message 
 	chain := tasksrecipes.BuildAppendInstruction(subjectID)
 
 	// Run the chain using the environment executor
-	_, err := s.env.ExecEnv(ctx, chain, message, taskengine.DataTypeString)
+	_, _, err := s.env.ExecEnv(ctx, chain, message, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)
 	}
@@ -104,16 +104,16 @@ type ChatRequest struct {
 	Provider            string
 }
 
-func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, error) {
+func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, []taskengine.CapturedStateUnit, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return "", 0, 0, err
+		return "", 0, 0, nil, err
 	}
 
 	// Retrieve chain from store
 	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, tasksrecipes.StandardChatChainID)
 	if err != nil {
-		return "", 0, 0, fmt.Errorf("failed to get chain: %w", err)
+		return "", 0, 0, nil, fmt.Errorf("failed to get chain: %w", err)
 	}
 
 	// Update chain parameters
@@ -135,23 +135,23 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	}
 
 	// Execute chain
-	result, err := s.env.ExecEnv(ctx, chain, req.Message, taskengine.DataTypeString)
+	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req.Message, taskengine.DataTypeString)
 	if err != nil {
-		return "", 0, 0, fmt.Errorf("chain execution failed: %w", err)
+		return "", 0, 0, nil, fmt.Errorf("chain execution failed: %w", err)
 	}
-
+	_ = stackTrace // TODO: log stack trace?
 	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
-		return "", 0, 0, fmt.Errorf("unexpected result from chain")
+		return "", 0, 0, nil, fmt.Errorf("unexpected result from chain")
 	}
 
 	lastMsg := hist.Messages[len(hist.Messages)-1]
 	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
-		return "", 0, 0, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
+		return "", 0, 0, nil, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
 	}
 
-	return lastMsg.Content, hist.InputTokens, hist.OutputTokens, nil
+	return lastMsg.Content, hist.InputTokens, hist.OutputTokens, stackTrace, nil
 }
 
 // ChatMessage is the public representation of a message in a chat.
@@ -252,12 +252,11 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	}
 	chain := tasksrecipes.BuildOpenAIChatChain(req.Model, provider)
 
-	// Use correct data type
-	result, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
+	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
 	if err != nil {
 		return nil, fmt.Errorf("chain execution failed: %w", err)
 	}
-
+	_ = stackTrace // TODO: log stack trace?
 	if result == nil {
 		return nil, fmt.Errorf("empty result from chain")
 	}

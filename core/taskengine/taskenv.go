@@ -67,7 +67,7 @@ func (d *DataType) String() string {
 // EnvExecutor defines an environment for executing ChainDefinitions
 type EnvExecutor interface {
 	// ExecEnv executes a chain with input and returns final output
-	ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, error)
+	ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, []CapturedStateUnit, error)
 }
 
 // ErrUnsupportedTaskType indicates unrecognized task type
@@ -90,8 +90,9 @@ type HookRegistry interface {
 // It executes tasks in order, using retry and timeout policies, and tracks execution
 // progress using an ActivityTracker.
 type SimpleEnv struct {
-	exec    TaskExecutor
-	tracker serverops.ActivityTracker
+	exec      TaskExecutor
+	tracker   serverops.ActivityTracker
+	inspector Inspector
 }
 
 // NewEnv creates a new SimpleEnv with the given tracker and task executor.
@@ -99,10 +100,12 @@ func NewEnv(
 	_ context.Context,
 	tracker serverops.ActivityTracker,
 	exec TaskExecutor,
+	inspector Inspector,
 ) (EnvExecutor, error) {
 	return &SimpleEnv{
-		exec:    exec,
-		tracker: tracker,
+		exec:      exec,
+		tracker:   tracker,
+		inspector: inspector,
 	}, nil
 }
 
@@ -110,7 +113,9 @@ func NewEnv(
 //
 // It manages the full lifecycle of task execution: rendering prompts, calling the
 // TaskExecutor, handling timeouts, retries, transitions, and collecting final output.
-func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, error) {
+func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, []CapturedStateUnit, error) {
+	stack := exe.inspector.Start()
+
 	vars := map[string]any{
 		"input": input,
 	}
@@ -118,19 +123,21 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	startingTime := time.Now().UTC()
 	resolver := llmresolver.Randomly
 	var err error
+
 	if len(chain.RoutingStrategy) > 0 {
 		resolver, err = llmresolver.PolicyFromString(chain.RoutingStrategy)
 		if err != nil {
-			return nil, err
+			return nil, stack.GetExecutionHistory(), err
 		}
 	}
-	err = validateChain(chain.Tasks)
-	if err != nil {
-		return nil, err
+
+	if err := validateChain(chain.Tasks); err != nil {
+		return nil, stack.GetExecutionHistory(), err
 	}
+
 	currentTask, err := findTaskByID(chain.Tasks, chain.Tasks[0].ID)
 	if err != nil {
-		return nil, err
+		return nil, stack.GetExecutionHistory(), err
 	}
 
 	var finalOutput any
@@ -138,23 +145,20 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 	var output any = input
 	var outputType DataType = dataType
 	var taskErr error
+
 	for {
 		// Determine task input
 		taskInput := output
 		taskInputType := outputType
-
 		if currentTask.InputVar != "" {
-			// Look up specified variable
 			var ok bool
 			taskInput, ok = vars[currentTask.InputVar]
 			if !ok {
-				return nil, fmt.Errorf("task %s: input variable %q not found",
-					currentTask.ID, currentTask.InputVar)
+				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: input variable %q not found", currentTask.ID, currentTask.InputVar)
 			}
 			taskInputType, ok = varTypes[currentTask.InputVar]
 			if !ok {
-				return nil, fmt.Errorf("task %s: input variable %q missing type info",
-					currentTask.ID, currentTask.InputVar)
+				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: input variable %q missing type info", currentTask.ID, currentTask.InputVar)
 			}
 		}
 
@@ -162,7 +166,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		if taskInputType == DataTypeString && currentTask.PromptTemplate != "" {
 			rendered, err := renderTemplate(currentTask.PromptTemplate, vars)
 			if err != nil {
-				return nil, fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
+				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
 			}
 			taskInput = rendered
 		}
@@ -171,13 +175,18 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 
 	retryLoop:
 		for retry := 0; retry <= maxRetries; retry++ {
+			// Note: Return on breakpoint for now
+			if stack.HasBreakpoint(currentTask.ID) {
+				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: breakpoint set", currentTask.ID)
+			}
+
 			// Track task attempt start
 			taskCtx := ctx
 			var cancel context.CancelFunc
 			if currentTask.Timeout != "" {
 				timeout, err := time.ParseDuration(currentTask.Timeout)
 				if err != nil {
-					return nil, fmt.Errorf("task %s: invalid timeout: %v", currentTask.ID, err)
+					return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: invalid timeout: %v", currentTask.ID, err)
 				}
 				taskCtx, cancel = context.WithTimeout(ctx, timeout)
 				defer cancel()
@@ -191,7 +200,25 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				"task_type", currentTask.Type,
 			)
 			defer endAttempt()
+
+			startTime := time.Now()
+
 			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, int(chain.TokenLimit), currentTask, taskInput, taskInputType)
+
+			duration := time.Since(startTime)
+
+			// Record execution step
+			step := CapturedStateUnit{
+				TaskID:     currentTask.ID,
+				TaskType:   currentTask.Type.String(),
+				InputType:  taskInputType,
+				OutputType: outputType,
+				Transition: transitionEval,
+				Duration:   duration,
+				Error:      taskErr,
+			}
+			stack.RecordStep(step)
+
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
@@ -207,7 +234,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				previousTaskID := currentTask.ID
 				currentTask, err = findTaskByID(chain.Tasks, currentTask.Transition.OnFailure)
 				if err != nil {
-					return nil, fmt.Errorf("error transition target not found: %v", err)
+					return nil, stack.GetExecutionHistory(), fmt.Errorf("error transition target not found: %v", err)
 				}
 				// Track error-based transition
 				_, reportChangeErrTransition, endErrTransition := exe.tracker.Start(
@@ -221,8 +248,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				reportChangeErrTransition(currentTask.ID, taskErr)
 				continue
 			}
-			return nil, fmt.Errorf("task %s failed after %d retries: %v",
-				currentTask.ID, maxRetries, taskErr)
+			return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s failed after %d retries: %v", currentTask.ID, maxRetries, taskErr)
 		}
 
 		// Update execution variables
@@ -235,7 +261,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		if currentTask.Print != "" {
 			printMsg, err := renderTemplate(currentTask.Print, vars)
 			if err != nil {
-				return nil, fmt.Errorf("task %s: print template error: %v", currentTask.ID, err)
+				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: print template error: %v", currentTask.ID, err)
 			}
 			fmt.Println(printMsg)
 		}
@@ -243,7 +269,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		// Evaluate transitions
 		nextTaskID, err := evaluateTransitions(currentTask.Transition, transitionEval)
 		if err != nil {
-			return nil, fmt.Errorf("task %s: transition error: %v", currentTask.ID, err)
+			return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: transition error: %v", currentTask.ID, err)
 		}
 
 		if nextTaskID == "" || nextTaskID == TermEnd {
@@ -273,11 +299,11 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		// Find next task
 		currentTask, err = findTaskByID(chain.Tasks, nextTaskID)
 		if err != nil {
-			return nil, fmt.Errorf("next task %s not found: %v", nextTaskID, err)
+			return nil, stack.GetExecutionHistory(), fmt.Errorf("next task %s not found: %v", nextTaskID, err)
 		}
 	}
 
-	return finalOutput, nil
+	return finalOutput, stack.GetExecutionHistory(), nil
 }
 
 func renderTemplate(tmplStr string, vars map[string]any) (string, error) {

@@ -164,7 +164,7 @@ func main() {
 		DefaultPos:     0,
 		DefaultEpsilon: 0.5,
 		DefaultRadius:  40,
-	})
+	}, serverops.NewLogActivityTracker(slog.Default()))
 	// Mux for handling commands like /echo
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 		"echo":             echocmd,
@@ -188,7 +188,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec)
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec, taskengine.MockInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

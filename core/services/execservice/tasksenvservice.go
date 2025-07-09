@@ -10,7 +10,7 @@ import (
 )
 
 type TasksEnvService interface {
-	Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error)
+	Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, []taskengine.CapturedStateUnit, error)
 	AttachToConnector(ctx context.Context, connectorID string, chain *taskengine.ChainDefinition) error
 	serverops.ServiceMeta
 	taskengine.HookRegistry
@@ -30,13 +30,13 @@ func NewTasksEnv(ctx context.Context, environmentExec taskengine.EnvExecutor, db
 	}
 }
 
-func (s *tasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
+func (s *tasksEnvService) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, []taskengine.CapturedStateUnit, error) {
 	tx := s.db.WithoutTransaction()
 
 	storeInstance := store.New(tx)
 	// TODO: check permission view? why not exec?
 	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return s.environmentExec.ExecEnv(ctx, chain, input, taskengine.DataTypeAny)

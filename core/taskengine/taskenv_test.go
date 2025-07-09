@@ -18,7 +18,7 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(t.Context(), tracker, mockExec)
+	env, err := taskengine.NewEnv(t.Context(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -40,7 +40,7 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "6 * 7", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "6 * 7", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "42", result)
 }
@@ -51,7 +51,7 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -66,7 +66,7 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 		},
 	}
 
-	_, err = env.ExecEnv(context.Background(), chain, "", taskengine.DataTypeString)
+	_, _, err = env.ExecEnv(context.Background(), chain, "", taskengine.DataTypeString)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed after 1 retries")
 }
@@ -79,7 +79,7 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -107,7 +107,7 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "step one", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "step one", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "intermediate", result)
 }
@@ -120,7 +120,7 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -146,7 +146,7 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "oops", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "oops", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "error recovered", result)
 }
@@ -158,7 +158,7 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -177,7 +177,7 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "user", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "user", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "printed-value", result)
 }
@@ -190,7 +190,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_OriginalInput(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -209,7 +209,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_OriginalInput(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "hello", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "hello", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "processed: hello", result)
 }
@@ -221,7 +221,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_PreviousTaskOutput(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -250,7 +250,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_PreviousTaskOutput(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "forty-two", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "forty-two", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "processed: 42", result)
 }
@@ -262,7 +262,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_WithModeration(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -304,7 +304,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_WithModeration(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "safe message", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "safe message", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "user message stored", result)
 }
@@ -313,7 +313,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_InvalidVariable(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{} // Shouldn't be called
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -332,7 +332,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_InvalidVariable(t *testing.T) {
 		},
 	}
 
-	_, err = env.ExecEnv(context.Background(), chain, "test", taskengine.DataTypeString)
+	_, _, err = env.ExecEnv(context.Background(), chain, "test", taskengine.DataTypeString)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "input variable")
 }
@@ -344,7 +344,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_DefaultBehavior(t *testing.T) {
 	}
 
 	tracker := serverops.NoopTracker{}
-	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec)
+	env, err := taskengine.NewEnv(context.Background(), tracker, mockExec, &taskengine.MockInspector{})
 	require.NoError(t, err)
 
 	chain := &taskengine.ChainDefinition{
@@ -373,7 +373,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_DefaultBehavior(t *testing.T) {
 		},
 	}
 
-	result, err := env.ExecEnv(context.Background(), chain, "input", taskengine.DataTypeString)
+	result, _, err := env.ExecEnv(context.Background(), chain, "input", taskengine.DataTypeString)
 	require.NoError(t, err)
 	require.Equal(t, "second", result)
 }

@@ -12,7 +12,7 @@ type activityTrackerTaskEnvDecorator struct {
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerTaskEnvDecorator) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, error) {
+func (d *activityTrackerTaskEnvDecorator) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, []taskengine.CapturedStateUnit, error) {
 	// Extract useful metadata from the chain
 	chainID := chain.ID
 
@@ -25,18 +25,19 @@ func (d *activityTrackerTaskEnvDecorator) Execute(ctx context.Context, chain *ta
 	)
 	defer endFn()
 
-	result, err := d.service.Execute(ctx, chain, input)
+	result, stacktrace, err := d.service.Execute(ctx, chain, input)
 	if err != nil {
 		reportErrFn(err)
 	} else {
 		reportChangeFn(chainID, map[string]interface{}{
-			"input":   input,
-			"result":  result,
-			"chainID": chainID,
+			"input":      input,
+			"result":     result,
+			"chainID":    chainID,
+			"stacktrace": stacktrace,
 		})
 	}
 
-	return result, err
+	return result, stacktrace, err
 }
 
 func (d *activityTrackerTaskEnvDecorator) GetServiceName() string {

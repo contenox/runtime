@@ -61,7 +61,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec)
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec, taskengine.MockInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 			Message:             "what is the capital of england?",
 			PreferredModelNames: []string{"smollm2:135m"},
 		}
-		response, _, _, err := manager.Chat(ctx, req)
+		response, _, _, _, err := manager.Chat(ctx, req)
 		require.NoError(t, err)
 		responseLower := strings.ToLower(response)
 		println(responseLower)
@@ -101,7 +101,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 			Message:             "/echo hello world! 123",
 			PreferredModelNames: []string{"smollm2:135m"},
 		}
-		response, _, _, err := manager.Chat(ctx, req)
+		response, _, _, _, err := manager.Chat(ctx, req)
 		require.NoError(t, err)
 		responseLower := strings.ToLower(response)
 		println(responseLower)
@@ -127,7 +127,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 			Message:             userMessage1,
 			PreferredModelNames: []string{"smollm2:135m"},
 		}
-		_, _, _, err = manager.Chat(ctx, req)
+		_, _, _, _, err = manager.Chat(ctx, req)
 		require.NoError(t, err)
 		time.Sleep(time.Millisecond)
 		// Verify first pair of messages
@@ -158,7 +158,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 			Message:             userMessage2,
 			PreferredModelNames: []string{"smollm2:135m"},
 		}
-		_, _, _, err = manager.Chat(ctx, req)
+		_, _, _, _, err = manager.Chat(ctx, req)
 		require.NoError(t, err)
 
 		// Verify updated history
@@ -224,7 +224,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 				Message:             userMsg,
 				PreferredModelNames: []string{"smollm2:135m"},
 			}
-			response, inputtokenCount, outputtokencount, err := manager.Chat(ctx, req)
+			response, inputtokenCount, outputtokencount, _, err := manager.Chat(ctx, req)
 			tokens += inputtokenCount + outputtokencount
 			require.NoError(t, err, "Chat interaction failed for message %d", i+1)
 			require.NotEmpty(t, response, "Assistant response should not be empty for message %d", i+1)

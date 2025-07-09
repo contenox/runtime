@@ -43,7 +43,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
-	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec)
+	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec, taskengine.MockInspector{})
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
 	t.Run("simple echo task", func(t *testing.T) {
-		output, err := service.Execute(ctx, &taskengine.ChainDefinition{
+		output, _, err := service.Execute(ctx, &taskengine.ChainDefinition{
 			ID:              "echo-chain",
 			Description:     "Echo input string",
 			RoutingStrategy: "random",

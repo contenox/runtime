@@ -276,10 +276,12 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 	}
 
 	// Execute chain
-	result, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)
+	result, stackTrace, err := w.env.ExecEnv(ctx, chain, text, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)
 	}
+
+	_ = stackTrace // TODO: Log stack trace?
 
 	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
