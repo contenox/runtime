@@ -48,7 +48,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	// Mux for handling commands like /echo
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 		"echo": echocmd,
-	})
+	}, serverops.NoopTracker{})
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{

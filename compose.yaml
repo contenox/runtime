@@ -77,7 +77,7 @@ services:
       runtime-mvp:
         condition: service_healthy
     environment:
-      API_BASE_URL: http://backend:8080/api
+      API_BASE_URL: http://runtime-mvp:8080/api
       WORKER_TYPE: plaintext
       WORKER_EMAIL: worker@example.com
       WORKER_PASSWORD: workerpassword

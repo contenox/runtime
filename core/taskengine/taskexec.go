@@ -2,6 +2,7 @@ package taskengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -54,8 +55,17 @@ func NewExec(
 // Prompt resolves a model client using the resolver policy and sends the prompt
 // to be executed. Returns the trimmed response string or an error.
 func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, llmCall LLMExecutionConfig, prompt string) (string, error) {
+	reportErr, reportChange, end := exe.tracker.Start(ctx, "SimpleExec", "prompt_model",
+		"model_name", llmCall.Model,
+		"model_names", llmCall.Models,
+		"provider_types", llmCall.Providers,
+		"provider_type", llmCall.Provider)
+	defer end()
+
 	if prompt == "" {
-		return "", fmt.Errorf("unprocessable empty prompt")
+		err := fmt.Errorf("unprocessable empty prompt")
+		reportErr(err)
+		return "", err
 	}
 	providerNames := []string{}
 	if llmCall.Provider != "" {
@@ -73,13 +83,29 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 	}
 	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
 	if len(modelNames) == 0 && len(providerNames) == 0 {
+		reportChange("runtime_state_resolution", "no explicit model/provider, using default system provider (Ollama)")
+		defaultProvider, err := exe.promptExec.GetDefaultSystemProvider(ctx) // Fetch the actual default provider
+		if err != nil {
+			reportErr(fmt.Errorf("failed to get default system provider: %w", err))
+			return "", fmt.Errorf("failed to get default system provider: %w", err)
+		}
+		// Populate the request fields with the default provider's model and type
+		modelNames = append(modelNames, defaultProvider.ModelName())
+		providerNames = append(providerNames, defaultProvider.GetType())
 		runtimeStateResolution = exe.promptExec.GetRuntime(ctx)
 	} else {
 		providers, err := exe.promptExec.GetAvailableProviders(ctx)
 		if err != nil {
-			return "", fmt.Errorf("failed to get providers: %w", err)
+			err = fmt.Errorf("failed to get providers: %w", err)
+			reportErr(err)
+			return "", err
 		}
 		runtimeStateResolution = func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
+			ids := []string{}
+			for _, p := range providers {
+				ids = append(ids, p.GetID())
+			}
+			reportChange("available_providers", ids)
 			return providers, nil // Use direct providers list
 		}
 	}
@@ -94,12 +120,16 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 		resolver,
 	)
 	if err != nil {
-		return "", fmt.Errorf("client resolution failed: %w", err)
+		err = fmt.Errorf("client resolution failed: %w", err)
+		reportErr(err)
+		return "", err
 	}
 
 	response, err := client.Prompt(ctx, prompt)
 	if err != nil {
-		return "", fmt.Errorf("prompt execution failed: %w", err)
+		err = fmt.Errorf("prompt execution failed: %w", err)
+		reportErr(err)
+		return "", err
 	}
 
 	return strings.TrimSpace(response), nil
@@ -184,6 +214,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				return "", fmt.Errorf("SEVERBUG: input is not a string")
 			}
 			return prompt, nil
+		case DataTypeInt:
+			return fmt.Sprintf("%d", input), nil
+		case DataTypeFloat:
+			return fmt.Sprintf("%f", input), nil
+		case DataTypeBool:
+			return fmt.Sprintf("%t", input), nil
 		case DataTypeChatHistory:
 			history, ok := input.(ChatHistory)
 			if !ok {
@@ -199,7 +235,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	}
 
 	switch currentTask.Type {
-	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange:
+	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange, RaiseError:
 		prompt, err := getPrompt()
 		if err != nil {
 			return nil, DataTypeAny, "", err
@@ -240,6 +276,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			transitionEval, taskErr = exe.rang(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			outputType = DataTypeString
 			output = transitionEval
+		case RaiseError:
+			message, err := getPrompt()
+			if err != nil {
+				return nil, DataTypeAny, "", fmt.Errorf("failed to get prompt: %w", err)
+			}
+			return nil, DataTypeAny, "", errors.New(message)
 		}
 
 	case ModelExecution:

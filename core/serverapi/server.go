@@ -136,9 +136,9 @@ func New(
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
 	handler = enableCORS(config, handler)
+	handler = requestIDMiddleware(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
-	handler = requestIDMiddleware(config, handler)
 	handler = JWTMiddleware(config, handler)
 	services := []serverops.ServiceMeta{
 		modelService,

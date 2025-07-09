@@ -5,6 +5,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/google/uuid"
 )
 
 var _ Worker = (*activityTrackerDecorator)(nil)
@@ -23,6 +24,9 @@ func (d *activityTrackerDecorator) ProcessTick(ctx context.Context) error {
 }
 
 func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi.Update) error {
+	if _, ok := ctx.Value(serverops.ContextKeyRequestID).(string); !ok {
+		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, uuid.NewString())
+	}
 	if update.Message == nil {
 		// Not a message; don't track
 		return d.worker.Process(ctx, update)

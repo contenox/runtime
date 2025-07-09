@@ -169,7 +169,8 @@ func main() {
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 		"echo":             echocmd,
 		"search_knowledge": knowledgeHook,
-	})
+		"vector_search":    rag,
+	}, serverops.NewLogActivityTracker(slog.Default()))
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{

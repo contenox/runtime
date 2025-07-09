@@ -37,11 +37,8 @@ func (t *LogActivityTracker) Start(
 		slog.String("op_id", opID),
 	}
 	requestID := ""
-	if ctx.Value(ContextKeyRequestID) != nil {
-		value, ok := ctx.Value(ContextKeyRequestID).(string)
-		if ok {
-			requestID = value
-		}
+	if val, ok := ctx.Value(ContextKeyRequestID).(string); ok {
+		requestID = val
 	}
 	attrs = append(attrs, slog.String("request_id", requestID))
 	arrs := append(attrs, toSlogAttrs(kvArgs...)...)

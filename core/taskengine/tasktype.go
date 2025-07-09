@@ -25,12 +25,19 @@ const (
 	// RawString returns the raw string result from the LLM.
 	RawString TaskType = "raw_string"
 
+	// RaiseError raises an error with the provided message.
+	RaiseError TaskType = "raise_error"
+
 	// ModelExecution will execute the system default or specified model on a chathistory.
 	ModelExecution TaskType = "model_execution"
 
 	// Hook indicates this task should execute an external action rather than calling the LLM.
 	Hook TaskType = "hook"
 )
+
+func (t TaskType) String() string {
+	return string(t)
+}
 
 // TriggerType defines the type of trigger that starts a chain.
 type TriggerType string
@@ -48,6 +55,10 @@ const (
 	// TriggerEvent starts the chain in response to an external event or webhook.
 	TriggerEvent TriggerType = "webhook"
 )
+
+func (t TriggerType) String() string {
+	return string(t)
+}
 
 // Trigger defines how and when a chain should be started.
 type Trigger struct {
@@ -103,6 +114,10 @@ const (
 	OpInRange     OperatorTerm = "in_range"
 	OpDefault     OperatorTerm = "default"
 )
+
+func (t OperatorTerm) String() string {
+	return string(t)
+}
 
 func SupportedOperators() []string {
 	return []string{

@@ -146,6 +146,16 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 							When:     "echo",
 							Goto:     "persist_messages",
 						},
+						{
+							Operator: "equals",
+							When:     "help",
+							Goto:     "persist_messages",
+						},
+						{
+							Operator: "equals",
+							When:     "search_knowledge",
+							Goto:     "persist_messages",
+						},
 					},
 				},
 			},
@@ -153,12 +163,12 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				ID:             "moderate",
 				Description:    "Moderate the input",
 				Type:           taskengine.ParseNumber,
-				PromptTemplate: "Classify the input as safe (10) or unsafe (0) respond with an numeric value between 0 and 10. Input: {{.input}}",
+				PromptTemplate: "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
-							Operator: taskengine.OpLessThan,
+							Operator: taskengine.OpGreaterThan,
 							When:     "4",
 							Goto:     "reject_request",
 						},
@@ -178,7 +188,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: ""},
+						{Operator: "default", Goto: "raise_error"},
 					},
 				},
 			},
@@ -187,6 +197,19 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Description:    "Reject the request",
 				Type:           taskengine.RawString,
 				PromptTemplate: "respond to the user that classification of the request failed for context the exact input: {{.input}}",
+				InputVar:       "input",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "raise_error"},
+					},
+				},
+			},
+			{
+				ID:             "raise_error",
+				Description:    "Raise an error",
+				Type:           taskengine.RaiseError,
+				PromptTemplate: "{{.input}}",
+				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: ""},

@@ -12,6 +12,22 @@ type activityTrackerDecorator struct {
 	tracker     serverops.ActivityTracker
 }
 
+// sanitizeFile removes sensitive data fields before logging
+func sanitizeFile(file *File) *File {
+	if file == nil {
+		return nil
+	}
+	return &File{
+		ID:          file.ID,
+		Path:        file.Path,
+		Name:        file.Name,
+		ParentID:    file.ParentID,
+		Size:        file.Size,
+		ContentType: file.ContentType,
+		// Explicitly omit the Data field containing file content
+	}
+}
+
 func (d *activityTrackerDecorator) MoveFile(ctx context.Context, fileID string, newParentID string) (*File, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
@@ -26,12 +42,11 @@ func (d *activityTrackerDecorator) MoveFile(ctx context.Context, fileID string, 
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(movedFile.ID, movedFile)
+		reportChangeFn(movedFile.ID, sanitizeFile(movedFile))
 	}
 	return movedFile, opErr
 }
 
-// MoveFolder implements Service.
 func (d *activityTrackerDecorator) MoveFolder(ctx context.Context, folderID string, newParentID string) (*Folder, error) {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
@@ -51,9 +66,6 @@ func (d *activityTrackerDecorator) MoveFolder(ctx context.Context, folderID stri
 	return movedFolder, opErr
 }
 
-// WithActivityTracker decorates a FileService implementation with an ActivityTracker.
-// It intercepts each method call, using the tracker to report on the operation's
-// lifecycle (start, end), outcome (error), and any resulting state changes.
 func WithActivityTracker(fileservice Service, tracker serverops.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		fileservice: fileservice,
@@ -76,9 +88,8 @@ func (d *activityTrackerDecorator) CreateFile(ctx context.Context, file *File) (
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(createdFile.ID, createdFile)
+		reportChangeFn(createdFile.ID, sanitizeFile(createdFile))
 	}
-
 	return createdFile, opErr
 }
 
@@ -130,7 +141,7 @@ func (d *activityTrackerDecorator) UpdateFile(ctx context.Context, file *File) (
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(updatedFile.ID, updatedFile)
+		reportChangeFn(updatedFile.ID, sanitizeFile(updatedFile))
 	}
 	return updatedFile, opErr
 }
@@ -185,14 +196,12 @@ func (d *activityTrackerDecorator) RenameFile(ctx context.Context, fileID, newNa
 	if opErr != nil {
 		reportErrFn(opErr)
 	} else {
-		reportChangeFn(file.ID, file)
+		reportChangeFn(file.ID, sanitizeFile(file))
 	}
 	return file, opErr
 }
 
 func (d *activityTrackerDecorator) RenameFolder(ctx context.Context, folderID, newName string) (*Folder, error) {
-	// Operation: "rename", Subject: "folder"
-	// Args: Pass the folder ID and the new name
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"rename",
@@ -227,7 +236,6 @@ func (d *activityTrackerDecorator) DeleteFolder(ctx context.Context, folderID st
 		reportChangeFn(folderID, nil)
 	}
 	return opErr
-
 }
 
 func (d *activityTrackerDecorator) GetFolderByID(ctx context.Context, id string) (*Folder, error) {

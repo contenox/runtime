@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
@@ -16,7 +17,10 @@ type Mux struct {
 }
 
 // NewMux creates a new Mux hook router with registered sub-hooks.
-func NewMux(hooks map[string]taskengine.HookRepo) taskengine.HookRepo {
+func NewMux(hooks map[string]taskengine.HookRepo, tracker serverops.ActivityTracker) taskengine.HookRepo {
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
 	return &Mux{
 		hooks: hooks,
 	}
@@ -84,17 +88,18 @@ func (m *Mux) Exec(ctx context.Context, startTime time.Time, input any, dataType
 	status, result, resultType, transition, err := hook.Exec(
 		ctx, startTime, args, taskengine.DataTypeString, command, hookCall,
 	)
+
 	if status != taskengine.StatusSuccess {
 		return status, nil, resultType, transition, err
 	}
 
 	if chatHist != nil {
 		if resultStr, ok := result.(string); ok {
-			// Append only assistant response (user message already exists)
 			chatHist.Messages = append(chatHist.Messages, taskengine.Message{
 				Role:    "system",
 				Content: resultStr,
 			})
+
 			return taskengine.StatusSuccess, *chatHist, taskengine.DataTypeChatHistory, transition, nil
 		}
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
