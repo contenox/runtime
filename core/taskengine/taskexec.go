@@ -334,6 +334,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 }
 
 func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLength int, resolverPolicy llmresolver.Policy, llmCall *LLMExecutionConfig) (any, DataType, string, error) {
+	reportErr, reportChange, end := exe.tracker.Start(ctx, "SimpleExec", "prompt_model",
+		"model_name", llmCall.Model,
+		"model_names", llmCall.Models,
+		"provider_types", llmCall.Providers,
+		"provider_type", llmCall.Provider)
+	defer end()
 	providerNames := []string{}
 	if llmCall.Provider != "" {
 		providerNames = append(providerNames, llmCall.Provider)
@@ -343,6 +349,7 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	}
 	tokenizer, err := exe.promptExec.GetTokenizer(ctx)
 	if err != nil {
+		reportErr(fmt.Errorf("tokenizer failed: %w", err))
 		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
 	}
 	if input.InputTokens <= 0 {
@@ -352,11 +359,13 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		}
 		inputCount, err := tokenizer.CountTokens(ctx, "tiny", prompt)
 		if err != nil {
+			reportErr(fmt.Errorf("token count failed: %w", err))
 			return nil, DataTypeAny, "", fmt.Errorf("token count failed: %w", err)
 		}
 		input.InputTokens = inputCount
 	}
 	if ctxLength > 0 && input.InputTokens > ctxLength {
+		reportErr(fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength))
 		err := fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength)
 		return nil, DataTypeAny, "", err
 	}
@@ -369,10 +378,17 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	}
 	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
 	if len(modelNames) == 0 && len(providerNames) == 0 {
+		reportChange("runtime_state_resolution", "no explicit model/provider, using default system provider (Ollama)")
 		runtimeStateResolution = exe.promptExec.GetRuntime(ctx)
 	} else {
 		providers, err := exe.promptExec.GetAvailableProviders(ctx)
+		ids := []string{}
+		for _, p := range providers {
+			ids = append(ids, p.GetID())
+		}
+		reportChange("available_providers", ids)
 		if err != nil {
+			reportErr(fmt.Errorf("failed to get providers: %w", err))
 			return nil, DataTypeAny, "", fmt.Errorf("failed to get providers: %w", err)
 		}
 		runtimeStateResolution = func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
@@ -392,6 +408,7 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	)
 	if err != nil {
 		err = fmt.Errorf("client resolution failed: %w", err)
+		reportErr(err)
 		return nil, DataTypeAny, "", err
 	}
 	messagesC := []libmodelprovider.Message{}
@@ -412,16 +429,19 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	p, err := exe.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to get provider: %w", err)
+		reportErr(err)
 		return nil, DataTypeAny, "", err
 	}
 	modelForTokenization, err := tokenizer.OptimalModel(ctx, p.ModelName())
 	if err != nil {
 		err = fmt.Errorf("failed to get model for tokenization: %w", err)
+		reportErr(err)
 		return nil, DataTypeAny, "", err
 	}
 	outputTokensCount, err := tokenizer.CountTokens(ctx, modelForTokenization, resp.Content)
 	if err != nil {
 		err = fmt.Errorf("tokenizer failed: %w", err)
+		reportErr(err)
 		return nil, DataTypeAny, "", err
 	}
 	input.OutputTokens = outputTokensCount

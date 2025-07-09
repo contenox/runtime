@@ -71,6 +71,7 @@ type ActivityTracker interface {
 	) (
 		reportErr func(err error),
 		reportChange func(id string, data any),
+		// logEvent func(message string, level string, kvArgs ...any),
 		end func(),
 	)
 }
