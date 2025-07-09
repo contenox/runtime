@@ -52,12 +52,16 @@ func (tm *taskManager) tasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := tm.taskService.Execute(r.Context(), req.Chain, req.Input)
+	resp, capturedStateUnits, err := tm.taskService.Execute(r.Context(), req.Chain, req.Input)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.ExecuteOperation)
 		return
 	}
-	_ = serverops.Encode(w, r, http.StatusOK, resp)
+	response := map[string]any{
+		"response": resp,
+		"state":    capturedStateUnits,
+	}
+	_ = serverops.Encode(w, r, http.StatusOK, response)
 }
 
 func (tm *taskManager) attachToConnector(w http.ResponseWriter, r *http.Request) {

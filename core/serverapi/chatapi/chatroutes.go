@@ -113,14 +113,15 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		PreferredModelNames: req.Models,
 		Provider:            req.Provider,
 	}
-	reply, _, _, err := h.service.Chat(ctx, reqConv)
+	reply, _, _, capturedStateUnits, err := h.service.Chat(ctx, reqConv)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 
-	resp := map[string]string{
-		"response": reply,
+	resp := map[string]any{
+		"response":             reply,
+		"captured_state_units": capturedStateUnits,
 	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }
