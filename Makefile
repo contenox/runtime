@@ -1,4 +1,4 @@
-.PHONY: core-test-unit core-test-system core-test libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-test-logs api-test-docker api-init wait-for-server
+.PHONY: core-test-unit core-test-system core-test compose-wipe libs-test benchmarks run build down logs ui-install ui-package ui-build ui-run api-test api-test-logs api-test-docker api-init wait-for-server
 DEFAULT_ADMIN_USER ?= admin@admin.com
 DEFAULT_CORE_VERSION ?= dev-demo
 
@@ -33,6 +33,9 @@ run: down build
 
 logs: run
 	docker compose logs -f runtime-mvp
+
+compose-wipe:
+	docker compose down --volumes --rmi all
 
 yarn-wipe:
 	echo "Removing Yarn PnP files..."

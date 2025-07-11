@@ -59,6 +59,7 @@ func (d *activityTrackerDecorator) Chat(ctx context.Context, req ChatRequest) (s
 		"input_token_count":  tokencount,
 		"output_token_count": outputtokencount,
 		"timestamp":          time.Now().UTC().Format("2006-01-02T15:04:05Z"),
+		"state":              capturedStateUnits,
 	})
 
 	return response, tokencount, outputtokencount, capturedStateUnits, nil
