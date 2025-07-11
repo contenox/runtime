@@ -11,6 +11,8 @@ import (
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
+const name = "search_knowledge"
+
 // NewSearchThenResolveHook creates a new SearchThenResolveHook with optional ActivityTracker
 func NewSearchThenResolveHook(
 	searchThenResolveHook SearchThenResolveHook,
@@ -46,7 +48,7 @@ type SearchThenResolveHook struct {
 var _ taskengine.HookRepo = (*SearchThenResolveHook)(nil)
 
 func (r *SearchThenResolveHook) Supports(ctx context.Context) ([]string, error) {
-	return []string{"search_knowledge"}, nil
+	return []string{name}, nil
 }
 
 func (r *SearchThenResolveHook) Exec(
@@ -197,5 +199,5 @@ func (r *SearchThenResolveHook) Exec(
 		return status, out, outType, trans, fmt.Errorf("resolve failed: %w", err)
 	}
 
-	return status, out, outType, trans, nil
+	return status, out, outType, name, nil
 }

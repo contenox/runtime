@@ -71,6 +71,7 @@ export default function ChatPage() {
 
     sendMessage(payload, {
       onSuccess: response => {
+        console.log(response);
         setLatestState(response.state);
       },
     });
