@@ -234,7 +234,8 @@ func (h *Chat) ConvertToOpenAIResponse(
 // PersistMessages saves the most recent user and assistant messages to the database.
 func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected chat history")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+			fmt.Errorf("expected chat history, got %v", dataType)
 	}
 
 	history, ok := input.(taskengine.ChatHistory)

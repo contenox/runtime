@@ -149,13 +149,29 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 						{
 							Operator: "equals",
 							When:     "help",
-							Goto:     "persist_messages",
+							Goto:     "print_help_message",
 						},
 						{
 							Operator: "equals",
 							When:     "search_knowledge",
 							Goto:     "persist_messages",
 						},
+					},
+				},
+			},
+			{
+				ID:          "print_help_message",
+				Description: "Display help message",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "print",
+					Args: map[string]string{
+						"message": "Available commands:\n/echo <text>\n/help\n/search_knowledge <query>",
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_messages"},
 					},
 				},
 			},

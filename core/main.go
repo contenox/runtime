@@ -166,10 +166,13 @@ func main() {
 		DefaultRadius:  40,
 	}, serverops.NewLogActivityTracker(slog.Default()))
 	// Mux for handling commands like /echo
+	transition := hooks.NewTransition("help", serverops.NewLogActivityTracker(slog.Default()))
+	printHook := hooks.NewPrint(serverops.NewLogActivityTracker(slog.Default()))
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 		"echo":             echocmd,
 		"search_knowledge": knowledgeHook,
 		"vector_search":    rag,
+		"help":             transition,
 	}, serverops.NewLogActivityTracker(slog.Default()))
 
 	// Combine all hooks into one registry
@@ -183,6 +186,8 @@ func main() {
 		"convert_history_to_openai":    chatHook,
 		"append_system_message":        chatHook,
 		"persist_messages":             chatHook,
+		"help":                         printHook,
+		"print":                        printHook,
 	})
 	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serverops.NewLogActivityTracker(slog.Default()))
 	if err != nil {

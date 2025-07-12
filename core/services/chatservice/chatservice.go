@@ -137,18 +137,17 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	// Execute chain
 	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req.Message, taskengine.DataTypeString)
 	if err != nil {
-		return "", 0, 0, nil, fmt.Errorf("chain execution failed: %w", err)
+		return "", 0, 0, stackTrace, fmt.Errorf("chain execution failed: %w", err)
 	}
-	_ = stackTrace // TODO: log stack trace?
 	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
-		return "", 0, 0, nil, fmt.Errorf("unexpected result from chain")
+		return "", 0, 0, stackTrace, fmt.Errorf("unexpected result from chain")
 	}
 
 	lastMsg := hist.Messages[len(hist.Messages)-1]
 	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
-		return "", 0, 0, nil, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
+		return "", 0, 0, stackTrace, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
 	}
 
 	return lastMsg.Content, hist.InputTokens, hist.OutputTokens, stackTrace, nil

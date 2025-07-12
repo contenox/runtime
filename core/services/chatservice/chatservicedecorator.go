@@ -50,7 +50,7 @@ func (d *activityTrackerDecorator) Chat(ctx context.Context, req ChatRequest) (s
 	response, tokencount, outputtokencount, capturedStateUnits, err := d.service.Chat(ctx, req)
 	if err != nil {
 		reportErrFn(err)
-		return "", 0, 0, nil, err
+		return response, tokencount, outputtokencount, capturedStateUnits, err
 	}
 
 	reportChangeFn(req.SubjectID, map[string]interface{}{
