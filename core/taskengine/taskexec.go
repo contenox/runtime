@@ -230,10 +230,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			}
 			return history.Messages[len(history.Messages)-1].Content, nil
 		default:
-			return "", fmt.Errorf("unsupported input type for task %v: %v", currentTask.Type, outputType)
+			return "", fmt.Errorf("getPrompt unsupported input type for task %v: %v", currentTask.Type.String(), outputType.String())
 		}
 	}
-
+	if len(currentTask.Type) == 0 {
+		return output, dataType, transitionEval, fmt.Errorf("%w: task-type is empty", ErrUnsupportedTaskType)
+	}
 	switch currentTask.Type {
 	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange, ParseTransition, RaiseError:
 		prompt, err := getPrompt()
@@ -331,7 +333,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		}
 
 	default:
-		taskErr = fmt.Errorf("unknown task type: %w %s", ErrUnsupportedTaskType, currentTask.Type)
+		taskErr = fmt.Errorf("unknown task type: %w -- %s", ErrUnsupportedTaskType, currentTask.Type.String())
 	}
 
 	return output, outputType, transitionEval, taskErr

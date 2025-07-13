@@ -112,22 +112,42 @@ func (r *SearchThenResolveHook) Exec(
 		}
 	}
 
-	_, ok := input.(string)
-	if !ok && dataType != taskengine.DataTypeString {
-		reportErr(errors.New("input must be a string"))
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("input must be a string")
+	// Unified prompt extraction function
+	getPrompt := func() (string, error) {
+		switch dataType {
+		case taskengine.DataTypeString:
+			prompt, ok := input.(string)
+			if !ok {
+				return "", fmt.Errorf("SEVERBUG: input is not a string")
+			}
+			return prompt, nil
+		case taskengine.DataTypeChatHistory:
+			history, ok := input.(taskengine.ChatHistory)
+			if !ok {
+				return "", fmt.Errorf("SEVERBUG: input is not a chat history")
+			}
+			if len(history.Messages) == 0 {
+				return "", fmt.Errorf("SEVERBUG: chat history is empty")
+			}
+			return history.Messages[len(history.Messages)-1].Content, nil
+		default:
+			return "", fmt.Errorf("unsupported input type %v", dataType.String())
+		}
 	}
 
-	var parsedArgs map[string]string
-	if inStr, ok := input.(string); ok {
-		inStrParsed, args, err := ParsePrefixedArgs(inStr)
-		if err != nil {
-			reportErr(err)
-			return taskengine.StatusError, nil, dataType, transition, err
-		}
-		input = inStrParsed
-		parsedArgs = args
+	inStr, err := getPrompt()
+	if err != nil {
+		reportErr(err)
+		return taskengine.StatusError, nil, dataType, transition, err
 	}
+	var parsedArgs map[string]string
+	inStrParsed, args, err := ParsePrefixedArgs(inStr)
+	if err != nil {
+		reportErr(err)
+		return taskengine.StatusError, nil, dataType, transition, err
+	}
+	input = inStrParsed
+	parsedArgs = args
 
 	// Override args from parsed input
 	if v, ok := parsedArgs["top_k"]; ok {

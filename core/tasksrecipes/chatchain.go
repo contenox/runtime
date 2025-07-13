@@ -131,6 +131,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 			{
 				ID:          "mux_input",
 				Description: "Check for commands like /echo",
+				Type:        taskengine.ParseTransition,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "moderate"},
@@ -185,7 +186,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Hook: &taskengine.HookCall{
 					Type: "print",
 					Args: map[string]string{
-						"message": "Available commands:\n/echo <text>\n/help\n/search_knowledge <query>",
+						"message": "Available commands:\n/echo <text>\n/help\n/search <query>",
 					},
 				},
 				Transition: taskengine.TaskTransition{
@@ -256,7 +257,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Description: "Run inference using selected LLM",
 				Type:        taskengine.ModelExecution,
 				SystemInstruction: "You're a helpful assistant in the contenox system. " +
-					"Respond helpfully and mention available commands (/help, /echo, /search_knowledge) when appropriate. " +
+					"Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. " +
 					"Keep conversation friendly.",
 				ExecuteConfig: &taskengine.LLMExecutionConfig{
 					Models:    req.PreferredModelNames,
