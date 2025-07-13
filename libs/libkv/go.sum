@@ -112,6 +112,8 @@ github.com/tklauser/numcpus v0.8.0 h1:Mx4Wwe/FjZLeQsK/6kt2EOepwwSl7SmJrK5bV/dXYg
 github.com/tklauser/numcpus v0.8.0/go.mod h1:ZJZlAY+dmR4eut8epnzf0u/VwodKmryxR8txiloSqBE=
 github.com/valkey-io/valkey-go v1.0.41 h1:pWgh9MP24Vl0ANZ0KxEMwB/LHvTUKwlm2SPuWIrSlFw=
 github.com/valkey-io/valkey-go v1.0.41/go.mod h1:LXqAbjygRuA1YRocojTslAGx2dQB4p8feaseGviWka4=
+github.com/valkey-io/valkey-go v1.0.62 h1:oQdPlQGRyxcQWL8fnu6J3SCaQwayc/hRZifjJIaJqu0=
+github.com/valkey-io/valkey-go v1.0.62/go.mod h1:bHmwjIEOrGq/ubOJfh5uMRs7Xj6mV3mQ/ZXUbmqpjqY=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo0=

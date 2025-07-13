@@ -33,4 +33,10 @@ type KVExec interface {
 	Delete(ctx context.Context, key []byte) error
 	Exists(ctx context.Context, key []byte) (bool, error)
 	List(ctx context.Context) ([]string, error)
+
+	LPush(ctx context.Context, key []byte, value []byte) error
+	RPop(ctx context.Context, key []byte) ([]byte, error)
+	LTrim(ctx context.Context, key []byte, start, stop int64) error
+	LRange(ctx context.Context, key []byte, start, stop int64) ([][]byte, error)
+	LLen(ctx context.Context, key []byte) (int64, error)
 }

@@ -2,6 +2,7 @@ import { TabbedPage } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';
+import ActivityLogsSection from './components/ActivityLogsSection';
 import BackendsSection from './components/BackendsSection';
 import CloudProvidersSection from './components/CloudProvidersSection';
 import PoolsSection from './components/PoolsSection';
@@ -26,6 +27,11 @@ export default function BackendsPage() {
       id: 'cloud-providers',
       label: t('cloud_providers.title'),
       content: <CloudProvidersSection />,
+    },
+    {
+      id: 'activity',
+      label: t('activity.title'),
+      content: <ActivityLogsSection />,
     },
     {
       id: 'state',

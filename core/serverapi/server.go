@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
+	"github.com/contenox/runtime-mvp/core/serverapi/activityapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/backendapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chainsapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chatapi"
@@ -25,6 +27,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
+	"github.com/contenox/runtime-mvp/core/services/activityservice"
 	"github.com/contenox/runtime-mvp/core/services/backendservice"
 	"github.com/contenox/runtime-mvp/core/services/chainservice"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
@@ -41,6 +44,7 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libauth"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/google/uuid"
 )
@@ -57,6 +61,7 @@ func New(
 	vectorStore vectors.Store,
 	hookRegistry taskengine.HookRegistry,
 	chatManager *chat.Manager,
+	kvManager libkv.KVManager,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -71,8 +76,12 @@ func New(
 	if err != nil {
 		return nil, cleanup, err
 	}
+	tracker := activity.NewKVActivityTracker(kvManager)
+	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
+	// tracker := serverops.NewLogActivityTracker(slog.Default())
+
 	backendService := backendservice.New(dbInstance)
-	backendservice.WithActivityTracker(backendService, serverops.NewLogActivityTracker(slog.Default()))
+	backendservice.WithActivityTracker(backendService, tracker)
 	backendapi.AddBackendRoutes(mux, config, backendService, state)
 	poolservice := poolservice.New(dbInstance)
 	poolapi.AddPoolRoutes(mux, config, poolservice)
@@ -99,40 +108,48 @@ func New(
 	)
 	fileService := fileservice.New(dbInstance, config)
 	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
-	fileService = fileservice.WithActivityTracker(fileService, serverops.NewLogActivityTracker(slog.Default()))
+	fileService = fileservice.WithActivityTracker(fileService, stdOuttracker)
+	fileService = fileservice.WithActivityTracker(fileService, tracker)
 	filesapi.AddFileRoutes(mux, config, fileService)
 	downloadService := downloadservice.New(dbInstance, pubsub)
-	downloadService = downloadservice.WithActivityTracker(downloadService, serverops.NewLogActivityTracker(slog.Default()))
+	downloadService = downloadservice.WithActivityTracker(downloadService, tracker)
 	backendapi.AddQueueRoutes(mux, config, downloadService)
 	modelService := modelservice.New(dbInstance, config)
-	modelService = modelservice.WithActivityTracker(modelService, serverops.NewLogActivityTracker(slog.Default()))
+	modelService = modelservice.WithActivityTracker(modelService, tracker)
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
 
 	chatService := chatservice.New(dbInstance, environmentExec)
-	chatService = chatservice.WithActivityTracker(chatService, serverops.NewLogActivityTracker(slog.Default()))
+	chatService = chatservice.WithActivityTracker(chatService, stdOuttracker)
+	chatService = chatservice.WithActivityTracker(chatService, tracker)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)
-	userService = userservice.WithActivityTracker(userService, serverops.NewLogActivityTracker(slog.Default()))
+	userService = userservice.WithActivityTracker(userService, tracker)
 	usersapi.AddUserRoutes(mux, config, userService)
 
 	accessService := accessservice.New(dbInstance)
-	accessService = accessservice.WithActivityTracker(accessService, serverops.NewLogActivityTracker(slog.Default()))
+	accessService = accessservice.WithActivityTracker(accessService, stdOuttracker)
+	accessService = accessservice.WithActivityTracker(accessService, tracker)
 	usersapi.AddAccessRoutes(mux, config, accessService)
 	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
-	indexService = indexservice.WithActivityTracker(indexService, serverops.NewLogActivityTracker(slog.Default()))
+
+	indexService = indexservice.WithActivityTracker(indexService, stdOuttracker)
+	indexService = indexservice.WithActivityTracker(indexService, tracker)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
 	execService := execservice.NewExec(ctx, execmodelrepo, dbInstance)
-	execService = execservice.WithActivityTracker(execService, serverops.NewLogActivityTracker(slog.Default()))
+	execService = execservice.WithActivityTracker(execService, stdOuttracker)
+	execService = execservice.WithActivityTracker(execService, tracker)
 	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance, hookRegistry)
 	execapi.AddExecRoutes(mux, config, execService, taskService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
 	providerService := providerservice.New(dbInstance)
-	providerService = providerservice.WithActivityTracker(providerService, serverops.NewLogActivityTracker(slog.Default()))
+	providerService = providerservice.WithActivityTracker(providerService, stdOuttracker)
+	providerService = providerservice.WithActivityTracker(providerService, tracker)
 	providersapi.AddProviderRoutes(mux, config, providerService)
-
+	activityService := activityservice.New(tracker)
+	activityapi.AddActivityRoutes(mux, config, activityService)
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
 	handler = enableCORS(config, handler)

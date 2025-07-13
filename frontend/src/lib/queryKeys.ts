@@ -98,3 +98,8 @@ export const chainKeys = {
   triggerDetail: (chainId: string, triggerId: string) =>
     [...chainKeys.triggers(chainId), triggerId] as const,
 };
+
+export const activityKeys = {
+  all: ['activity'] as const,
+  list: (limit?: number) => [...activityKeys.all, 'list', { limit }] as const,
+};

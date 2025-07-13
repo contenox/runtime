@@ -27,6 +27,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
 )
 
@@ -144,6 +145,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing vector store failed: %v", err)
 	}
+	kvManager, err := libkv.NewManager(libkv.Config{
+		Addr:     config.KVHost,
+		Password: config.KVPassword,
+	}, time.Hour*24)
+	if err != nil {
+		log.Fatalf("initializing kv manager failed: %v", err)
+	}
+	kvExec, err := kvManager.Operation(ctx)
+	if err != nil {
+		log.Fatalf("initializing kv manager 1 failed: %v", err)
+	}
+	err = kvExec.Set(ctx, libkv.KeyValue{
+		Key:   []byte("test"),
+		Value: []byte("test"),
+		TTL:   time.Now().Add(time.Second),
+	})
+	if err != nil {
+		log.Fatalf("initializing kv manager 2 failed: %v", err)
+	}
 	rag := hooks.NewSearch(embedder, vectorStore, dbInstance)
 	webcall := hooks.NewWebCaller()
 	// Hook instances
@@ -200,7 +220,7 @@ func main() {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hooks, chatManager)
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hooks, chatManager, kvManager)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

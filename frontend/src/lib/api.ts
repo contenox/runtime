@@ -1,6 +1,7 @@
 import { apiFetch } from './fetch';
 import {
   AccessEntry,
+  ActivityLogsResponse,
   AuthenticatedUser,
   Backend,
   ChainDefinition,
@@ -253,4 +254,8 @@ export const api = {
     apiFetch<Trigger>(`/api/chains/${chainId}/triggers`, options('POST', data)),
   removeChainTrigger: (chainId: string, triggerId: string) =>
     apiFetch<void>(`/api/chains/${chainId}/triggers/${triggerId}`, options('DELETE')),
+  getActivityLogs: (limit?: number) =>
+    apiFetch<ActivityLogsResponse>(
+      limit ? `/api/activity/logs?limit=${limit}` : '/api/activity/logs',
+    ),
 };

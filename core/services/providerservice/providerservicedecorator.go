@@ -35,18 +35,18 @@ func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, provid
 }
 
 func (d *activityTrackerDecorator) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {
-	reportErrFn, _, endFn := d.tracker.Start(
-		ctx,
-		"get",
-		"provider_config",
-		"provider_type", providerType,
-	)
-	defer endFn()
+	// reportErrFn, _, endFn := d.tracker.Start(
+	// 	ctx,
+	// 	"get",
+	// 	"provider_config",
+	// 	"provider_type", providerType,
+	// )
+	// defer endFn()
 
 	config, err := d.service.GetProviderConfig(ctx, providerType)
-	if err != nil {
-		reportErrFn(err)
-	}
+	// if err != nil {
+	// 	reportErrFn(err)
+	// }
 	return config, err
 }
 

@@ -300,3 +300,18 @@ export interface ChainWithTrigger {
   triggers?: Trigger[];
   chain_definition: ChainDefinition;
 }
+
+export type ActivityLog = {
+  id: string;
+  operation: string;
+  subject: string;
+  start: string;
+  end?: string;
+  error?: string;
+  entityID?: string;
+  entityData?: undefined;
+  durationMS?: number;
+  metadata?: Record<string, string>;
+};
+
+export type ActivityLogsResponse = ActivityLog[];
