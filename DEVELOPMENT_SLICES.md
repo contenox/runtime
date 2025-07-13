@@ -70,7 +70,7 @@ Notes:
 ### 📅 July 2025 – Building a demo application
 - [ ] **Persona Chat Application Packaging**
 - [ ] **Package a Persona-Chat Application**
-- [ ] **Observability Integration**
+- [x] **Basic Observability Integration**
 - [ ] **API Rate Limiting Middleware**
 - [x] **Implement Chat moderation**
 
