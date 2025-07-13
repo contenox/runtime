@@ -72,7 +72,7 @@ Notes:
 - [ ] **Package a Persona-Chat Application**
 - [ ] **Observability Integration**
 - [ ] **API Rate Limiting Middleware**
-- [ ] **Implement Chat moderation**
+- [x] **Implement Chat moderation**
 
 ---
 

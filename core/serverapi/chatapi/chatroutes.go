@@ -115,15 +115,17 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		PreferredModelNames: req.Models,
 		Provider:            req.Provider,
 	}
-	reply, _, _, capturedStateUnits, err := h.service.Chat(ctx, reqConv)
+	reply, inputTokenCount, outputTokenCount, capturedStateUnits, err := h.service.Chat(ctx, reqConv)
 	if err != nil {
 		// _ = serverops.Error(w, r, err, serverops.CreateOperation)
 		reply = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp := map[string]any{
-		"response": reply,
-		"state":    capturedStateUnits,
+		"response":         reply,
+		"state":            capturedStateUnits,
+		"inputTokenCount":  inputTokenCount,
+		"outputTokenCount": outputTokenCount,
 	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
 }

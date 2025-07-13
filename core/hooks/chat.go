@@ -180,7 +180,7 @@ func (h *Chat) ConvertToOpenAIResponse(
 ) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
-			fmt.Errorf("expected chat history, got %v", dataType)
+			fmt.Errorf("ConvertToOpenAIResponse expected chat history, got %s", dataType.String())
 	}
 
 	history, ok := input.(taskengine.ChatHistory)
@@ -235,7 +235,7 @@ func (h *Chat) ConvertToOpenAIResponse(
 func (h *Chat) PersistMessages(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
-			fmt.Errorf("expected chat history, got %v", dataType)
+			fmt.Errorf("PersistMessages expected chat history, got %s", dataType.String())
 	}
 
 	history, ok := input.(taskengine.ChatHistory)

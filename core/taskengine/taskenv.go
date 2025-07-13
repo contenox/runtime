@@ -206,7 +206,12 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, int(chain.TokenLimit), currentTask, taskInput, taskInputType)
 
 			duration := time.Since(startTime)
-
+			errState := ErrorResponse{
+				ErrorInternal: taskErr,
+			}
+			if taskErr != nil {
+				errState.Error = taskErr.Error()
+			}
 			// Record execution step
 			step := CapturedStateUnit{
 				TaskID:     currentTask.ID,
@@ -215,7 +220,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				OutputType: outputType,
 				Transition: transitionEval,
 				Duration:   duration,
-				Error:      taskErr,
+				Error:      errState,
 			}
 			stack.RecordStep(step)
 

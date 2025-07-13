@@ -34,7 +34,12 @@ type CapturedStateUnit struct {
 	OutputType DataType      `json:"outputType"`
 	Transition string        `json:"transition"`
 	Duration   time.Duration `json:"duration"`
-	Error      error         `json:"error"`
+	Error      ErrorResponse `json:"error"`
+}
+
+type ErrorResponse struct {
+	ErrorInternal error  `json:"-"`
+	Error         string `json:"error"`
 }
 
 type MockInspector struct{}

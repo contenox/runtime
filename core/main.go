@@ -166,21 +166,23 @@ func main() {
 		DefaultRadius:  40,
 	}, serverops.NewLogActivityTracker(slog.Default()))
 	// Mux for handling commands like /echo
-	transition := hooks.NewTransition("help", serverops.NewLogActivityTracker(slog.Default()))
+	// transition := hooks.NewTransition("help", serverops.NewLogActivityTracker(slog.Default()))
 	printHook := hooks.NewPrint(serverops.NewLogActivityTracker(slog.Default()))
-	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
-		"echo":             echocmd,
-		"search_knowledge": knowledgeHook,
-		"vector_search":    rag,
-		"help":             transition,
-	}, serverops.NewLogActivityTracker(slog.Default()))
+	// hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
+	// 	"echo":             echocmd,
+	// 	"search_knowledge": knowledgeHook,
+	// 	"vector_search":    rag,
+	// 	"help":             transition,
+	// }, serverops.NewLogActivityTracker(slog.Default()))
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
-		"vector_search":                rag,
-		"webhook":                      webcall,
-		"command_router":               hookMux,
+		"vector_search":    rag,
+		"webhook":          webcall,
+		"search_knowledge": knowledgeHook,
+		// "command_router":               hookMux,
 		"append_user_message":          chatHook,
+		"echo":                         echocmd,
 		"preappend_message_to_history": chatHook,
 		"convert_openai_to_history":    chatHook,
 		"convert_history_to_openai":    chatHook,

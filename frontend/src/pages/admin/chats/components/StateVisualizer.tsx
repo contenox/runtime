@@ -31,7 +31,7 @@ export const StateVisualizer = ({ state }: StateVisualizerProps) => {
           <TableCell className="max-w-xs truncate">{unit.transition || '-'}</TableCell>
           <TableCell>{unit.duration} ms</TableCell>
           <TableCell>
-            {unit.error ? <span className="text-error">{unit.error}</span> : '-'}
+            {unit.error ? <span className="text-error">{unit.error.error}</span> : '-'}
           </TableCell>
         </TableRow>
       ))}

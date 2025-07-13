@@ -31,6 +31,9 @@ const (
 	// ModelExecution will execute the system default or specified model on a chathistory.
 	ModelExecution TaskType = "model_execution"
 
+	// ParseTransition will attempt to parse a transition command from the input and strip the transition prefix if it exists.
+	ParseTransition TaskType = "parse_transition"
+
 	// Hook indicates this task should execute an external action rather than calling the LLM.
 	Hook TaskType = "hook"
 )

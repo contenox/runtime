@@ -130,21 +130,21 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 			},
 			{
 				ID:          "mux_input",
-				Description: "Check for commands like /echo using Mux",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "command_router",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
+				Description: "Check for commands like /echo",
+				Type:        taskengine.ParseTransition,
+				// Hook: &taskengine.HookCall{
+				// 	Type: "command_router",
+				// 	Args: map[string]string{
+				// 		"subject_id": req.SubjectID,
+				// 	},
+				// },
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "moderate"},
 						{
 							Operator: "equals",
 							When:     "echo",
-							Goto:     "persist_messages",
+							Goto:     "echo_message",
 						},
 						{
 							Operator: "equals",
@@ -153,9 +153,35 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 						},
 						{
 							Operator: "equals",
-							When:     "search_knowledge",
-							Goto:     "persist_messages",
+							When:     "search",
+							Goto:     "search_knowledge",
 						},
+					},
+				},
+			},
+			{
+				ID:          "echo_message",
+				Description: "Echo the message",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "echo",
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_messages"},
+					},
+				},
+			},
+			{
+				ID:          "search_knowledge",
+				Description: "Search knowledge base",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "search_knowledge",
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: "default", Goto: "persist_messages"},
 					},
 				},
 			},
@@ -228,7 +254,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: ""},
+						{Operator: "default", Goto: taskengine.TermEnd},
 					},
 				},
 			},

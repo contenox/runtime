@@ -235,7 +235,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	}
 
 	switch currentTask.Type {
-	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange, RaiseError:
+	case RawString, ConditionKey, ParseNumber, ParseScore, ParseRange, ParseTransition, RaiseError:
 		prompt, err := getPrompt()
 		if err != nil {
 			return nil, DataTypeAny, "", err
@@ -276,6 +276,10 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			transitionEval, taskErr = exe.rang(taskCtx, resolver, *currentTask.ExecuteConfig, prompt)
 			outputType = DataTypeString
 			output = transitionEval
+		case ParseTransition:
+			transitionEval, taskErr = exe.parseTransition(prompt)
+			// output = output // pass as is to the next task
+			// outputType = outputType
 		case RaiseError:
 			message, err := getPrompt()
 			if err != nil {
@@ -331,6 +335,25 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	}
 
 	return output, outputType, transitionEval, taskErr
+}
+
+func (exe *SimpleExec) parseTransition(inputStr string) (string, error) {
+	if inputStr == "" {
+		return "", nil
+	}
+	trimmedInput := strings.TrimSpace(inputStr)
+	if !strings.HasPrefix(trimmedInput, "/") {
+		return "pass", nil
+	}
+
+	// Parse command
+	parts := strings.SplitN(trimmedInput, " ", 2)
+	command := strings.TrimPrefix(parts[0], "/")
+	if command == "" {
+		return "", fmt.Errorf("empty command")
+	}
+
+	return command, nil
 }
 
 func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLength int, resolverPolicy llmresolver.Policy, llmCall *LLMExecutionConfig) (any, DataType, string, error) {
@@ -451,13 +474,10 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 
 func (exe *SimpleExec) hookengine(ctx context.Context, startingTime time.Time, input any, dataType DataType, transition string, hook *HookCall) (any, DataType, string, error) {
 	status, res, dataType, transition, err := exe.hookProvider.Exec(ctx, startingTime, input, dataType, transition, hook)
-	if err != nil {
-		return nil, dataType, "", err
-	}
 	if status != StatusSuccess {
-		return nil, dataType, "", fmt.Errorf("hook execution failed")
+		return res, dataType, transition, fmt.Errorf("hook execution failed bad status: %v %w", status, err)
 	}
-	return res, dataType, transition, nil
+	return res, dataType, transition, err
 }
 
 // condition executes a prompt and evaluates its result against a provided condition mapping.

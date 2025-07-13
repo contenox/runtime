@@ -66,6 +66,10 @@ export type CapturedStateUnit = {
   outputType: string;
   transition: string;
   duration: string;
+  error: ErrorState;
+};
+
+export type ErrorState = {
   error: string | null;
 };
 
