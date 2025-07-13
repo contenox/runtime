@@ -131,13 +131,6 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 			{
 				ID:          "mux_input",
 				Description: "Check for commands like /echo",
-				Type:        taskengine.ParseTransition,
-				// Hook: &taskengine.HookCall{
-				// 	Type: "command_router",
-				// 	Args: map[string]string{
-				// 		"subject_id": req.SubjectID,
-				// 	},
-				// },
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "moderate"},
