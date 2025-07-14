@@ -4,14 +4,26 @@ import (
 	"context"
 
 	"github.com/contenox/runtime-mvp/core/activity"
+	"github.com/contenox/runtime-mvp/core/serverops"
 )
 
 type Service interface {
 	GetLogs(ctx context.Context, limit int) ([]activity.TrackedEvent, error)
+	serverops.ServiceMeta
 }
 
 type service struct {
 	tracker *activity.KVActivityTracker
+}
+
+// GetServiceGroup implements Service.
+func (s *service) GetServiceGroup() string {
+	return "activityservice"
+}
+
+// GetServiceName implements Service.
+func (s *service) GetServiceName() string {
+	return "activityservice"
 }
 
 func New(tracker *activity.KVActivityTracker) Service {

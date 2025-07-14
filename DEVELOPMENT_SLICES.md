@@ -70,7 +70,7 @@ Notes:
 ### 📅 July 2025 – Building a demo application
 - [ ] **Package a Persona-Chat Application**
 - [x] **Basic Observability Integration & UI-Dashboard**
-- [ ] **API Rate Limiting Middleware**
+- [x] **API Rate Limiting Middleware**
 - [x] **Implement Chat moderation**
 
 ---
@@ -92,4 +92,4 @@ Notes:
 - Adding userdefined frontend-connectors
 - Adding a way to upload tasks to attach them to connectors
 - Sticky session routing policy
-- Implement MCP compatibility so that MCP servers act as hooks
+- Implement MCP compatibility so that MCP servers (MCP provides a consistent way for AI models to access and utilize external information) are detected by the task-engine and usable as hooks

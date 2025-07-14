@@ -74,6 +74,8 @@ type Config struct {
 	KVBackend           string `json:"kv_backend"`
 	KVHost              string `json:"kv_host"`
 	KVPassword          string `json:"kv_password"`
+	// RateLimit           string `json:"rate_limit"`
+	// RateWindow          string `json:"rate_window"`
 }
 
 type ConfigTokenizerService struct {

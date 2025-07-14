@@ -157,6 +157,7 @@ func New(
 	handler = jwtRefreshMiddleware(config, handler)
 	handler = authSourceNormalizerMiddleware(handler)
 	handler = JWTMiddleware(config, handler)
+	handler = rateLimitMiddleware(kvManager, 100, time.Minute)(handler)
 	services := []serverops.ServiceMeta{
 		modelService,
 		backendService,
@@ -170,6 +171,7 @@ func New(
 		execService,
 		providerService,
 		chainService,
+		activityService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {
@@ -301,4 +303,32 @@ func requestIDMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), serverops.ContextKeyRequestID, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func rateLimitMiddleware(kvManager libkv.KVManager, limit int, window time.Duration) func(http.Handler) http.Handler {
+	rateLimiter := serverops.NewRateLimiter(kvManager)
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip rate limiting for health checks
+			if r.URL.Path == "/health" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			key := r.RemoteAddr
+			allowed, err := rateLimiter.Allow(r.Context(), key, limit, window)
+			if err != nil {
+				serverops.Error(w, r, fmt.Errorf("rate limit error"), serverops.ServerOperation)
+				return
+			}
+
+			if !allowed {
+				serverops.Error(w, r, fmt.Errorf("too many requests"), serverops.ServerOperation)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
