@@ -5,6 +5,7 @@ go 1.24.1
 replace github.com/contenox/runtime-mvp/core => ../core
 
 replace (
+	github.com/contenox/runtime-mvp/contenox/libkv => ../libs/libkv
 	github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
 	github.com/contenox/runtime-mvp/libs/libcipher => ../libs/libcipher
 	github.com/contenox/runtime-mvp/libs/libdb => ../libs/libdb
@@ -17,7 +18,6 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303
 require (
 	github.com/contenox/runtime-mvp/core v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/runtime-mvp/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
-	github.com/contenox/runtime-mvp/tokenizer v0.0.0-20250626094131-df93eea0ce6a
 	google.golang.org/grpc v1.72.0
 )
 
@@ -39,6 +39,7 @@ require (
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a // indirect
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
+	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250713115048-fbbd2cbf22e7 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/d4l3k/go-bfloat16 v0.0.0-20211005043715-690c3bdd05f1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -83,6 +84,9 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/nats-io/nats.go v1.41.1 // indirect
+	github.com/nats-io/nkeys v0.4.9 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nlpodyssey/gopickle v0.3.0 // indirect
 	github.com/ollama/ollama v0.9.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -97,6 +101,7 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.37.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
+	github.com/testcontainers/testcontainers-go/modules/valkey v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

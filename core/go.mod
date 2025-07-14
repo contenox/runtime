@@ -1,6 +1,8 @@
 module github.com/contenox/runtime-mvp/core
 
-go 1.24.1
+go 1.24.4
+
+toolchain go1.24.5
 
 // libauth libbus  libcipher  libdb  libkv  libollama  libroutine libtestenv
 replace github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
@@ -11,47 +13,43 @@ replace github.com/contenox/runtime-mvp/libs/libcipher => ../libs/libcipher
 
 replace github.com/contenox/runtime-mvp/libs/libdb => ../libs/libdb
 
-replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
-
 replace github.com/contenox/runtime-mvp/libs/libroutine => ../libs/libroutine
 
 replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 
-replace github.com/contenox/runtime-mvp/contenox/libkv => ../libs/libkv
+replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
 
 replace github.com/contenox/runtime-mvp/libs/libmodelprovider => ../libs/libmodelprovider
 
 require (
-	dario.cat/mergo v1.0.1
+	dario.cat/mergo v1.0.2
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/runtime-mvp/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000
+	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250714091341-746b94b8a904
 	github.com/contenox/runtime-mvp/libs/libmodelprovider v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libroutine v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
-	github.com/ollama/ollama v0.9.2
+	github.com/ollama/ollama v0.9.6
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
-	github.com/vdaas/vald-client-go v1.7.16
-	google.golang.org/grpc v1.72.0
+	github.com/vdaas/vald-client-go v1.7.17
+	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/testcontainers/testcontainers-go/modules/valkey v0.36.0 // indirect
-
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.1-20241127180247-a33202765966.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250625184727-c923a0c2a132.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250713115048-fbbd2cbf22e7
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -88,6 +86,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/testcontainers/testcontainers-go/modules/nats v0.36.0 // indirect
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.36.0 // indirect
+	github.com/testcontainers/testcontainers-go/modules/valkey v0.36.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/valkey-io/valkey-go v1.0.62 // indirect
@@ -99,8 +98,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250227231956-55c901821b1e // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250324211829-b45e905df463 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 )
