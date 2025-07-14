@@ -68,9 +68,8 @@ Notes:
 - Packaging the platform as a Application for Persona based chat was moved to the next cycle.
 
 ### 📅 July 2025 – Building a demo application
-- [ ] **Persona Chat Application Packaging**
 - [ ] **Package a Persona-Chat Application**
-- [x] **Basic Observability Integration**
+- [x] **Basic Observability Integration & UI-Dashboard**
 - [ ] **API Rate Limiting Middleware**
 - [x] **Implement Chat moderation**
 
@@ -84,7 +83,7 @@ Notes:
 - Persiting Tasks + UI-Tasks Builder
 - Slack bot integrations
 - Voice interface integration
-- Audit logging and compliance tooling
+- Audit logging and compliance tooling UI-Dashboards
 - Exportable conversation transcripts
 - Model fine-tuning management dashboard
 - Implement queue based model provider
