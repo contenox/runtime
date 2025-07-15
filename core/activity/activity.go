@@ -46,7 +46,7 @@ func (t *KVActivityTracker) Start(
 	subject string,
 	kvArgs ...any,
 ) (func(error), func(string, any), func()) {
-	startTime := time.Now()
+	startTime := time.Now().UTC()
 	metadata := extractMetadata(kvArgs...)
 
 	// Initialize event with start information
