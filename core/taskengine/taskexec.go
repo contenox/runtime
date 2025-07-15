@@ -378,16 +378,14 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
 	}
 	if input.InputTokens <= 0 {
-		prompt := ""
 		for _, m := range input.Messages {
-			prompt += m.Content
+			InputCount, err := tokenizer.CountTokens(ctx, "tiny", m.Content)
+			if err != nil {
+				reportErr(fmt.Errorf("token count failed: %w", err))
+				return nil, DataTypeAny, "", fmt.Errorf("token count failed: %w", err)
+			}
+			input.InputTokens += InputCount
 		}
-		inputCount, err := tokenizer.CountTokens(ctx, "tiny", prompt)
-		if err != nil {
-			reportErr(fmt.Errorf("token count failed: %w", err))
-			return nil, DataTypeAny, "", fmt.Errorf("token count failed: %w", err)
-		}
-		input.InputTokens = inputCount
 	}
 	if ctxLength > 0 && input.InputTokens > ctxLength {
 		reportErr(fmt.Errorf("input token count %d exceeds context length %d", input.InputTokens, ctxLength))
