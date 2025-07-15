@@ -2,6 +2,8 @@ package indexservice
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -17,6 +19,7 @@ import (
 type Service interface {
 	Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error)
 	Search(ctx context.Context, request *SearchRequest) (*SearchResponse, error)
+	ListKeywords(ctx context.Context) ([]string, error)
 	serverops.ServiceMeta
 }
 
@@ -42,6 +45,10 @@ type IndexRequest struct {
 	Replace  bool     `json:"replace"`
 	JobID    string   `json:"jobId"`
 	LeaserID string   `json:"leaserId"`
+}
+
+type Keyword struct {
+	Text string `json:"text"`
 }
 
 type IndexResponse struct {
@@ -99,14 +106,28 @@ func (s *service) Index(ctx context.Context, request *IndexRequest) (*IndexRespo
 			if err != nil {
 				return nil, fmt.Errorf("failed to delete vector: %w", err)
 			}
+			if delErr := storeInstance.DeleteKV(ctx, "vector:"+chunk.VectorID); delErr != nil && errors.Is(delErr, libdb.ErrNotFound) {
+				return nil, fmt.Errorf("failed to delete KV for vector %s: %w", chunk.VectorID, delErr)
+			}
 		}
 	}
 
-	augmentStrategy := func(ctx context.Context, chunk string) (string, error) {
+	augmentStrategy := func(ctx context.Context, resourceID string, vectorID string, chunk string) (string, error) {
+		dbInstance := store.New(s.db.WithoutTransaction())
 		keywords, err := s.findKeywords(ctx, chunk)
 		if err != nil {
 			return "", fmt.Errorf("failed to enrich chunk: %w", err)
 		}
+
+		keywordsJSON, err := json.Marshal(Keyword{Text: keywords})
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal keywords: %w", err)
+		}
+		err = dbInstance.SetKV(ctx, "vector:"+vectorID, keywordsJSON)
+		if err != nil {
+			return "", fmt.Errorf("failed to set keywords: %w", err)
+		}
+
 		return fmt.Sprintf("%s\n\nKeywords: %s", chunk, keywords), nil
 	}
 
@@ -211,6 +232,10 @@ func (s *service) Search(ctx context.Context, request *SearchRequest) (*SearchRe
 				}
 				searchResults[i].FileMeta = file
 			}
+			if delKVErr := storeInstance.DeleteKV(ctx, "vector:"+sr.ChunkID); delKVErr != nil && errors.Is(delKVErr, libdb.ErrNotFound) {
+				return nil, fmt.Errorf("BADSERVER STATE failed to clean orphaned KV %s: %v", sr.ID, delKVErr)
+			}
+			continue
 		}
 	}
 
@@ -288,6 +313,34 @@ func (s *service) executePrompt(ctx context.Context, prompt string) (string, err
 	}
 
 	return strings.TrimSpace(response), nil
+}
+
+func (s *service) ListKeywords(ctx context.Context) ([]string, error) {
+	tx := s.db.WithoutTransaction()
+	storeInstance := store.New(tx)
+
+	if err := serverops.CheckServiceAuthorization(ctx, storeInstance, s, store.PermissionView); err != nil {
+		return nil, err
+	}
+
+	// List all KV entries with "vector:" prefix
+	kvs, err := storeInstance.ListKVPrefix(ctx, "vector:")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list keywords: %w", err)
+	}
+
+	keywords := make([]string, 0, len(kvs))
+	for _, kv := range kvs {
+		var keyword Keyword
+		if err := json.Unmarshal(kv.Value, &keyword); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal keyword (skipping): %w", err)
+		}
+		if keyword.Text != "" {
+			keywords = append(keywords, keyword.Text)
+		}
+	}
+
+	return keywords, nil
 }
 
 func (s *service) GetServiceName() string {

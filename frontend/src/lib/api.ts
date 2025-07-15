@@ -258,4 +258,5 @@ export const api = {
     apiFetch<ActivityLogsResponse>(
       limit ? `/api/activity/logs?limit=${limit}` : '/api/activity/logs',
     ),
+  getKeywords: () => apiFetch<string[]>('/api/keywords'),
 };

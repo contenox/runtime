@@ -1,6 +1,8 @@
 module github.com/contenox/runtime-mvp/tokenizer
 
-go 1.24.1
+go 1.24.4
+
+toolchain go1.24.5
 
 replace github.com/contenox/runtime-mvp/core => ../core
 
@@ -18,11 +20,11 @@ replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250303
 require (
 	github.com/contenox/runtime-mvp/core v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/runtime-mvp/libs/libollama v0.0.0-20250626094131-df93eea0ce6a
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.73.0
 )
 
 require (
-	dario.cat/mergo v1.0.1 // indirect
+	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
@@ -39,7 +41,7 @@ require (
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a // indirect
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000 // indirect
-	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250713115048-fbbd2cbf22e7 // indirect
+	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250714091341-746b94b8a904 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/d4l3k/go-bfloat16 v0.0.0-20211005043715-690c3bdd05f1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -84,11 +86,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
-	github.com/nats-io/nats.go v1.41.1 // indirect
-	github.com/nats-io/nkeys v0.4.9 // indirect
-	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nlpodyssey/gopickle v0.3.0 // indirect
-	github.com/ollama/ollama v0.9.2 // indirect
+	github.com/ollama/ollama v0.9.6 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pdevine/tensor v0.0.0-20240510204454-f88f4562727c // indirect
@@ -106,6 +105,7 @@ require (
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/valkey-io/valkey-go v1.0.62 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xtgo/set v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
@@ -120,12 +120,12 @@ require (
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
 	golang.org/x/image v0.22.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorgonia.org/vecf32 v0.9.0 // indirect

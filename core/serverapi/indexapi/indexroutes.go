@@ -15,6 +15,7 @@ func AddIndexRoutes(mux *http.ServeMux, _ *serverops.Config, indexService indexs
 	}
 	mux.HandleFunc("POST /index", f.index)
 	mux.HandleFunc("GET /search", f.search)
+	mux.HandleFunc("GET /keywords", f.listKeywords)
 }
 
 type indexManager struct {
@@ -92,7 +93,8 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 	if radius != nil && epsilon != nil {
 		args = &indexservice.SearchRequestArgs{Radius: *radius, Epsilon: *epsilon}
 	}
-	req := indexservice.SearchRequest{Query: q, TopK: k,
+	req := indexservice.SearchRequest{
+		Query: q, TopK: k,
 		SearchRequestArgs: args,
 	}
 	if r.URL.Query().Get("expand") == "files" {
@@ -104,4 +106,13 @@ func (im *indexManager) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = serverops.Encode(w, r, http.StatusOK, resp)
+}
+
+func (im *indexManager) listKeywords(w http.ResponseWriter, r *http.Request) {
+	keywords, err := im.service.ListKeywords(r.Context())
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.GetOperation)
+		return
+	}
+	_ = serverops.Encode(w, r, http.StatusOK, keywords)
 }

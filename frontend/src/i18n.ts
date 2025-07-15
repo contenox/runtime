@@ -47,6 +47,7 @@ const resources = {
         loading: 'Loading...',
         save: 'Save',
         welcome: 'Welcome',
+        keyword: 'Keyword',
         edit: 'Edit',
         type: 'Type',
         menu: 'Menu',
@@ -330,6 +331,13 @@ const resources = {
         list_empty_message: 'No files found',
         form_path_placeholder: 'Path',
         form_path: 'Path',
+        tab_files: 'Files',
+        tab_keywords: 'Keywords',
+      },
+      keywords: {
+        list_error_title: 'Failed to load keywords',
+        list_empty_title: 'No keywords found',
+        list_empty_message: 'Upload files to generate keywords',
       },
       serverJobs: {
         title: 'Job Monitoring',
@@ -415,6 +423,7 @@ const resources = {
         welcome: 'Willkommen',
         edit: 'Bearbeiten',
         type: 'Typ',
+        keyword: 'Keyword',
         menu: 'Menü',
         reset: 'Zurücksetzen',
         cancel: 'Abbrechen',
@@ -696,6 +705,13 @@ const resources = {
         list_empty_message: 'Keine Dateien gefunden',
         form_path_placeholder: 'Pfad',
         form_path: 'Pfad',
+        tab_files: 'Dateien',
+        tab_keywords: 'Keywords',
+      },
+      keywords: {
+        list_error_title: 'Fehler beim Laden der Keywords',
+        list_empty_title: 'Keine Keywords gefunden',
+        list_empty_message: 'Keine Keywords gefunden',
       },
       serverJobs: {
         title: 'Job-Überwachung',

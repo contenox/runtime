@@ -23,6 +23,7 @@ type SearchResult struct {
 	ResourceType string      `json:"type"`
 	Distance     float32     `json:"distance"`
 	FileMeta     *store.File `json:"fileMeta"`
+	ChunkID      string      `json:"chunkId"`
 }
 
 func ExecuteVectorSearch(
@@ -92,6 +93,7 @@ func ExecuteVectorSearch(
 				ID:           chunkIndex.ResourceID,
 				ResourceType: chunkIndex.ResourceType,
 				Distance:     res.Distance,
+				ChunkID:      chunkIndex.VectorID,
 			})
 		}
 	}
@@ -114,7 +116,7 @@ func ExecuteVectorSearch(
 	return deduplicatedResults, nil
 }
 
-func DummyaugmentStrategy(ctx context.Context, chunk string) (string, error) {
+func DummyaugmentStrategy(ctx context.Context, _, _, chunk string) (string, error) {
 	return chunk, nil
 }
 
@@ -126,7 +128,7 @@ func IngestChunks(
 	resourceID string,
 	resourceType string,
 	chunks []string,
-	augmentStrategy func(ctx context.Context, chunk string) (string, error),
+	augmentStrategy func(ctx context.Context, resourceID string, vectorID string, chunk string) (string, error),
 ) (vectorIDs []string, augmentedMetadata []string, err error) {
 	// Get embedding provider once
 	embedProvider, err := embedder.GetDefaultSystemProvider(ctx)
@@ -151,7 +153,8 @@ func IngestChunks(
 
 	for i, chunk := range chunks {
 		var enriched string
-		enriched, err := augmentStrategy(ctx, chunk)
+		vectorID := fmt.Sprintf("%s-%d", resourceID, i)
+		enriched, err := augmentStrategy(ctx, resourceID, vectorID, chunk)
 		if err != nil {
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
@@ -160,8 +163,6 @@ func IngestChunks(
 		if err != nil {
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
-
-		vectorID := fmt.Sprintf("%s-%d", resourceID, i)
 
 		v := vectors.Vector{ID: vectorID, Data: vectorData}
 		if err := vectorsStore.Insert(ctx, v); err != nil {

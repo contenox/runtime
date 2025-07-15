@@ -67,6 +67,21 @@ func (d *activityTrackerDecorator) Search(ctx context.Context, request *SearchRe
 	return resp, err
 }
 
+func (d *activityTrackerDecorator) ListKeywords(ctx context.Context) ([]string, error) {
+	reportErrFn, _, endFn := d.tracker.Start(
+		ctx,
+		"list",
+		"keywords",
+	)
+	defer endFn()
+
+	keywords, err := d.service.ListKeywords(ctx)
+	if err != nil {
+		reportErrFn(err)
+	}
+	return keywords, err
+}
+
 func (d *activityTrackerDecorator) GetServiceName() string {
 	return d.service.GetServiceName()
 }
