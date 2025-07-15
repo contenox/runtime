@@ -145,3 +145,21 @@ func (r *VKExec) LLen(ctx context.Context, key []byte) (int64, error) {
 	cmd := r.client.B().Llen().Key(string(key)).Build()
 	return r.client.Do(ctx, cmd).AsInt64()
 }
+
+func (r *VKExec) SAdd(ctx context.Context, key []byte, value []byte) error {
+	cmd := r.client.B().Sadd().Key(string(key)).Member(string(value)).Build()
+	return r.client.Do(ctx, cmd).Error()
+}
+
+func (r *VKExec) SMembers(ctx context.Context, key []byte) ([][]byte, error) {
+	cmd := r.client.B().Smembers().Key(string(key)).Build()
+	s, err := r.client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+	bSlice := make([][]byte, len(s))
+	for i, v := range s {
+		bSlice[i] = []byte(v)
+	}
+	return bSlice, nil
+}

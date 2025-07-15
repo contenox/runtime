@@ -9,6 +9,8 @@ import (
 
 type Service interface {
 	GetLogs(ctx context.Context, limit int) ([]activity.TrackedEvent, error)
+	GetRequests(ctx context.Context, limit int) ([]activity.TrackedRequest, error)
+	GetRequest(ctx context.Context, reqID string) ([]activity.TrackedEvent, error)
 	serverops.ServiceMeta
 }
 
@@ -32,4 +34,12 @@ func New(tracker *activity.KVActivityTracker) Service {
 
 func (s *service) GetLogs(ctx context.Context, limit int) ([]activity.TrackedEvent, error) {
 	return s.tracker.GetActivityLogs(ctx, limit)
+}
+
+func (s *service) GetRequests(ctx context.Context, limit int) ([]activity.TrackedRequest, error) {
+	return s.tracker.GetRecentRequestIDs(ctx, limit)
+}
+
+func (s *service) GetRequest(ctx context.Context, reqID string) ([]activity.TrackedEvent, error) {
+	return s.tracker.GetActivityLogsByRequestID(ctx, reqID)
 }

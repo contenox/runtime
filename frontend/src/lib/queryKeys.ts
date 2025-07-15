@@ -102,4 +102,6 @@ export const chainKeys = {
 export const activityKeys = {
   all: ['activity'] as const,
   list: (limit?: number) => [...activityKeys.all, 'list', { limit }] as const,
+  requests: (limit?: number) => [...activityKeys.all, 'requests', { limit }] as const,
+  requestById: (requestID: string) => [...activityKeys.all, 'request', requestID] as const,
 };

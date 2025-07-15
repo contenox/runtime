@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
@@ -174,6 +175,12 @@ func main() {
 	go breakerSettings.Loop(ctx, time.Second*3, triggerChan, settings.ProcessTick, func(err error) {
 		log.Printf("SERVER Error in settings.ProcessTick: %v", err)
 	})
+	tracker := activity.NewKVActivityTracker(kvManager)
+	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
+	serveropsChainedTracker := serverops.ChainedTracker{
+		tracker,
+		stdOuttracker,
+	}
 	chatManager := chat.New(state, tokenizerSvc, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)
 	knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
@@ -211,11 +218,11 @@ func main() {
 		"help":                         printHook,
 		"print":                        printHook,
 	})
-	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serverops.NewLogActivityTracker(slog.Default()))
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serveropsChainedTracker)
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec, taskengine.MockInspector{})
+	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, exec, taskengine.MockInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
@@ -238,7 +245,7 @@ func main() {
 			}
 		}
 		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
-		telegramservice.WithActivityTracker(telegramWorker, serverops.NewLogActivityTracker(slog.Default()))
+		telegramservice.WithActivityTracker(telegramWorker, serveropsChainedTracker)
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)
 		}

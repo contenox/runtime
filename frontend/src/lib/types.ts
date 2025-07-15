@@ -312,6 +312,12 @@ export type ActivityLog = {
   entityData?: undefined;
   durationMS?: number;
   metadata?: Record<string, string>;
+  requestID?: string;
 };
 
 export type ActivityLogsResponse = ActivityLog[];
+
+export type TrackedRequest = {
+  id: string;
+  hasError: boolean;
+};

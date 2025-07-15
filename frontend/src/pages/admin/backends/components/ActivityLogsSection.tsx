@@ -54,6 +54,7 @@ export default function ActivityLogsSection() {
           t('activity.start_time'),
           t('activity.duration'),
           t('activity.status'),
+          t('activity.request_id'),
           t('activity.entity_id'),
           t('activity.entity_data'),
           t('activity.metadata'),
@@ -88,6 +89,11 @@ export default function ActivityLogsSection() {
                   {t('activity.success')}
                 </Span>
               )}
+            </TableCell>
+            <TableCell>
+              <Span variant="status" className="text-error">
+                {log.requestID}
+              </Span>
             </TableCell>
             <TableCell>
               <Span>

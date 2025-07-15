@@ -6,7 +6,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libkv"
+	"github.com/google/uuid"
 )
 
 type KVActivityTracker struct {
@@ -20,6 +22,7 @@ func NewKVActivityTracker(kvManager libkv.KVManager) *KVActivityTracker {
 }
 
 type TrackedEvent struct {
+	ID         string            `json:"id"`
 	Operation  string            `json:"operation"`
 	Subject    string            `json:"subject"`
 	Start      time.Time         `json:"start"`
@@ -29,6 +32,12 @@ type TrackedEvent struct {
 	EntityData any               `json:"entityData,omitempty"`
 	DurationMS *int64            `json:"durationMS,omitempty"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
+	RequestID  string            `json:"requestID,omitempty"`
+}
+
+type TrackedRequest struct {
+	ID       string `json:"id"`
+	HasError bool   `json:"hasError,omitempty"`
 }
 
 func (t *KVActivityTracker) Start(
@@ -42,17 +51,22 @@ func (t *KVActivityTracker) Start(
 
 	// Initialize event with start information
 	event := &TrackedEvent{
+		ID:        uuid.New().String(),
 		Operation: operation,
 		Subject:   subject,
 		Start:     startTime,
 		Metadata:  metadata,
 	}
-
+	if reqID, ok := ctx.Value(serverops.ContextKeyRequestID).(string); ok {
+		event.RequestID = reqID
+	}
+	hasError := false
 	// Define lifecycle handlers
 	reportErr := func(err error) {
 		if err != nil {
 			errStr := err.Error()
 			event.Error = &errStr
+			hasError = true
 		}
 	}
 
@@ -90,6 +104,23 @@ func (t *KVActivityTracker) Start(
 		if err := kv.LTrim(ctx, []byte("activity:log"), 0, 999); err != nil {
 			log.Printf("SERVERBUG: Failed to trim activity log: %v", err)
 		}
+		if event.RequestID != "" {
+			reqKey := []byte("activity:request:" + event.RequestID)
+			if err := kv.LPush(ctx, reqKey, data); err != nil {
+				log.Printf("SERVERBUG: Failed to push requestID activity event: %v", err)
+			}
+			trackedRequest := TrackedRequest{
+				ID:       event.RequestID,
+				HasError: hasError,
+			}
+			treq, err := json.Marshal(trackedRequest)
+			if err != nil {
+				log.Printf("SERVERBUG: Failed to marshal tracked request: %v", err)
+			}
+			if err := kv.SAdd(ctx, []byte("activity:requests"), treq); err != nil {
+				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
+			}
+		}
 	}
 
 	return reportErr, reportChange, end
@@ -105,6 +136,39 @@ func extractMetadata(args ...any) map[string]string {
 		}
 	}
 	return meta
+}
+
+func (t *KVActivityTracker) GetRecentRequestIDs(ctx context.Context, limit int) ([]TrackedRequest, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rawItems, err := kv.SMembers(ctx, []byte("activity:requests"))
+	if err != nil {
+		return nil, err
+	}
+
+	var requestIDs []TrackedRequest
+	seen := make(map[string]struct{}, len(rawItems))
+
+	for _, raw := range rawItems {
+		var req TrackedRequest
+		if err := json.Unmarshal(raw, &req); err != nil {
+			log.Printf("SERVERBUG: Failed to unmarshal tracked request: %v", err)
+			continue
+		}
+		if _, exists := seen[req.ID]; !exists {
+			seen[req.ID] = struct{}{}
+			requestIDs = append(requestIDs, req)
+		}
+	}
+
+	return requestIDs, nil
 }
 
 func (t *KVActivityTracker) GetActivityLogs(ctx context.Context, limit int) ([]TrackedEvent, error) {
@@ -131,6 +195,34 @@ func (t *KVActivityTracker) GetActivityLogs(ctx context.Context, limit int) ([]T
 	}
 
 	rawItems, err := kv.LRange(ctx, []byte("activity:log"), start, stop)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []TrackedEvent
+	for _, raw := range rawItems {
+		var evt TrackedEvent
+		if err := json.Unmarshal(raw, &evt); err == nil {
+			results = append(results, evt)
+		}
+	}
+
+	return results, nil
+}
+
+func (t *KVActivityTracker) GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]TrackedEvent, error) {
+	if requestID == "" {
+		return nil, nil
+	}
+
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := []byte("activity:request:" + requestID)
+
+	rawItems, err := kv.LRange(ctx, key, 0, -1)
 	if err != nil {
 		return nil, err
 	}

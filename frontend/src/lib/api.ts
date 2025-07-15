@@ -20,6 +20,7 @@ import {
   SearchResponse,
   StateResponse,
   StatusResponse,
+  TrackedRequest,
   Trigger,
   UpdateAccessEntryRequest,
   UpdateUserRequest,
@@ -259,4 +260,10 @@ export const api = {
       limit ? `/api/activity/logs?limit=${limit}` : '/api/activity/logs',
     ),
   getKeywords: () => apiFetch<string[]>('/api/keywords'),
+  getActivityRequests: (limit?: number) =>
+    apiFetch<TrackedRequest[]>(
+      limit ? `/api/activity/requests?limit=${limit}` : '/api/activity/requests',
+    ),
+  getActivityRequestById: (requestID: string) =>
+    apiFetch<ActivityLogsResponse>(`/api/activity/requests/${requestID}`),
 };

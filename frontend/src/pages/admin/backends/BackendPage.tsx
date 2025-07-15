@@ -3,13 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';
 import ActivityLogsSection from './components/ActivityLogsSection';
+import ActivityRequestsSection from './components/ActivityRequestsSection';
 import BackendsSection from './components/BackendsSection';
 import CloudProvidersSection from './components/CloudProvidersSection';
 import PoolsSection from './components/PoolsSection';
 
 export default function BackendsPage() {
   const { t } = useTranslation();
-  const { data: queue, isLoading, isError, error } = useQueue();
+  const {
+    data: queue,
+    isLoading: queueLoading,
+    isError: queueError,
+    error: queueErrorObj,
+  } = useQueue();
   const { statusMap } = useDownloadProgressSSE();
 
   const tabs = [
@@ -29,17 +35,22 @@ export default function BackendsPage() {
       content: <CloudProvidersSection />,
     },
     {
-      id: 'activity',
-      label: t('activity.title'),
+      id: 'activity-logs',
+      label: t('activity.logs_title'),
       content: <ActivityLogsSection />,
+    },
+    {
+      id: 'requests',
+      label: t('activity.requests_title'),
+      content: <ActivityRequestsSection />,
     },
     {
       id: 'state',
       label: t('state.title'),
-      content: isLoading ? (
+      content: queueLoading ? (
         <div>Loading...</div>
-      ) : isError ? (
-        <div>Error: {error?.message}</div>
+      ) : queueError ? (
+        <div>Error: {queueErrorObj?.message}</div>
       ) : (
         <>
           <div>{queue?.length} items in queue</div>

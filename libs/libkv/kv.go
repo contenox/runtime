@@ -35,6 +35,8 @@ type KVExec interface {
 	List(ctx context.Context) ([]string, error)
 
 	LPush(ctx context.Context, key []byte, value []byte) error
+	SAdd(ctx context.Context, key []byte, value []byte) error
+	SMembers(ctx context.Context, key []byte) ([][]byte, error)
 	RPop(ctx context.Context, key []byte) ([]byte, error)
 	LTrim(ctx context.Context, key []byte, start, stop int64) error
 	LRange(ctx context.Context, key []byte, start, stop int64) ([][]byte, error)
