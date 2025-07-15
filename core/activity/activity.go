@@ -36,8 +36,9 @@ type TrackedEvent struct {
 }
 
 type TrackedRequest struct {
-	ID       string `json:"id"`
-	HasError bool   `json:"hasError,omitempty"`
+	ID        string `json:"id"`
+	HasError  bool   `json:"hasError,omitempty"`
+	HasChange bool   `json:"hasChange,omitempty"`
 }
 
 func (t *KVActivityTracker) Start(
@@ -69,10 +70,11 @@ func (t *KVActivityTracker) Start(
 			hasError = true
 		}
 	}
-
+	reportedChange := false
 	reportChange := func(id string, data any) {
 		event.EntityID = &id
 		event.EntityData = data
+		reportedChange = true
 	}
 
 	end := func() {
@@ -110,13 +112,15 @@ func (t *KVActivityTracker) Start(
 				log.Printf("SERVERBUG: Failed to push requestID activity event: %v", err)
 			}
 			trackedRequest := TrackedRequest{
-				ID:       event.RequestID,
-				HasError: hasError,
+				ID:        event.RequestID,
+				HasError:  hasError,
+				HasChange: reportedChange,
 			}
 			treq, err := json.Marshal(trackedRequest)
 			if err != nil {
 				log.Printf("SERVERBUG: Failed to marshal tracked request: %v", err)
 			}
+
 			if err := kv.SAdd(ctx, []byte("activity:requests"), treq); err != nil {
 				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
 			}
