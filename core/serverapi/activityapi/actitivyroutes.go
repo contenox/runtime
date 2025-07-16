@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
 )
@@ -13,6 +14,8 @@ func AddActivityRoutes(mux *http.ServeMux, _ *serverops.Config, activityService 
 	mux.HandleFunc("GET /activity/logs", s.list)
 	mux.HandleFunc("GET /activity/requests", s.requests)
 	mux.HandleFunc("GET /activity/requests/{id}", s.requestByID)
+	mux.HandleFunc("GET /activity/operations", s.operations)
+	mux.HandleFunc("GET /activity/operations/{op}/{subject}", s.requestsByOperation)
 }
 
 type activityAPI struct {
@@ -71,4 +74,26 @@ func (s *activityAPI) requestByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverops.Encode(w, r, http.StatusOK, events)
+}
+
+func (s *activityAPI) operations(w http.ResponseWriter, r *http.Request) {
+	ops, err := s.service.GetKnownOperations(r.Context())
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
+	}
+	serverops.Encode(w, r, http.StatusOK, ops)
+}
+
+func (s *activityAPI) requestsByOperation(w http.ResponseWriter, r *http.Request) {
+	op := activity.Operation{
+		Operation: r.PathValue("op"),
+		Subject:   r.PathValue("subject"),
+	}
+	reqs, err := s.service.GetRequestIDByOperation(r.Context(), op)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
+	}
+	serverops.Encode(w, r, http.StatusOK, reqs)
 }

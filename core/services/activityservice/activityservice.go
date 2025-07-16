@@ -11,6 +11,9 @@ type Service interface {
 	GetLogs(ctx context.Context, limit int) ([]activity.TrackedEvent, error)
 	GetRequests(ctx context.Context, limit int) ([]activity.TrackedRequest, error)
 	GetRequest(ctx context.Context, reqID string) ([]activity.TrackedEvent, error)
+	GetKnownOperations(ctx context.Context) ([]activity.Operation, error)
+	GetRequestIDByOperation(ctx context.Context, operation activity.Operation) ([]activity.TrackedRequest, error)
+	GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]activity.TrackedEvent, error)
 	serverops.ServiceMeta
 }
 
@@ -42,4 +45,18 @@ func (s *service) GetRequests(ctx context.Context, limit int) ([]activity.Tracke
 
 func (s *service) GetRequest(ctx context.Context, reqID string) ([]activity.TrackedEvent, error) {
 	return s.tracker.GetActivityLogsByRequestID(ctx, reqID)
+}
+
+func (s *service) GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]activity.TrackedEvent, error) {
+	return s.tracker.GetActivityLogsByRequestID(ctx, requestID)
+}
+
+// GetKnownOperations implements Service.
+func (s *service) GetKnownOperations(ctx context.Context) ([]activity.Operation, error) {
+	return s.tracker.GetKnownOperations(ctx)
+}
+
+// GetRequestIDByOperation implements Service.
+func (s *service) GetRequestIDByOperation(ctx context.Context, operation activity.Operation) ([]activity.TrackedRequest, error) {
+	return s.tracker.GetRequestIDByOperation(ctx, operation)
 }

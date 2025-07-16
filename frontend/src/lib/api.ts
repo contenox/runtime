@@ -2,6 +2,7 @@ import { apiFetch } from './fetch';
 import {
   AccessEntry,
   ActivityLogsResponse,
+  ActivityOperationsResponse,
   AuthenticatedUser,
   Backend,
   ChainDefinition,
@@ -266,4 +267,7 @@ export const api = {
     ),
   getActivityRequestById: (requestID: string) =>
     apiFetch<ActivityLogsResponse>(`/api/activity/requests/${requestID}`),
+  getActivityOperations: () => apiFetch<ActivityOperationsResponse>('/api/activity/operations'),
+  getActivityRequestByOperation: (operation: string, subject: string) =>
+    apiFetch<TrackedRequest[]>(`/api/activity/operations/${operation}/${subject}`),
 };

@@ -319,5 +319,31 @@ export type ActivityLogsResponse = ActivityLog[];
 
 export type TrackedRequest = {
   id: string;
-  hasError: boolean;
 };
+
+export type ActivityOperation = {
+  operation: string;
+  subject: string;
+};
+
+export type TrackedEvent = {
+  id: string;
+  operation: string;
+  subject: string;
+  start: string;
+  end?: string;
+  error?: string;
+  entityID?: string;
+  entityData?: unknown;
+  durationMS?: number;
+  metadata?: Record<string, string>;
+  requestID?: string;
+};
+
+export type Operation = {
+  operation: string;
+  subject: string;
+};
+
+export type TrackedRequestsResponse = TrackedRequest[];
+export type ActivityOperationsResponse = ActivityOperation[];

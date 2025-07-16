@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';
 import ActivityLogsSection from './components/ActivityLogsSection';
+import ActivityOperationsSection from './components/ActivityOperationsSection';
 import ActivityRequestsSection from './components/ActivityRequestsSection';
 import BackendsSection from './components/BackendsSection';
 import CloudProvidersSection from './components/CloudProvidersSection';
@@ -38,6 +39,11 @@ export default function BackendsPage() {
       id: 'activity-logs',
       label: t('activity.logs_title'),
       content: <ActivityLogsSection />,
+    },
+    {
+      id: 'operations',
+      label: t('activity.operations_title'),
+      content: <ActivityOperationsSection />,
     },
     {
       id: 'requests',

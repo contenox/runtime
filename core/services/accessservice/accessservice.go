@@ -159,6 +159,9 @@ func (s *service) Update(ctx context.Context, entry *AccessEntryRequest) (*Acces
 		Permission:   perm,
 		Resource:     entry.Resource,
 	})
+	if err != nil {
+		return nil, err
+	}
 	withDetails := false
 	if entry.WithUserDetails != nil && *entry.WithUserDetails {
 		withDetails = true

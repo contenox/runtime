@@ -11,6 +11,7 @@ export default function ActivityLogsSection() {
   // Format entity_data as JSON string
   const formatEntityData = (data?: Record<string, undefined>) =>
     data ? JSON.stringify(data, null, 2) : '';
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -91,9 +92,13 @@ export default function ActivityLogsSection() {
               )}
             </TableCell>
             <TableCell>
-              <Span variant="status" className="text-error">
-                {log.requestID}
-              </Span>
+              <Span>{log.requestID}</Span>
+            </TableCell>
+            <TableCell>
+              <Span>{log.entityID ? truncateString(log.entityID, 20) : '-'}</Span>
+            </TableCell>
+            <TableCell>
+              <Span>{truncateString(formatEntityData(log.entityData), 30) || '-'}</Span>
             </TableCell>
             <TableCell>
               <Span>
@@ -102,13 +107,6 @@ export default function ActivityLogsSection() {
                     .map(([key, value]) => `${key}: ${value}`)
                     .join(', ')}
               </Span>
-            </TableCell>
-            <TableCell>
-              <Span>{log.entityID ? truncateString(log.entityID, 20) : '-'}</Span>
-            </TableCell>
-
-            <TableCell>
-              <Span>{truncateString(formatEntityData(log.entityData), 30) || '-'}</Span>
             </TableCell>
           </TableRow>
         ))}

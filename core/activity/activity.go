@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -36,9 +37,7 @@ type TrackedEvent struct {
 }
 
 type TrackedRequest struct {
-	ID        string `json:"id"`
-	HasError  bool   `json:"hasError,omitempty"`
-	HasChange bool   `json:"hasChange,omitempty"`
+	ID string `json:"id"`
 }
 
 func (t *KVActivityTracker) Start(
@@ -61,20 +60,16 @@ func (t *KVActivityTracker) Start(
 	if reqID, ok := ctx.Value(serverops.ContextKeyRequestID).(string); ok {
 		event.RequestID = reqID
 	}
-	hasError := false
 	// Define lifecycle handlers
 	reportErr := func(err error) {
 		if err != nil {
 			errStr := err.Error()
 			event.Error = &errStr
-			hasError = true
 		}
 	}
-	reportedChange := false
 	reportChange := func(id string, data any) {
 		event.EntityID = &id
 		event.EntityData = data
-		reportedChange = true
 	}
 
 	end := func() {
@@ -112,17 +107,26 @@ func (t *KVActivityTracker) Start(
 				log.Printf("SERVERBUG: Failed to push requestID activity event: %v", err)
 			}
 			trackedRequest := TrackedRequest{
-				ID:        event.RequestID,
-				HasError:  hasError,
-				HasChange: reportedChange,
+				ID: event.RequestID,
 			}
 			treq, err := json.Marshal(trackedRequest)
 			if err != nil {
 				log.Printf("SERVERBUG: Failed to marshal tracked request: %v", err)
 			}
-
 			if err := kv.SAdd(ctx, []byte("activity:requests"), treq); err != nil {
 				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
+			}
+			if err := kv.SAdd(ctx, []byte("activity:"+event.Operation+","+event.Subject), treq); err != nil {
+				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
+			}
+			op := Operation{Operation: event.Operation, Subject: event.Subject}
+			opData, err := json.Marshal(op)
+			if err != nil {
+				log.Printf("SERVERBUG: Failed to marshal operation: %v", err)
+			} else {
+				if err := kv.SAdd(ctx, []byte("activity:operations"), opData); err != nil {
+					log.Printf("SERVERBUG: Failed to track operation: %v", err)
+				}
 			}
 		}
 	}
@@ -208,6 +212,80 @@ func (t *KVActivityTracker) GetActivityLogs(ctx context.Context, limit int) ([]T
 		var evt TrackedEvent
 		if err := json.Unmarshal(raw, &evt); err == nil {
 			results = append(results, evt)
+		}
+	}
+
+	return results, nil
+}
+
+type Operation struct {
+	Operation string `json:"operation"`
+	Subject   string `json:"subject"`
+}
+
+func (t *KVActivityTracker) GetKnownOperations(ctx context.Context) ([]Operation, error) {
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rawItems, err := kv.SMembers(ctx, []byte("activity:operations"))
+	if err != nil {
+		return nil, err
+	}
+
+	var results []Operation
+	seen := make(map[string]struct{})
+
+	for _, raw := range rawItems {
+		var op Operation
+		// First try to unmarshal as JSON
+		if err := json.Unmarshal(raw, &op); err == nil {
+			// Check if we've seen this operation
+			key := op.Operation + ":" + op.Subject
+			if _, exists := seen[key]; !exists {
+				seen[key] = struct{}{}
+				results = append(results, op)
+			}
+			continue
+		}
+
+		// If not JSON, try to parse as old format
+		parts := strings.Split(string(raw), ",")
+		if len(parts) >= 2 {
+			op := Operation{
+				Operation: parts[0],
+				Subject:   parts[1],
+			}
+			key := op.Operation + ":" + op.Subject
+			if _, exists := seen[key]; !exists {
+				seen[key] = struct{}{}
+				results = append(results, op)
+			}
+		}
+	}
+
+	return results, nil
+}
+
+func (t *KVActivityTracker) GetRequestIDByOperation(ctx context.Context, operation Operation) ([]TrackedRequest, error) {
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := []byte("activity:" + operation.Operation + "," + operation.Subject)
+
+	rawItems, err := kv.SMembers(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []TrackedRequest
+	for _, raw := range rawItems {
+		var req TrackedRequest
+		if err := json.Unmarshal(raw, &req); err == nil {
+			results = append(results, req)
 		}
 	}
 
