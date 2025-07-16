@@ -347,3 +347,13 @@ export type Operation = {
 
 export type TrackedRequestsResponse = TrackedRequest[];
 export type ActivityOperationsResponse = ActivityOperation[];
+
+export type Alert = {
+  id: string;
+  requestID: string;
+  metadata: unknown;
+  message: string;
+  timestamp: string;
+};
+
+export type ActivityAlertsResponse = Alert[];

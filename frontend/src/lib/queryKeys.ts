@@ -109,4 +109,5 @@ export const activityKeys = {
     ['activity', 'operations', 'detail', operation, subject] as const,
   state: (requestID: string) => ['activity', 'state', requestID] as const,
   statefulRequests: () => ['activity', 'statefulRequests'] as const,
+  alerts: (limit?: number) => ['activity', 'alerts', { limit }] as const,
 };

@@ -16,6 +16,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -61,7 +62,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), exec, taskengine.SimpleInspector{})
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), *taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

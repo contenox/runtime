@@ -3,6 +3,7 @@ import {
   AccessEntry,
   ActivityLogsResponse,
   ActivityOperationsResponse,
+  Alert,
   AuthenticatedUser,
   Backend,
   ChainDefinition,
@@ -273,4 +274,6 @@ export const api = {
   getExecutionState: (requestID: string) =>
     apiFetch<StateResponse>(`/api/activity/requests/${requestID}/state`),
   getActivityStatefulRequests: () => apiFetch<string[]>('/api/activity/stateful-requests'),
+  getActivityAlerts: (limit?: number) =>
+    apiFetch<Alert[]>(limit ? `/api/activity/alerts?limit=${limit}` : '/api/activity/alerts'),
 };

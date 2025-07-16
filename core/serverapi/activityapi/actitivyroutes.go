@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 func AddActivityRoutes(mux *http.ServeMux, _ *serverops.Config, activityService activityservice.Service) {
@@ -18,6 +18,7 @@ func AddActivityRoutes(mux *http.ServeMux, _ *serverops.Config, activityService 
 	mux.HandleFunc("GET /activity/operations", s.operations)
 	mux.HandleFunc("GET /activity/operations/{op}/{subject}", s.requestsByOperation)
 	mux.HandleFunc("GET /activity/stateful-requests", s.getStatefulRequests)
+	mux.HandleFunc("GET /activity/alerts", s.alerts)
 }
 
 type activityAPI struct {
@@ -88,7 +89,7 @@ func (s *activityAPI) operations(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *activityAPI) requestsByOperation(w http.ResponseWriter, r *http.Request) {
-	op := activity.Operation{
+	op := taskengine.Operation{
 		Operation: r.PathValue("op"),
 		Subject:   r.PathValue("subject"),
 	}
@@ -121,4 +122,20 @@ func (s *activityAPI) getStatefulRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 	serverops.Encode(w, r, http.StatusOK, reqIDs)
+}
+
+func (s *activityAPI) alerts(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	limit := 99
+	limitStr := r.URL.Query().Get("limit")
+	if limitStr != "" {
+		limit, _ = strconv.Atoi(limitStr)
+	}
+
+	alerts, err := s.service.FetchAlerts(ctx, limit)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
+	}
+	serverops.Encode(w, r, http.StatusOK, alerts)
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
@@ -76,7 +75,7 @@ func New(
 	if err != nil {
 		return nil, cleanup, err
 	}
-	tracker := activity.NewKVActivityTracker(kvManager)
+	tracker := taskengine.NewKVActivityTracker(kvManager)
 	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
 	serveropsChainedTracker := serverops.ChainedTracker{
 		tracker,
@@ -144,7 +143,7 @@ func New(
 	providerService := providerservice.New(dbInstance)
 	providerService = providerservice.WithActivityTracker(providerService, serveropsChainedTracker)
 	providersapi.AddProviderRoutes(mux, config, providerService)
-	activityService := activityservice.New(tracker)
+	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityapi.AddActivityRoutes(mux, config, activityService)
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)

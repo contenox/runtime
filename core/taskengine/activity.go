@@ -1,4 +1,4 @@
-package activity
+package taskengine
 
 import (
 	"context"
@@ -8,17 +8,16 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
 )
 
-type KVActivityTracker struct {
+type KVActivitySink struct {
 	kvManager libkv.KVManager
 }
 
-func NewKVActivityTracker(kvManager libkv.KVManager) *KVActivityTracker {
-	return &KVActivityTracker{
+func NewKVActivityTracker(kvManager libkv.KVManager) *KVActivitySink {
+	return &KVActivitySink{
 		kvManager: kvManager,
 	}
 }
@@ -41,7 +40,7 @@ type TrackedRequest struct {
 	ID string `json:"id"`
 }
 
-func (t *KVActivityTracker) Start(
+func (t *KVActivitySink) Start(
 	ctx context.Context,
 	operation string,
 	subject string,
@@ -147,7 +146,7 @@ func extractMetadata(args ...any) map[string]string {
 	return meta
 }
 
-func (t *KVActivityTracker) GetRecentRequestIDs(ctx context.Context, limit int) ([]TrackedRequest, error) {
+func (t *KVActivitySink) GetRecentRequestIDs(ctx context.Context, limit int) ([]TrackedRequest, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -180,7 +179,7 @@ func (t *KVActivityTracker) GetRecentRequestIDs(ctx context.Context, limit int) 
 	return requestIDs, nil
 }
 
-func (t *KVActivityTracker) GetActivityLogs(ctx context.Context, limit int) ([]TrackedEvent, error) {
+func (t *KVActivitySink) GetActivityLogs(ctx context.Context, limit int) ([]TrackedEvent, error) {
 	kv, err := t.kvManager.Operation(ctx)
 	if err != nil {
 		return nil, err
@@ -224,7 +223,7 @@ type Operation struct {
 	Subject   string `json:"subject"`
 }
 
-func (t *KVActivityTracker) GetKnownOperations(ctx context.Context) ([]Operation, error) {
+func (t *KVActivitySink) GetKnownOperations(ctx context.Context) ([]Operation, error) {
 	kv, err := t.kvManager.Operation(ctx)
 	if err != nil {
 		return nil, err
@@ -269,7 +268,7 @@ func (t *KVActivityTracker) GetKnownOperations(ctx context.Context) ([]Operation
 	return results, nil
 }
 
-func (t *KVActivityTracker) GetRequestIDByOperation(ctx context.Context, operation Operation) ([]TrackedRequest, error) {
+func (t *KVActivitySink) GetRequestIDByOperation(ctx context.Context, operation Operation) ([]TrackedRequest, error) {
 	kv, err := t.kvManager.Operation(ctx)
 	if err != nil {
 		return nil, err
@@ -293,7 +292,7 @@ func (t *KVActivityTracker) GetRequestIDByOperation(ctx context.Context, operati
 	return results, nil
 }
 
-func (t *KVActivityTracker) GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]TrackedEvent, error) {
+func (t *KVActivitySink) GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]TrackedEvent, error) {
 	if requestID == "" {
 		return nil, nil
 	}
@@ -321,7 +320,7 @@ func (t *KVActivityTracker) GetActivityLogsByRequestID(ctx context.Context, requ
 	return results, nil
 }
 
-func (t *KVActivityTracker) GetExecutionStateByRequestID(ctx context.Context, requestID string) ([]taskengine.CapturedStateUnit, error) {
+func (t *KVActivitySink) GetExecutionStateByRequestID(ctx context.Context, requestID string) ([]CapturedStateUnit, error) {
 	if requestID == "" {
 		return nil, nil
 	}
@@ -338,9 +337,9 @@ func (t *KVActivityTracker) GetExecutionStateByRequestID(ctx context.Context, re
 		return nil, err
 	}
 
-	var results []taskengine.CapturedStateUnit
+	var results []CapturedStateUnit
 	for _, raw := range rawItems {
-		var unit taskengine.CapturedStateUnit
+		var unit CapturedStateUnit
 		if err := json.Unmarshal(raw, &unit); err != nil {
 			log.Printf("SERVERBUG: Failed to unmarshal CapturedStateUnit: %v", err)
 			continue
@@ -351,7 +350,7 @@ func (t *KVActivityTracker) GetExecutionStateByRequestID(ctx context.Context, re
 	return results, nil
 }
 
-func (t *KVActivityTracker) GetStatefulRequests(ctx context.Context) ([]string, error) {
+func (t *KVActivitySink) GetStatefulRequests(ctx context.Context) ([]string, error) {
 	kv, err := t.kvManager.Operation(ctx)
 	if err != nil {
 		return nil, err

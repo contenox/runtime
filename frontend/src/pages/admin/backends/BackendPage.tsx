@@ -2,6 +2,7 @@ import { TabbedPage } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { useDownloadProgressSSE } from '../../../hooks/useDownload';
 import { useQueue } from '../../../hooks/useQueue';
+import ActivityAlertsSection from './components/ActivityAlertsSection';
 import ActivityLogsSection from './components/ActivityLogsSection';
 import ActivityOperationsSection from './components/ActivityOperationsSection';
 import ActivityRequestsSection from './components/ActivityRequestsSection';
@@ -40,6 +41,11 @@ export default function BackendsPage() {
       id: 'activity-logs',
       label: t('activity.logs_title'),
       content: <ActivityLogsSection />,
+    },
+    {
+      id: 'activity-alerts',
+      label: t('activity.alerts_title'),
+      content: <ActivityAlertsSection />,
     },
     {
       id: 'operations',

@@ -81,6 +81,9 @@ type TaskTransition struct {
 	// OnFailure is the task ID to jump to in case of failure.
 	OnFailure string `yaml:"on_failure" json:"on_failure"`
 
+	// OnFailureAlert specifies the alert message to send if the task fails.
+	OnFailureAlert string `yaml:"on_failure_alert" json:"on_failure_alert"`
+
 	// Branches defines conditional branches for successful task completion.
 	Branches []TransitionBranch `yaml:"branches" json:"branches"`
 }
@@ -100,6 +103,9 @@ type TransitionBranch struct {
 	// Goto specifies the target task ID if this branch is taken.
 	// Leave empty or use taskengine.TermEnd to end the chain.
 	Goto string `yaml:"goto" json:"goto"`
+
+	// AlertOnMatch specifies the alert message to send if this branch is taken.
+	AlertOnMatch string `yaml:"alert_on_match" json:"alert_on_match"`
 }
 
 // OperatorTerm represents logical operators used for task transition evaluation

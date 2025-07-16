@@ -124,7 +124,10 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "mux_input"},
+						{
+							Operator: "default", Goto: "mux_input",
+							AlertOnMatch: "Test Alert",
+						},
 					},
 				},
 			},

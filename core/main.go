@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
@@ -175,7 +174,7 @@ func main() {
 	go breakerSettings.Loop(ctx, time.Second*3, triggerChan, settings.ProcessTick, func(err error) {
 		log.Printf("SERVER Error in settings.ProcessTick: %v", err)
 	})
-	tracker := activity.NewKVActivityTracker(kvManager)
+	tracker := taskengine.NewKVActivityTracker(kvManager)
 	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
 	serveropsChainedTracker := serverops.ChainedTracker{
 		tracker,
@@ -222,7 +221,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, exec, taskengine.NewSimpleInspector(kvManager))
+	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, *taskengine.NewAlertSink(kvManager), exec, taskengine.NewSimpleInspector(kvManager))
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/execservice"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
-	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec, taskengine.SimpleInspector{})
+	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, *taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}

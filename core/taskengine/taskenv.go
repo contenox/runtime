@@ -90,22 +90,25 @@ type HookRegistry interface {
 // It executes tasks in order, using retry and timeout policies, and tracks execution
 // progress using an ActivityTracker.
 type SimpleEnv struct {
-	exec      TaskExecutor
-	tracker   serverops.ActivityTracker
-	inspector Inspector
+	exec           TaskExecutor
+	tracker        serverops.ActivityTracker
+	inspector      Inspector
+	alertCollector SimpleAlertSink
 }
 
 // NewEnv creates a new SimpleEnv with the given tracker and task executor.
 func NewEnv(
 	_ context.Context,
 	tracker serverops.ActivityTracker,
+	alertCollector SimpleAlertSink,
 	exec TaskExecutor,
 	inspector Inspector,
 ) (EnvExecutor, error) {
 	return &SimpleEnv{
-		exec:      exec,
-		tracker:   tracker,
-		inspector: inspector,
+		exec:           exec,
+		tracker:        tracker,
+		inspector:      inspector,
+		alertCollector: alertCollector,
 	}, nil
 }
 
@@ -201,7 +204,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			)
 			defer endAttempt()
 
-			startTime := time.Now()
+			startTime := time.Now().UTC()
 
 			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, int(chain.TokenLimit), currentTask, taskInput, taskInputType)
 
@@ -236,6 +239,9 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 
 		if taskErr != nil {
 			if currentTask.Transition.OnFailure != "" {
+				if currentTask.Transition.OnFailureAlert != "" {
+					exe.alertCollector.SendAlert(ctx, currentTask.Transition.OnFailureAlert, "task_id", currentTask.ID, "error", err.Error())
+				}
 				previousTaskID := currentTask.ID
 				currentTask, err = findTaskByID(chain.Tasks, currentTask.Transition.OnFailure)
 				if err != nil {
@@ -272,7 +278,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 		}
 
 		// Evaluate transitions
-		nextTaskID, err := evaluateTransitions(currentTask.Transition, transitionEval)
+		nextTaskID, err := exe.evaluateTransitions(ctx, currentTask.ID, currentTask.Transition, transitionEval)
 		if err != nil {
 			return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: transition error: %v", currentTask.ID, err)
 		}
@@ -323,7 +329,7 @@ func renderTemplate(tmplStr string, vars map[string]any) (string, error) {
 	return buf.String(), nil
 }
 
-func evaluateTransitions(transition TaskTransition, eval string) (string, error) {
+func (exe SimpleEnv) evaluateTransitions(ctx context.Context, taskID string, transition TaskTransition, eval string) (string, error) {
 	// First check explicit matches
 	for _, ct := range transition.Branches {
 		if ct.Operator == OpDefault {
@@ -335,6 +341,9 @@ func evaluateTransitions(transition TaskTransition, eval string) (string, error)
 			return "", err
 		}
 		if match {
+			if ct.AlertOnMatch != "" {
+				exe.alertCollector.SendAlert(ctx, ct.AlertOnMatch, "task_id", taskID, "eval", eval)
+			}
 			return ct.Goto, nil
 		}
 	}
@@ -342,6 +351,9 @@ func evaluateTransitions(transition TaskTransition, eval string) (string, error)
 	// Then check for default
 	for _, ct := range transition.Branches {
 		if ct.Operator == "default" {
+			if ct.AlertOnMatch != "" {
+				exe.alertCollector.SendAlert(ctx, ct.AlertOnMatch, "task_id", taskID, "eval", eval)
+			}
 			return ct.Goto, nil
 		}
 	}

@@ -18,10 +18,11 @@ export function useActivityRequests(limit?: number) {
   });
 }
 
-export function useActivityRequestById(requestID: string) {
+export function useActivityRequestById(requestID: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: activityKeys.requestById(requestID),
     queryFn: () => api.getActivityRequestById(requestID),
+    enabled: options?.enabled,
   });
 }
 
@@ -57,6 +58,14 @@ export function useActivityStatefulRequests() {
   return useQuery({
     queryKey: activityKeys.statefulRequests(),
     queryFn: () => api.getActivityStatefulRequests(),
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
+}
+
+export function useActivityAlerts(limit?: number) {
+  return useQuery({
+    queryKey: activityKeys.alerts(limit),
+    queryFn: () => api.getActivityAlerts(limit),
     refetchInterval: 5000, // Refetch every 5 seconds
   });
 }
