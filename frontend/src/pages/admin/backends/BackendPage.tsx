@@ -8,6 +8,7 @@ import ActivityRequestsSection from './components/ActivityRequestsSection';
 import BackendsSection from './components/BackendsSection';
 import CloudProvidersSection from './components/CloudProvidersSection';
 import PoolsSection from './components/PoolsSection';
+import StatefulRequestsSection from './components/StatefulRequestsSection';
 
 export default function BackendsPage() {
   const { t } = useTranslation();
@@ -49,6 +50,11 @@ export default function BackendsPage() {
       id: 'requests',
       label: t('activity.requests_title'),
       content: <ActivityRequestsSection />,
+    },
+    {
+      id: 'stateful-requests',
+      label: t('activity.stateful_requests_title'),
+      content: <StatefulRequestsSection />,
     },
     {
       id: 'state',

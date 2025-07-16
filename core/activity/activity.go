@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
 )
@@ -318,4 +319,53 @@ func (t *KVActivityTracker) GetActivityLogsByRequestID(ctx context.Context, requ
 	}
 
 	return results, nil
+}
+
+func (t *KVActivityTracker) GetExecutionStateByRequestID(ctx context.Context, requestID string) ([]taskengine.CapturedStateUnit, error) {
+	if requestID == "" {
+		return nil, nil
+	}
+
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := []byte("state:" + requestID)
+
+	rawItems, err := kv.LRange(ctx, key, 0, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []taskengine.CapturedStateUnit
+	for _, raw := range rawItems {
+		var unit taskengine.CapturedStateUnit
+		if err := json.Unmarshal(raw, &unit); err != nil {
+			log.Printf("SERVERBUG: Failed to unmarshal CapturedStateUnit: %v", err)
+			continue
+		}
+		results = append(results, unit)
+	}
+
+	return results, nil
+}
+
+func (t *KVActivityTracker) GetStatefulRequests(ctx context.Context) ([]string, error) {
+	kv, err := t.kvManager.Operation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := []byte("state:requests")
+	rawItems, err := kv.SMembers(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var requestIDs []string
+	for _, raw := range rawItems {
+		requestIDs = append(requestIDs, string(raw))
+	}
+	return requestIDs, nil
 }

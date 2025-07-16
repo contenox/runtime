@@ -5,6 +5,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/activity"
 	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 type Service interface {
@@ -14,6 +15,9 @@ type Service interface {
 	GetKnownOperations(ctx context.Context) ([]activity.Operation, error)
 	GetRequestIDByOperation(ctx context.Context, operation activity.Operation) ([]activity.TrackedRequest, error)
 	GetActivityLogsByRequestID(ctx context.Context, requestID string) ([]activity.TrackedEvent, error)
+	GetExecutionState(ctx context.Context, reqID string) ([]taskengine.CapturedStateUnit, error)
+	GetStatefulRequests(ctx context.Context) ([]string, error)
+
 	serverops.ServiceMeta
 }
 
@@ -59,4 +63,12 @@ func (s *service) GetKnownOperations(ctx context.Context) ([]activity.Operation,
 // GetRequestIDByOperation implements Service.
 func (s *service) GetRequestIDByOperation(ctx context.Context, operation activity.Operation) ([]activity.TrackedRequest, error) {
 	return s.tracker.GetRequestIDByOperation(ctx, operation)
+}
+
+func (s *service) GetExecutionState(ctx context.Context, reqID string) ([]taskengine.CapturedStateUnit, error) {
+	return s.tracker.GetExecutionStateByRequestID(ctx, reqID)
+}
+
+func (s *service) GetStatefulRequests(ctx context.Context) ([]string, error) {
+	return s.tracker.GetStatefulRequests(ctx)
 }

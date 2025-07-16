@@ -114,7 +114,7 @@ func NewEnv(
 // It manages the full lifecycle of task execution: rendering prompts, calling the
 // TaskExecutor, handling timeouts, retries, transitions, and collecting final output.
 func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input any, dataType DataType) (any, []CapturedStateUnit, error) {
-	stack := exe.inspector.Start()
+	stack := exe.inspector.Start(ctx)
 
 	vars := map[string]any{
 		"input": input,

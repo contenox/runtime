@@ -1,8 +1,9 @@
-import { Panel, Span, Spinner, Table, TableCell, TableRow } from '@contenox/ui';
+import { Panel, Span, Spinner, TableCell, TableRow } from '@contenox/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../../lib/api';
-import { ActivityLog, TrackedRequest } from '../../../../lib/types';
+import { TrackedRequest } from '../../../../lib/types';
+import EventsRow from './eventsRow';
 
 interface RequestRowProps {
   request: TrackedRequest;
@@ -21,18 +22,6 @@ export default function RequestRow({ request, isExpanded, onToggle }: RequestRow
     queryFn: () => api.getActivityRequestById(request.id),
     enabled: isExpanded,
   });
-
-  function formatDateTime(dateString: string): string {
-    const date = new Date(dateString);
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  }
 
   return (
     <>
@@ -58,42 +47,7 @@ export default function RequestRow({ request, isExpanded, onToggle }: RequestRow
               </Panel>
             )}
 
-            {events && events.length > 0 && (
-              <div className="ml-4 border-l-2 pl-4">
-                <Table
-                  columns={[
-                    t('activity.operation'),
-                    t('activity.subject'),
-                    t('activity.start_time'),
-                    t('activity.status'),
-                  ]}>
-                  {events.map((event: ActivityLog) => (
-                    <TableRow key={event.id}>
-                      <TableCell>
-                        <Span>{event.operation}</Span>
-                      </TableCell>
-                      <TableCell>
-                        <Span>{event.subject}</Span>
-                      </TableCell>
-                      <TableCell>
-                        <Span>{formatDateTime(event.start)}</Span>
-                      </TableCell>
-                      <TableCell>
-                        {event.error ? (
-                          <Span variant="status" className="text-error">
-                            {t('activity.failed')}
-                          </Span>
-                        ) : (
-                          <Span variant="status" className="text-success">
-                            {t('activity.success')}
-                          </Span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </Table>
-              </div>
-            )}
+            {events && events.length > 0 && <EventsRow logs={events} />}
           </TableCell>
         </TableRow>
       )}

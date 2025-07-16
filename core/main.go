@@ -222,7 +222,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, exec, taskengine.MockInspector{})
+	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, exec, taskengine.NewSimpleInspector(kvManager))
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

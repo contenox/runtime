@@ -43,7 +43,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
-	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec, taskengine.MockInspector{})
+	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}

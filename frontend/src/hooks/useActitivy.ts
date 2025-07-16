@@ -43,3 +43,20 @@ export function useActivityRequestsByOperation(
     enabled: options?.enabled,
   });
 }
+
+export function useExecutionState(requestID: string) {
+  return useQuery({
+    queryKey: activityKeys.state(requestID),
+    queryFn: () => api.getExecutionState(requestID),
+    enabled: !!requestID,
+    refetchInterval: 5000,
+  });
+}
+
+export function useActivityStatefulRequests() {
+  return useQuery({
+    queryKey: activityKeys.statefulRequests(),
+    queryFn: () => api.getActivityStatefulRequests(),
+    refetchInterval: 5000, // Refetch every 5 seconds
+  });
+}

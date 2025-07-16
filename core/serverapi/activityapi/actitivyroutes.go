@@ -14,8 +14,10 @@ func AddActivityRoutes(mux *http.ServeMux, _ *serverops.Config, activityService 
 	mux.HandleFunc("GET /activity/logs", s.list)
 	mux.HandleFunc("GET /activity/requests", s.requests)
 	mux.HandleFunc("GET /activity/requests/{id}", s.requestByID)
+	mux.HandleFunc("GET /activity/requests/{id}/state", s.getExecutionState)
 	mux.HandleFunc("GET /activity/operations", s.operations)
 	mux.HandleFunc("GET /activity/operations/{op}/{subject}", s.requestsByOperation)
+	mux.HandleFunc("GET /activity/stateful-requests", s.getStatefulRequests)
 }
 
 type activityAPI struct {
@@ -96,4 +98,27 @@ func (s *activityAPI) requestsByOperation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	serverops.Encode(w, r, http.StatusOK, reqs)
+}
+
+func (s *activityAPI) getExecutionState(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqID := r.PathValue("id")
+
+	state, err := s.service.GetExecutionState(ctx, reqID)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.GetOperation)
+		return
+	}
+
+	serverops.Encode(w, r, http.StatusOK, state)
+}
+
+func (s *activityAPI) getStatefulRequests(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqIDs, err := s.service.GetStatefulRequests(ctx)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.ListOperation)
+		return
+	}
+	serverops.Encode(w, r, http.StatusOK, reqIDs)
 }

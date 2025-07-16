@@ -630,6 +630,6 @@ func TestUnit_JobQueue_PopNJobsForType_EdgeCases(t *testing.T) {
 	require.Empty(t, jobs)
 
 	// Request negative
-	jobs, err = s.PopNJobsForType(ctx, taskType, -1)
+	_, err = s.PopNJobsForType(ctx, taskType, -1)
 	require.Error(t, err)
 }

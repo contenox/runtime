@@ -270,4 +270,7 @@ export const api = {
   getActivityOperations: () => apiFetch<ActivityOperationsResponse>('/api/activity/operations'),
   getActivityRequestByOperation: (operation: string, subject: string) =>
     apiFetch<TrackedRequest[]>(`/api/activity/operations/${operation}/${subject}`),
+  getExecutionState: (requestID: string) =>
+    apiFetch<StateResponse>(`/api/activity/requests/${requestID}/state`),
+  getActivityStatefulRequests: () => apiFetch<string[]>('/api/activity/stateful-requests'),
 };
