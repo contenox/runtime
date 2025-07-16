@@ -34,6 +34,8 @@ const (
 	// ParseTransition will attempt to parse a transition command from the input and strip the transition prefix if it exists.
 	ParseTransition TaskType = "parse_transition"
 
+	Noop TaskType = "noop"
+
 	// Hook indicates this task should execute an external action rather than calling the LLM.
 	Hook TaskType = "hook"
 )

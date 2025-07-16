@@ -204,7 +204,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 	var taskErr error
 	var output any = input
 	var outputType DataType = dataType
-
+	if currentTask.Type == Noop {
+		return output, outputType, "noop", nil
+	}
 	// Unified prompt extraction function
 	getPrompt := func() (string, error) {
 		switch outputType {

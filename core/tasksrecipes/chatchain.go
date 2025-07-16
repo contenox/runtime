@@ -113,46 +113,12 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 		Description: "Standard chat processing pipeline with hooks",
 		Tasks: []taskengine.ChainTask{
 			{
-				ID:          "append_user_message",
-				Description: "Append user message to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "append_user_message",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{
-							Operator: "default", Goto: "inject_context",
-							AlertOnMatch: "Test Alert",
-						},
-					},
-				},
-			},
-			// {
-			// 	ID:             "inject_context",
-			// 	Description:    "Add context to the conversation",
-			// 	Type:           taskengine.RawString,
-			// 	PromptTemplate: "Evaluate if input contains question that requires knowleage if yes output /search <search query> to retrieve context. Input: {{.input}}",
-			// 	InputVar:       "input",
-			// 	Transition: taskengine.TaskTransition{
-			// 		Branches: []taskengine.TransitionBranch{
-			// 			{
-			// 				Operator: "default",
-			// 				Goto:     "mux_input",
-			// 			},
-			// 		},
-			// 	},
-			// },
-			{
 				ID:          "mux_input",
 				Description: "Check for commands like /echo",
 				Type:        taskengine.ParseTransition,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "moderate"},
+						{Operator: taskengine.OpDefault, Goto: "moderate"},
 						{
 							Operator: "equals",
 							When:     "echo",
@@ -172,6 +138,60 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
+				ID:             "moderate",
+				Description:    "Moderate the input",
+				Type:           taskengine.ParseNumber,
+				PromptTemplate: "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}",
+				InputVar:       "input",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpGreaterThan,
+							When:     "4",
+							Goto:     "reject_request",
+						},
+						{
+							Operator: "default",
+							Goto:     "do_we_need_context",
+						},
+					},
+					OnFailure: "request_failed",
+				},
+			},
+			{
+				ID:             "do_we_need_context",
+				Description:    "Add context to the conversation",
+				Type:           taskengine.RawString,
+				PromptTemplate: "Classify the necessity of searching documents with (0) not likely and (10) highly likely to solve the users request with an numeric value between 0 and 10. Input {{.input}}",
+				InputVar:       "input",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpDefault,
+							Goto:     "swap_to_input",
+						},
+						{
+							Operator: taskengine.OpGreaterThan,
+							When:     "4",
+							Goto:     "search_knowledge",
+						},
+					},
+				},
+			},
+			{
+				ID:       "swap_to_input",
+				Type:     taskengine.Noop,
+				InputVar: "input",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpDefault,
+							Goto:     "append_user_message",
+						},
+					},
+				},
+			},
+			{
 				ID:          "echo_message",
 				Description: "Echo the message",
 				Type:        taskengine.Hook,
@@ -180,7 +200,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_messages"},
+						{Operator: taskengine.OpDefault, Goto: "append_user_message_2"},
 					},
 				},
 			},
@@ -193,7 +213,21 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_messages"},
+						{Operator: taskengine.OpDefault, Goto: "append_context_to_input"},
+					},
+				},
+			},
+			{
+				ID:             "append_context_to_input",
+				Description:    "Added context to the user input",
+				Type:           taskengine.Noop,
+				PromptTemplate: "{{.input}} \n\n Context: {{.search_knowledge}}",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpDefault,
+							Goto:     "append_user_message",
+						},
 					},
 				},
 			},
@@ -209,7 +243,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_messages"},
+						{Operator: taskengine.OpDefault, Goto: "append_user_message_2"},
 					},
 				},
 			},
@@ -222,7 +256,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "raise_error"},
+						{Operator: taskengine.OpDefault, Goto: "raise_error"},
 					},
 				},
 			},
@@ -234,7 +268,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "raise_error"},
+						{Operator: taskengine.OpDefault, Goto: "raise_error"},
 					},
 				},
 			},
@@ -246,7 +280,26 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: taskengine.TermEnd},
+						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
+					},
+				},
+			},
+			{
+				ID:          "append_user_message",
+				Description: "Append user message to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "append_user_message",
+					Args: map[string]string{
+						"subject_id": req.SubjectID,
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpDefault, Goto: "execute_model_on_messages",
+							AlertOnMatch: "Test Alert",
+						},
 					},
 				},
 			},
@@ -264,7 +317,26 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				// InputVar: "append_user_message",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: "persist_messages"},
+						{Operator: taskengine.OpDefault, Goto: "persist_messages"},
+					},
+				},
+			},
+			{
+				ID:          "append_user_message_2",
+				Description: "Append user message to chat history",
+				Type:        taskengine.Hook,
+				Hook: &taskengine.HookCall{
+					Type: "append_user_message",
+					Args: map[string]string{
+						"subject_id": req.SubjectID,
+					},
+				},
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{
+							Operator: taskengine.OpDefault, Goto: "persist_messages",
+							AlertOnMatch: "Test Alert",
+						},
 					},
 				},
 			},
@@ -280,7 +352,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: "default", Goto: taskengine.TermEnd},
+						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
 					},
 				},
 			},
