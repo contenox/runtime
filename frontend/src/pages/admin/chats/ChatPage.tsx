@@ -110,7 +110,7 @@ export default function ChatPage() {
                 className="w-48"
               />
             </Panel>
-            <Panel className="max-h-55 overflow-auto">
+            <Panel className="max-h-155 overflow-auto">
               {operationError && <Panel variant="error"> {operationError}</Panel>}
               {chatHistory && Array.isArray(chatHistory) && (
                 <ChatInterface chatHistory={chatHistory} isLoading={isLoading} error={error} />

@@ -125,12 +125,27 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
-							Operator: "default", Goto: "mux_input",
+							Operator: "default", Goto: "inject_context",
 							AlertOnMatch: "Test Alert",
 						},
 					},
 				},
 			},
+			// {
+			// 	ID:             "inject_context",
+			// 	Description:    "Add context to the conversation",
+			// 	Type:           taskengine.RawString,
+			// 	PromptTemplate: "Evaluate if input contains question that requires knowleage if yes output /search <search query> to retrieve context. Input: {{.input}}",
+			// 	InputVar:       "input",
+			// 	Transition: taskengine.TaskTransition{
+			// 		Branches: []taskengine.TransitionBranch{
+			// 			{
+			// 				Operator: "default",
+			// 				Goto:     "mux_input",
+			// 			},
+			// 		},
+			// 	},
+			// },
 			{
 				ID:          "mux_input",
 				Description: "Check for commands like /echo",
@@ -198,27 +213,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 					},
 				},
 			},
-			{
-				ID:             "moderate",
-				Description:    "Moderate the input",
-				Type:           taskengine.ParseNumber,
-				PromptTemplate: "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}",
-				InputVar:       "input",
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{
-							Operator: taskengine.OpGreaterThan,
-							When:     "4",
-							Goto:     "reject_request",
-						},
-						{
-							Operator: "default",
-							Goto:     "execute_model_on_messages",
-						},
-					},
-					OnFailure: "request_failed",
-				},
-			},
+
 			{
 				ID:             "reject_request",
 				Description:    "Reject the request",
@@ -266,7 +261,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 					Models:    req.PreferredModelNames,
 					Providers: []string{req.Provider},
 				},
-				InputVar: "append_user_message",
+				// InputVar: "append_user_message",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "persist_messages"},

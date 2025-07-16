@@ -27,7 +27,8 @@ func (e *EchoHook) Exec(ctx context.Context, startTime time.Time, input any, dat
 	case taskengine.DataTypeChatHistory:
 		if chatHist, ok := input.(taskengine.ChatHistory); ok {
 			lastMsg := chatHist.Messages[len(chatHist.Messages)-1]
-			return taskengine.StatusSuccess, lastMsg.Content, taskengine.DataTypeString, lastMsg.Content, nil
+			chatHist.Messages = append(chatHist.Messages, lastMsg)
+			return taskengine.StatusSuccess, chatHist, taskengine.DataTypeChatHistory, transition, nil
 		}
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history input")
 	default:
