@@ -213,20 +213,25 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: taskengine.OpDefault, Goto: "append_context_to_input"},
+						{Operator: taskengine.OpDefault, Goto: "append_search_results"},
 					},
 				},
 			},
 			{
-				ID:             "append_context_to_input",
-				Description:    "Added context to the user input",
-				Type:           taskengine.Noop,
-				PromptTemplate: "{{.input}} \n\n Context: {{.search_knowledge}}",
+				ID:             "append_search_results",
+				Type:           taskengine.Hook,
+				PromptTemplate: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}",
+				Hook: &taskengine.HookCall{
+					Type: "append_system_message",
+					Args: map[string]string{
+						"subject_id": "",
+					},
+				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
 							Operator: taskengine.OpDefault,
-							Goto:     "append_user_message",
+							Goto:     "swap_to_input",
 						},
 					},
 				},

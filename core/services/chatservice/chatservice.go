@@ -130,9 +130,13 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 		case "append_user_message":
 			task.Hook.Args["subject_id"] = req.SubjectID
 		case "append_user_message_2":
+			task.Hook.Args["subject_id"] = req.SubjectID
 		case "persist_messages":
 			task.Hook.Args["subject_id"] = req.SubjectID
+		case "append_search_results":
+			task.Hook.Args["subject_id"] = req.SubjectID
 		}
+
 	}
 
 	// Execute chain
