@@ -19,6 +19,13 @@ export const modelKeys = {
   pools: (modelID: string) => [...modelKeys.all, modelID, 'pools'] as const,
 };
 
+export const githubKeys = {
+  all: ['github'] as const,
+  repos: () => [...githubKeys.all, 'repos'] as const,
+  repo: (id: string) => [...githubKeys.all, 'repo', id] as const,
+  prs: (repoID: string) => [...githubKeys.all, 'prs', repoID] as const,
+};
+
 export const providerKeys = {
   status: (provider: string) => ['providers', provider, 'status'] as const,
 };

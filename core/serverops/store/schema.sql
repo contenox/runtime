@@ -1,3 +1,14 @@
+CREATE TABLE IF NOT EXISTS github_repos (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(512) NOT NULL,
+    owner VARCHAR(512) NOT NULL,
+    repo_name VARCHAR(512) NOT NULL,
+    access_token VARCHAR(512) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    UNIQUE (user_id, owner, repo_name)
+);
+
 CREATE TABLE IF NOT EXISTS ollama_models (
     id VARCHAR(255) PRIMARY KEY,
     model VARCHAR(512) NOT NULL UNIQUE,

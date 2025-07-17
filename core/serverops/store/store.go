@@ -16,6 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type GitHubRepo struct {
+	ID          string    `json:"id"`
+	UserID      string    `json:"userId"`
+	Owner       string    `json:"owner"`
+	RepoName    string    `json:"repoName"`
+	AccessToken string    `json:"accessToken"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
 type Status struct {
 	Status    string `json:"status"`
 	Digest    string `json:"digest,omitempty"`
@@ -333,6 +343,11 @@ type Store interface {
 	DeleteChunkIndex(ctx context.Context, id string) error
 	ListChunkIndicesByVectorID(ctx context.Context, vectorID string) ([]*ChunkIndex, error)
 	ListChunkIndicesByResource(ctx context.Context, resourceID, resourceType string) ([]*ChunkIndex, error)
+
+	CreateGitHubRepo(ctx context.Context, repo *GitHubRepo) error
+	GetGitHubRepo(ctx context.Context, id string) (*GitHubRepo, error)
+	DeleteGitHubRepo(ctx context.Context, id string) error
+	ListGitHubRepos(ctx context.Context) ([]*GitHubRepo, error)
 }
 
 //go:embed schema.sql

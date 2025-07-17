@@ -18,6 +18,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverapi/dispatchapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/execapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/filesapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/githubapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/indexapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/poolapi"
 	providersapi "github.com/contenox/runtime-mvp/core/serverapi/providerapi"
@@ -34,6 +35,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/downloadservice"
 	"github.com/contenox/runtime-mvp/core/services/execservice"
 	"github.com/contenox/runtime-mvp/core/services/fileservice"
+	"github.com/contenox/runtime-mvp/core/services/githubservice"
 	"github.com/contenox/runtime-mvp/core/services/indexservice"
 	"github.com/contenox/runtime-mvp/core/services/modelservice"
 	"github.com/contenox/runtime-mvp/core/services/poolservice"
@@ -145,6 +147,9 @@ func New(
 	providersapi.AddProviderRoutes(mux, config, providerService)
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityapi.AddActivityRoutes(mux, config, activityService)
+	githubService := githubservice.New(dbInstance)
+	githubapi.AddGitHubRoutes(mux, config, githubService)
+
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
 	handler = enableCORS(config, handler)
@@ -167,6 +172,7 @@ func New(
 		providerService,
 		chainService,
 		activityService,
+		githubService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

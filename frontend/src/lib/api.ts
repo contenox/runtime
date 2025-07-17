@@ -13,12 +13,14 @@ import {
   ExecResp,
   FileResponse,
   FolderResponse,
+  GitHubRepo,
   InProgressJob,
   Job,
   Model,
   ModelListResponse,
   PendingJob,
   Pool,
+  PullRequest,
   SearchResponse,
   StateResponse,
   StatusResponse,
@@ -276,4 +278,17 @@ export const api = {
   getActivityStatefulRequests: () => apiFetch<string[]>('/api/activity/stateful-requests'),
   getActivityAlerts: (limit?: number) =>
     apiFetch<Alert[]>(limit ? `/api/activity/alerts?limit=${limit}` : '/api/activity/alerts'),
+  connectGitHubRepo: (data: {
+    userID: string;
+    owner: string;
+    repoName: string;
+    accessToken: string;
+  }) => apiFetch<GitHubRepo>('/api/github/connect', options('POST', data)),
+
+  listGitHubRepos: () => apiFetch<GitHubRepo[]>('/api/github/repos'),
+
+  listGitHubPRs: (repoID: string) => apiFetch<PullRequest[]>(`/api/github/repos/${repoID}/prs`),
+
+  deleteGitHubRepo: (repoID: string) =>
+    apiFetch<void>(`/api/github/repos/${repoID}`, options('DELETE')),
 };

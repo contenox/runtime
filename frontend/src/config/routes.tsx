@@ -18,6 +18,7 @@ import ChainDetailPage from '../pages/admin/chains/components/ChainDetailPage.ts
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
 import ChatsListPage from '../pages/admin/chats/components/ChatListPage.tsx';
 import FilesPage from '../pages/admin/files/FilesPage.tsx';
+import GitHubPage from '../pages/admin/github/GitHubPage.tsx';
 import ExecPromptPage from '../pages/admin/prompt/ExecPromptPage.tsx';
 import SearchPage from '../pages/admin/search/SearchPage.tsx';
 import ServerJobsPage from '../pages/admin/serverjobs/ServerJobsPage.tsx';
@@ -69,6 +70,15 @@ export const routes: RouteConfig[] = [
     showInShelf: false,
   },
   {
+    path: '/github',
+    element: GitHubPage,
+    label: i18n.t('navbar.github'),
+    icon: <Link className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+    showInShelf: false,
+  },
+  {
     path: '/jobs',
     element: ServerJobsPage,
     label: i18n.t('navbar.serverjobs'),
@@ -85,6 +95,7 @@ export const routes: RouteConfig[] = [
     protected: true,
     showInShelf: false,
   },
+
   {
     path: '/chats',
     element: ChatsListPage,

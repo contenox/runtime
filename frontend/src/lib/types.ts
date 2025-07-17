@@ -357,3 +357,24 @@ export type Alert = {
 };
 
 export type ActivityAlertsResponse = Alert[];
+
+export interface GitHubRepo {
+  id: string;
+  userID: string;
+  owner: string;
+  repoName: string;
+  accessToken: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PullRequest {
+  id: number;
+  number: number;
+  title: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  authorLogin: string;
+}
