@@ -111,6 +111,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		ID:          "chat_chain",
 		Description: "Standard chat processing pipeline with hooks",
+		Debug:       true,
 		Tasks: []taskengine.ChainTask{
 			{
 				ID:          "mux_input",
@@ -162,7 +163,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				ID:             "do_we_need_context",
 				Description:    "Add context to the conversation",
 				Type:           taskengine.RawString,
-				PromptTemplate: "Classify the necessity of searching documents with (0) not likely and (10) highly likely to solve the users request with an numeric value between 0 and 10. Input {{.input}}",
+				PromptTemplate: "Rate how likely it is that the answer requires access to this internal information respond with an numeric value between (0) not likely and (10) highly likely. Input {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{

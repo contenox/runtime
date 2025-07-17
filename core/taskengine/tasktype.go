@@ -339,8 +339,8 @@ const (
 //	fmt.Println("Final output:", output)
 type ChainDefinition struct {
 	// ID uniquely identifies the chain.
-	ID string `yaml:"id" json:"id"`
-
+	ID    string `yaml:"id" json:"id"`
+	Debug bool   `yaml:"debug" json:"debug"`
 	// Description provides a human-readable summary of the chain's purpose.
 	Description string `yaml:"description" json:"description"`
 

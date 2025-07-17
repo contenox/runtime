@@ -225,6 +225,10 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				Duration:   duration,
 				Error:      errState,
 			}
+			if chain.Debug {
+				step.Input = fmt.Sprintf("%v", taskInput)
+				step.Output = fmt.Sprintf("%v", output)
+			}
 			stack.RecordStep(step)
 
 			if taskErr != nil {
