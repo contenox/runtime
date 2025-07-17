@@ -24,6 +24,9 @@ type Service interface {
 	ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error)
 	ListRepos(ctx context.Context) ([]*store.GitHubRepo, error)
 	DisconnectRepo(ctx context.Context, repoID string) error
+	PR(ctx context.Context, repoID string, prNumber int) (*PullRequestDetails, error)
+	ListComments(ctx context.Context, repoID string, prNumber int, since time.Time) ([]*github.IssueComment, error)
+	PostComment(ctx context.Context, repoID string, prNumber int, comment string) error
 }
 
 type service struct {
@@ -102,6 +105,147 @@ func (s *service) ListRepos(ctx context.Context) ([]*store.GitHubRepo, error) {
 func (s *service) DisconnectRepo(ctx context.Context, repoID string) error {
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	return storeInstance.DeleteGitHubRepo(ctx, repoID)
+}
+
+type PullRequestDetails struct {
+	PullRequest   *github.PullRequest
+	ChangedFiles  []*github.CommitFile
+	IssueComments []*github.IssueComment
+	Reviews       []*github.PullRequestReview
+}
+
+func (s *service) PR(ctx context.Context, repoID string, prNumber int) (*PullRequestDetails, error) {
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
+	if err != nil {
+		return nil, err
+	}
+	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
+
+	// Fetch PR details
+	pr, _, err := client.PullRequests.Get(ctx, repoMeta.Owner, repoMeta.RepoName, prNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch changed files (with pagination)
+	var allFiles []*github.CommitFile
+	fileOpt := &github.ListOptions{PerPage: 100}
+	maxPages := 10
+	for {
+		files, resp, err := client.PullRequests.ListFiles(ctx, repoMeta.Owner, repoMeta.RepoName, prNumber, fileOpt)
+		if err != nil {
+			return nil, err
+		}
+		allFiles = append(allFiles, files...)
+		if resp.NextPage == 0 {
+			break
+		}
+		fileOpt.Page = resp.NextPage
+		maxPages -= 1
+		if maxPages <= 0 {
+			break
+		}
+	}
+	maxPages = 10
+	// Fetch general comments (with pagination)
+	var allIssueComments []*github.IssueComment
+	issueCommentOpt := &github.IssueListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
+	for {
+		comments, resp, err := client.Issues.ListComments(ctx, repoMeta.Owner, repoMeta.RepoName, prNumber, issueCommentOpt)
+		if err != nil {
+			return nil, err
+		}
+		allIssueComments = append(allIssueComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		issueCommentOpt.Page = resp.NextPage
+		if maxPages <= 0 {
+			break
+		}
+	}
+
+	// Fetch reviews (with pagination)
+	var allReviews []*github.PullRequestReview
+	reviewOpt := &github.ListOptions{PerPage: 100}
+	for {
+		reviews, resp, err := client.PullRequests.ListReviews(ctx, repoMeta.Owner, repoMeta.RepoName, prNumber, reviewOpt)
+		if err != nil {
+			return nil, err
+		}
+		allReviews = append(allReviews, reviews...)
+		if resp.NextPage == 0 {
+			break
+		}
+		reviewOpt.Page = resp.NextPage
+	}
+
+	return &PullRequestDetails{
+		PullRequest:   pr,
+		ChangedFiles:  allFiles,
+		IssueComments: allIssueComments,
+		Reviews:       allReviews,
+	}, nil
+}
+
+func (s *service) PostComment(ctx context.Context, repoID string, prNumber int, comment string) error {
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
+	if err != nil {
+		return fmt.Errorf("repo not found: %w", err)
+	}
+
+	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
+
+	// Create GitHub comment
+	_, _, err = client.Issues.CreateComment(
+		ctx,
+		repoMeta.Owner,
+		repoMeta.RepoName,
+		prNumber,
+		&github.IssueComment{Body: &comment},
+	)
+	if err != nil {
+		return fmt.Errorf("%w: failed to post comment: %v", ErrGitHubAPIError, err)
+	}
+	return nil
+}
+
+func (s *service) ListComments(ctx context.Context, repoID string, prNumber int, since time.Time) ([]*github.IssueComment, error) {
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("repo not found: %w", err)
+	}
+
+	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
+
+	var allComments []*github.IssueComment
+	opt := &github.IssueListCommentsOptions{
+		Since:       &since,
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	for {
+		comments, resp, err := client.Issues.ListComments(
+			ctx,
+			repoMeta.Owner,
+			repoMeta.RepoName,
+			prNumber,
+			opt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to list comments: %v", ErrGitHubAPIError, err)
+		}
+		allComments = append(allComments, comments...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+	}
+
+	return allComments, nil
 }
 
 func (s *service) createGitHubClient(ctx context.Context, accessToken string) *github.Client {
