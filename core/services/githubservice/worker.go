@@ -244,7 +244,13 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		}
 	}
 	if !found {
-		err := storeInstance.CreateMessageIndex(ctx, streamID, serverops.DefaultAdminUser)
+		user, err := storeInstance.GetUserByEmail(ctx, serverops.DefaultAdminUser)
+		if err != nil {
+			err := fmt.Errorf("SERVER BUG %w", err)
+			reportErr(err)
+			return err
+		}
+		err = storeInstance.CreateMessageIndex(ctx, streamID, user.ID)
 		if err != nil {
 			reportErr(err)
 			return err

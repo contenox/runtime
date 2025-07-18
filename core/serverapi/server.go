@@ -150,6 +150,13 @@ func New(
 	githubService := githubservice.New(dbInstance)
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
+	githubworker := githubservice.NewWorker(githubService, kvManager, tracker, dbInstance)
+	libroutine.GetPool().StartLoop(ctx, "github-worker-pull", 2, time.Minute, time.Minute, func(ctx context.Context) error {
+		return githubworker.ReceiveTick(ctx)
+	})
+	libroutine.GetPool().StartLoop(ctx, "github-worker-sync", 2, time.Minute, time.Minute, func(ctx context.Context) error {
+		return githubworker.ProcessTick(ctx)
+	})
 
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
