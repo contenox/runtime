@@ -21,6 +21,8 @@ export function useDeleteQueueEntry(): UseMutationResult<void, Error, string, un
     mutationFn: api.deleteQueueEntry,
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.all });
+      queryClient.invalidateQueries({ queryKey: jobKeys.pending() });
+      queryClient.invalidateQueries({ queryKey: jobKeys.inprogress() });
     },
   });
 }

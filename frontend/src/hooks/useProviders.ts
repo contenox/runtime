@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { providerKeys } from '../lib/queryKeys';
 
@@ -11,8 +11,16 @@ export function useProviderStatus(provider: 'openai' | 'gemini') {
 }
 
 export function useConfigureProvider(provider: 'openai' | 'gemini') {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (data: { apiKey: string; upsert: boolean }) =>
       api.configureProvider(provider, data),
+    onSuccess: () => {
+      // Invalidate the provider status query
+      queryClient.invalidateQueries({
+        queryKey: providerKeys.status(provider),
+      });
+    },
   });
 }
