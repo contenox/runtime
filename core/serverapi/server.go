@@ -148,6 +148,7 @@ func New(
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityapi.AddActivityRoutes(mux, config, activityService)
 	githubService := githubservice.New(dbInstance)
+	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
 
 	chainService := chainservice.New(dbInstance)

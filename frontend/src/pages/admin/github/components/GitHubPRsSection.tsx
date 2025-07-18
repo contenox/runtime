@@ -30,7 +30,12 @@ export default function GitHubPRsSection() {
 
   return (
     <Section>
-      <Select options={repoOptions} value={repoID} onChange={e => setRepoID(e.target.value)} />
+      <Select
+        options={repoOptions}
+        value={repoID}
+        placeholder={t('github.pr_input_placeholder')}
+        onChange={e => setRepoID(e.target.value)}
+      />
       {isLoading ? (
         <Spinner size="lg" />
       ) : isError ? (

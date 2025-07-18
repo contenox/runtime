@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useExecutionState } from '../../../../hooks/useActitivy';
 import { api } from '../../../../lib/api';
-import EventsRow from './eventsRow';
+import EventsRow from './EventsRow';
 import StateRow from './StateRow';
 
 interface StatefulRequestRowProps {

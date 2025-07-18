@@ -53,6 +53,9 @@ func listRepos(svc githubservice.Service) http.HandlerFunc {
 			serverops.Error(w, r, err, serverops.ListOperation)
 			return
 		}
+		for _, ghr := range repos {
+			ghr.AccessToken = "***-***"
+		}
 		serverops.Encode(w, r, http.StatusOK, repos)
 	}
 }

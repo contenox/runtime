@@ -130,6 +130,7 @@ const resources = {
         author: 'Author',
         state: 'State',
         user: 'User',
+        pr_input_placeholder: 'Select a PR',
       },
       accesscontrol: {
         manage_title: 'Manage Access Control',

@@ -50,7 +50,7 @@ func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, acce
 	}
 
 	repo := &store.GitHubRepo{
-		ID:          fmt.Sprintf("%s/%s", owner, repoName),
+		ID:          fmt.Sprintf("%s-%s", owner, repoName),
 		UserID:      userID,
 		Owner:       owner,
 		RepoName:    repoName,
@@ -74,15 +74,34 @@ func (s *service) ListPRs(ctx context.Context, repoID string) ([]*PullRequest, e
 	}
 
 	client := s.createGitHubClient(ctx, repo.AccessToken)
-	prs, _, err := client.PullRequests.List(ctx, repo.Owner, repo.RepoName, &github.PullRequestListOptions{
+
+	var allPRs []*github.PullRequest
+	opt := &github.PullRequestListOptions{
 		State: "open",
-	})
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrGitHubAPIError, err)
+		ListOptions: github.ListOptions{
+			Page:    1,
+			PerPage: 100,
+		},
+	}
+	maxpages := 10
+	for {
+		prs, resp, err := client.PullRequests.List(ctx, repo.Owner, repo.RepoName, opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list PRs: %w, Response: %+v", err, resp)
+		}
+		allPRs = append(allPRs, prs...)
+		if resp.NextPage == 0 {
+			break
+		}
+		opt.Page = resp.NextPage
+		maxpages -= 1
+		if maxpages < 0 {
+			break
+		}
 	}
 
-	result := make([]*PullRequest, len(prs))
-	for i, pr := range prs {
+	result := make([]*PullRequest, len(allPRs))
+	for i, pr := range allPRs {
 		result[i] = &PullRequest{
 			ID:          pr.GetID(),
 			Number:      pr.GetNumber(),
