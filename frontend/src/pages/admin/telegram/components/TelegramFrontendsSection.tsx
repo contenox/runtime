@@ -75,7 +75,7 @@ export default function TelegramFrontendsSection() {
         {error && <div className="text-error">{t('telegram.list_error')}</div>}
 
         {frontends && frontends.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div>
             {frontends.map(frontend => (
               <TelegramCard
                 key={frontend.id}

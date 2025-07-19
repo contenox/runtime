@@ -1,4 +1,4 @@
-import { Button, Form, FormField, Input, Select } from '@contenox/ui';
+import { Button, Form, FormField, Input } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { TelegramFrontend } from '../../../../lib/types';
 
@@ -60,14 +60,6 @@ export default function TelegramForm({
         />
       </FormField>
 
-      <FormField label={t('telegram.user_id')} required>
-        <Input
-          value={formData.userId || ''}
-          onChange={e => handleChange('userId', e.target.value)}
-          placeholder="123456789"
-        />
-      </FormField>
-
       <FormField label={t('telegram.description')}>
         <Input
           value={formData.description || ''}
@@ -80,26 +72,6 @@ export default function TelegramForm({
           type="number"
           value={formData.syncInterval || 60}
           onChange={e => handleChange('syncInterval', parseInt(e.target.value))}
-        />
-      </FormField>
-
-      <FormField label={t('telegram.status')}>
-        <Select
-          value={formData.status || 'active'}
-          onChange={e => handleChange('status', e.target.value)}
-          options={[
-            { value: 'active', label: t('common.active') },
-            { value: 'inactive', label: t('common.inactive') },
-            { value: 'error', label: t('common.error') },
-          ]}
-        />
-      </FormField>
-
-      <FormField label={t('telegram.chat_chain')}>
-        <Input
-          value={formData.chatChain || ''}
-          onChange={e => handleChange('chatChain', e.target.value)}
-          placeholder="default-chain"
         />
       </FormField>
     </Form>

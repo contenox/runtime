@@ -24,16 +24,36 @@ type telegramHandler struct {
 	service telegramservice.Service
 }
 
+type TelegramFrontendDAO struct {
+	Description  string `json:"description"`
+	BotToken     string `json:"botToken"`
+	SyncInterval int    `json:"syncInterval"`
+	LastOffset   int    `json:"lastOffset"`
+}
+
 func (h *telegramHandler) create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	frontend, err := serverops.Decode[store.TelegramFrontend](r)
+	frontend, err := serverops.Decode[TelegramFrontendDAO](r)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 
-	if err := h.service.Create(ctx, &frontend); err != nil {
+	id, err := serverops.GetIdentity(ctx)
+	if err != nil {
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		return
+	}
+	f := store.TelegramFrontend{
+		UserID:       id,
+		BotToken:     frontend.BotToken,
+		Description:  frontend.Description,
+		LastOffset:   frontend.LastOffset,
+		SyncInterval: frontend.SyncInterval,
+	}
+
+	if err := h.service.Create(ctx, &f); err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
