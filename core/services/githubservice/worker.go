@@ -269,7 +269,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		if comment.ID == nil {
 			continue // There is no way in syncing without a ID
 		}
-		messageID = fmt.Sprintf("%v-%v", prNumber, *comment.ID)
+		messageID = fmt.Sprintf("%v-%v", prNumber, comment.GetID())
 		type Message struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
