@@ -7,6 +7,7 @@ import {
   Link,
   MessageCircleCode,
   Search,
+  Send,
   Settings,
   Turtle,
   User2Icon,
@@ -22,6 +23,7 @@ import GitHubPage from '../pages/admin/github/GitHubPage.tsx';
 import ExecPromptPage from '../pages/admin/prompt/ExecPromptPage.tsx';
 import SearchPage from '../pages/admin/search/SearchPage.tsx';
 import ServerJobsPage from '../pages/admin/serverjobs/ServerJobsPage.tsx';
+import TelegramPage from '../pages/admin/telegram/TelegramPage.tsx';
 import UserPage from '../pages/admin/users/UserPage.tsx';
 import About from '../pages/public/about/About.tsx';
 import ByePage from '../pages/public/bye/Bye.tsx';
@@ -65,6 +67,15 @@ export const routes: RouteConfig[] = [
     element: FilesPage,
     label: i18n.t('navbar.files'),
     icon: <File className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+    showInShelf: false,
+  },
+  {
+    path: '/telegram',
+    element: TelegramPage,
+    label: i18n.t('navbar.telegram'),
+    icon: <Send className="h-[1em] w-[1em]" />,
     showInNav: true,
     protected: true,
     showInShelf: false,

@@ -295,19 +295,20 @@ export const api = {
 
   // Telegram Frontends
   createTelegramFrontend: (data: Partial<TelegramFrontend>) =>
-    apiFetch<TelegramFrontend>('/telegram-frontends', options('POST', data)),
+    apiFetch<TelegramFrontend>('/api/telegram-frontends', options('POST', data)),
 
   updateTelegramFrontend: (id: string, data: Partial<TelegramFrontend>) =>
-    apiFetch<TelegramFrontend>(`/telegram-frontends/${id}`, options('PUT', data)),
+    apiFetch<TelegramFrontend>(`/api/telegram-frontends/${id}`, options('PUT', data)),
 
   getTelegramFrontend: (id: string) =>
-    apiFetch<TelegramFrontend>(`/telegram-frontends/${id}`, options('GET')),
+    apiFetch<TelegramFrontend>(`/api/telegram-frontends/${id}`, options('GET')),
 
   deleteTelegramFrontend: (id: string) =>
-    apiFetch<void>(`/telegram-frontends/${id}`, options('DELETE')),
+    apiFetch<void>(`/api/telegram-frontends/${id}`, options('DELETE')),
 
-  listTelegramFrontends: () => apiFetch<TelegramFrontend[]>(`/telegram-frontends`, options('GET')),
+  listTelegramFrontends: () =>
+    apiFetch<TelegramFrontend[]>(`/api/telegram-frontends`, options('GET')),
 
   listTelegramFrontendsByUser: (userId: string) =>
-    apiFetch<TelegramFrontend[]>(`/users/${userId}/telegram-frontends`, options('GET')),
+    apiFetch<TelegramFrontend[]>(`/api/telegram-frontends/users/${userId}`, options('GET')),
 };

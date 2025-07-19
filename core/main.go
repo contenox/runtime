@@ -244,7 +244,7 @@ func main() {
 			}
 		}
 		telegramWorker, err := telegramservice.NewWorker(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
-		telegramservice.WithActivityTracker(telegramWorker, serveropsChainedTracker)
+		telegramservice.WithWorkerActivityTracker(telegramWorker, serveropsChainedTracker)
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)
 		}

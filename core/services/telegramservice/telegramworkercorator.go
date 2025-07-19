@@ -8,22 +8,22 @@ import (
 	"github.com/google/uuid"
 )
 
-var _ Worker = (*activityTrackerDecorator)(nil)
+var _ Worker = (*workerTrackerDecorator)(nil)
 
-type activityTrackerDecorator struct {
+type workerTrackerDecorator struct {
 	worker  Worker
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) ReceiveTick(ctx context.Context) error {
+func (d *workerTrackerDecorator) ReceiveTick(ctx context.Context) error {
 	return d.worker.ReceiveTick(ctx)
 }
 
-func (d *activityTrackerDecorator) ProcessTick(ctx context.Context) error {
+func (d *workerTrackerDecorator) ProcessTick(ctx context.Context) error {
 	return d.worker.ProcessTick(ctx)
 }
 
-func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi.Update) error {
+func (d *workerTrackerDecorator) Process(ctx context.Context, update *tgbotapi.Update) error {
 	if _, ok := ctx.Value(serverops.ContextKeyRequestID).(string); !ok {
 		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, uuid.NewString())
 	}
@@ -56,17 +56,17 @@ func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi
 	return err
 }
 
-func (d *activityTrackerDecorator) GetServiceName() string {
+func (d *workerTrackerDecorator) GetServiceName() string {
 	return d.worker.GetServiceName()
 }
 
-func (d *activityTrackerDecorator) GetServiceGroup() string {
+func (d *workerTrackerDecorator) GetServiceGroup() string {
 	return d.worker.GetServiceGroup()
 }
 
 // Wrap a Worker with an activity tracker.
-func WithActivityTracker(worker Worker, tracker serverops.ActivityTracker) Worker {
-	return &activityTrackerDecorator{
+func WithWorkerActivityTracker(worker Worker, tracker serverops.ActivityTracker) Worker {
+	return &workerTrackerDecorator{
 		worker:  worker,
 		tracker: tracker,
 	}

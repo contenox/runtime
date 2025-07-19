@@ -23,6 +23,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverapi/poolapi"
 	providersapi "github.com/contenox/runtime-mvp/core/serverapi/providerapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/systemapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/telegramapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/usersapi"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
@@ -40,6 +41,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/modelservice"
 	"github.com/contenox/runtime-mvp/core/services/poolservice"
 	"github.com/contenox/runtime-mvp/core/services/providerservice"
+	"github.com/contenox/runtime-mvp/core/services/telegramservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libauth"
@@ -160,6 +162,11 @@ func New(
 
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
+
+	telegramService := telegramservice.New(dbInstance)
+	telegramService = telegramservice.WithServiceActivityTracker(telegramService, serveropsChainedTracker)
+	telegramapi.AddTelegramRoutes(mux, telegramService)
+
 	handler = enableCORS(config, handler)
 	handler = requestIDMiddleware(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)

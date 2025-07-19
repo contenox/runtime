@@ -1,4 +1,4 @@
-package backendapi
+package telegramapi
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ func AddTelegramRoutes(mux *http.ServeMux, telegramService telegramservice.Servi
 	mux.HandleFunc("GET /telegram-frontends/{id}", s.get)
 	mux.HandleFunc("DELETE /telegram-frontends/{id}", s.delete)
 	mux.HandleFunc("GET /telegram-frontends", s.list)
-	mux.HandleFunc("GET /users/{userId}/telegram-frontends", s.listByUser)
+	mux.HandleFunc("GET /telegram-frontends/users/{userId}", s.listByUser)
 }
 
 type telegramHandler struct {
