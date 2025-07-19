@@ -154,9 +154,11 @@ func New(
 	githubapi.AddGitHubRoutes(mux, config, githubService)
 	githubworker := githubservice.NewWorker(githubService, kvManager, tracker, dbInstance)
 	libroutine.GetPool().StartLoop(ctx, "github-worker-pull", 2, time.Minute, time.Minute, func(ctx context.Context) error {
+		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
 		return githubworker.ReceiveTick(ctx)
 	})
 	libroutine.GetPool().StartLoop(ctx, "github-worker-sync", 2, time.Minute, time.Minute, func(ctx context.Context) error {
+		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
 		return githubworker.ProcessTick(ctx)
 	})
 

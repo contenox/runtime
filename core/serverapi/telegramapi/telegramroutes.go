@@ -25,10 +25,10 @@ type telegramHandler struct {
 }
 
 type TelegramFrontendDAO struct {
-	Description  string `json:"description"`
-	BotToken     string `json:"botToken"`
-	SyncInterval int    `json:"syncInterval"`
-	LastOffset   int    `json:"lastOffset"`
+	Description string `json:"description"`
+	BotToken    string `json:"botToken"`
+	ChatChain   string `json:"chatChain"`
+	LastOffset  int    `json:"lastOffset"`
 }
 
 func (h *telegramHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -46,11 +46,11 @@ func (h *telegramHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := store.TelegramFrontend{
-		UserID:       id,
-		BotToken:     frontend.BotToken,
-		Description:  frontend.Description,
-		LastOffset:   frontend.LastOffset,
-		SyncInterval: frontend.SyncInterval,
+		UserID:      id,
+		BotToken:    frontend.BotToken,
+		Description: frontend.Description,
+		LastOffset:  frontend.LastOffset,
+		ChatChain:   frontend.ChatChain,
 	}
 
 	if err := h.service.Create(ctx, &f); err != nil {

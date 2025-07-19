@@ -38,7 +38,7 @@ func (wf *WorkerFactory) ReceiveTick(ctx context.Context) error {
 	for _, fe := range frontends {
 		botID := fe.ID
 
-		worker, err := NewWorker(ctx, fe.BotToken, 0, wf.env, wf.db)
+		worker, err := NewWorker(ctx, fe.BotToken, fe.LastOffset, fe.ChatChain, wf.env, wf.db)
 		if err != nil {
 			log.Printf("Failed to create worker for bot %s: %v", botID, err)
 			continue

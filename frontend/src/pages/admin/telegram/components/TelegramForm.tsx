@@ -67,11 +67,11 @@ export default function TelegramForm({
         />
       </FormField>
 
-      <FormField label={t('telegram.sync_interval')}>
+      <FormField label={t('telegram.chat_chain')}>
         <Input
-          type="number"
-          value={formData.syncInterval || 60}
-          onChange={e => handleChange('syncInterval', parseInt(e.target.value))}
+          value={formData.chatChain || ''}
+          onChange={e => handleChange('chatChain', e.target.value)}
+          placeholder="default-chain"
         />
       </FormField>
     </Form>

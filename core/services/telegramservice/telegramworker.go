@@ -19,7 +19,6 @@ import (
 )
 
 var (
-	JobTypeTelegram      string = "telegram"
 	DefaultLeaseDuration        = 30 * time.Second
 	provider             string = "gemini"
 )
@@ -40,18 +39,19 @@ type worker struct {
 	bot                 *tgbotapi.BotAPI
 	env                 taskengine.EnvExecutor
 	dbInstance          libdb.DBManager
+	chatChainID         string
 	workerUserAccountID string
 	bootOffset          int
 }
 
-func NewWorker(ctx context.Context, botToken string, bootOffset int, env taskengine.EnvExecutor, dbInstance libdb.DBManager) (Worker, error) {
+func NewWorker(ctx context.Context, botToken string, bootOffset int, chatchainid string, env taskengine.EnvExecutor, dbInstance libdb.DBManager) (Worker, error) {
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
 		return nil, err
 	}
 	hash := sha256.Sum256([]byte(botToken))
 	id := fmt.Sprintf("%x", hash[:])
-	w := &worker{bot: bot, env: env, dbInstance: dbInstance, bootOffset: bootOffset, id: string(id)}
+	w := &worker{bot: bot, env: env, dbInstance: dbInstance, bootOffset: bootOffset, id: string(id), chatChainID: chatchainid}
 	if w.dbInstance == nil {
 		return nil, errors.New("db instance is nil")
 	}
@@ -148,7 +148,7 @@ func (w *worker) createJobForUpdate(ctx context.Context, storeInstance store.Sto
 
 	return &store.Job{
 		ID:        uuid.NewString(),
-		TaskType:  JobTypeTelegram,
+		TaskType:  "telegram" + w.id,
 		CreatedAt: time.Now().UTC(),
 		Operation: "message",
 		Payload:   payload,
@@ -165,7 +165,6 @@ func (w *worker) ensureUserExists(ctx context.Context, storeInstance store.Store
 	if !errors.Is(err, libdb.ErrNotFound) {
 		return err
 	}
-
 	return storeInstance.CreateUser(ctx, &store.User{
 		ID:           userID,
 		FriendlyName: update.SentFrom().UserName,
@@ -207,7 +206,7 @@ func (w *worker) ProcessTick(ctx context.Context) error {
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
 	leaseID := uuid.NewString()
 
-	leasedJob, err := storeInstance.PopJobForType(ctx, JobTypeTelegram)
+	leasedJob, err := storeInstance.PopJobForType(ctx, w.id)
 	if err != nil {
 		if errors.Is(err, libdb.ErrNotFound) {
 			return nil
@@ -257,7 +256,7 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 	text := update.Message.Text
 	subjID := fmt.Sprint(update.FromChat().ID) + fmt.Sprint(update.SentFrom().ID)
 	tx := w.dbInstance.WithoutTransaction()
-	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, tasksrecipes.StandardChatChainID)
+	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, w.chatChainID)
 	if err != nil {
 		return fmt.Errorf("failed to get chain: %w", err)
 	}
@@ -268,15 +267,7 @@ func (w *worker) Process(ctx context.Context, update *tgbotapi.Update) error {
 		if task.Hook == nil {
 			continue
 		}
-		if task.Type == taskengine.ModelExecution && task.ExecuteConfig != nil {
-			task.ExecuteConfig.Models = []string{"gemini-2.5-flash"}
-			task.ExecuteConfig.Providers = []string{provider}
-		}
-
-		switch task.ID {
-		case "append_user_message":
-			task.Hook.Args["subject_id"] = subjID
-		case "persist_messages":
+		if task.Type == taskengine.Hook {
 			task.Hook.Args["subject_id"] = subjID
 		}
 	}
