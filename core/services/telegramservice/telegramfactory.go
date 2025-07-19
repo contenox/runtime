@@ -46,8 +46,8 @@ func (wf *WorkerFactory) ReceiveTick(ctx context.Context) error {
 
 		WithWorkerActivityTracker(worker, wf.tracker)
 		ctxTelegram := context.WithValue(ctx, serverops.ContextKeyRequestID, "telegram:"+uuid.NewString())
-		go libroutine.NewRoutine(2, time.Second).Execute(ctxTelegram, worker.ReceiveTick)
-		go libroutine.NewRoutine(2, time.Second).Execute(ctxTelegram, worker.ProcessTick)
+		libroutine.GetPool().StartLoop(ctxTelegram, fe.ID+"ReceiveTick", 1, time.Second, time.Second, worker.ReceiveTick)
+		libroutine.GetPool().StartLoop(ctxTelegram, fe.ID+"ProcessTick", 1, time.Second, time.Second, worker.ProcessTick)
 	}
 
 	return nil
