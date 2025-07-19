@@ -118,3 +118,10 @@ export const activityKeys = {
   statefulRequests: () => ['activity', 'statefulRequests'] as const,
   alerts: (limit?: number) => ['activity', 'alerts', { limit }] as const,
 };
+
+export const telegramKeys = {
+  all: ['telegramFrontends'] as const,
+  detail: (id: string) => [...telegramKeys.all, id] as const,
+  list: () => [...telegramKeys.all, 'list'] as const,
+  byUser: (userId: string) => [...telegramKeys.all, 'user', userId] as const,
+};

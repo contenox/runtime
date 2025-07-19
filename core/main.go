@@ -243,7 +243,7 @@ func main() {
 				log.Fatalf("parsing Telegram boot offset failed: %v", err)
 			}
 		}
-		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
+		telegramWorker, err := telegramservice.NewWorker(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
 		telegramservice.WithActivityTracker(telegramWorker, serveropsChainedTracker)
 		if err != nil {
 			log.Fatalf("initializing Telegram worker failed: %v", err)

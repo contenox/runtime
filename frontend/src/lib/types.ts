@@ -378,3 +378,18 @@ export interface PullRequest {
   updatedAt: string;
   authorLogin: string;
 }
+
+export type TelegramFrontend = {
+  id: string;
+  userId: string;
+  chatChain: string;
+  description: string;
+  botToken: string;
+  syncInterval: number;
+  status: string;
+  lastOffset: number;
+  lastHeartbeat?: string;
+  lastError: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
