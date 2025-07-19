@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -15,8 +16,9 @@ import (
 )
 
 const (
-	JobTypeGitHubCommentSync = "github_comment_sync"
-	DefaultLeaseDuration     = 30 * time.Second
+	JobTypeGitHubCommentSync       = "github_comment_sync"
+	JobTypeGitHubProcessCommentLLM = "github_process_comment_llm"
+	DefaultLeaseDuration           = 30 * time.Second
 )
 
 type Worker interface {
@@ -268,15 +270,18 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			continue // There is no way in syncing without a ID
 		}
 		messageID = fmt.Sprintf("%v-%v", prNumber, *comment.ID)
-		m := GithubMessage{
-			ID:     comment.GetID(),
-			Body:   comment.GetBody(),
-			RepoID: repoID,
-			PR:     prNumber,
+		type Message struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		}
+		m := Message{
+			Role: "user",
 		}
 		if user := comment.GetUser(); user != nil {
-			m.UserName = user.GetName()
-			m.UserEmail = user.GetEmail()
+			m.Content = "[" + user.GetName() + "]" + comment.GetBody()
+			if user.GetEmail() == serverops.DefaultAdminUser {
+				m.Role = "system"
+			}
 		}
 
 		createdAt := time.Now().UTC()
@@ -311,7 +316,80 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			missingMessages = append(missingMessages, &m)
 		}
 	}
-	storeInstance.AppendMessages(ctx, missingMessages...)
+	err = storeInstance.AppendMessages(ctx, missingMessages...)
+	if err != nil {
+		reportErr(err)
+		return err
+	}
+	err = storeInstance.AppendJob(ctx, store.Job{
+		TaskType: "github-job",
+	})
+	if err != nil {
+		reportErr(err)
+		return err
+	}
+	// Append new messages
+	if len(missingMessages) > 0 {
+		if err := storeInstance.AppendMessages(ctx, missingMessages...); err != nil {
+			reportErr(err)
+			return err
+		}
+	}
+
+	// Create LLM jobs for each new comment
+	for _, msg := range missingMessages {
+		// Extract GitHub comment ID from message ID
+		parts := strings.Split(msg.ID, "-")
+		var commentID string
+		if len(parts) > 1 {
+			commentID = parts[1]
+		} else {
+			continue
+		}
+
+		// Parse the message payload
+		var githubMsg GithubMessage
+		if err := json.Unmarshal(msg.Payload, &githubMsg); err != nil {
+			reportErr(fmt.Errorf("failed to parse message payload: %w", err))
+			continue
+		}
+
+		// Create job payload
+		payload, err := json.Marshal(struct {
+			RepoID    string `json:"repo_id"`
+			PRNumber  int    `json:"pr_number"`
+			CommentID string `json:"comment_id"`
+			MessageID string `json:"message_id"`
+			UserName  string `json:"user_name"`
+			Content   string `json:"content"`
+		}{
+			RepoID:    repoID,
+			PRNumber:  prNumber,
+			CommentID: commentID,
+			MessageID: msg.ID,
+			UserName:  githubMsg.UserName,
+			Content:   githubMsg.Body,
+		})
+		if err != nil {
+			reportErr(fmt.Errorf("failed to marshal job payload: %w", err))
+			continue
+		}
+
+		// Create and append job
+		job := &store.Job{
+			ID:        uuid.NewString(),
+			TaskType:  JobTypeGitHubProcessCommentLLM,
+			CreatedAt: time.Now().UTC(),
+			Operation: "process_comment_llm",
+			Payload:   payload,
+			Subject:   fmt.Sprintf("%s:%d", repoID, prNumber),
+		}
+
+		if err := storeInstance.AppendJob(ctx, *job); err != nil {
+			reportErr(fmt.Errorf("failed to append job: %w", err))
+			continue
+		}
+	}
 	err = commit(ctx)
 	if err != nil {
 		reportErr(err)
@@ -336,6 +414,78 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 
 	return nil
 }
+
+// func (w *worker) processGitHubProcessCommentLLMJob(
+// 	ctx context.Context,
+// 	storeInstance store.Store,
+// 	leasedJob *store.Job,
+// 	leaseID string,
+// ) error {
+// 	// Parse job payload
+// 	var payload struct {
+// 		RepoID    string `json:"repo_id"`
+// 		PRNumber  int    `json:"pr_number"`
+// 		CommentID string `json:"comment_id"`
+// 		MessageID string `json:"message_id"`
+// 		UserName  string `json:"user_name"`
+// 		Content   string `json:"content"`
+// 	}
+// 	if err := json.Unmarshal(leasedJob.Payload, &payload); err != nil {
+// 		return fmt.Errorf("unmarshal payload: %w", err)
+// 	}
+
+// 	// Load chat history for the PR
+// 	streamID := fmt.Sprintf("%v-%v", payload.RepoID, payload.PRNumber)
+// 	messagesFromStore, err := storeInstance.ListMessages(ctx, streamID)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to load messages: %w", err)
+// 	}
+
+// 	// Convert to libmodelprovider.Message
+// 	var chatHistory []libmodelprovider.Message
+// 	for _, msg := range messagesFromStore {
+// 		var parsedMsg libmodelprovider.Message
+// 		if err := json.Unmarshal(msg.Payload, &parsedMsg); err != nil {
+// 			return fmt.Errorf("failed to parse message content: %w", err)
+// 		}
+// 		chatHistory = append(chatHistory, parsedMsg)
+// 	}
+
+// 	// Build prompt template using the full conversation
+// 	prompt := fmt.Sprintf("You are reviewing a GitHub PR. Here's the conversation:\n")
+// 	for _, m := range chatHistory {
+// 		prompt += fmt.Sprintf("[%s] %s\n", m.Role, m.Content)
+// 	}
+// 	prompt += "Please provide a thoughtful response."
+
+// 	// Build or load chain definition
+// 	chain, err := tasksrecipes.GetChainDefinition(ctx, storeInstance, tasksrecipes.StandardChatChainID)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get chain: %w", err)
+// 	}
+
+// 	// Update chain with dynamic parameters
+// 	for i := range chain.Tasks {
+// 		task := &chain.Tasks[i]
+// 		if task.Type == taskengine.ModelExecution && task.ExecuteConfig != nil {
+// 			task.ExecuteConfig.Models = []string{"ollama/llama3"} // Example model
+// 		}
+// 		if task.ID == "append_user_message" && task.Hook != nil {
+// 			task.Hook.Args["subject_id"] = streamID
+// 		}
+// 	}
+
+// 	// Execute chain (LLM processing will happen here in full implementation)
+// 	_, _, err = w.env.ExecEnv(ctx, chain, prompt, taskengine.DataTypeString)
+// 	if err != nil {
+// 		return fmt.Errorf("chain execution failed: %w", err)
+// 	}
+
+// 	// At this point, the LLM has processed the message
+// 	// The actual response handling (e.g., posting to GitHub) is not implemented here
+
+// 	return storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
+// }
 
 // Key generation functions
 func (w *worker) lastSyncKey(repoID string, prNumber int) string {
