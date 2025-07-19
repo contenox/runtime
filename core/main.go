@@ -242,7 +242,7 @@ func main() {
 		"telegram:factory:tick",
 		3,
 		15*time.Second,
-		10*time.Second,
+		1*time.Second,
 		func(ctx context.Context) error {
 			return workerFactory.ReceiveTick(ctx)
 		},

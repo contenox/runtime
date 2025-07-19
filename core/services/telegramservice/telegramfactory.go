@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libroutine"
+	"github.com/google/uuid"
 )
 
 type WorkerFactory struct {
@@ -42,14 +45,9 @@ func (wf *WorkerFactory) ReceiveTick(ctx context.Context) error {
 		}
 
 		WithWorkerActivityTracker(worker, wf.tracker)
-
-		// Run worker logic inline (short-lived, not goroutine-based)
-		if err := worker.ReceiveTick(ctx); err != nil {
-			log.Printf("Worker ReceiveTick error for bot %s: %v", botID, err)
-		}
-		if err := worker.ProcessTick(ctx); err != nil {
-			log.Printf("Worker ProcessTick error for bot %s: %v", botID, err)
-		}
+		ctxTelegram := context.WithValue(ctx, serverops.ContextKeyRequestID, "telegram:"+uuid.NewString())
+		go libroutine.NewRoutine(2, time.Second).Execute(ctxTelegram, worker.ReceiveTick)
+		go libroutine.NewRoutine(2, time.Second).Execute(ctxTelegram, worker.ProcessTick)
 	}
 
 	return nil
