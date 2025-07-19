@@ -16,6 +16,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type TelegramFrontend struct {
+	ID            string     `json:"id"`
+	UserID        string     `json:"userId"`
+	ChatChain     string     `json:"chatChain"`
+	Description   string     `json:"description"`
+	BotToken      string     `json:"botToken"`
+	SyncInterval  int        `json:"syncInterval"`
+	Status        string     `json:"status"`
+	LastOffset    int        `json:"lastOffset"`
+	LastHeartbeat *time.Time `json:"lastHeartbeat"`
+	LastError     string     `json:"lastError"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
 type GitHubRepo struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"userId"`
@@ -348,6 +363,13 @@ type Store interface {
 	GetGitHubRepo(ctx context.Context, id string) (*GitHubRepo, error)
 	DeleteGitHubRepo(ctx context.Context, id string) error
 	ListGitHubRepos(ctx context.Context) ([]*GitHubRepo, error)
+
+	CreateTelegramFrontend(ctx context.Context, frontend *TelegramFrontend) error
+	GetTelegramFrontend(ctx context.Context, id string) (*TelegramFrontend, error)
+	UpdateTelegramFrontend(ctx context.Context, frontend *TelegramFrontend) error
+	DeleteTelegramFrontend(ctx context.Context, id string) error
+	ListTelegramFrontends(ctx context.Context) ([]*TelegramFrontend, error)
+	ListTelegramFrontendsByUser(ctx context.Context, userID string) ([]*TelegramFrontend, error)
 }
 
 //go:embed schema.sql
