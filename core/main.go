@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -235,18 +236,55 @@ func main() {
 		log.Fatalf("initializing default tasks failed: %v", err)
 	}
 	pool := libroutine.GetPool()
-	workerFactory := telegramservice.NewWorkerFactory(dbInstance, environmentExec, serveropsChainedTracker)
+	telegramService := telegramservice.New(dbInstance)
+	poller := telegramservice.NewPoller(dbInstance, telegramService)
+	processor := telegramservice.NewProcessor(dbInstance, environmentExec)
 
+	// Start Telegram poller
 	pool.StartLoop(
 		ctx,
-		"telegram:factory:tick",
-		3,
+		"telegram-poller",
+		1, // Only one poller needed
 		15*time.Second,
 		1*time.Second,
+		poller.Tick,
+	)
+
+	// Start Telegram worker
+	pool.StartLoop(
+		ctx,
+		"telegram-worker",
+		1,
+		1*time.Second, // Check for jobs every second
+		0,             // No initial delay
 		func(ctx context.Context) error {
-			return workerFactory.ReceiveTick(ctx)
+			storeInstance := store.New(dbInstance.WithoutTransaction())
+
+			// Fetch next job
+			job, err := storeInstance.PopJobForType(ctx, "telegram-message")
+			if err != nil {
+				if errors.Is(err, libdb.ErrNotFound) {
+					return nil // No job available
+				}
+				return fmt.Errorf("fetching job: %w", err)
+			}
+
+			// Process job
+			if err := processor.ProcessJob(ctx, job); err != nil {
+				// Handle retries
+				if job.RetryCount < 5 {
+					job.RetryCount++
+					if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+						return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+					}
+					return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
+				}
+				return fmt.Errorf("abandoning job after 5 retries: %w", err)
+			}
+			return nil
 		},
 	)
+
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
 	uiURL, err := url.Parse(config.UIBaseURL)

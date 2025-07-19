@@ -2,6 +2,7 @@ package serverapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverapi/telegramapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/usersapi"
 	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
@@ -168,6 +170,54 @@ func New(
 	telegramService := telegramservice.New(dbInstance)
 	telegramService = telegramservice.WithServiceActivityTracker(telegramService, serveropsChainedTracker)
 	telegramapi.AddTelegramRoutes(mux, telegramService)
+	pool = libroutine.GetPool()
+	poller := telegramservice.NewPoller(dbInstance, telegramService)
+	processor := telegramservice.NewProcessor(dbInstance, environmentExec)
+
+	// Start Telegram poller
+	pool.StartLoop(
+		ctx,
+		"telegram-poller",
+		1, // Only one poller needed
+		15*time.Second,
+		1*time.Second,
+		poller.Tick,
+	)
+
+	// Start Telegram worker
+	pool.StartLoop(
+		ctx,
+		"telegram-worker",
+		1,
+		1*time.Second, // Check for jobs every second
+		0,             // No initial delay
+		func(ctx context.Context) error {
+			storeInstance := store.New(dbInstance.WithoutTransaction())
+
+			// Fetch next job
+			job, err := storeInstance.PopJobForType(ctx, "telegram-message")
+			if err != nil {
+				if errors.Is(err, libdb.ErrNotFound) {
+					return nil // No job available
+				}
+				return fmt.Errorf("fetching job: %w", err)
+			}
+
+			// Process job
+			if err := processor.ProcessJob(ctx, job); err != nil {
+				// Handle retries
+				if job.RetryCount < 5 {
+					job.RetryCount++
+					if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+						return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+					}
+					return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
+				}
+				return fmt.Errorf("abandoning job after 5 retries: %w", err)
+			}
+			return nil
+		},
+	)
 
 	handler = enableCORS(config, handler)
 	handler = requestIDMiddleware(config, handler)

@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/google/uuid"
 )
 
 func (s *store) CreateTelegramFrontend(ctx context.Context, frontend *TelegramFrontend) error {
 	now := time.Now().UTC()
 	frontend.CreatedAt = now
 	frontend.UpdatedAt = now
-
+	frontend.ID = uuid.NewString()
 	_, err := s.Exec.ExecContext(ctx, `
         INSERT INTO telegram_frontends
         (id, user_id, chat_chain, description, bot_token, sync_interval, status, last_offset, last_heartbeat, last_error, created_at, updated_at)

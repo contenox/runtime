@@ -34,7 +34,6 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 			name: "Create and Get Telegram Frontend",
 			testFunc: func(t *testing.T, s store.Store) {
 				frontend := &store.TelegramFrontend{
-					ID:           uuid.NewString(),
 					UserID:       userID,
 					ChatChain:    "default-chain",
 					Description:  "Test Bot",
@@ -67,9 +66,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 		{
 			name: "Update Telegram Frontend",
 			testFunc: func(t *testing.T, s store.Store) {
-				id := uuid.NewString()
 				frontend := &store.TelegramFrontend{
-					ID:           id,
 					UserID:       userID,
 					ChatChain:    "default-chain",
 					Description:  "Test Bot",
@@ -98,7 +95,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 				err = s.UpdateTelegramFrontend(ctx, &updated)
 				require.NoError(t, err)
 
-				fetched, err := s.GetTelegramFrontend(ctx, id)
+				fetched, err := s.GetTelegramFrontend(ctx, frontend.ID)
 				require.NoError(t, err)
 				assert.Equal(t, updated.Description, fetched.Description)
 				assert.Equal(t, updated.SyncInterval, fetched.SyncInterval)
@@ -113,9 +110,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 			name: "List Telegram Frontends by User",
 			testFunc: func(t *testing.T, s store.Store) {
 				// Create multiple frontends for the same user
-				id1 := uuid.NewString()
 				frontend1 := &store.TelegramFrontend{
-					ID:           id1,
 					UserID:       userID,
 					ChatChain:    "chain1",
 					BotToken:     "token1",
@@ -123,9 +118,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 					Status:       "active",
 				}
 
-				id2 := uuid.NewString()
 				frontend2 := &store.TelegramFrontend{
-					ID:           id2,
 					UserID:       userID,
 					ChatChain:    "chain2",
 					BotToken:     "token2",
@@ -136,7 +129,6 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 				// Create another frontend for a different user (shouldn't appear in results)
 				otherUserID := uuid.NewString()
 				otherFrontend := &store.TelegramFrontend{
-					ID:           uuid.NewString(),
 					UserID:       otherUserID,
 					ChatChain:    "other-chain",
 					BotToken:     "other-token",
@@ -171,9 +163,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 		{
 			name: "Create Fails with Duplicate Bot Token",
 			testFunc: func(t *testing.T, s store.Store) {
-				id1 := uuid.NewString()
 				frontend1 := &store.TelegramFrontend{
-					ID:           id1,
 					UserID:       userID,
 					ChatChain:    "chain1",
 					BotToken:     "test-token",
@@ -181,9 +171,7 @@ func TestTelegramFrontendCRUD(t *testing.T) {
 					Status:       "active",
 				}
 
-				id2 := uuid.NewString()
 				frontend2 := &store.TelegramFrontend{
-					ID:           id2,
 					UserID:       userID,
 					ChatChain:    "chain2",
 					BotToken:     "test-token", // Duplicate token

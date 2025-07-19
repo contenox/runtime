@@ -33,9 +33,6 @@ export default function TelegramCard({ frontend, onEdit, onDelete }: TelegramCar
       <P>
         {t('telegram.status')}: {frontend.status}
       </P>
-      <P>
-        {t('telegram.sync_interval')}: {frontend.syncInterval} {t('common.seconds')}
-      </P>
       {frontend.chatChain && (
         <P>
           {t('telegram.chat_chain')}: {frontend.chatChain}
