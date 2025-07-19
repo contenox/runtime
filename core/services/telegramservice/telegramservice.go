@@ -36,9 +36,9 @@ func (s *service) Create(ctx context.Context, frontend *store.TelegramFrontend) 
 		return err
 	}
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+	// 	return err
+	// }
 	return store.New(tx).CreateTelegramFrontend(ctx, frontend)
 }
 
@@ -47,41 +47,41 @@ func (s *service) Update(ctx context.Context, frontend *store.TelegramFrontend) 
 		return err
 	}
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+	// 	return err
+	// }
 	return store.New(tx).UpdateTelegramFrontend(ctx, frontend)
 }
 
 func (s *service) Get(ctx context.Context, id string) (*store.TelegramFrontend, error) {
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
-		return nil, err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
+	// 	return nil, err
+	// }
 	return store.New(tx).GetTelegramFrontend(ctx, id)
 }
 
 func (s *service) Delete(ctx context.Context, id string) error {
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
+	// 	return err
+	// }
 	return store.New(tx).DeleteTelegramFrontend(ctx, id)
 }
 
 func (s *service) List(ctx context.Context) ([]*store.TelegramFrontend, error) {
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
-		return nil, err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
+	// 	return nil, err
+	// }
 	return store.New(tx).ListTelegramFrontends(ctx)
 }
 
 func (s *service) ListByUser(ctx context.Context, userID string) ([]*store.TelegramFrontend, error) {
 	tx := s.dbInstance.WithoutTransaction()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
-		return nil, err
-	}
+	// if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
+	// 	return nil, err
+	// }
 	return store.New(tx).ListTelegramFrontendsByUser(ctx, userID)
 }
 

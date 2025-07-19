@@ -72,12 +72,16 @@ Notes:
 - [x] **Basic Observability Integration & UI-Dashboard**
 - [x] **API Rate Limiting Middleware**
 - [x] **Implement Chat moderation**
+- [ ] **Github PR moderator**
 
 ---
 
 ### 📅 Future Slices (Wishlist)
 
 #### Potential Focus Areas:
+- Fix permission model
+- Teardown the monolith store
+- Improve backend architecture
 - Multi-user collaboration via shared chat sessions
 - Pull based LLM Provider implementation
 - Persiting Tasks + UI-Tasks Builder

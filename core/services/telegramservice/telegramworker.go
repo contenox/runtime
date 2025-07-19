@@ -2,6 +2,7 @@ package telegramservice
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,11 +19,14 @@ import (
 )
 
 var (
-	JobTypeTelegram                string = "telegram"
-	JobTypeTelegramWorkerOffsetKey string = "telegram-worker-offset-key"
-	DefaultLeaseDuration                  = 30 * time.Second
-	provider                       string = "gemini"
+	JobTypeTelegram      string = "telegram"
+	DefaultLeaseDuration        = 30 * time.Second
+	provider             string = "gemini"
 )
+
+func (w *worker) offsetKey() string {
+	return fmt.Sprintf("telegram-worker-offset-key-%s", w.id)
+}
 
 type Worker interface {
 	ReceiveTick(ctx context.Context) error
@@ -32,6 +36,7 @@ type Worker interface {
 }
 
 type worker struct {
+	id                  string
 	bot                 *tgbotapi.BotAPI
 	env                 taskengine.EnvExecutor
 	dbInstance          libdb.DBManager
@@ -44,14 +49,15 @@ func NewWorker(ctx context.Context, botToken string, bootOffset int, env taskeng
 	if err != nil {
 		return nil, err
 	}
-	w := &worker{bot: bot, env: env, dbInstance: dbInstance, bootOffset: bootOffset}
-
+	hash := sha256.Sum256([]byte(botToken))
+	id := fmt.Sprintf("%x", hash[:])
+	w := &worker{bot: bot, env: env, dbInstance: dbInstance, bootOffset: bootOffset, id: string(id)}
 	if w.dbInstance == nil {
 		return nil, errors.New("db instance is nil")
 	}
 	var offset int
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
-	err = storeInstance.GetKV(ctx, JobTypeTelegramWorkerOffsetKey, &offset)
+	err = storeInstance.GetKV(ctx, w.offsetKey(), &offset)
 	if err != nil && err != libdb.ErrNotFound {
 		return nil, err
 	}
@@ -82,7 +88,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 func (w *worker) runTick(ctx context.Context, tx libdb.Exec) error {
 	var offset int
 	storeInstance := store.New(tx)
-	err := storeInstance.GetKV(ctx, JobTypeTelegramWorkerOffsetKey, &offset)
+	err := storeInstance.GetKV(ctx, w.offsetKey(), &offset)
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return fmt.Errorf("get offset: %w", err)
 	}
@@ -194,7 +200,7 @@ func (w *worker) updateOffset(ctx context.Context, storeInstance store.Store, up
 	if err != nil {
 		return err
 	}
-	return storeInstance.SetKV(ctx, JobTypeTelegramWorkerOffsetKey, offs)
+	return storeInstance.SetKV(ctx, w.offsetKey(), offs)
 }
 
 func (w *worker) ProcessTick(ctx context.Context) error {

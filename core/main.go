@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
@@ -235,46 +234,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing default tasks failed: %v", err)
 	}
-	if config.TelegramToken != "" {
-		bootOffset := 0
-		if config.TelegramBootOffset != "" {
-			bootOffset, err = strconv.Atoi(config.TelegramBootOffset)
-			if err != nil {
-				log.Fatalf("parsing Telegram boot offset failed: %v", err)
-			}
-		}
-		telegramWorker, err := telegramservice.NewWorker(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
-		telegramservice.WithWorkerActivityTracker(telegramWorker, serveropsChainedTracker)
-		if err != nil {
-			log.Fatalf("initializing Telegram worker failed: %v", err)
-		}
-		var BotErr error
-		triggerChan := make(chan struct{})
-		breakerTelegram := libroutine.NewRoutine(10, time.Second)
-		go breakerTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
-			BotErr = telegramWorker.ProcessTick(ctx)
-			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker ProcessTick failed: %v", BotErr)
-			}
-			return nil
-		}, func(err error) {
-			if err != nil {
-				slog.Error("Telegram worker ProcessTick failed", "error", err)
-			}
-		})
-		breakerPullTelegram := libroutine.NewRoutine(10, time.Second)
-		go breakerPullTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
-			BotErr = telegramWorker.ReceiveTick(ctx)
-			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker ReceiveTick failed: %v", BotErr)
-			}
-			return nil
-		}, func(err error) {
-			if err != nil {
-				slog.Error("Telegram worker ReceiveTick failed", "error", err)
-			}
-		})
-	}
+	pool := libroutine.GetPool()
+	workerFactory := telegramservice.NewWorkerFactory(dbInstance, environmentExec, serveropsChainedTracker)
+
+	pool.StartLoop(
+		ctx,
+		"telegram:factory:tick",
+		3,
+		15*time.Second,
+		10*time.Second,
+		func(ctx context.Context) error {
+			return workerFactory.ReceiveTick(ctx)
+		},
+	)
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
 	uiURL, err := url.Parse(config.UIBaseURL)
