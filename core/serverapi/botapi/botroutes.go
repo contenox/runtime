@@ -70,17 +70,17 @@ func (s *botAPIService) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type ListResponse struct {
-		Object string       `json:"object"`
-		Data   []*store.Bot `json:"data"`
-	}
+	// type ListResponse struct { // TODO: consider this as api-response pattern
+	// 	Object string       `json:"object"`
+	// 	Data   []*store.Bot `json:"data"`
+	// }
 
-	response := ListResponse{
-		Object: "list",
-		Data:   bots,
-	}
+	// response := ListResponse{
+	// 	Object: "list",
+	// 	Data:   bots,
+	// }
 
-	serverops.Encode(w, r, http.StatusOK, response)
+	serverops.Encode(w, r, http.StatusOK, bots)
 }
 
 func (s *botAPIService) update(w http.ResponseWriter, r *http.Request) {

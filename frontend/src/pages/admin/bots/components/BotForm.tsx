@@ -65,7 +65,8 @@ export default function BotForm({
         <Select
           value={formData.botType || ''}
           onChange={e => handleChange('botType', e.target.value)}
-          options={[]}>
+          placeholder={t('bots.type_placeholder')}
+          options={[{ value: 'GitHub', label: 'GitHub' }]}>
           {botTypes.map(type => (
             <option key={type} value={type}>
               {type}
@@ -78,7 +79,8 @@ export default function BotForm({
         <Select
           value={formData.jobType || ''}
           onChange={e => handleChange('jobType', e.target.value)}
-          options={[]}>
+          placeholder={t('bots.job_type_placeholder')}
+          options={[{ value: 'github_process_comment_llm', label: 'GitHub' }]}>
           {jobTypes.map(type => (
             <option key={type} value={type}>
               {type}

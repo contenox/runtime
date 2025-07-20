@@ -127,6 +127,8 @@ const resources = {
         task_chain_id: 'Task Chain ID',
         task_chain_id_placeholder: 'Enter task chain ID',
         last_updated: 'Last Updated',
+        job_type_placeholder: 'Select job type',
+        type_placeholder: 'Select bot type',
       },
       github: {
         user_id: 'User ID',
