@@ -393,3 +393,13 @@ export type TelegramFrontend = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+export type Bot = {
+  id: string;
+  name: string;
+  botType: string;
+  jobType: string;
+  taskChainId: string;
+  createdAt: string;
+  updatedAt: string;
+};

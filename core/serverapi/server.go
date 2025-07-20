@@ -14,6 +14,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverapi/activityapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/backendapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/botapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chainsapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chatapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/dispatchapi"
@@ -32,6 +33,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
 	"github.com/contenox/runtime-mvp/core/services/backendservice"
+	"github.com/contenox/runtime-mvp/core/services/botservice"
 	"github.com/contenox/runtime-mvp/core/services/chainservice"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
@@ -174,6 +176,9 @@ func New(
 	poller := telegramservice.NewPoller(dbInstance, telegramService)
 	processor := telegramservice.NewProcessor(dbInstance, environmentExec)
 
+	botService := botservice.New(dbInstance)
+	botapi.AddBotRoutes(mux, botService)
+
 	// Start Telegram poller
 	pool.StartLoop(
 		ctx,
@@ -240,6 +245,8 @@ func New(
 		chainService,
 		activityService,
 		githubService,
+		botService,
+		telegramService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

@@ -6,6 +6,7 @@ import {
   Alert,
   AuthenticatedUser,
   Backend,
+  Bot,
   ChainDefinition,
   ChatMessage,
   ChatSession,
@@ -311,4 +312,10 @@ export const api = {
 
   listTelegramFrontendsByUser: (userId: string) =>
     apiFetch<TelegramFrontend[]>(`/api/telegram-frontends/users/${userId}`, options('GET')),
+  getBots: () => apiFetch<Bot[]>('/api/bots'),
+  getBot: (id: string) => apiFetch<Bot>(`/api/bots/${id}`),
+  createBot: (data: Partial<Bot>) => apiFetch<Bot>('/api/bots', options('POST', data)),
+  updateBot: (id: string, data: Partial<Bot>) =>
+    apiFetch<Bot>(`/api/bots/${id}`, options('PUT', data)),
+  deleteBot: (id: string) => apiFetch<void>(`/api/bots/${id}`, options('DELETE')),
 };

@@ -1,5 +1,6 @@
 import { P } from '@contenox/ui';
 import {
+  BotIcon,
   ChevronsRight,
   Database,
   File,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import i18n from '../i18n';
 import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
+import BotPage from '../pages/admin/bots/BotsPage.tsx';
 import ChainsPage from '../pages/admin/chains/ChainsPage.tsx';
 import ChainDetailPage from '../pages/admin/chains/components/ChainDetailPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
@@ -106,7 +108,15 @@ export const routes: RouteConfig[] = [
     protected: true,
     showInShelf: false,
   },
-
+  {
+    path: '/bots',
+    element: BotPage,
+    label: i18n.t('navbar.bots'),
+    icon: <BotIcon className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+    showInShelf: false,
+  },
   {
     path: '/chats',
     element: ChatsListPage,

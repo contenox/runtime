@@ -125,3 +125,9 @@ export const telegramKeys = {
   list: () => [...telegramKeys.all, 'list'] as const,
   byUser: (userId: string) => [...telegramKeys.all, 'user', userId] as const,
 };
+
+export const botKeys = {
+  all: ['bots'] as const,
+  list: () => [...botKeys.all, 'list'] as const,
+  detail: (id: string) => [...botKeys.all, id] as const,
+};

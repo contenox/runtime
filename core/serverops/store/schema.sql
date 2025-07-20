@@ -9,6 +9,18 @@ CREATE TABLE IF NOT EXISTS github_repos (
     UNIQUE (user_id, owner, repo_name)
 );
 
+CREATE TABLE bots (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    user_id VARCHAR(512) NOT NULL,
+    bot_type VARCHAR(512) NOT NULL,
+    job_type VARCHAR(512) NOT NULL,
+    task_chain_id VARCHAR(512) NOT NULL,
+
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ollama_models (
     id VARCHAR(255) PRIMARY KEY,
     model VARCHAR(512) NOT NULL UNIQUE,
