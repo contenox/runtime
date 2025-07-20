@@ -307,7 +307,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			if name == "" {
 				name = user.GetLogin()
 			}
-			m.Content = "[" + name + "]" + comment.GetBody()
+			m.Content = "[" + name + "] " + comment.GetBody()
 			if user.GetEmail() == serverops.DefaultAdminUser {
 				m.Role = "system"
 			}
