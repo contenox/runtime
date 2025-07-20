@@ -210,7 +210,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		if err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
-		jobs, err := dispatcher.PendingJobs(ctx, nil)
+		jobs, err := dispatcher.PendingJobs(ctx, nil, 199)
 		require.NoError(t, err, "failed to get pending jobs")
 		for i, j := range jobs {
 			t.Logf("JOB %d: %s %v %v", i, j.TaskType, j.ID, j.RetryCount)
@@ -236,7 +236,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 		defer readCloser.Close()
 		getLogs(ctx)
 		require.Eventually(t, func() bool {
-			jobs, err = dispatcher.PendingJobs(ctx, &testStartTime)
+			jobs, err = dispatcher.PendingJobs(ctx, &testStartTime, 199)
 			if err != nil {
 				t.Logf("Warning: failed to get pending jobs: %v", err)
 			}
@@ -337,7 +337,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 
 		// Wait for ingestion
 		require.Eventually(t, func() bool {
-			jobs, err := dispatcher.PendingJobs(ctx, &testStartTime)
+			jobs, err := dispatcher.PendingJobs(ctx, &testStartTime, 199)
 			if err != nil {
 				t.Logf("Warning: failed to get pending jobs: %v", err)
 			}

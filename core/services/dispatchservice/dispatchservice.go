@@ -10,6 +10,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/google/uuid"
 )
 
 type JobInfo struct {
@@ -21,8 +22,9 @@ type JobInfo struct {
 }
 
 type Service interface {
-	PendingJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.Job, error)
-	InProgressJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.LeasedJob, error)
+	CreateJob(ctx context.Context, job *CreateJobRequest) error
+	PendingJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.Job, error)
+	InProgressJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.LeasedJob, error)
 
 	AssignPendingJob(ctx context.Context, leaserID string, leaseDuration *time.Duration, jobTypes ...string) (*store.LeasedJob, error)
 	MarkJobAsDone(ctx context.Context, jobID string, leaserID string) error
@@ -41,6 +43,59 @@ func New(dbInstance libdb.DBManager, config *serverops.Config) *service {
 	}
 }
 
+type CreateJobRequest struct {
+	TaskType     string    `json:"taskType"`
+	Operation    string    `json:"operation"`
+	Subject      string    `json:"subject"`
+	EntityID     string    `json:"entityId"`
+	EntityType   string    `json:"entityType"`
+	Payload      []byte    `json:"payload"`
+	ScheduledFor time.Time `json:"scheduledFor"`
+	ValidUntil   time.Time `json:"validUntil"`
+}
+
+func (s *service) CreateJob(ctx context.Context, job *CreateJobRequest) error {
+	// Validate job
+	if job.TaskType == "" {
+		return errors.New("task type is required")
+	}
+	if job.ScheduledFor.IsZero() {
+		return errors.New("scheduledFor is required")
+	}
+	if job.ValidUntil.IsZero() {
+		return errors.New("validUntil is required")
+	}
+	if job.ValidUntil.Before(job.ScheduledFor) {
+		return errors.New("validUntil must be after scheduledFor")
+	}
+	if job.Operation == "" {
+		return errors.New("operation is required")
+	}
+	if job.Subject == "" {
+		return errors.New("subject is required")
+	}
+
+	// Convert to store.Job
+	storeJob := store.Job{
+		ID:           uuid.New().String(),
+		TaskType:     job.TaskType,
+		Operation:    job.Operation,
+		Subject:      job.Subject,
+		EntityID:     job.EntityID,
+		EntityType:   job.EntityType,
+		Payload:      job.Payload,
+		ScheduledFor: job.ScheduledFor.Unix(),
+		ValidUntil:   job.ValidUntil.Unix(),
+		RetryCount:   0,
+		CreatedAt:    time.Now().UTC(),
+	}
+
+	// Check authorization
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+
+	return storeInstance.AppendJob(ctx, storeJob)
+}
+
 // AssignPendingJob implements Service.
 func (s *service) AssignPendingJob(ctx context.Context, leaserID string, leaseDuration *time.Duration, jobTypes ...string) (*store.LeasedJob, error) {
 	if len(jobTypes) == 0 {
@@ -51,11 +106,6 @@ func (s *service) AssignPendingJob(ctx context.Context, leaserID string, leaseDu
 		return nil, err
 	}
 	defer end()
-	authStore := store.New(tx)
-
-	if err := serverops.CheckServiceAuthorization(ctx, authStore, s, store.PermissionManage); err != nil {
-		return nil, err
-	}
 	storeInstance := store.New(tx)
 
 	index := rand.Intn(len(jobTypes))
@@ -91,9 +141,6 @@ func (s *service) GetServiceName() string {
 }
 
 func (s *service) MarkJobAsDone(ctx context.Context, jobID string, leaserID string) error {
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(s.dbInstance.WithoutTransaction()), s, store.PermissionManage); err != nil {
-		return err
-	}
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	job, err := storeInstance.GetLeasedJob(ctx, jobID)
 	if err != nil {
@@ -115,9 +162,6 @@ func (s *service) MarkJobAsFailed(ctx context.Context, jobID string, leaserID st
 		return err
 	}
 	defer end()
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
-		return err
-	}
 	storeInstance := store.New(tx)
 	job, err := storeInstance.GetLeasedJob(ctx, jobID)
 	if err != nil {
@@ -139,12 +183,15 @@ func (s *service) MarkJobAsFailed(ctx context.Context, jobID string, leaserID st
 	return nil
 }
 
-func (s *service) PendingJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.Job, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(s.dbInstance.WithoutTransaction()), s, store.PermissionView); err != nil {
-		return nil, err
-	}
+func (s *service) PendingJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.Job, error) {
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	jobs, err := storeInstance.ListJobs(ctx, createdAtCursor, 1000)
+	if limit <= 0 {
+		return nil, fmt.Errorf("invalid limit %d", limit)
+	}
+	if limit > 1000 {
+		return nil, fmt.Errorf("invalid limit %d", limit)
+	}
+	jobs, err := storeInstance.ListJobs(ctx, createdAtCursor, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +201,15 @@ func (s *service) PendingJobs(ctx context.Context, createdAtCursor *time.Time) (
 	return jobs, nil
 }
 
-func (s *service) InProgressJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.LeasedJob, error) {
-	if err := serverops.CheckServiceAuthorization(ctx, store.New(s.dbInstance.WithoutTransaction()), s, store.PermissionView); err != nil {
-		return nil, err
-	}
+func (s *service) InProgressJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.LeasedJob, error) {
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	jobs, err := storeInstance.ListLeasedJobs(ctx, createdAtCursor, 1000)
+	if limit <= 0 {
+		return nil, fmt.Errorf("invalid limit %d", limit)
+	}
+	if limit > 1000 {
+		return nil, fmt.Errorf("invalid limit %d", limit)
+	}
+	jobs, err := storeInstance.ListLeasedJobs(ctx, createdAtCursor, limit)
 	if err != nil {
 		return nil, err
 	}
