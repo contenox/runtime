@@ -58,19 +58,13 @@ type instructionRequest struct {
 func (h *chatManagerHandler) addInstruction(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
-	chatID, err := uuid.Parse(idStr)
-	if err != nil {
-		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.CreateOperation)
-		return
-	}
-
 	req, err := serverops.Decode[instructionRequest](r)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
 	}
 
-	err = h.service.AddInstruction(ctx, chatID.String(), req.Instruction)
+	err = h.service.AddInstruction(ctx, idStr, req.Instruction)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.CreateOperation)
 		return
