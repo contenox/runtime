@@ -34,6 +34,7 @@ export default function EventsRow({ logs }: { logs: ActivityLogsResponse }) {
           t('activity.request_id'),
           t('activity.entity_id'),
           t('activity.entity_data'),
+          t('activity.error'),
           t('activity.metadata'),
         ]}>
         {logs.map(log => (
@@ -75,6 +76,9 @@ export default function EventsRow({ logs }: { logs: ActivityLogsResponse }) {
             </TableCell>
             <TableCell>
               <Span>{truncateString(formatEntityData(log.entityData), 30) || '-'}</Span>
+            </TableCell>
+            <TableCell>
+              <Span>{log.error || '-'}</Span>
             </TableCell>
             <TableCell>
               <Span>

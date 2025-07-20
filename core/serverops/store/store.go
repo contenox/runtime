@@ -16,6 +16,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type TelegramFrontend struct {
+	ID            string     `json:"id"`
+	UserID        string     `json:"userId"`
+	ChatChain     string     `json:"chatChain"`
+	Description   string     `json:"description"`
+	BotToken      string     `json:"botToken"`
+	SyncInterval  int        `json:"syncInterval"`
+	Status        string     `json:"status"`
+	LastOffset    int        `json:"lastOffset"`
+	LastHeartbeat *time.Time `json:"lastHeartbeat"`
+	LastError     string     `json:"lastError"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
 type GitHubRepo struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"userId"`
@@ -228,8 +243,20 @@ func (al AccessList) RequireAuthorisation(forResource string, permission int) (b
 type KV struct {
 	Key       string          `json:"key"`
 	Value     json.RawMessage `json:"value"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+type Bot struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	UserID string `json:"userId"`
+
+	BotType     string    `json:"botType"`
+	JobType     string    `json:"jobType"`
+	TaskChainID string    `json:"taskChainId"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Store interface {
@@ -348,6 +375,21 @@ type Store interface {
 	GetGitHubRepo(ctx context.Context, id string) (*GitHubRepo, error)
 	DeleteGitHubRepo(ctx context.Context, id string) error
 	ListGitHubRepos(ctx context.Context) ([]*GitHubRepo, error)
+
+	CreateTelegramFrontend(ctx context.Context, frontend *TelegramFrontend) error
+	GetTelegramFrontend(ctx context.Context, id string) (*TelegramFrontend, error)
+	UpdateTelegramFrontend(ctx context.Context, frontend *TelegramFrontend) error
+	DeleteTelegramFrontend(ctx context.Context, id string) error
+	ListTelegramFrontends(ctx context.Context) ([]*TelegramFrontend, error)
+	ListTelegramFrontendsByUser(ctx context.Context, userID string) ([]*TelegramFrontend, error)
+
+	CreateBot(ctx context.Context, bot *Bot) error
+	GetBot(ctx context.Context, id string) (*Bot, error)
+	GetBotByName(ctx context.Context, name string) (*Bot, error)
+	UpdateBot(ctx context.Context, bot *Bot) error
+	DeleteBot(ctx context.Context, id string) error
+	ListBots(ctx context.Context) ([]*Bot, error)
+	ListBotsByUser(ctx context.Context, userID string) ([]*Bot, error)
 }
 
 //go:embed schema.sql

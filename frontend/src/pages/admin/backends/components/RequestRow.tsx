@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../../lib/api';
 import { TrackedRequest } from '../../../../lib/types';
-import EventsRow from './eventsRow';
+import EventsRow from './EventsRow';
 
 interface RequestRowProps {
   request: TrackedRequest;

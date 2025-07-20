@@ -2,6 +2,7 @@ package serverapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverapi/activityapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/backendapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/botapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chainsapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/chatapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/dispatchapi"
@@ -23,12 +25,15 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverapi/poolapi"
 	providersapi "github.com/contenox/runtime-mvp/core/serverapi/providerapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/systemapi"
+	"github.com/contenox/runtime-mvp/core/serverapi/telegramapi"
 	"github.com/contenox/runtime-mvp/core/serverapi/usersapi"
 	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
 	"github.com/contenox/runtime-mvp/core/services/backendservice"
+	"github.com/contenox/runtime-mvp/core/services/botservice"
 	"github.com/contenox/runtime-mvp/core/services/chainservice"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
@@ -40,6 +45,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/modelservice"
 	"github.com/contenox/runtime-mvp/core/services/poolservice"
 	"github.com/contenox/runtime-mvp/core/services/providerservice"
+	"github.com/contenox/runtime-mvp/core/services/telegramservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libauth"
@@ -148,10 +154,76 @@ func New(
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityapi.AddActivityRoutes(mux, config, activityService)
 	githubService := githubservice.New(dbInstance)
+	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
+	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*31))
+	libroutine.GetPool().StartLoop(ctx, "github-worker-pull", 4, time.Minute, time.Minute, func(ctx context.Context) error {
+		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
+		return githubworker.ReceiveTick(ctx)
+	})
+	libroutine.GetPool().StartLoop(ctx, "github-worker-sync", 4, time.Minute, time.Minute, func(ctx context.Context) error {
+		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
+		return githubworker.ProcessTick(ctx)
+	})
 
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
+
+	telegramService := telegramservice.New(dbInstance)
+	telegramService = telegramservice.WithServiceActivityTracker(telegramService, serveropsChainedTracker)
+	telegramapi.AddTelegramRoutes(mux, telegramService)
+	pool = libroutine.GetPool()
+	poller := telegramservice.NewPoller(dbInstance, telegramService)
+	processor := telegramservice.NewProcessor(dbInstance, environmentExec)
+
+	botService := botservice.New(dbInstance)
+	botapi.AddBotRoutes(mux, botService)
+
+	// Start Telegram poller
+	pool.StartLoop(
+		ctx,
+		"telegram-poller",
+		1, // Only one poller needed
+		15*time.Second,
+		1*time.Second,
+		poller.Tick,
+	)
+
+	// Start Telegram worker
+	pool.StartLoop(
+		ctx,
+		"telegram-worker",
+		1,
+		1*time.Second, // Check for jobs every second
+		0,             // No initial delay
+		func(ctx context.Context) error {
+			storeInstance := store.New(dbInstance.WithoutTransaction())
+
+			// Fetch next job
+			job, err := storeInstance.PopJobForType(ctx, "telegram-message")
+			if err != nil {
+				if errors.Is(err, libdb.ErrNotFound) {
+					return nil // No job available
+				}
+				return fmt.Errorf("fetching job: %w", err)
+			}
+
+			// Process job
+			if err := processor.ProcessJob(ctx, job); err != nil {
+				// Handle retries
+				if job.RetryCount < 5 {
+					job.RetryCount++
+					if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+						return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+					}
+					return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
+				}
+				return fmt.Errorf("abandoning job after 5 retries: %w", err)
+			}
+			return nil
+		},
+	)
+
 	handler = enableCORS(config, handler)
 	handler = requestIDMiddleware(config, handler)
 	handler = jwtRefreshMiddleware(config, handler)
@@ -173,6 +245,8 @@ func New(
 		chainService,
 		activityService,
 		githubService,
+		botService,
+		telegramService,
 	}
 	err = serverops.GetManagerInstance().RegisterServices(services...)
 	if err != nil {

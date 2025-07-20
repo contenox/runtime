@@ -9,6 +9,18 @@ CREATE TABLE IF NOT EXISTS github_repos (
     UNIQUE (user_id, owner, repo_name)
 );
 
+CREATE TABLE bots (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(512) NOT NULL UNIQUE,
+    user_id VARCHAR(512) NOT NULL,
+    bot_type VARCHAR(512) NOT NULL,
+    job_type VARCHAR(512) NOT NULL,
+    task_chain_id VARCHAR(512) NOT NULL,
+
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ollama_models (
     id VARCHAR(255) PRIMARY KEY,
     model VARCHAR(512) NOT NULL UNIQUE,
@@ -189,6 +201,24 @@ CREATE TABLE IF NOT EXISTS kv (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL
 );
+
+
+CREATE TABLE IF NOT EXISTS telegram_frontends (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(512) REFERENCES users(id),
+    chat_chain VARCHAR(512) NOT NULL,
+    description VARCHAR(512),
+    bot_token VARCHAR(512) NOT NULL UNIQUE,
+    sync_interval INT NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
+    last_offset INT NOT NULL DEFAULT 0,
+    last_heartbeat TIMESTAMP,
+    last_error TEXT,
+
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
 
 CREATE INDEX IF NOT EXISTS idx_job_queue_v2_task_type ON job_queue_v2 USING hash(task_type);
 CREATE INDEX IF NOT EXISTS idx_accesslists_identity ON accesslists USING hash(identity);

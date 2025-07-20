@@ -4,70 +4,135 @@ import (
 	"context"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/google/uuid"
+	"github.com/contenox/runtime-mvp/core/serverops/store"
 )
 
-var _ Worker = (*activityTrackerDecorator)(nil)
-
 type activityTrackerDecorator struct {
-	worker  Worker
+	service Service
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) ReceiveTick(ctx context.Context) error {
-	return d.worker.ReceiveTick(ctx)
-}
-
-func (d *activityTrackerDecorator) ProcessTick(ctx context.Context) error {
-	return d.worker.ProcessTick(ctx)
-}
-
-func (d *activityTrackerDecorator) Process(ctx context.Context, update *tgbotapi.Update) error {
-	if _, ok := ctx.Value(serverops.ContextKeyRequestID).(string); !ok {
-		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, uuid.NewString())
-	}
-	if update.Message == nil {
-		// Not a message; don't track
-		return d.worker.Process(ctx, update)
-	}
-
-	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
+func (d *activityTrackerDecorator) Create(ctx context.Context, frontend *store.TelegramFrontend) error {
+	reportErr, reportChange, end := d.tracker.Start(
 		ctx,
-		"process",
-		"telegram_message",
-		"user", update.SentFrom().UserName,
-		"chat_id", update.Message.Chat.ID,
+		"create",
+		"telegram_frontend",
+		"user_id", frontend.UserID,
 	)
-	defer endFn()
+	defer end()
 
-	err := d.worker.Process(ctx, update)
+	err := d.service.Create(ctx, frontend)
 	if err != nil {
-		reportErrFn(err)
+		reportErr(err)
 	} else {
-		reportChangeFn("processed", map[string]interface{}{
-			"text":       update.Message.Text,
-			"chat_id":    update.Message.Chat.ID,
-			"message_id": update.Message.MessageID,
-			"username":   update.SentFrom().UserName,
-		})
+		// Mask sensitive data before reporting
+		masked := *frontend
+		masked.BotToken = "********"
+		reportChange(frontend.ID, &masked)
 	}
-
 	return err
 }
 
+func (d *activityTrackerDecorator) Update(ctx context.Context, frontend *store.TelegramFrontend) error {
+	reportErr, reportChange, end := d.tracker.Start(
+		ctx,
+		"update",
+		"telegram_frontend",
+		"id", frontend.ID,
+		"user_id", frontend.UserID,
+	)
+	defer end()
+
+	err := d.service.Update(ctx, frontend)
+	if err != nil {
+		reportErr(err)
+	} else {
+		// Mask sensitive data before reporting
+		masked := *frontend
+		masked.BotToken = "********"
+		reportChange(frontend.ID, &masked)
+	}
+	return err
+}
+
+func (d *activityTrackerDecorator) Get(ctx context.Context, id string) (*store.TelegramFrontend, error) {
+	reportErr, _, end := d.tracker.Start(
+		ctx,
+		"get",
+		"telegram_frontend",
+		"id", id,
+	)
+	defer end()
+
+	frontend, err := d.service.Get(ctx, id)
+	if err != nil {
+		reportErr(err)
+	}
+	return frontend, err
+}
+
+func (d *activityTrackerDecorator) Delete(ctx context.Context, id string) error {
+	reportErr, reportChange, end := d.tracker.Start(
+		ctx,
+		"delete",
+		"telegram_frontend",
+		"id", id,
+	)
+	defer end()
+
+	err := d.service.Delete(ctx, id)
+	if err != nil {
+		reportErr(err)
+	} else {
+		reportChange(id, nil)
+	}
+	return err
+}
+
+func (d *activityTrackerDecorator) List(ctx context.Context) ([]*store.TelegramFrontend, error) {
+	// reportErr, _, end := d.tracker.Start(
+	// 	ctx,
+	// 	"list",
+	// 	"telegram_frontends",
+	// )
+	// defer end()
+
+	frontends, err := d.service.List(ctx)
+	// if err != nil {
+	// 	reportErr(err)
+	// }
+	return frontends, err
+}
+
+func (d *activityTrackerDecorator) ListByUser(ctx context.Context, userID string) ([]*store.TelegramFrontend, error) {
+	reportErr, _, end := d.tracker.Start(
+		ctx,
+		"list",
+		"telegram_frontends",
+		"user_id", userID,
+	)
+	defer end()
+
+	frontends, err := d.service.ListByUser(ctx, userID)
+	if err != nil {
+		reportErr(err)
+	}
+	return frontends, err
+}
+
 func (d *activityTrackerDecorator) GetServiceName() string {
-	return d.worker.GetServiceName()
+	return d.service.GetServiceName()
 }
 
 func (d *activityTrackerDecorator) GetServiceGroup() string {
-	return d.worker.GetServiceGroup()
+	return d.service.GetServiceGroup()
 }
 
-// Wrap a Worker with an activity tracker.
-func WithActivityTracker(worker Worker, tracker serverops.ActivityTracker) Worker {
+func WithServiceActivityTracker(service Service, tracker serverops.ActivityTracker) Service {
 	return &activityTrackerDecorator{
-		worker:  worker,
+		service: service,
 		tracker: tracker,
 	}
 }
+
+var _ serverops.ServiceMeta = (*activityTrackerDecorator)(nil)

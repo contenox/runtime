@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
@@ -21,7 +20,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime-mvp/core/services/telegramservice"
 	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
@@ -235,46 +233,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing default tasks failed: %v", err)
 	}
-	if config.TelegramToken != "" {
-		bootOffset := 0
-		if config.TelegramBootOffset != "" {
-			bootOffset, err = strconv.Atoi(config.TelegramBootOffset)
-			if err != nil {
-				log.Fatalf("parsing Telegram boot offset failed: %v", err)
-			}
-		}
-		telegramWorker, err := telegramservice.New(ctx, config.TelegramToken, bootOffset, environmentExec, dbInstance)
-		telegramservice.WithActivityTracker(telegramWorker, serveropsChainedTracker)
-		if err != nil {
-			log.Fatalf("initializing Telegram worker failed: %v", err)
-		}
-		var BotErr error
-		triggerChan := make(chan struct{})
-		breakerTelegram := libroutine.NewRoutine(10, time.Second)
-		go breakerTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
-			BotErr = telegramWorker.ProcessTick(ctx)
-			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker ProcessTick failed: %v", BotErr)
-			}
-			return nil
-		}, func(err error) {
-			if err != nil {
-				slog.Error("Telegram worker ProcessTick failed", "error", err)
-			}
-		})
-		breakerPullTelegram := libroutine.NewRoutine(10, time.Second)
-		go breakerPullTelegram.Loop(ctx, time.Second, triggerChan, func(ctx context.Context) error {
-			BotErr = telegramWorker.ReceiveTick(ctx)
-			if BotErr != nil {
-				return fmt.Errorf("initializing Telegram worker ReceiveTick failed: %v", BotErr)
-			}
-			return nil
-		}, func(err error) {
-			if err != nil {
-				slog.Error("Telegram worker ReceiveTick failed", "error", err)
-			}
-		})
-	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
 	uiURL, err := url.Parse(config.UIBaseURL)

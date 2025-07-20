@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { githubKeys } from '../lib/queryKeys';
 
@@ -10,15 +10,28 @@ export function useListGitHubRepos() {
 }
 
 export function useConnectGitHubRepo() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { userID: string; owner: string; repoName: string; accessToken: string }) =>
       api.connectGitHubRepo(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: githubKeys.repos() });
+    },
+    onSettled: () => {
+      // Ensures sensitive data is not retained in mutation cache
+    },
   });
 }
 
 export function useDeleteGitHubRepo() {
-  return useMutation({
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
     mutationFn: (repoID: string) => api.deleteGitHubRepo(repoID),
+    onSuccess: (_, repoID) => {
+      queryClient.invalidateQueries({ queryKey: githubKeys.repo(repoID) });
+      queryClient.invalidateQueries({ queryKey: githubKeys.repos() });
+    },
   });
 }
 

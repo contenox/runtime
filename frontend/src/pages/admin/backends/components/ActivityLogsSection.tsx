@@ -1,7 +1,7 @@
 import { EmptyState, Panel, Spinner } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { useActivityLogs } from '../../../../hooks/useActitivy';
-import EventsRow from './eventsRow';
+import EventsRow from './EventsRow';
 
 export default function ActivityLogsSection() {
   const { t } = useTranslation();

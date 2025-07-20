@@ -6,6 +6,7 @@ import {
   Alert,
   AuthenticatedUser,
   Backend,
+  Bot,
   ChainDefinition,
   ChatMessage,
   ChatSession,
@@ -24,6 +25,7 @@ import {
   SearchResponse,
   StateResponse,
   StatusResponse,
+  TelegramFrontend,
   TrackedRequest,
   Trigger,
   UpdateAccessEntryRequest,
@@ -291,4 +293,29 @@ export const api = {
 
   deleteGitHubRepo: (repoID: string) =>
     apiFetch<void>(`/api/github/repos/${repoID}`, options('DELETE')),
+
+  // Telegram Frontends
+  createTelegramFrontend: (data: Partial<TelegramFrontend>) =>
+    apiFetch<TelegramFrontend>('/api/telegram-frontends', options('POST', data)),
+
+  updateTelegramFrontend: (id: string, data: Partial<TelegramFrontend>) =>
+    apiFetch<TelegramFrontend>(`/api/telegram-frontends/${id}`, options('PUT', data)),
+
+  getTelegramFrontend: (id: string) =>
+    apiFetch<TelegramFrontend>(`/api/telegram-frontends/${id}`, options('GET')),
+
+  deleteTelegramFrontend: (id: string) =>
+    apiFetch<void>(`/api/telegram-frontends/${id}`, options('DELETE')),
+
+  listTelegramFrontends: () =>
+    apiFetch<TelegramFrontend[]>(`/api/telegram-frontends`, options('GET')),
+
+  listTelegramFrontendsByUser: (userId: string) =>
+    apiFetch<TelegramFrontend[]>(`/api/telegram-frontends/users/${userId}`, options('GET')),
+  getBots: () => apiFetch<Bot[]>('/api/bots'),
+  getBot: (id: string) => apiFetch<Bot>(`/api/bots/${id}`),
+  createBot: (data: Partial<Bot>) => apiFetch<Bot>('/api/bots', options('POST', data)),
+  updateBot: (id: string, data: Partial<Bot>) =>
+    apiFetch<Bot>(`/api/bots/${id}`, options('PUT', data)),
+  deleteBot: (id: string) => apiFetch<void>(`/api/bots/${id}`, options('DELETE')),
 };

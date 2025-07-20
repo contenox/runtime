@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useActivityAlerts, useActivityRequestById } from '../../../../hooks/useActitivy';
 import { Alert } from '../../../../lib/types';
-import EventsRow from './eventsRow';
+import EventsRow from './EventsRow';
 
 export default function ActivityAlertsSection() {
   const { t } = useTranslation();

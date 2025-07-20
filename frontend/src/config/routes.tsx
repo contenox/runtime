@@ -1,5 +1,6 @@
 import { P } from '@contenox/ui';
 import {
+  BotIcon,
   ChevronsRight,
   Database,
   File,
@@ -7,12 +8,14 @@ import {
   Link,
   MessageCircleCode,
   Search,
+  Send,
   Settings,
   Turtle,
   User2Icon,
 } from 'lucide-react';
 import i18n from '../i18n';
 import BackendsPage from '../pages/admin/backends/BackendPage.tsx';
+import BotPage from '../pages/admin/bots/BotsPage.tsx';
 import ChainsPage from '../pages/admin/chains/ChainsPage.tsx';
 import ChainDetailPage from '../pages/admin/chains/components/ChainDetailPage.tsx';
 import ChatPage from '../pages/admin/chats/ChatPage.tsx';
@@ -22,6 +25,7 @@ import GitHubPage from '../pages/admin/github/GitHubPage.tsx';
 import ExecPromptPage from '../pages/admin/prompt/ExecPromptPage.tsx';
 import SearchPage from '../pages/admin/search/SearchPage.tsx';
 import ServerJobsPage from '../pages/admin/serverjobs/ServerJobsPage.tsx';
+import TelegramPage from '../pages/admin/telegram/TelegramPage.tsx';
 import UserPage from '../pages/admin/users/UserPage.tsx';
 import About from '../pages/public/about/About.tsx';
 import ByePage from '../pages/public/bye/Bye.tsx';
@@ -70,6 +74,15 @@ export const routes: RouteConfig[] = [
     showInShelf: false,
   },
   {
+    path: '/telegram',
+    element: TelegramPage,
+    label: i18n.t('navbar.telegram'),
+    icon: <Send className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+    showInShelf: false,
+  },
+  {
     path: '/github',
     element: GitHubPage,
     label: i18n.t('navbar.github'),
@@ -95,7 +108,15 @@ export const routes: RouteConfig[] = [
     protected: true,
     showInShelf: false,
   },
-
+  {
+    path: '/bots',
+    element: BotPage,
+    label: i18n.t('navbar.bots'),
+    icon: <BotIcon className="h-[1em] w-[1em]" />,
+    showInNav: true,
+    protected: true,
+    showInShelf: false,
+  },
   {
     path: '/chats',
     element: ChatsListPage,

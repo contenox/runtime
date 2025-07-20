@@ -69,8 +69,6 @@ type Config struct {
 	WorkerUserAccountID string `json:"worker_user_account_id"`
 	WorkerUserPassword  string `json:"worker_user_password"`
 	WorkerUserEmail     string `json:"worker_user_email"`
-	TelegramToken       string `json:"telegram_token"`
-	TelegramBootOffset  string `json:"telegram_boot_offset"`
 	KVBackend           string `json:"kv_backend"`
 	KVHost              string `json:"kv_host"`
 	KVPassword          string `json:"kv_password"`

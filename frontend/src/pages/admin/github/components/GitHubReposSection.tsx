@@ -3,7 +3,7 @@ import {
   EmptyState,
   Form,
   FormField,
-  H3,
+  GridLayout,
   Input,
   Panel,
   Section,
@@ -53,10 +53,36 @@ export default function GitHubReposSection() {
   };
 
   return (
-    <div className="space-y-6">
-      <Section>
+    <GridLayout>
+      <Section title={t('github.connected_repos')}>
+        {isLoading && (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        )}
+
+        {error && <Panel variant="error">{t('github.list_error')}</Panel>}
+
+        {!isLoading && !error && (!repos || repos.length === 0) ? (
+          <EmptyState
+            title={t('github.no_repos_title')}
+            description={t('github.no_repos_description')}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {repos?.map(repo => (
+              <RepoCard
+                key={repo.id}
+                repo={repo}
+                onDelete={handleDeleteRepo}
+                isDeleting={deleteRepoMutation.isPending && deletingRepoId === repo.id}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
+      <Section title={t('github.connect_repo')}>
         <Form
-          title={t('github.connect_repo')}
           onSubmit={handleConnectRepo}
           error={connectRepoMutation.isError ? t('github.connect_error') : undefined}
           actions={
@@ -94,37 +120,7 @@ export default function GitHubReposSection() {
           </FormField>
         </Form>
       </Section>
-
-      <Section>
-        <h2 className="mb-4 text-lg font-semibold">{t('github.connected_repos')}</h2>
-
-        {isLoading && (
-          <div className="flex justify-center py-8">
-            <Spinner />
-          </div>
-        )}
-
-        {error && <Panel variant="error">{t('github.list_error')}</Panel>}
-
-        {!isLoading && !error && (!repos || repos.length === 0) ? (
-          <EmptyState
-            title={t('github.no_repos_title')}
-            description={t('github.no_repos_description')}
-          />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {repos?.map(repo => (
-              <RepoCard
-                key={repo.id}
-                repo={repo}
-                onDelete={handleDeleteRepo}
-                isDeleting={deleteRepoMutation.isPending && deletingRepoId === repo.id}
-              />
-            ))}
-          </div>
-        )}
-      </Section>
-    </div>
+    </GridLayout>
   );
 }
 
@@ -136,13 +132,9 @@ type RepoCardProps = {
 
 function RepoCard({ repo, onDelete, isDeleting }: RepoCardProps) {
   const { t } = useTranslation();
-
   return (
-    <Section className="flex h-full flex-col">
+    <Section className="flex h-full flex-col" title={`${repo.owner}/${repo.repoName}`}>
       <div className="flex-grow">
-        <H3 className="mb-2">
-          {repo.owner}/{repo.repoName}
-        </H3>
         <div className="space-y-1 text-sm">
           <div>
             <span className="font-medium">{t('github.user_id')}:</span> {repo.userID}
