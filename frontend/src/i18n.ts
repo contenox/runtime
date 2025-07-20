@@ -299,6 +299,7 @@ const resources = {
         pool_assigned_success: 'Model assigned to Pool',
       },
       activity: {
+        error: 'Error',
         title: 'Activity Logs',
         operation: 'Operation',
         subject: 'Subject',

@@ -90,17 +90,17 @@ func (d *activityTrackerDecorator) Delete(ctx context.Context, id string) error 
 }
 
 func (d *activityTrackerDecorator) List(ctx context.Context) ([]*store.TelegramFrontend, error) {
-	reportErr, _, end := d.tracker.Start(
-		ctx,
-		"list",
-		"telegram_frontends",
-	)
-	defer end()
+	// reportErr, _, end := d.tracker.Start(
+	// 	ctx,
+	// 	"list",
+	// 	"telegram_frontends",
+	// )
+	// defer end()
 
 	frontends, err := d.service.List(ctx)
-	if err != nil {
-		reportErr(err)
-	}
+	// if err != nil {
+	// 	reportErr(err)
+	// }
 	return frontends, err
 }
 

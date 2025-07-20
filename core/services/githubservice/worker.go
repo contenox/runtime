@@ -28,10 +28,11 @@ type Worker interface {
 }
 
 type worker struct {
-	githubService Service
-	kvManager     libkv.KVManager
-	tracker       serverops.ActivityTracker
-	dbInstance    libdb.DBManager
+	githubService    Service
+	kvManager        libkv.KVManager
+	tracker          serverops.ActivityTracker
+	dbInstance       libdb.DBManager
+	bootLastSyncTime time.Time
 }
 
 func NewWorker(
@@ -39,12 +40,14 @@ func NewWorker(
 	kvManager libkv.KVManager,
 	tracker serverops.ActivityTracker,
 	dbInstance libdb.DBManager,
+	bootLastSyncTime time.Time,
 ) Worker {
 	return &worker{
-		githubService: githubService,
-		kvManager:     kvManager,
-		tracker:       tracker,
-		dbInstance:    dbInstance,
+		githubService:    githubService,
+		kvManager:        kvManager,
+		tracker:          tracker,
+		dbInstance:       dbInstance,
+		bootLastSyncTime: bootLastSyncTime,
 	}
 }
 
@@ -66,14 +69,14 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 		prs, err := w.githubService.ListPRs(ctx, repo.ID)
 		if err != nil {
 			reportErr(fmt.Errorf("failed to list PRs for repo %s: %w", repo.ID, err))
-			continue
+			return fmt.Errorf("failed to list PRs for repo %s: %w", repo.ID, err)
 		}
 
 		for _, pr := range prs {
 			job, err := w.createJobForPR(repo.ID, pr.Number)
 			if err != nil {
 				reportErr(fmt.Errorf("failed to create job for repo %s pr %d: %w", repo.ID, pr.Number, err))
-				continue
+				return fmt.Errorf("failed to create job for repo %s pr %d: %w", repo.ID, pr.Number, err)
 			}
 			jobs = append(jobs, job)
 		}
@@ -82,7 +85,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 	if len(jobs) > 0 {
 		if err := storeInstance.AppendJobs(ctx, jobs...); err != nil {
 			reportErr(fmt.Errorf("failed to append jobs: %w", err))
-			return err
+			return fmt.Errorf("failed to append jobs: %w", err)
 		}
 	}
 
@@ -112,11 +115,14 @@ func (w *worker) createJobForPR(repoID string, prNumber int) (*store.Job, error)
 }
 
 func (w *worker) ProcessTick(ctx context.Context) error {
+	reportErr, _, end := w.tracker.Start(ctx, "process", "tick")
+	defer end()
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
 	leaseID := uuid.NewString()
 
 	leasedJob, err := storeInstance.PopJobForType(ctx, JobTypeGitHubCommentSync)
 	if err != nil {
+		reportErr(err)
 		if errors.Is(err, libdb.ErrNotFound) {
 			return nil
 		}
@@ -132,6 +138,15 @@ func (w *worker) processLeasedJob(
 	leasedJob *store.Job,
 	leaseID string,
 ) error {
+	var processErr error
+	reportJobErr, _, endJob := w.tracker.Start(ctx, "process", "leased_job", "job_id", leasedJob.ID)
+	defer func() {
+		if processErr != nil {
+			reportJobErr(fmt.Errorf("worker error: %w", processErr))
+		}
+		endJob()
+	}()
+
 	leaseDuration := DefaultLeaseDuration
 	if err := storeInstance.AppendLeasedJob(ctx, *leasedJob, leaseDuration, leaseID); err != nil {
 		return fmt.Errorf("lease job: %w", err)
@@ -146,8 +161,7 @@ func (w *worker) processLeasedJob(
 		return fmt.Errorf("unmarshal payload: %w", err)
 	}
 
-	processErr := w.syncPRComments(ctx, payload.RepoID, payload.PRNumber)
-
+	processErr = w.syncPRComments(ctx, payload.RepoID, payload.PRNumber) // TODO this is super fragile
 	if processErr == nil {
 		return storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
 	}
@@ -195,31 +209,45 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		reportErr(fmt.Errorf("failed to create KV operation: %w", err))
 		return err
 	}
-
+	// TODO: cannot parse \"\\\"2025-07-20T10:27:55.159545896Z\\\"\" as \"2006\""
 	// Get last sync time
 	lastSyncKey := w.lastSyncKey(repoID, prNumber)
 	lastSyncBytes, err := kvOp.Get(ctx, []byte(lastSyncKey))
-
 	var lastSync time.Time
-	if errors.Is(err, libkv.ErrNotFound) {
-		lastSync = time.Now().Add(-24 * time.Hour)
-	} else if err != nil {
-		err = fmt.Errorf("failed to get last sync time: %w", err)
-		reportErr(err)
-		return err
-	} else if err := json.Unmarshal(lastSyncBytes, &lastSync); err != nil {
-		lastSync = time.Now().Add(-24 * time.Hour)
+	// Handle empty value and errors
+	if err != nil || len(lastSyncBytes) == 0 {
+		// Use boot time if value is missing/empty
+		lastSync = w.bootLastSyncTime
+		b := []byte(lastSync.Format(time.RFC3339))
+		if setErr := kvOp.Set(ctx, libkv.KeyValue{
+			Key:   []byte(lastSyncKey),
+			Value: b,
+		}); setErr != nil {
+			reportErr(fmt.Errorf("failed to set last sync time: %w", setErr))
+			return setErr
+		}
+	} else {
+		// Parse existing value
+		var parseErr error
+		if lastSync, parseErr = time.Parse(time.RFC3339, string(lastSyncBytes)); parseErr != nil {
+			reportErr(fmt.Errorf("failed to parse last sync time: %w", parseErr))
+			return parseErr
+		}
 	}
 
 	// Fetch new comments
 	comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
 	if err != nil {
-		err = fmt.Errorf("failed to list comments: %w", err)
+		err := fmt.Errorf("failed to list comments: %w", err)
 		reportErr(err)
 		return err
 	}
 
 	if len(comments) == 0 {
+		// Track empty comment list
+		_, reportChange, end := w.tracker.Start(ctx, "empty", "github_comments", "repo", repoID, "pr", prNumber)
+		defer end()
+		reportChange("no_new_comments", nil)
 		return nil
 	}
 
@@ -229,6 +257,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	tx, commit, release, err := w.dbInstance.WithTransaction(ctx)
 	defer release()
 	if err != nil {
+		err := fmt.Errorf("failed to start transaction: %w", err)
 		reportErr(err)
 		return err
 	}
@@ -236,6 +265,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	storeInstance := store.New(tx)
 	idxs, err := storeInstance.ListMessageIndices(ctx, serverops.DefaultAdminUser)
 	if err != nil {
+		err := fmt.Errorf("failed to list message indices: %w", err)
 		reportErr(err)
 		return err
 	}
@@ -254,12 +284,14 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		}
 		err = storeInstance.CreateMessageIndex(ctx, streamID, user.ID)
 		if err != nil {
+			err := fmt.Errorf("failed to create message index: %w", err)
 			reportErr(err)
 			return err
 		}
 	}
 	messagesFromStore, err := storeInstance.ListMessages(ctx, streamID)
 	if err != nil {
+		err := fmt.Errorf("failed to list messages: %w", err)
 		reportErr(err)
 		return err
 	}
@@ -267,6 +299,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	for _, comment := range comments {
 		messageID := ""
 		if comment.ID == nil {
+			reportErr(errors.New("comment ID is nil"))
 			continue // There is no way in syncing without a ID
 		}
 		messageID = fmt.Sprintf("%v-%v", prNumber, comment.GetID())
@@ -290,6 +323,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		}
 		payload, err := json.Marshal(m)
 		if err != nil {
+			err = fmt.Errorf("failed to marshal message payload: %w", err)
 			reportErr(err)
 			return err
 		}
@@ -316,23 +350,11 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			missingMessages = append(missingMessages, &m)
 		}
 	}
-	err = storeInstance.AppendMessages(ctx, missingMessages...)
-	if err != nil {
-		reportErr(err)
-		return err
-	}
-	err = storeInstance.AppendJob(ctx, store.Job{
-		TaskType: "github-job",
-	})
-	if err != nil {
-		reportErr(err)
-		return err
-	}
 	// Append new messages
 	if len(missingMessages) > 0 {
 		if err := storeInstance.AppendMessages(ctx, missingMessages...); err != nil {
 			reportErr(err)
-			return err
+			return fmt.Errorf("failed to append messages: %w", err)
 		}
 	}
 
@@ -344,14 +366,14 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		if len(parts) > 1 {
 			commentID = parts[1]
 		} else {
-			continue
+			return fmt.Errorf("invalid message ID format")
 		}
 
 		// Parse the message payload
 		var githubMsg GithubMessage
 		if err := json.Unmarshal(msg.Payload, &githubMsg); err != nil {
 			reportErr(fmt.Errorf("failed to parse message payload: %w", err))
-			continue
+			return fmt.Errorf("failed to parse message payload: %w", err)
 		}
 
 		// Create job payload
@@ -372,8 +394,10 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		})
 		if err != nil {
 			reportErr(fmt.Errorf("failed to marshal job payload: %w", err))
-			continue
+			return fmt.Errorf("failed to marshal job payload: %w", err)
 		}
+		reportJobErr, _, endJob := w.tracker.Start(ctx, "append", "job", "type", JobTypeGitHubProcessCommentLLM)
+		defer endJob()
 
 		// Create and append job
 		job := &store.Job{
@@ -386,8 +410,8 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		}
 
 		if err := storeInstance.AppendJob(ctx, *job); err != nil {
-			reportErr(fmt.Errorf("failed to append job: %w", err))
-			continue
+			reportJobErr(fmt.Errorf("failed to append job: %w", err))
+			return fmt.Errorf("failed to append job: %w", err)
 		}
 	}
 	err = commit(ctx)
@@ -396,20 +420,23 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		return err
 	}
 	// Update last sync time
-	newSync := time.Now()
-	syncData, _ := json.Marshal(newSync)
+	newSync := time.Now().UTC()
+	syncData, err := json.Marshal(newSync)
+	if err != nil {
+		reportErr(fmt.Errorf("failed to marshal last sync time: %w", err))
+		return fmt.Errorf("failed to marshal last sync time: %w", err)
+	}
 	if err := kvOp.Set(ctx, libkv.KeyValue{
 		Key:   []byte(lastSyncKey),
 		Value: syncData,
 	}); err != nil {
 		err = fmt.Errorf("failed to update last sync time: %w", err)
 		reportErr(err)
-
+		return fmt.Errorf("failed to update last sync time: %w", err)
 	}
-
 	// Report successful storage
 	if storedCount > 0 {
-		reportChange("", storedCount)
+		reportChange("storedCount", storedCount)
 	}
 
 	return nil
