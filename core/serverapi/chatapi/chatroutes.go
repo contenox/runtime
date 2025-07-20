@@ -8,7 +8,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
-	"github.com/google/uuid"
 )
 
 func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatservice.Service, stateService *runtimestate.State) {
@@ -85,11 +84,6 @@ type chatRequest struct {
 func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
-	chatID, err := uuid.Parse(idStr)
-	if err != nil {
-		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.ServerOperation)
-		return
-	}
 
 	req, err := serverops.Decode[chatRequest](r)
 	if err != nil {
@@ -104,7 +98,7 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 		req.Models = []string{}
 	}
 	reqConv := chatservice.ChatRequest{
-		SubjectID:           chatID.String(),
+		SubjectID:           idStr,
 		Message:             req.Message,
 		PreferredModelNames: req.Models,
 		Provider:            req.Provider,
@@ -151,13 +145,8 @@ func (h *chatManagerHandler) openAIChatCompletions(w http.ResponseWriter, r *htt
 func (h *chatManagerHandler) history(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	idStr := r.PathValue("id")
-	chatID, err := uuid.Parse(idStr)
-	if err != nil {
-		_ = serverops.Error(w, r, fmt.Errorf("id parsing error: %w: %w", err, serverops.ErrBadPathValue), serverops.ListOperation)
-		return
-	}
 
-	history, err := h.service.GetChatHistory(ctx, chatID.String())
+	history, err := h.service.GetChatHistory(ctx, idStr)
 	if err != nil {
 		_ = serverops.Error(w, r, err, serverops.GetOperation)
 		return

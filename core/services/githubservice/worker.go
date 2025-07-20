@@ -114,6 +114,10 @@ func (w *worker) createJobForPR(repoID string, prNumber int) (*store.Job, error)
 	}, nil
 }
 
+type lastSync struct {
+	Time time.Time `json:"time"`
+}
+
 func (w *worker) ProcessTick(ctx context.Context) error {
 	reportErr, _, end := w.tracker.Start(ctx, "process", "tick")
 	defer end()
@@ -161,8 +165,24 @@ func (w *worker) processLeasedJob(
 		return fmt.Errorf("unmarshal payload: %w", err)
 	}
 
-	processErr = w.syncPRComments(ctx, payload.RepoID, payload.PRNumber) // TODO this is super fragile
+	var lsync lastSync
+	err := storeInstance.GetKV(ctx, w.lastSyncKey(payload.RepoID, payload.PRNumber), &lsync)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return fmt.Errorf("get last sync: %w", err)
+	}
+	if w.bootLastSyncTime.After(lsync.Time) {
+		lsync.Time = w.bootLastSyncTime
+	}
+	processErr = w.syncPRComments(ctx, payload.RepoID, payload.PRNumber, lsync.Time)
 	if processErr == nil {
+		updateSyncTime := lastSync{
+			Time: time.Now().UTC(),
+		}
+		b, err := json.Marshal(updateSyncTime)
+		if err != nil {
+			return fmt.Errorf("marshal last sync time: %w", err)
+		}
+		storeInstance.SetKV(ctx, w.lastSyncKey(payload.RepoID, payload.PRNumber), b)
 		return storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
 	}
 
@@ -193,7 +213,7 @@ type GithubMessage struct {
 	Body      string
 }
 
-func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int) error {
+func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int, lastSync time.Time) error {
 	// Track PR processing
 	reportErr, reportChange, end := w.tracker.Start(
 		ctx,
@@ -203,37 +223,6 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		"pr", prNumber,
 	)
 	defer end()
-
-	kvOp, err := w.kvManager.Operation(ctx)
-	if err != nil {
-		reportErr(fmt.Errorf("failed to create KV operation: %w", err))
-		return err
-	}
-	// TODO: cannot parse \"\\\"2025-07-20T10:27:55.159545896Z\\\"\" as \"2006\""
-	// Get last sync time
-	lastSyncKey := w.lastSyncKey(repoID, prNumber)
-	lastSyncBytes, err := kvOp.Get(ctx, []byte(lastSyncKey))
-	var lastSync time.Time
-	// Handle empty value and errors
-	if err != nil || len(lastSyncBytes) == 0 {
-		// Use boot time if value is missing/empty
-		lastSync = w.bootLastSyncTime
-		b := []byte(lastSync.Format(time.RFC3339))
-		if setErr := kvOp.Set(ctx, libkv.KeyValue{
-			Key:   []byte(lastSyncKey),
-			Value: b,
-		}); setErr != nil {
-			reportErr(fmt.Errorf("failed to set last sync time: %w", setErr))
-			return setErr
-		}
-	} else {
-		// Parse existing value
-		var parseErr error
-		if lastSync, parseErr = time.Parse(time.RFC3339, string(lastSyncBytes)); parseErr != nil {
-			reportErr(fmt.Errorf("failed to parse last sync time: %w", parseErr))
-			return parseErr
-		}
-	}
 
 	// Fetch new comments
 	comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
@@ -263,7 +252,13 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	}
 
 	storeInstance := store.New(tx)
-	idxs, err := storeInstance.ListMessageIndices(ctx, serverops.DefaultAdminUser)
+	user, err := storeInstance.GetUserByEmail(ctx, serverops.DefaultAdminUser)
+	if err != nil {
+		err := fmt.Errorf("SERVER BUG %w", err)
+		reportErr(err)
+		return err
+	}
+	idxs, err := storeInstance.ListMessageIndices(ctx, user.ID)
 	if err != nil {
 		err := fmt.Errorf("failed to list message indices: %w", err)
 		reportErr(err)
@@ -276,12 +271,6 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		}
 	}
 	if !found {
-		user, err := storeInstance.GetUserByEmail(ctx, serverops.DefaultAdminUser)
-		if err != nil {
-			err := fmt.Errorf("SERVER BUG %w", err)
-			reportErr(err)
-			return err
-		}
 		err = storeInstance.CreateMessageIndex(ctx, streamID, user.ID)
 		if err != nil {
 			err := fmt.Errorf("failed to create message index: %w", err)
@@ -311,7 +300,14 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			Role: "user",
 		}
 		if user := comment.GetUser(); user != nil {
-			m.Content = "[" + user.GetName() + "]" + comment.GetBody()
+			name := user.GetName()
+			if name == "" {
+				name = user.GetEmail()
+			}
+			if name == "" {
+				name = user.GetLogin()
+			}
+			m.Content = "[" + name + "]" + comment.GetBody()
 			if user.GetEmail() == serverops.DefaultAdminUser {
 				m.Role = "system"
 			}
@@ -418,21 +414,6 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	if err != nil {
 		reportErr(err)
 		return err
-	}
-	// Update last sync time
-	newSync := time.Now().UTC()
-	syncData, err := json.Marshal(newSync)
-	if err != nil {
-		reportErr(fmt.Errorf("failed to marshal last sync time: %w", err))
-		return fmt.Errorf("failed to marshal last sync time: %w", err)
-	}
-	if err := kvOp.Set(ctx, libkv.KeyValue{
-		Key:   []byte(lastSyncKey),
-		Value: syncData,
-	}); err != nil {
-		err = fmt.Errorf("failed to update last sync time: %w", err)
-		reportErr(err)
-		return fmt.Errorf("failed to update last sync time: %w", err)
 	}
 	// Report successful storage
 	if storedCount > 0 {
