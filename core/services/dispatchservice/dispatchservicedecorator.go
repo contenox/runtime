@@ -14,38 +14,11 @@ type activityTrackerDecorator struct {
 	tracker serverops.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) CreateJob(ctx context.Context, job *CreateJobRequest) error {
-	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
-		ctx,
-		"create",
-		"job",
-		"taskType", job.TaskType,
-		"operation", job.Operation,
-		"subject", job.Subject,
-		"entityType", job.EntityType,
-		"entityId", job.EntityID,
-	)
+func (d *activityTrackerDecorator) PendingJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.Job, error) {
+	reportErrFn, _, endFn := d.tracker.Start(ctx, "list", "pending-jobs")
 	defer endFn()
 
-	err := d.service.CreateJob(ctx, job)
-	if err != nil {
-		reportErrFn(err)
-	} else {
-		reportChangeFn("", map[string]any{
-			"taskType":   job.TaskType,
-			"operation":  job.Operation,
-			"entityType": job.EntityType,
-			"entityId":   job.EntityID,
-		})
-	}
-	return err
-}
-
-func (d *activityTrackerDecorator) PendingJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.Job, error) {
-	reportErrFn, _, endFn := d.tracker.Start(ctx, "list", "pending-jobs", "limit", limit)
-	defer endFn()
-
-	jobs, err := d.service.PendingJobs(ctx, createdAtCursor, limit)
+	jobs, err := d.service.PendingJobs(ctx, createdAtCursor)
 	if err != nil {
 		reportErrFn(err)
 	}
@@ -53,11 +26,11 @@ func (d *activityTrackerDecorator) PendingJobs(ctx context.Context, createdAtCur
 	return jobs, err
 }
 
-func (d *activityTrackerDecorator) InProgressJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*store.LeasedJob, error) {
-	reportErrFn, _, endFn := d.tracker.Start(ctx, "list", "in-progress-jobs", "limit", limit)
+func (d *activityTrackerDecorator) InProgressJobs(ctx context.Context, createdAtCursor *time.Time) ([]*store.LeasedJob, error) {
+	reportErrFn, _, endFn := d.tracker.Start(ctx, "list", "in-progress-jobs")
 	defer endFn()
 
-	jobs, err := d.service.InProgressJobs(ctx, createdAtCursor, limit)
+	jobs, err := d.service.InProgressJobs(ctx, createdAtCursor)
 	if err != nil {
 		reportErrFn(err)
 	}

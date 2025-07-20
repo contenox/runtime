@@ -188,14 +188,14 @@ func TestUnit_DispatchService_ListsPendingAndInProgressJobs(t *testing.T) {
 	require.NoError(t, storeInstance.AppendLeasedJob(ctx, *leasedJob, 30*time.Minute, "leaser-1"))
 
 	t.Run("pending_jobs", func(t *testing.T) {
-		jobs, err := service.PendingJobs(ctx, nil, 100)
+		jobs, err := service.PendingJobs(ctx, nil)
 		require.NoError(t, err)
 		require.Len(t, jobs, 1)
 		require.Equal(t, pendingJob.ID, jobs[0].ID)
 	})
 
 	t.Run("in_progress_jobs", func(t *testing.T) {
-		jobs, err := service.InProgressJobs(ctx, nil, 100)
+		jobs, err := service.InProgressJobs(ctx, nil)
 		require.NoError(t, err)
 		require.Len(t, jobs, 1)
 		require.Equal(t, leasedJob.ID, jobs[0].ID)
