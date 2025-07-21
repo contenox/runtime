@@ -116,13 +116,13 @@ func New(
 		state.RunDownloadCycle, // operation
 	)
 
-	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec)
+	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, serveropsChainedTracker)
 	libroutine.GetPool().StartLoop(
 		ctx,
 		"github-comment-processor",
-		1,             // concurrency
-		1*time.Second, // interval
-		0,             // initial delay
+		4,
+		time.Minute,
+		time.Minute,
 		func(ctx context.Context) error {
 			storeInstance := store.New(dbInstance.WithoutTransaction())
 			job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubProcessCommentLLM)

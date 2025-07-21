@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
@@ -14,8 +15,9 @@ import (
 )
 
 type GitHubCommentProcessor struct {
-	db  libdb.DBManager
-	env taskengine.EnvExecutor
+	db      libdb.DBManager
+	env     taskengine.EnvExecutor
+	tracker serverops.ActivityTracker
 }
 
 type jobPayload struct {
@@ -27,32 +29,62 @@ type jobPayload struct {
 	Content   string `json:"content"`
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor) *GitHubCommentProcessor {
-	return &GitHubCommentProcessor{db: db, env: env}
+func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker}
 }
 
-func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job) error {
+func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job) (err error) {
+	// Start activity tracking
+	reportErr, reportChange, end := p.tracker.Start(
+		ctx,
+		"process",
+		"github-job",
+		"job_id", job.ID,
+		"task_type", job.TaskType,
+	)
+	defer end()
+
+	// Defer error reporting and state change
+	var changeData map[string]interface{}
+	defer func() {
+		if err == nil && changeData != nil {
+			reportChange(changeData["message_id"].(string), changeData)
+		}
+	}()
+
+	// Unmarshal payload
 	var payload jobPayload
-	if err := json.Unmarshal(job.Payload, &payload); err != nil {
-		return fmt.Errorf("failed to unmarshal job payload: %w", err)
+	if err = json.Unmarshal(job.Payload, &payload); err != nil {
+		err = fmt.Errorf("failed to unmarshal job payload: %w", err)
+		reportErr(err)
+		return
 	}
 
 	storeInstance := store.New(p.db.WithoutTransaction())
 
-	// Find the bot that handles this job type
+	// Find bot for job type
 	bots, err := storeInstance.ListBotsByJobType(ctx, job.TaskType)
 	if err != nil {
-		return fmt.Errorf("failed to find bot for job type: %w", err)
+		err = fmt.Errorf("failed to find bot for job type: %w", err)
+		reportErr(err)
+		return
 	}
 	if len(bots) == 0 {
-		return fmt.Errorf("no bot found for job type: %s", job.TaskType)
+		err = fmt.Errorf("no bot found for job type: %s", job.TaskType)
+		reportErr(err)
+		return
 	}
 	bot := bots[0]
 
-	// Get the task chain
+	// Get task chain
 	chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
 	if err != nil {
-		return fmt.Errorf("failed to get task chain: %w", err)
+		err = fmt.Errorf("failed to get task chain: %w", err)
+		reportErr(err)
+		return
 	}
 
 	// Configure chain with subject context
@@ -68,26 +100,36 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		}
 	}
 
-	// Execute the chain
+	// Execute chain
 	result, _, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
 	if err != nil {
-		return fmt.Errorf("failed to execute chain: %w", err)
+		err = fmt.Errorf("failed to execute chain: %w", err)
+		reportErr(err)
+		return
 	}
 
-	// Extract the response
+	// Extract response
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
-		return errors.New("invalid chain result - expected chat history")
+		err = errors.New("invalid chain result - expected chat history")
+		reportErr(err)
+		return
 	}
 	lastMsg := hist.Messages[len(hist.Messages)-1]
 	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
-		return fmt.Errorf("unexpected message role in response: %s", lastMsg.Role)
+		err = fmt.Errorf("unexpected message role in response: %s", lastMsg.Role)
+		reportErr(err)
+		return
 	}
 
-	// Post the response to GitHub
-	if err := p.postGitHubComment(ctx, payload.RepoID, payload.PRNumber, lastMsg.Content); err != nil {
-		return fmt.Errorf("failed to post GitHub comment: %w", err)
+	// Post response to GitHub
+	if err = p.postGitHubComment(ctx, payload.RepoID, payload.PRNumber, lastMsg.Content); err != nil {
+		err = fmt.Errorf("failed to post GitHub comment: %w", err)
+		reportErr(err)
+		return
 	}
+
+	// Store assistant message
 	type chatMessage struct {
 		Role    string
 		Message string
@@ -97,17 +139,29 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		Message: lastMsg.Content,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal chat message: %w", err)
+		err = fmt.Errorf("failed to marshal chat message: %w", err)
+		reportErr(err)
+		return
 	}
-	// Store the assistant's message in the message history
 	message := store.Message{
 		ID:      fmt.Sprintf("response-%s", payload.MessageID),
 		IDX:     subjectID,
 		AddedAt: time.Now().UTC(),
 		Payload: jsonBytes,
 	}
-	if err := storeInstance.AppendMessages(ctx, &message); err != nil {
-		return fmt.Errorf("failed to store response message: %w", err)
+	if err = storeInstance.AppendMessages(ctx, &message); err != nil {
+		err = fmt.Errorf("failed to store response message: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Prepare success data
+	changeData = map[string]interface{}{
+		"repo_id":            payload.RepoID,
+		"pr_number":          payload.PRNumber,
+		"comment_id":         payload.CommentID,
+		"message_id":         payload.MessageID,
+		"assistant_response": lastMsg.Content,
 	}
 
 	return nil
