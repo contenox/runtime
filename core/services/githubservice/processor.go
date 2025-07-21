@@ -9,6 +9,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
@@ -49,7 +50,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	bot := bots[0]
 
 	// Get the task chain
-	chain, err := taskengine.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
+	chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
 	if err != nil {
 		return fmt.Errorf("failed to get task chain: %w", err)
 	}
