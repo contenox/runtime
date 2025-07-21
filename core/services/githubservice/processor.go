@@ -88,13 +88,23 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	if err := p.postGitHubComment(ctx, payload.RepoID, payload.PRNumber, lastMsg.Content); err != nil {
 		return fmt.Errorf("failed to post GitHub comment: %w", err)
 	}
-
+	type chatMessage struct {
+		Role    string
+		Message string
+	}
+	jsonBytes, err := json.Marshal(chatMessage{
+		Role:    lastMsg.Role,
+		Message: lastMsg.Content,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal chat message: %w", err)
+	}
 	// Store the assistant's message in the message history
 	message := store.Message{
 		ID:      fmt.Sprintf("response-%s", payload.MessageID),
 		IDX:     subjectID,
 		AddedAt: time.Now().UTC(),
-		Payload: []byte(fmt.Sprintf(`{"role":"assistant","content":"%s"}`, lastMsg.Content)),
+		Payload: jsonBytes,
 	}
 	if err := storeInstance.AppendMessages(ctx, &message); err != nil {
 		return fmt.Errorf("failed to store response message: %w", err)
@@ -104,6 +114,6 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 }
 
 func (p *GitHubCommentProcessor) postGitHubComment(ctx context.Context, repoID string, prNumber int, comment string) error {
-	githubService := New(p.db) // Assuming githubservice is initialized with the same DB
+	githubService := New(p.db)
 	return githubService.PostComment(ctx, repoID, prNumber, comment)
 }
