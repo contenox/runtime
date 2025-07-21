@@ -17,12 +17,13 @@ func (s *store) CreateBot(ctx context.Context, bot *Bot) error {
 
 	_, err := s.Exec.ExecContext(ctx, `
         INSERT INTO bots
-        (id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        (id, name, user_id, bot_type, state, job_type, task_chain_id, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		bot.ID,
 		bot.Name,
 		bot.UserID,
 		bot.BotType,
+		bot.State,
 		bot.JobType,
 		bot.TaskChainID,
 		bot.CreatedAt,
@@ -34,7 +35,7 @@ func (s *store) CreateBot(ctx context.Context, bot *Bot) error {
 func (s *store) GetBot(ctx context.Context, id string) (*Bot, error) {
 	var bot Bot
 	err := s.Exec.QueryRowContext(ctx, `
-        SELECT id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at
+        SELECT id, name, user_id, bot_type, state, job_type, task_chain_id, created_at, updated_at
         FROM bots
         WHERE id = $1`,
 		id,
@@ -43,6 +44,7 @@ func (s *store) GetBot(ctx context.Context, id string) (*Bot, error) {
 		&bot.Name,
 		&bot.UserID,
 		&bot.BotType,
+		&bot.State,
 		&bot.JobType,
 		&bot.TaskChainID,
 		&bot.CreatedAt,
@@ -58,7 +60,7 @@ func (s *store) GetBot(ctx context.Context, id string) (*Bot, error) {
 func (s *store) GetBotByName(ctx context.Context, name string) (*Bot, error) {
 	var bot Bot
 	err := s.Exec.QueryRowContext(ctx, `
-        SELECT id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at
+        SELECT id, name, user_id, bot_type, state, job_type, task_chain_id, created_at, updated_at
         FROM bots
         WHERE name = $1`,
 		name,
@@ -67,6 +69,7 @@ func (s *store) GetBotByName(ctx context.Context, name string) (*Bot, error) {
 		&bot.Name,
 		&bot.UserID,
 		&bot.BotType,
+		&bot.State,
 		&bot.JobType,
 		&bot.TaskChainID,
 		&bot.CreatedAt,
@@ -85,11 +88,12 @@ func (s *store) UpdateBot(ctx context.Context, bot *Bot) error {
 
 	_, err := s.Exec.ExecContext(ctx, `
         UPDATE bots
-        SET name = $1, user_id = $2, bot_type = $3, job_type = $4, task_chain_id = $5, updated_at = $6
-        WHERE id = $7`,
+        SET name = $1, user_id = $2, bot_type = $3, state = $4, job_type = $5, task_chain_id = $6, updated_at = $7
+        WHERE id = $8`,
 		bot.Name,
 		bot.UserID,
 		bot.BotType,
+		bot.State,
 		bot.JobType,
 		bot.TaskChainID,
 		bot.UpdatedAt,
@@ -112,7 +116,7 @@ func (s *store) DeleteBot(ctx context.Context, id string) error {
 
 func (s *store) ListBots(ctx context.Context) ([]*Bot, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at
+        SELECT id, name, user_id, bot_type, state, job_type, task_chain_id, created_at, updated_at
         FROM bots
         ORDER BY created_at DESC`,
 	)
@@ -129,6 +133,7 @@ func (s *store) ListBots(ctx context.Context) ([]*Bot, error) {
 			&bot.Name,
 			&bot.UserID,
 			&bot.BotType,
+			&bot.State,
 			&bot.JobType,
 			&bot.TaskChainID,
 			&bot.CreatedAt,
@@ -148,7 +153,7 @@ func (s *store) ListBots(ctx context.Context) ([]*Bot, error) {
 
 func (s *store) ListBotsByUser(ctx context.Context, userID string) ([]*Bot, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at
+        SELECT id, name, user_id, bot_type, state, job_type, task_chain_id, created_at, updated_at
         FROM bots
         WHERE user_id = $1
         ORDER BY created_at DESC`,
@@ -167,6 +172,7 @@ func (s *store) ListBotsByUser(ctx context.Context, userID string) ([]*Bot, erro
 			&bot.Name,
 			&bot.UserID,
 			&bot.BotType,
+			&bot.State,
 			&bot.JobType,
 			&bot.TaskChainID,
 			&bot.CreatedAt,

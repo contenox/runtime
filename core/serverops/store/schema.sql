@@ -14,6 +14,7 @@ CREATE TABLE bots (
     name VARCHAR(512) NOT NULL UNIQUE,
     user_id VARCHAR(512) NOT NULL,
     bot_type VARCHAR(512) NOT NULL,
+    state bytea NOT NULL,
     job_type VARCHAR(512) NOT NULL,
     task_chain_id VARCHAR(512) NOT NULL,
 

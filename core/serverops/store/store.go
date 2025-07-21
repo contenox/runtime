@@ -254,6 +254,7 @@ type Bot struct {
 
 	BotType     string    `json:"botType"`
 	JobType     string    `json:"jobType"`
+	State       []byte    `json:"state"`
 	TaskChainID string    `json:"taskChainId"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
