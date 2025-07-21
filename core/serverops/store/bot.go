@@ -189,3 +189,41 @@ func (s *store) ListBotsByUser(ctx context.Context, userID string) ([]*Bot, erro
 
 	return bots, nil
 }
+
+func (s *store) ListBotsByJobType(ctx context.Context, jobType string) ([]*Bot, error) {
+	rows, err := s.Exec.QueryContext(ctx, `
+        SELECT id, name, user_id, bot_type, job_type, task_chain_id, created_at, updated_at
+        FROM bots
+        WHERE job_type = $1
+        ORDER BY created_at DESC`,
+		jobType,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query bots by job type: %w", err)
+	}
+	defer rows.Close()
+
+	var bots []*Bot
+	for rows.Next() {
+		var bot Bot
+		if err := rows.Scan(
+			&bot.ID,
+			&bot.Name,
+			&bot.UserID,
+			&bot.BotType,
+			&bot.JobType,
+			&bot.TaskChainID,
+			&bot.CreatedAt,
+			&bot.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan bot: %w", err)
+		}
+		bots = append(bots, &bot)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return bots, nil
+}

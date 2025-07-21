@@ -390,6 +390,7 @@ type Store interface {
 	UpdateBot(ctx context.Context, bot *Bot) error
 	DeleteBot(ctx context.Context, id string) error
 	ListBots(ctx context.Context) ([]*Bot, error)
+	ListBotsByJobType(ctx context.Context, jobType string) ([]*Bot, error)
 	ListBotsByUser(ctx context.Context, userID string) ([]*Bot, error)
 }
 
