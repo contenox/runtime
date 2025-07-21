@@ -94,10 +94,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		if task.Hook == nil {
 			continue
 		}
-		switch task.ID {
-		case "append_user_message", "persist_messages", "preappend_message_to_history":
-			task.Hook.Args["subject_id"] = subjectID
-		}
+		task.Hook.Args["subject_id"] = subjectID
 	}
 
 	// Execute chain

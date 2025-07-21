@@ -207,7 +207,10 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			startTime := time.Now().UTC()
 
 			output, outputType, transitionEval, taskErr = exe.exec.TaskExec(taskCtx, startingTime, resolver, int(chain.TokenLimit), currentTask, taskInput, taskInputType)
-
+			if taskErr != nil {
+				taskErr = fmt.Errorf("task %s: %w", currentTask.ID, taskErr)
+				reportErrAttempt(taskErr)
+			}
 			duration := time.Since(startTime)
 			errState := ErrorResponse{
 				ErrorInternal: taskErr,
