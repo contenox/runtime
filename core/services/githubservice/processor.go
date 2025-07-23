@@ -20,15 +20,6 @@ type GitHubCommentProcessor struct {
 	tracker serverops.ActivityTracker
 }
 
-type jobPayload struct {
-	RepoID    string `json:"repo_id"`
-	PRNumber  int    `json:"pr_number"`
-	CommentID string `json:"comment_id"`
-	MessageID string `json:"message_id"`
-	UserName  string `json:"user_name"`
-	Content   string `json:"content"`
-}
-
 func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
@@ -56,7 +47,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	}()
 
 	// Unmarshal payload
-	var payload jobPayload
+	var payload GithubMessage
 	if err = json.Unmarshal(job.Payload, &payload); err != nil {
 		err = fmt.Errorf("failed to unmarshal job payload: %w", err)
 		reportErr(err)
@@ -88,11 +79,14 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	}
 
 	// Configure chain with subject context
-	subjectID := fmt.Sprintf("%s:%d", payload.RepoID, payload.PRNumber)
+	subjectID := fmt.Sprintf("%s:%d", payload.RepoID, payload.PR)
 	for i := range chain.Tasks {
 		task := &chain.Tasks[i]
 		if task.Hook == nil {
 			continue
+		}
+		if task.Hook.Args == nil {
+			task.Hook.Args = make(map[string]string)
 		}
 		task.Hook.Args["subject_id"] = subjectID
 	}
@@ -120,7 +114,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	}
 
 	// Post response to GitHub
-	if err = p.postGitHubComment(ctx, payload.RepoID, payload.PRNumber, lastMsg.Content); err != nil {
+	if err = p.postGitHubComment(ctx, payload.RepoID, payload.PR, lastMsg.Content); err != nil {
 		err = fmt.Errorf("failed to post GitHub comment: %w", err)
 		reportErr(err)
 		return
@@ -140,8 +134,9 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		reportErr(err)
 		return
 	}
+	messageID := fmt.Sprintf("%v-%v", payload.PR, payload.CommentID)
 	message := store.Message{
-		ID:      fmt.Sprintf("response-%s", payload.MessageID),
+		ID:      fmt.Sprintf("response-%s", messageID),
 		IDX:     subjectID,
 		AddedAt: time.Now().UTC(),
 		Payload: jsonBytes,
@@ -155,9 +150,9 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	// Prepare success data
 	changeData = map[string]interface{}{
 		"repo_id":            payload.RepoID,
-		"pr_number":          payload.PRNumber,
+		"pr_number":          payload.PR,
 		"comment_id":         payload.CommentID,
-		"message_id":         payload.MessageID,
+		"message_id":         payload.CommentID,
 		"assistant_response": lastMsg.Content,
 	}
 

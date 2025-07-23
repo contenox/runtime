@@ -204,13 +204,13 @@ func (w *worker) processLeasedJob(
 }
 
 type GithubMessage struct {
-	ID        int64
-	UserName  string
-	UserEmail string
-	UserID    string
-	PR        int
-	RepoID    string
-	Body      string
+	CommentID int64  `json:"commentID"`
+	UserName  string `json:"userName"`
+	UserEmail string `json:"userEmail"`
+	UserID    string `json:"userID"`
+	PR        int    `json:"pr"`
+	RepoID    string `json:"repoID"`
+	Content   string `json:"content"`
 }
 
 func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int, lastSync time.Time) error {
@@ -386,7 +386,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			CommentID: commentID,
 			MessageID: msg.ID,
 			UserName:  githubMsg.UserName,
-			Content:   githubMsg.Body,
+			Content:   githubMsg.Content,
 		})
 		if err != nil {
 			reportErr(fmt.Errorf("failed to marshal job payload: %w", err))
