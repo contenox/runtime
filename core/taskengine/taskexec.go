@@ -291,7 +291,6 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			}
 			return nil, DataTypeAny, "", errors.New(message)
 		}
-
 	case ModelExecution:
 		if currentTask.ExecuteConfig == nil {
 			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")

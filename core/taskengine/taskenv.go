@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"dario.cat/mergo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/serverops"
 )
@@ -237,6 +238,98 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			if taskErr != nil {
 				reportErrAttempt(taskErr)
 				continue retryLoop
+			}
+
+			// Handle compose statement
+			if currentTask.Compose != nil {
+				compose := currentTask.Compose
+
+				// Fetch right value
+				rightVal, ok := vars[compose.WithVar]
+				if !ok {
+					return nil, stack.GetExecutionHistory(), fmt.Errorf("compose right_var %q not found", compose.WithVar) // Use stack.GetExecutionHistory()
+				}
+
+				// Determine strategy
+				strategy := compose.Strategy
+				if strategy == "" {
+					// Automatic strategy selection based on types
+					if dataType == DataTypeChatHistory && varTypes[compose.WithVar] == DataTypeChatHistory {
+						strategy = "chathistory_append"
+					} else {
+						strategy = "override"
+					}
+				}
+
+				// Clone current output to avoid mutation during merge
+				merged := output
+
+				// Merge based on strategy
+				switch strategy {
+				case "override":
+					if err := mergo.Merge(&merged, rightVal, mergo.WithOverride); err != nil {
+						return nil, stack.GetExecutionHistory(), fmt.Errorf("merge failed (override): %w", err)
+					}
+				case "append_string_to_chat_history":
+					if dataType == DataTypeString {
+						leftCH, leftIsCH := output.(string)
+						rightCH, rightIsCH := rightVal.(ChatHistory)
+						if leftIsCH && rightIsCH {
+							merged = ChatHistory{
+								Messages: append([]Message{
+									{
+										Content: leftCH,
+										Role:    "system",
+									},
+								}, rightCH.Messages...),
+								InputTokens: 0, // should be recalculated.
+							}
+						}
+					}
+				case "merge_chat_histories":
+					// Explicitly check types for this strategy
+					leftCH, leftIsCH := output.(ChatHistory)
+					rightCH, rightIsCH := rightVal.(ChatHistory)
+
+					if !leftIsCH || !rightIsCH {
+						rightType, ok := varTypes[compose.WithVar]
+						if !ok {
+							return nil, stack.GetExecutionHistory(), fmt.Errorf("compose strategy 'chathistory_append' requires both right value to exist")
+						}
+
+						return nil, stack.GetExecutionHistory(), fmt.Errorf("compose strategy 'chathistory_append' requires both left (type: %s) and right (type: %s) values to be ChatHistory", dataType.String(), rightType.String())
+					}
+
+					// Perform the custom merge: Append right messages to left messages
+					leftCH.Messages = append(leftCH.Messages, rightCH.Messages...)
+
+					// Sum the token counts
+					leftCH.InputTokens += rightCH.InputTokens
+					leftCH.OutputTokens += rightCH.OutputTokens
+
+					// Clear the Model field if the models are different
+					if leftCH.Model != rightCH.Model {
+						leftCH.Model = ""
+					}
+					// If models are the same, leftCH.Model remains unchanged.
+					merged = leftCH
+				default:
+					return nil, stack.GetExecutionHistory(), fmt.Errorf("unsupported compose strategy: %q", strategy)
+				}
+
+				// Update task output to composed value
+				output = merged
+				var composedVarType DataType
+				if dataType == varTypes[compose.WithVar] {
+					composedVarType = dataType
+				} else {
+					// Types differ (e.g., ChatHistory + String), result type is ambiguous.
+					composedVarType = DataTypeAny
+				}
+				// Store in new variable
+				outputVarName := currentTask.ID + "_composed"
+				vars[outputVarName] = output
+				varTypes[outputVarName] = composedVarType
 			}
 
 			// Report successful attempt

@@ -102,7 +102,6 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 }
 
 type BuildChatChainReq struct {
-	SubjectID           string
 	PreferredModelNames []string
 	Provider            string
 }
@@ -186,8 +185,8 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
-							Operator: taskengine.OpDefault,
-							Goto:     "append_user_message",
+							Operator: taskengine.OpDefault, Goto: "execute_model_on_messages",
+							AlertOnMatch: "Test Alert",
 						},
 					},
 				},
@@ -201,7 +200,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: taskengine.OpDefault, Goto: "append_user_message_2"},
+						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -222,17 +221,15 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				ID:             "append_search_results",
 				Type:           taskengine.Hook,
 				PromptTemplate: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}",
-				Hook: &taskengine.HookCall{
-					Type: "append_system_message",
-					Args: map[string]string{
-						"subject_id": "",
-					},
+				Compose: &taskengine.ComposeTask{
+					WithVar:  "input",
+					Strategy: "append_string_to_chat_history",
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
 							Operator: taskengine.OpDefault,
-							Goto:     "swap_to_input",
+							Goto:     "execute_model_on_messages",
 						},
 					},
 				},
@@ -249,7 +246,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
-						{Operator: taskengine.OpDefault, Goto: "append_user_message_2"},
+						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
 					},
 				},
 			},
@@ -282,30 +279,11 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				ID:             "raise_error",
 				Description:    "Raise an error",
 				Type:           taskengine.RaiseError,
-				PromptTemplate: "{{.input}}",
+				PromptTemplate: "Error processing: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
-					},
-				},
-			},
-			{
-				ID:          "append_user_message",
-				Description: "Append user message to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "append_user_message",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{
-							Operator: taskengine.OpDefault, Goto: "execute_model_on_messages",
-							AlertOnMatch: "Test Alert",
-						},
 					},
 				},
 			},
@@ -321,41 +299,6 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 					Providers: []string{req.Provider},
 				},
 				// InputVar: "append_user_message",
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{Operator: taskengine.OpDefault, Goto: "persist_messages"},
-					},
-				},
-			},
-			{
-				ID:          "append_user_message_2",
-				Description: "Append user message to chat history",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "append_user_message",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
-				Transition: taskengine.TaskTransition{
-					Branches: []taskengine.TransitionBranch{
-						{
-							Operator: taskengine.OpDefault, Goto: "persist_messages",
-							AlertOnMatch: "Test Alert",
-						},
-					},
-				},
-			},
-			{
-				ID:          "persist_messages",
-				Description: "Persist the conversation",
-				Type:        taskengine.Hook,
-				Hook: &taskengine.HookCall{
-					Type: "persist_messages",
-					Args: map[string]string{
-						"subject_id": req.SubjectID,
-					},
-				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
