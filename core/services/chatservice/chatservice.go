@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
@@ -31,17 +32,20 @@ type OpenAIChat interface {
 }
 
 type service struct {
-	dbInstance libdb.DBManager
-	env        taskengine.EnvExecutor
+	dbInstance  libdb.DBManager
+	chatManager *chat.Manager
+	env         taskengine.EnvExecutor
 }
 
 func New(
 	dbInstance libdb.DBManager,
 	env taskengine.EnvExecutor,
+	chatManager *chat.Manager,
 ) Service {
 	return &service{
-		dbInstance: dbInstance,
-		env:        env,
+		dbInstance:  dbInstance,
+		env:         env,
+		chatManager: chatManager,
 	}
 }
 
@@ -109,7 +113,17 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return "", 0, 0, nil, err
 	}
-
+	messages, err := s.chatManager.ListMessages(ctx, tx, req.SubjectID)
+	if err != nil {
+		return "", 0, 0, nil, err
+	}
+	messages, err = s.chatManager.AppendMessage(ctx, messages, req.Message, "user")
+	if err != nil {
+		return "", 0, 0, nil, err
+	}
+	history := taskengine.ChatHistory{
+		Messages: messages,
+	}
 	// Retrieve chain from store
 	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, tasksrecipes.StandardChatChainID)
 	if err != nil {
@@ -126,21 +140,10 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 			task.ExecuteConfig.Models = req.PreferredModelNames
 			task.ExecuteConfig.Provider = req.Provider
 		}
-		switch task.ID {
-		case "append_user_message":
-			task.Hook.Args["subject_id"] = req.SubjectID
-		case "append_user_message_2":
-			task.Hook.Args["subject_id"] = req.SubjectID
-		case "persist_messages":
-			task.Hook.Args["subject_id"] = req.SubjectID
-		case "append_search_results":
-			task.Hook.Args["subject_id"] = req.SubjectID
-		}
-
 	}
 
 	// Execute chain
-	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req.Message, taskengine.DataTypeString)
+	result, stackTrace, err := s.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return "", 0, 0, stackTrace, fmt.Errorf("chain execution failed: %w", err)
 	}

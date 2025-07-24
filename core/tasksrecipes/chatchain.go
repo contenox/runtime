@@ -138,11 +138,12 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
-				ID:             "moderate",
-				Description:    "Moderate the input",
-				Type:           taskengine.ParseNumber,
-				PromptTemplate: "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}",
-				InputVar:       "input",
+				ID:                "moderate",
+				Description:       "Moderate the input",
+				Type:              taskengine.ParseNumber,
+				SystemInstruction: "You are a task processing engine talking to other machines. Return the direct answer without explanation to the given task.",
+				PromptTemplate:    "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}",
+				InputVar:          "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{
@@ -159,11 +160,12 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				},
 			},
 			{
-				ID:             "do_we_need_context",
-				Description:    "Add context to the conversation",
-				Type:           taskengine.RawString,
-				PromptTemplate: "Rate how likely it is that the answer requires access to this internal information respond with an numeric value between (0) not likely and (10) highly likely. Input {{.input}}",
-				InputVar:       "input",
+				ID:                "do_we_need_context",
+				Description:       "Add context to the conversation",
+				Type:              taskengine.RawString,
+				SystemInstruction: "You are a task processing engine talking to other machines. Return the direct answer without explanation to the given task.",
+				PromptTemplate:    "Rate how likely it is that the answer requires access to this internal information respond with an numeric value between (0) not likely and (10) highly likely. Input {{.input}}",
+				InputVar:          "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{

@@ -156,7 +156,7 @@ func New(
 	modelService = modelservice.WithActivityTracker(modelService, serveropsChainedTracker)
 	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
 
-	chatService := chatservice.New(dbInstance, environmentExec)
+	chatService := chatservice.New(dbInstance, environmentExec, chatManager)
 	chatService = chatservice.WithActivityTracker(chatService, serveropsChainedTracker)
 	chatapi.AddChatRoutes(mux, config, chatService, state)
 	userService := userservice.New(dbInstance, config)

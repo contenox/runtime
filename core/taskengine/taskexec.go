@@ -179,7 +179,7 @@ func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, 
 	}
 	i, err := strconv.Atoi(response)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("invalid number format: %s %w", response, err)
 	}
 	return i, nil
 }

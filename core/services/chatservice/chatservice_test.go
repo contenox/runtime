@@ -67,7 +67,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		log.Fatalf("initializing task engine failed: %v", err)
 	}
 	t.Run("creating new chat instance", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, environmentExec)
+		manager := chatservice.New(dbInstance, environmentExec, manager)
 
 		// Test valid model
 		id, err := manager.NewInstance(ctx, "user1")
@@ -76,7 +76,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("simple chat interaction tests", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, environmentExec)
+		manager := chatservice.New(dbInstance, environmentExec, manager)
 
 		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("simple echo command interaction tests", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, environmentExec)
+		manager := chatservice.New(dbInstance, environmentExec, manager)
 
 		id, err := manager.NewInstance(ctx, "user1")
 		require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("test chat history via interactions", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, environmentExec)
+		manager := chatservice.New(dbInstance, environmentExec, manager)
 
 		// Create new chat instance
 		id, err := manager.NewInstance(ctx, "user1")
@@ -192,7 +192,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	})
 
 	t.Run("simulate extended chat conversation", func(t *testing.T) {
-		manager := chatservice.New(dbInstance, environmentExec)
+		manager := chatservice.New(dbInstance, environmentExec, manager)
 
 		subject := "user-long-convo"
 
