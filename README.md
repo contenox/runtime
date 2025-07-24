@@ -45,6 +45,158 @@ Key components include:
 
 ---
 
+## Example
+
+```yaml
+id: chat_chain
+description: Standard chat processing pipeline with hooks
+debug: true
+tasks:
+  - id: mux_input
+    description: Check for commands like /echo
+    type: parse_transition
+    transition:
+      branches:
+        - operator: default
+          goto: moderate
+        - operator: equals
+          when: echo
+          goto: echo_message
+        - operator: equals
+          when: help
+          goto: print_help_message
+        - operator: equals
+          when: search
+          goto: search_knowledge
+
+  - id: moderate
+    description: Moderate the input
+    type: parse_number
+    prompt_template: "Classify the input as safe (0) or spam (10) respond with an numeric value between 0 and 10. Input: {{.input}}"
+    input_var: input
+    transition:
+      branches:
+        - operator: ">"
+          when: "4"
+          goto: reject_request
+        - operator: default
+          goto: do_we_need_context
+      on_failure: request_failed
+
+  - id: do_we_need_context
+    description: Add context to the conversation
+    type: raw_string
+    prompt_template: "Rate how likely it is that the answer requires access to this internal information respond with an numeric value between (0) not likely and (10) highly likely. Input {{.input}}"
+    input_var: input
+    transition:
+      branches:
+        - operator: default
+          goto: swap_to_input
+        - operator: ">"
+          when: "4"
+          goto: search_knowledge
+
+  - id: swap_to_input
+    type: noop
+    input_var: input
+    transition:
+      branches:
+        - operator: default
+          goto: execute_model_on_messages
+          alert_on_match: Test Alert
+
+  - id: echo_message
+    description: Echo the message
+    type: hook
+    hook:
+      type: echo
+    transition:
+      branches:
+        - operator: default
+          goto: end
+
+  - id: search_knowledge
+    description: Search knowledge base
+    type: hook
+    hook:
+      type: search_knowledge
+    transition:
+      branches:
+        - operator: default
+          goto: append_search_results
+
+  - id: append_search_results
+    type: hook
+    prompt_template: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}"
+    compose:
+      with_var: input
+      strategy: append_string_to_chat_history
+    transition:
+      branches:
+        - operator: default
+          goto: execute_model_on_messages
+
+  - id: print_help_message
+    description: Display help message
+    type: hook
+    hook:
+      type: print
+      args:
+        message: |
+          Available commands:
+          /echo <text>
+          /help
+          /search <query>
+    transition:
+      branches:
+        - operator: default
+          goto: end
+
+  - id: reject_request
+    description: Reject the request
+    type: raw_string
+    prompt_template: "respond to the user that request was rejected because the input was flagged: {{.input}}"
+    input_var: input
+    transition:
+      branches:
+        - operator: default
+          goto: raise_error
+
+  - id: request_failed
+    description: Reject the request
+    type: raw_string
+    prompt_template: "respond to the user that classification of the request failed for context the exact input: {{.input}}"
+    input_var: input
+    transition:
+      branches:
+        - operator: default
+          goto: raise_error
+
+  - id: raise_error
+    description: Raise an error
+    type: raise_error
+    prompt_template: "Error processing: {{.input}}"
+    input_var: input
+    transition:
+      branches:
+        - operator: default
+          goto: end
+
+  - id: execute_model_on_messages
+    description: Run inference using selected LLM
+    type: model_execution
+    system_instruction: "You're a helpful assistant in the contenox system. Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. Keep conversation friendly."
+    # Note: execute_config.models and execute_config.providers would be filled dynamically based on 'req' in the Go code.
+    # This YAML represents the static structure.
+    execute_config:
+      models: [] # req.PreferredModelNames would populate this
+      providers: [] # req.Provider would populate this (likely as a single-item list)
+    transition:
+      branches:
+        - operator: default
+          goto: end
+```
+
 ## 🛠️ Development
 
 This project includes tooling and structure to help developers explore and extend the system.
