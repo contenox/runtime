@@ -23,7 +23,7 @@ type Service interface {
 
 type service struct {
 	tracker *taskengine.KVActivitySink
-	alerts  *taskengine.SimpleAlertSink
+	alerts  taskengine.AlertSink
 }
 
 // GetServiceGroup implements Service.
@@ -36,7 +36,7 @@ func (s *service) GetServiceName() string {
 	return "activityservice"
 }
 
-func New(tracker *taskengine.KVActivitySink, alerts *taskengine.SimpleAlertSink) Service {
+func New(tracker *taskengine.KVActivitySink, alerts taskengine.AlertSink) Service {
 	return &service{tracker: tracker, alerts: alerts}
 }
 

@@ -62,7 +62,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), *taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
+	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

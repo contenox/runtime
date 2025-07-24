@@ -94,14 +94,14 @@ type SimpleEnv struct {
 	exec           TaskExecutor
 	tracker        serverops.ActivityTracker
 	inspector      Inspector
-	alertCollector SimpleAlertSink
+	alertCollector AlertSink
 }
 
 // NewEnv creates a new SimpleEnv with the given tracker and task executor.
 func NewEnv(
 	_ context.Context,
 	tracker serverops.ActivityTracker,
-	alertCollector SimpleAlertSink,
+	alertCollector AlertSink,
 	exec TaskExecutor,
 	inspector Inspector,
 ) (EnvExecutor, error) {
