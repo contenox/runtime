@@ -186,8 +186,6 @@ tasks:
     description: Run inference using selected LLM
     type: model_execution
     system_instruction: "You're a helpful assistant in the contenox system. Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. Keep conversation friendly."
-    # Note: execute_config.models and execute_config.providers would be filled dynamically based on 'req' in the Go code.
-    # This YAML represents the static structure.
     execute_config:
       models: []
       providers: []
