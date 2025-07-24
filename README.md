@@ -189,8 +189,8 @@ tasks:
     # Note: execute_config.models and execute_config.providers would be filled dynamically based on 'req' in the Go code.
     # This YAML represents the static structure.
     execute_config:
-      models: [] # req.PreferredModelNames would populate this
-      providers: [] # req.Provider would populate this (likely as a single-item list)
+      models: []
+      providers: []
     transition:
       branches:
         - operator: default
