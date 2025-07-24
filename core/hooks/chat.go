@@ -73,34 +73,34 @@ func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataTyp
 // AppendUserInputToChathistory appends a user message to the current chat history. The subject_id must already exist.
 func (h *Chat) AppendUserInputToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeString {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected string input")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat expected string input got %s", dataType.String())
 	}
 
 	inputStr, ok := input.(string)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type expected string")
 	}
 	if inputStr == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("empty input")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an empty input, expected non-empty string")
 	}
 
 	// Get subject ID from hook args
 	subjectID, ok := hookCall.Args["subject_id"]
 	if !ok || subjectID == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("missing subject_id")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid subject_id")
 	}
 
 	// Get chat history from DB
 	tx := h.dbInstance.WithoutTransaction()
 	messages, err := h.chatManager.ListMessages(ctx, tx, subjectID)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to load history: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an failed to load history: %w", err)
 	}
 
 	// Append new message
 	updatedMessages, err := h.chatManager.AppendMessage(ctx, messages, inputStr, "user")
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("failed to append message: %w", err)
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an failed to append message: %w", err)
 	}
 
 	history := taskengine.ChatHistory{
@@ -117,7 +117,7 @@ func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time
 
 	openAIHistory, ok := input.(taskengine.OpenAIChatRequest)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got %s an invalid input type, expected OpenAIChatRequest", dataType.String())
 	}
 	history := taskengine.ChatHistory{
 		Messages: []taskengine.Message{},
@@ -138,10 +138,10 @@ func (h *Chat) AppendInstructionToChathistory(ctx context.Context, startTime tim
 
 	inputStr, ok := input.(string)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got an invalid input type expected a non-empty string")
 	}
 	if inputStr == "" {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("empty input")
+		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append instruction to chat got an empty input,got: %s expected a non-empty string", dataType.String())
 	}
 
 	// Get subject ID from hook args

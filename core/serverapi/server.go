@@ -115,6 +115,36 @@ func New(
 		10*time.Second,         // interval
 		state.RunDownloadCycle, // operation
 	)
+
+	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, serveropsChainedTracker)
+	libroutine.GetPool().StartLoop(
+		ctx,
+		"github-comment-processor",
+		4,
+		10*time.Second,
+		10*time.Second,
+		func(ctx context.Context) error {
+			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-comment-processor-"+uuid.New().String())
+			storeInstance := store.New(dbInstance.WithoutTransaction())
+			job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubProcessCommentLLM)
+			if err != nil {
+				if errors.Is(err, libdb.ErrNotFound) {
+					return nil
+				}
+				return fmt.Errorf("fetching GitHub comment job: %w", err)
+			}
+
+			// Process the job
+			if err := githubProcessor.ProcessJob(ctx, job); err != nil {
+				if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+					return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+				}
+				return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
+			}
+
+			return nil
+		},
+	)
 	fileService := fileservice.New(dbInstance, config)
 	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
 	fileService = fileservice.WithActivityTracker(fileService, serveropsChainedTracker)

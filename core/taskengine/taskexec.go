@@ -324,6 +324,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 		if currentTask.Hook == nil {
 			taskErr = fmt.Errorf("hook task missing hook definition")
 		} else {
+			if currentTask.Hook.Args == nil {
+				currentTask.Hook.Args = make(map[string]string)
+			}
 			output, outputType, transitionEval, taskErr = exe.hookengine(
 				taskCtx,
 				startingTime,

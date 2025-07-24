@@ -125,23 +125,25 @@ func (s *SimpleStackTrace) RecordStep(step CapturedStateUnit) {
 		}
 
 		// Get KV operation handle
-		kvOp, err := s.kvManager.Operation(s.ctx)
+		opCtx, timeout := context.WithTimeout(context.Background(), time.Second*10)
+		defer timeout()
+		kvOp, err := s.kvManager.Operation(opCtx)
 		if err != nil {
 			log.Printf("SERVERBUG: Failed to get KV operation: %v", err)
 			return
 		}
 
 		// Push step to KV list
-		if err := kvOp.LPush(s.ctx, key, data); err != nil {
+		if err := kvOp.LPush(opCtx, key, data); err != nil {
 			log.Printf("SERVERBUG: Failed to store step in KV: %v", err)
 			return
 		}
 
-		listLen, err := kvOp.LLen(s.ctx, key)
+		listLen, err := kvOp.LLen(opCtx, key)
 		if err != nil {
 			log.Printf("SERVERBUG: Failed to get list length: %v", err)
 		} else if listLen > 1000 {
-			if err := kvOp.LTrim(s.ctx, key, 0, 999); err != nil {
+			if err := kvOp.LTrim(opCtx, key, 0, 999); err != nil {
 				log.Printf("SERVERBUG: Failed to trim KV list: %v", err)
 			}
 		}
