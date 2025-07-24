@@ -267,27 +267,37 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				// Merge based on strategy
 				switch strategy {
 				case "override":
-					if err := mergo.Merge(&merged, rightVal, mergo.WithOverride); err != nil {
+					baseMap, isBaseMap := output.(map[string]any)
+					overridesMap, isOverridesMap := rightVal.(map[string]any)
+					if !isBaseMap || !isOverridesMap {
+						return nil, stack.GetExecutionHistory(), fmt.Errorf("invalid types for override")
+					}
+					if err := mergo.Merge(&baseMap, overridesMap, mergo.WithOverride); err != nil {
 						return nil, stack.GetExecutionHistory(), fmt.Errorf("merge failed (override): %w", err)
 					}
+					merged = baseMap
 				case "append_string_to_chat_history":
-					if dataType == DataTypeString {
-						leftCH, leftIsCH := output.(string)
-						rightCH, rightIsCH := rightVal.(ChatHistory)
-						if leftIsCH && rightIsCH {
-							merged = ChatHistory{
-								Messages: append([]Message{
-									{
-										Content: leftCH,
-										Role:    "system",
-									},
-								}, rightCH.Messages...),
-								InputTokens: 0, // should be recalculated.
-							}
-						}
+					leftCH, leftIsCH := output.(string)
+					rightCH, rightIsCH := rightVal.(ChatHistory)
+					if !leftIsCH || !rightIsCH {
+						leftCH, leftIsCH = rightVal.(string)
+						rightCH, rightIsCH = output.(ChatHistory)
+					}
+					if !leftIsCH || !rightIsCH {
+						return nil, stack.GetExecutionHistory(), fmt.Errorf("compose strategy 'append_string_to_chat_history' requires both left and right values to be either string or ChatHistory")
+					}
+					merged = ChatHistory{
+						Messages: append([]Message{
+							{
+								Content: leftCH,
+								Role:    "system",
+							},
+						}, rightCH.Messages...),
+						Model:        rightCH.Model,
+						OutputTokens: 0,
+						InputTokens:  0, // should be recalculated.
 					}
 				case "merge_chat_histories":
-					// Explicitly check types for this strategy
 					leftCH, leftIsCH := output.(ChatHistory)
 					rightCH, rightIsCH := rightVal.(ChatHistory)
 
@@ -300,8 +310,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 						return nil, stack.GetExecutionHistory(), fmt.Errorf("compose strategy 'chathistory_append' requires both left (type: %s) and right (type: %s) values to be ChatHistory", dataType.String(), rightType.String())
 					}
 
-					// Perform the custom merge: Append right messages to left messages
-					leftCH.Messages = append(leftCH.Messages, rightCH.Messages...)
+					leftCH.Messages = append(rightCH.Messages, leftCH.Messages...)
 
 					// Sum the token counts
 					leftCH.InputTokens += rightCH.InputTokens

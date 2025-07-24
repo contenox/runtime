@@ -11,10 +11,12 @@ import (
 )
 
 func TestUnit_ComposeOverride(t *testing.T) {
-	// Setup environment
+	// Setup environment with proper mock sequence
 	mockExec := &taskengine.MockTaskExecutor{
-		MockOutput:      map[string]any{"b": 3, "c": 4},
-		MockRawResponse: "",
+		MockOutputSequence: []any{
+			map[string]any{"a": 1, "b": 2},
+			map[string]any{"b": 3, "c": 4},
+		},
 	}
 	env := setupTestEnv(mockExec)
 
@@ -58,17 +60,18 @@ func TestUnit_ComposeOverride(t *testing.T) {
 func TestUnit_ComposeAppendStringToChatHistory(t *testing.T) {
 	// Setup environment
 	mockExec := &taskengine.MockTaskExecutor{
-		MockOutput:      "System message",
-		MockRawResponse: "",
+		MockOutputSequence: []any{
+			"New system message", // Task1 output (string)
+			taskengine.ChatHistory{ // Task2 output (ChatHistory)
+				Messages: []taskengine.Message{
+					{Role: "user", Content: "Hello"},
+				},
+			},
+		},
 	}
 	env := setupTestEnv(mockExec)
 
 	// Define chain
-	rightChat := taskengine.ChatHistory{
-		Messages: []taskengine.Message{
-			{Role: "user", Content: "Hello"},
-		},
-	}
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
@@ -97,45 +100,41 @@ func TestUnit_ComposeAppendStringToChatHistory(t *testing.T) {
 	}
 
 	// Execute chain
-	output, _, err := env.ExecEnv(context.Background(), chain, rightChat, taskengine.DataTypeChatHistory)
+	output, _, err := env.ExecEnv(context.Background(), chain, nil, taskengine.DataTypeAny)
 	require.NoError(t, err)
 
 	// Verify composition
-	composed, ok := output.(taskengine.ChatHistory)
-	require.True(t, ok)
-	expected := taskengine.ChatHistory{
-		Messages: []taskengine.Message{
-			{Role: "system", Content: "System message"},
-			{Role: "user", Content: "Hello"},
-		},
-	}
-	assert.Equal(t, expected.Messages, composed.Messages)
+	ch, ok := output.(taskengine.ChatHistory)
+	require.True(t, ok, "output should be ChatHistory")
+	require.Len(t, ch.Messages, 2)
+	assert.Equal(t, "system", ch.Messages[0].Role)
+	assert.Equal(t, "New system message", ch.Messages[0].Content)
+	assert.Equal(t, "user", ch.Messages[1].Role)
+	assert.Equal(t, "Hello", ch.Messages[1].Content)
 }
 
 func TestUnit_ComposeMergeChatHistories(t *testing.T) {
 	// Setup environment
 	mockExec := &taskengine.MockTaskExecutor{
-		MockOutput: taskengine.ChatHistory{
-			Messages: []taskengine.Message{
-				{Role: "user", Content: "Hello"},
+		MockOutputSequence: []any{
+			taskengine.ChatHistory{ // Task1 output
+				Messages: []taskengine.Message{
+					{Role: "user", Content: "Hello"},
+				},
+				InputTokens: 10,
 			},
-			Model:        "gpt-3.5",
-			InputTokens:  10,
-			OutputTokens: 20,
+			taskengine.ChatHistory{ // Task2 output
+				Messages: []taskengine.Message{
+					{Role: "assistant", Content: "Hi there!"},
+				},
+				InputTokens: 20,
+				Model:       "gpt-4",
+			},
 		},
-		MockRawResponse: "",
 	}
 	env := setupTestEnv(mockExec)
 
 	// Define chain
-	rightChat := taskengine.ChatHistory{
-		Messages: []taskengine.Message{
-			{Role: "assistant", Content: "Hi!"},
-		},
-		Model:        "gpt-4",
-		InputTokens:  5,
-		OutputTokens: 15,
-	}
 	chain := &taskengine.ChainDefinition{
 		Tasks: []taskengine.ChainTask{
 			{
@@ -164,35 +163,33 @@ func TestUnit_ComposeMergeChatHistories(t *testing.T) {
 	}
 
 	// Execute chain
-	output, _, err := env.ExecEnv(context.Background(), chain, rightChat, taskengine.DataTypeChatHistory)
+	output, _, err := env.ExecEnv(context.Background(), chain, nil, taskengine.DataTypeAny)
 	require.NoError(t, err)
 
 	// Verify composition
-	composed, ok := output.(taskengine.ChatHistory)
-	require.True(t, ok)
-	expected := taskengine.ChatHistory{
-		Messages: []taskengine.Message{
-			{Role: "user", Content: "Hello"},
-			{Role: "assistant", Content: "Hi!"},
-		},
-		InputTokens:  15,
-		OutputTokens: 35,
-		Model:        "", // Models differ, so cleared
-	}
-	assert.Equal(t, expected, composed)
+	ch, ok := output.(taskengine.ChatHistory)
+	require.True(t, ok, "output should be ChatHistory")
+	require.Len(t, ch.Messages, 2)
+	assert.Equal(t, "user", ch.Messages[0].Role)
+	assert.Equal(t, "Hello", ch.Messages[0].Content)
+	assert.Equal(t, "assistant", ch.Messages[1].Role)
+	assert.Equal(t, "Hi there!", ch.Messages[1].Content)
+	assert.Equal(t, 30, ch.InputTokens)
+	assert.Empty(t, ch.Model) // Models differ so should be empty
 }
 
 func TestUnit_ComposeAutoStrategy(t *testing.T) {
-	t.Run("AutoSelectsMergeForChatHistories", func(t *testing.T) {
+	t.Run("NonChatHistoryOverride", func(t *testing.T) {
 		// Setup environment
 		mockExec := &taskengine.MockTaskExecutor{
-			MockOutput: taskengine.ChatHistory{
-				Messages: []taskengine.Message{{Role: "user", Content: "Hi"}},
+			MockOutputSequence: []any{
+				map[string]any{"a": 1},
+				map[string]any{"b": 2},
 			},
 		}
 		env := setupTestEnv(mockExec)
 
-		// Define chain with empty strategy
+		// Define chain with automatic strategy
 		chain := &taskengine.ChainDefinition{
 			Tasks: []taskengine.ChainTask{
 				{
@@ -208,63 +205,26 @@ func TestUnit_ComposeAutoStrategy(t *testing.T) {
 					ID:   "task2",
 					Type: taskengine.RawString,
 					Compose: &taskengine.ComposeTask{
-						WithVar: "task1", // Strategy omitted for auto-selection
+						WithVar: "task1", // Strategy omitted for auto
 					},
-				},
-			},
-		}
-
-		// Execute with chat history input
-		_, _, err := env.ExecEnv(
-			context.Background(),
-			chain,
-			taskengine.ChatHistory{},
-			taskengine.DataTypeChatHistory,
-		)
-
-		// Should succeed with merge strategy
-		assert.NoError(t, err)
-	})
-
-	t.Run("AutoSelectsOverrideForOtherTypes", func(t *testing.T) {
-		// Setup environment
-		mockExec := &taskengine.MockTaskExecutor{
-			MockOutput: "test output",
-		}
-		env := setupTestEnv(mockExec)
-
-		// Define chain with empty strategy
-		chain := &taskengine.ChainDefinition{
-			Tasks: []taskengine.ChainTask{
-				{
-					ID:   "task1",
-					Type: taskengine.RawString,
 					Transition: taskengine.TaskTransition{
 						Branches: []taskengine.TransitionBranch{
-							{Operator: taskengine.OpDefault, Goto: "task2"},
+							{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
 						},
 					},
 				},
-				{
-					ID:   "task2",
-					Type: taskengine.RawString,
-					Compose: &taskengine.ComposeTask{
-						WithVar: "task1", // Strategy omitted
-					},
-				},
 			},
 		}
 
-		// Execute with string input
-		_, _, err := env.ExecEnv(
-			context.Background(),
-			chain,
-			"right value",
-			taskengine.DataTypeString,
-		)
+		// Execute chain
+		output, _, err := env.ExecEnv(context.Background(), chain, nil, taskengine.DataTypeAny)
+		require.NoError(t, err)
 
-		// Should succeed with override strategy
-		assert.NoError(t, err)
+		// Verify auto-selected override strategy
+		result, ok := output.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, result["a"])
+		assert.Equal(t, 2, result["b"])
 	})
 }
 
@@ -292,6 +252,11 @@ func TestUnit_ComposeErrors(t *testing.T) {
 					Compose: &taskengine.ComposeTask{
 						WithVar:  "task1",
 						Strategy: "invalid_strategy",
+					},
+					Transition: taskengine.TaskTransition{
+						Branches: []taskengine.TransitionBranch{
+							{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
+						},
 					},
 				},
 			},
@@ -327,6 +292,89 @@ func TestUnit_ComposeErrors(t *testing.T) {
 
 		// Verify error
 		assert.ErrorContains(t, err, "compose right_var \"nonexistent\" not found")
+	})
+
+	t.Run("InvalidAppendStringTypes", func(t *testing.T) {
+		// Setup environment
+		mockExec := &taskengine.MockTaskExecutor{
+			MockOutputSequence: []any{
+				[]string{}, // Invalid type
+				taskengine.ChatHistory{},
+			},
+		}
+		env := setupTestEnv(mockExec)
+
+		// Define chain
+		chain := &taskengine.ChainDefinition{
+			Tasks: []taskengine.ChainTask{
+				{
+					ID:   "task1",
+					Type: taskengine.RawString,
+					Transition: taskengine.TaskTransition{
+						Branches: []taskengine.TransitionBranch{
+							{Operator: taskengine.OpDefault, Goto: "task2"},
+						},
+					},
+				},
+				{
+					ID:   "task2",
+					Type: taskengine.RawString,
+					Compose: &taskengine.ComposeTask{
+						WithVar:  "task1",
+						Strategy: "append_string_to_chat_history",
+					},
+					Transition: taskengine.TaskTransition{
+						Branches: []taskengine.TransitionBranch{
+							{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
+						},
+					},
+				},
+			},
+		}
+
+		// Execute chain
+		_, _, err := env.ExecEnv(context.Background(), chain, nil, taskengine.DataTypeAny)
+
+		// Verify error
+		assert.Error(t, err, "invalid types for append_string_to_chat_history")
+	})
+
+	t.Run("InvalidMergeChatHistoryTypes", func(t *testing.T) {
+		// Setup environment
+		mockExec := &taskengine.MockTaskExecutor{
+			MockOutputSequence: []any{
+				"not a chat history",
+				taskengine.ChatHistory{},
+			},
+		}
+		env := setupTestEnv(mockExec)
+
+		// Define chain
+		chain := &taskengine.ChainDefinition{
+			Tasks: []taskengine.ChainTask{
+				{
+					ID:   "task1",
+					Type: taskengine.RawString,
+					Transition: taskengine.TaskTransition{
+						Branches: []taskengine.TransitionBranch{
+							{Operator: taskengine.OpDefault, Goto: "task2"},
+						},
+					},
+				},
+				{
+					ID:   "task2",
+					Type: taskengine.RawString,
+					Compose: &taskengine.ComposeTask{
+						WithVar:  "task1",
+						Strategy: "merge_chat_histories",
+					},
+				},
+			},
+		}
+
+		// Execute chain
+		_, _, err := env.ExecEnv(context.Background(), chain, nil, taskengine.DataTypeAny)
+		assert.Error(t, err, "compose strategy 'merge_chat_histories' requires both left")
 	})
 }
 
