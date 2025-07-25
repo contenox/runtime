@@ -166,15 +166,15 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 			}
 		}
 
-		// Render prompt template using the determined input
-		if taskInputType == DataTypeString && currentTask.PromptTemplate != "" {
+		// Render prompt template if exists
+		if currentTask.PromptTemplate != "" {
 			rendered, err := renderTemplate(currentTask.PromptTemplate, vars)
 			if err != nil {
 				return nil, stack.GetExecutionHistory(), fmt.Errorf("task %s: template error: %v", currentTask.ID, err)
 			}
 			taskInput = rendered
+			taskInputType = DataTypeString
 		}
-
 		maxRetries := max(currentTask.RetryOnFailure, 0)
 
 	retryLoop:
@@ -247,7 +247,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				// Fetch right value
 				rightVal, ok := vars[compose.WithVar]
 				if !ok {
-					return nil, stack.GetExecutionHistory(), fmt.Errorf("compose right_var %q not found", compose.WithVar) // Use stack.GetExecutionHistory()
+					return nil, stack.GetExecutionHistory(), fmt.Errorf("compose right_var %q not found", compose.WithVar)
 				}
 
 				// Determine strategy
@@ -339,6 +339,7 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 				outputVarName := currentTask.ID + "_composed"
 				vars[outputVarName] = output
 				varTypes[outputVarName] = composedVarType
+				outputType = composedVarType
 			}
 
 			// Report successful attempt
