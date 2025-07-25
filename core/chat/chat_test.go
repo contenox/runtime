@@ -3,7 +3,6 @@ package chat_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/kv"
@@ -82,7 +81,6 @@ func TestManagerSystem(t *testing.T) {
 	})
 
 	t.Run("AppendMessages_persists_user_and_assistant_messages", func(t *testing.T) {
-		beginTime := time.Now().UTC()
 		inputMsg := &taskengine.Message{
 			Role:    "user",
 			Content: userMessage,
@@ -92,7 +90,7 @@ func TestManagerSystem(t *testing.T) {
 			Content: "The capital of France is Paris.",
 		}
 
-		err := manager.AppendMessages(ctx, dbInstance.WithoutTransaction(), beginTime, subjectID, inputMsg, responseMsg)
+		err := manager.AppendMessages(ctx, dbInstance.WithoutTransaction(), subjectID, inputMsg, responseMsg)
 		require.NoError(t, err)
 
 		storedMessages, err := manager.ListMessages(ctx, dbInstance.WithoutTransaction(), subjectID)

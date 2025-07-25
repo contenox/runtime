@@ -96,8 +96,9 @@ func (m *Mux) Exec(ctx context.Context, startTime time.Time, input any, dataType
 	if chatHist != nil {
 		if resultStr, ok := result.(string); ok {
 			chatHist.Messages = append(chatHist.Messages, taskengine.Message{
-				Role:    "system",
-				Content: resultStr,
+				Role:      "system",
+				Content:   resultStr,
+				Timestamp: time.Now().UTC(),
 			})
 
 			return taskengine.StatusSuccess, *chatHist, taskengine.DataTypeChatHistory, transition, nil

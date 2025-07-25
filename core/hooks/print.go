@@ -38,8 +38,9 @@ func (h *Print) Exec(ctx context.Context, startTime time.Time, input any, dataTy
 	case taskengine.DataTypeChatHistory:
 		if chatHist, ok := input.(taskengine.ChatHistory); ok {
 			chatHist.Messages = append(chatHist.Messages, taskengine.Message{
-				Role:    "system",
-				Content: message,
+				Role:      "system",
+				Content:   message,
+				Timestamp: time.Now().UTC(),
 			})
 			return taskengine.StatusSuccess, chatHist, taskengine.DataTypeChatHistory, "print", nil
 		}

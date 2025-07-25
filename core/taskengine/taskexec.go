@@ -303,13 +303,26 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			return nil, DataTypeAny, "", fmt.Errorf("llm_execution requires chat history input")
 		}
 		if currentTask.SystemInstruction != "" {
-			messages := []Message{
-				{
-					Role:    "system",
-					Content: currentTask.SystemInstruction,
-				},
+			// Check if the exact system instruction already exists in the messages
+			alreadyPresent := false
+			for _, msg := range chatHistory.Messages {
+				if msg.Role == "system" && msg.Content == currentTask.SystemInstruction {
+					alreadyPresent = true
+					break
+				}
 			}
-			chatHistory.Messages = append(messages, chatHistory.Messages...)
+
+			// Only add if not already present
+			if !alreadyPresent {
+				messages := []Message{
+					{
+						Role:      "system",
+						Content:   currentTask.SystemInstruction,
+						Timestamp: time.Now().UTC(),
+					},
+				}
+				chatHistory.Messages = append(messages, chatHistory.Messages...)
+			}
 		}
 		output, outputType, transitionEval, taskErr = exe.executeLLM(
 			taskCtx,
@@ -450,8 +463,9 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		return nil, DataTypeAny, "", fmt.Errorf("chat failed: %w", err)
 	}
 	input.Messages = append(input.Messages, Message{
-		Role:    resp.Role,
-		Content: resp.Content,
+		Role:      resp.Role,
+		Content:   resp.Content,
+		Timestamp: time.Now().UTC(),
 	})
 	p, err := exe.promptExec.GetDefaultSystemProvider(ctx)
 	if err != nil {

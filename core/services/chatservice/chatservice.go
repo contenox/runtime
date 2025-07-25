@@ -157,6 +157,10 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
 		return "", 0, 0, stackTrace, fmt.Errorf("expected assistant or system message, got %q", lastMsg.Role)
 	}
+	err = s.chatManager.PersistDiff(ctx, tx, req.SubjectID, hist.Messages)
+	if err != nil {
+		return "", 0, 0, stackTrace, fmt.Errorf("failed to persist chat history: %w", err)
+	}
 
 	return lastMsg.Content, hist.InputTokens, hist.OutputTokens, stackTrace, nil
 }

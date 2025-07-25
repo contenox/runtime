@@ -2,6 +2,7 @@ package taskengine
 
 import (
 	"fmt"
+	"time"
 )
 
 // TaskType defines the expected output format of a task.
@@ -365,8 +366,11 @@ const (
 //	fmt.Println("Final output:", output)
 type ChainDefinition struct {
 	// ID uniquely identifies the chain.
-	ID    string `yaml:"id" json:"id"`
-	Debug bool   `yaml:"debug" json:"debug"`
+	ID string `yaml:"id" json:"id"`
+
+	// Enables capturing user input and output.
+	Debug bool `yaml:"debug" json:"debug"`
+
 	// Description provides a human-readable summary of the chain's purpose.
 	Description string `yaml:"description" json:"description"`
 
@@ -394,8 +398,9 @@ type ChatHistory struct {
 }
 
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role      string    `json:"role"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type OpenAIChatRequest struct {

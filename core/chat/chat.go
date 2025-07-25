@@ -4,6 +4,7 @@ package chat
 
 import (
 	"context"
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libdb"
-	"github.com/google/uuid"
 )
 
 // Manager coordinates chat message management and LLM execution.
@@ -39,31 +39,34 @@ func New(
 
 // AddInstruction inserts a system message into an existing chat.
 func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, message string) error {
+	now := time.Now().UTC()
 	msg := taskengine.Message{
-		Role:    "system",
-		Content: message,
+		Role:      "system",
+		Content:   message,
+		Timestamp: now,
 	}
 	payload, err := json.Marshal(&msg)
 	if err != nil {
 		return err
 	}
+
+	messageID := generateMessageID(id, payload)
+
 	err = store.New(tx).AppendMessages(ctx, &store.Message{
-		ID:      uuid.NewString(),
+		ID:      messageID,
 		IDX:     id,
 		Payload: payload,
+		AddedAt: now,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // AppendMessage appends a message to an existing message slice.
 func (m *Manager) AppendMessage(ctx context.Context, messages []taskengine.Message, message string, role string) ([]taskengine.Message, error) {
 	userMsg := taskengine.Message{
-		Role:    role,
-		Content: message,
+		Role:      role,
+		Content:   message,
+		Timestamp: time.Now().UTC(),
 	}
 	messages = append(messages, userMsg)
 
@@ -76,12 +79,12 @@ func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID str
 	if err != nil {
 		return nil, err
 	}
-	// Convert stored messages into the api.Message slice.
+
 	var messages []taskengine.Message
 	for _, msg := range conversation {
 		var parsedMsg taskengine.Message
 		if err := json.Unmarshal([]byte(msg.Payload), &parsedMsg); err != nil {
-			return nil, fmt.Errorf("BUG: TODO: json.Unmarshal([]byte(msg.Data): now what? %w", err)
+			return nil, fmt.Errorf("failed to unmarshal message: %w", err)
 		}
 		messages = append(messages, parsedMsg)
 	}
@@ -90,9 +93,12 @@ func (m *Manager) ListMessages(ctx context.Context, tx libdb.Exec, subjectID str
 }
 
 // AppendMessages stores a user message and the assistant response to the database.
-func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime time.Time, subjectID string, inputMessage *taskengine.Message, responseMessage *taskengine.Message) error {
-	if beginTime.IsZero() {
-		return fmt.Errorf("beginTime cannot be zero")
+func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, subjectID string, inputMessage *taskengine.Message, responseMessage *taskengine.Message) error {
+	if inputMessage.Timestamp.IsZero() {
+		inputMessage.Timestamp = time.Now().UTC()
+	}
+	if responseMessage.Timestamp.IsZero() {
+		responseMessage.Timestamp = time.Now().UTC()
 	}
 	if subjectID == "" {
 		return fmt.Errorf("subjectID cannot be empty")
@@ -103,34 +109,32 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, beginTime t
 	if responseMessage == nil {
 		return fmt.Errorf("responseMessage cannot be nil")
 	}
-	payload, err := json.Marshal(inputMessage)
+	inputPayload, err := json.Marshal(inputMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal user message %w", err)
 	}
 
-	jsonData, err := json.Marshal(responseMessage)
+	responsePayload, err := json.Marshal(responseMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
 
-	err = store.New(tx).AppendMessages(ctx,
+	inputID := generateMessageID(subjectID, inputPayload)
+	responseID := generateMessageID(subjectID, responsePayload)
+
+	return store.New(tx).AppendMessages(ctx,
 		&store.Message{
-			ID:      uuid.NewString(),
+			ID:      inputID,
 			IDX:     subjectID,
-			Payload: payload,
-			AddedAt: beginTime,
+			Payload: inputPayload,
+			AddedAt: inputMessage.Timestamp,
 		},
 		&store.Message{
-			ID:      uuid.New().String(),
+			ID:      responseID,
 			IDX:     subjectID,
-			Payload: jsonData,
-			AddedAt: time.Now().UTC(),
+			Payload: responsePayload,
+			AddedAt: responseMessage.Timestamp,
 		})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // CalculateContextSize estimates the token count for the chat prompt history.
@@ -169,4 +173,57 @@ func (m *Manager) CalculateContextSize(ctx context.Context, messages []taskengin
 	return count, nil
 }
 
+func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID string, hist []taskengine.Message) error {
+	if len(hist) == 0 {
+		return nil
+	}
+
+	conversation, err := store.New(tx).ListMessages(ctx, subjectID)
+	if err != nil {
+		return err
+	}
+
+	// Create set of existing message IDs
+	existingIDs := make(map[string]bool)
+	for _, msg := range conversation {
+		existingIDs[msg.ID] = true
+	}
+
+	var messages []*store.Message
+	for _, msg := range hist {
+		payload, err := json.Marshal(msg)
+		if err != nil {
+			return fmt.Errorf("failed to marshal message: %w", err)
+		}
+
+		messageID := generateMessageID(subjectID, payload)
+
+		if existingIDs[messageID] {
+			continue
+		}
+		if msg.Timestamp.IsZero() {
+			msg.Timestamp = time.Now().UTC()
+		}
+		messages = append(messages, &store.Message{
+			ID:      messageID,
+			IDX:     subjectID,
+			Payload: payload,
+			AddedAt: msg.Timestamp,
+		})
+	}
+
+	if len(messages) > 0 {
+		return store.New(tx).AppendMessages(ctx, messages...)
+	}
+	return nil
+}
+
 const tokenizerMaxPromptBytes = 16 * 1024 // 16 KiB
+
+// Helper function for consistent message ID generation
+func generateMessageID(subjectID string, payload []byte) string {
+	h := sha1.New()
+	h.Write([]byte(subjectID))
+	h.Write(payload)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}

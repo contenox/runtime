@@ -289,8 +289,9 @@ func (exe SimpleEnv) ExecEnv(ctx context.Context, chain *ChainDefinition, input 
 					merged = ChatHistory{
 						Messages: append([]Message{
 							{
-								Content: leftCH,
-								Role:    "system",
+								Content:   leftCH,
+								Role:      "system",
+								Timestamp: time.Now().UTC(),
 							},
 						}, rightCH.Messages...),
 						Model:        rightCH.Model,
