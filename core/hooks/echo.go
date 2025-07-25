@@ -25,12 +25,36 @@ func (e *EchoHook) Exec(ctx context.Context, startTime time.Time, input any, dat
 		}
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid string input")
 	case taskengine.DataTypeChatHistory:
-		if chatHist, ok := input.(taskengine.ChatHistory); ok {
-			lastMsg := chatHist.Messages[len(chatHist.Messages)-1]
-			chatHist.Messages = append(chatHist.Messages, lastMsg)
-			return taskengine.StatusSuccess, chatHist, taskengine.DataTypeChatHistory, transition, nil
+		chatHist, ok := input.(taskengine.ChatHistory)
+		if !ok {
+			return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history input")
 		}
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history input")
+
+		// Create assistant response echoing the last USER message
+		var echoContent string
+		for i := len(chatHist.Messages) - 1; i >= 0; i-- {
+			if chatHist.Messages[i].Role == "user" {
+				echoContent = chatHist.Messages[i].Content
+				break
+			}
+		}
+
+		if echoContent == "" {
+			echoContent = "nothing to echo"
+		}
+
+		// Add new assistant message
+		echoMsg := taskengine.Message{
+			Role:      "assistant",
+			Content:   "Echo: " + echoContent,
+			Timestamp: time.Now().UTC(),
+		}
+
+		chatHist.Messages = append(chatHist.Messages, echoMsg)
+		chatHist.OutputTokens += 0 // Will be calculated later
+
+		return taskengine.StatusSuccess, chatHist, taskengine.DataTypeChatHistory, transition, nil
+
 	default:
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("unsupported data type: %v", dataType)
 	}
