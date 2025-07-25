@@ -126,7 +126,7 @@ tasks:
           goto: append_search_results
 
   - id: append_search_results
-    type: hook
+    type: noop
     prompt_template: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}"
     compose:
       with_var: input
