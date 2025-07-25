@@ -220,7 +220,7 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 			},
 			{
 				ID:             "append_search_results",
-				Type:           taskengine.Hook,
+				Type:           taskengine.Noop,
 				PromptTemplate: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}",
 				Compose: &taskengine.ComposeTask{
 					WithVar:  "input",
