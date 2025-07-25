@@ -204,7 +204,7 @@ func New(
 	telegramapi.AddTelegramRoutes(mux, telegramService)
 	pool = libroutine.GetPool()
 	poller := telegramservice.NewPoller(dbInstance, telegramService)
-	processor := telegramservice.NewProcessor(dbInstance, environmentExec)
+	processor := telegramservice.NewProcessor(dbInstance, environmentExec, chatManager)
 
 	botService := botservice.New(dbInstance)
 	botapi.AddBotRoutes(mux, botService)

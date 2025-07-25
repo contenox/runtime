@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
@@ -16,12 +17,13 @@ import (
 )
 
 type Processor struct {
-	db  libdb.DBManager
-	env taskengine.EnvExecutor
+	db          libdb.DBManager
+	chatManager *chat.Manager
+	env         taskengine.EnvExecutor
 }
 
-func NewProcessor(db libdb.DBManager, env taskengine.EnvExecutor) *Processor {
-	return &Processor{db: db, env: env}
+func NewProcessor(db libdb.DBManager, env taskengine.EnvExecutor, chatManager *chat.Manager) *Processor {
+	return &Processor{db: db, env: env, chatManager: chatManager}
 }
 
 func (p *Processor) ProcessJob(ctx context.Context, job *store.Job) error {
@@ -42,7 +44,8 @@ func (p *Processor) ProcessJob(ctx context.Context, job *store.Job) error {
 }
 
 func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error {
-	storeInstance := store.New(p.db.WithoutTransaction())
+	tx := p.db.WithoutTransaction()
+	storeInstance := store.New(tx)
 
 	// Ensure user exists
 	if err := ensureUserExists(ctx, storeInstance, payload.UserID, payload.Update); err != nil {
@@ -60,33 +63,37 @@ func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error
 		return fmt.Errorf("creating bot API: %w", err)
 	}
 
+	// Get existing messages
+	messages, err := p.chatManager.ListMessages(ctx, tx, payload.SubjectID)
+	if err != nil {
+		return fmt.Errorf("listing messages: %w", err)
+	}
+
+	// Append new user message
+	userMessage := payload.Update.Message.Text
+	messages, err = p.chatManager.AppendMessage(ctx, messages, userMessage, "user")
+	if err != nil {
+		return fmt.Errorf("appending user message: %w", err)
+	}
+
+	// Form chat history
+	history := taskengine.ChatHistory{
+		Messages: messages,
+	}
+
 	// Get chat chain definition
-	chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), payload.ChainID)
+	chain, err := tasksrecipes.GetChainDefinition(ctx, tx, payload.ChainID)
 	if err != nil {
 		return fmt.Errorf("getting chain: %w", err)
 	}
 
-	// Configure chain with subject context
-	for i := range chain.Tasks {
-		task := &chain.Tasks[i]
-		if task.Hook == nil {
-			continue
-		}
-
-		// Set subject ID for relevant tasks
-		switch task.ID {
-		case "append_user_message", "persist_messages", "preappend_message_to_history":
-			task.Hook.Args["subject_id"] = payload.SubjectID
-		}
-	}
-
 	// Execute processing chain
-	result, _, err := p.env.ExecEnv(ctx, chain, payload.Update.Message.Text, taskengine.DataTypeString)
+	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return fmt.Errorf("executing chain: %w", err)
 	}
 
-	// Process and send response
+	// Process result
 	hist, ok := result.(taskengine.ChatHistory)
 	if !ok || len(hist.Messages) == 0 {
 		return errors.New("invalid chain result - expected chat history")
@@ -95,6 +102,11 @@ func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error
 	lastMsg := hist.Messages[len(hist.Messages)-1]
 	if lastMsg.Role != "assistant" && lastMsg.Role != "system" {
 		return fmt.Errorf("unexpected message role in response: %s", lastMsg.Role)
+	}
+
+	// Persist updated history
+	if err := p.chatManager.PersistDiff(ctx, tx, payload.SubjectID, hist.Messages); err != nil {
+		return fmt.Errorf("persisting chat history: %w", err)
 	}
 
 	// Send response back to Telegram
