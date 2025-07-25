@@ -1,30 +1,40 @@
 # contenox/runtime-mvp
 
-> *A runtime engine to power agent-based applications, semantic search systems, and LLM-powered automation*
+> **Build agent-based applications with LLMs** - An open runtime for chat-driven automation, RAG systems, and copilot experiences
 
-This is the **Minimum Viable Product (MVP)** of `contenox-runtime` — the first working version of a system designed to build and operate agent-based applications, conversational interfaces, and knowledge-grounded automation.
-
-It serves as both a **technical foundation** and a **vision prototype**, showing how future versions can enable systems with language models to drive workflows, decisions, and interactions.
-
----
-
-## 🧠 What It Does
-
-At its core, this MVP demonstrates:
-
-- **Conversational UIs**: Replace buttons with chat — slash commands (`/echo`, `/search_knowledge`) trigger actions directly from natural language input.
-- **RAG-Powered Search & QA**: Ask questions and get answers rooted in internal documents and knowledge bases.
-- **Prompt Chain Automation**: Define repeatable, multi-step tasks using chains of prompts, conditions, and hooks — enabling transparent, configurable agentic behavior.
-- **Stateful Chat Sessions**: Maintain memory across conversations with role-based message history.
-- **Command-Driven Actions**: Execute powerful operations from within chat.
-
-In short: The aim of this MVP is to prove that you can **chat with data**, **automate tasks via logic**, and **extend capabilities through hooks** — all in one integrated system exposable via any conversational or natural language based frontend like Telegram, without lock-in into external black-box Model Provider-Services, while also ensuring everything you need reliably operate your own agent-based applications, from model lifecycles, observability, usage analytics, security, and regulatory compliance.
-
-Secondary aim of the MVP is to demonstrate the capacity and performance of the system of the underlying infrastructure and services.
+This MVP demonstrates the vision for building **production-ready agent systems**:
+- Execute complex workflows through natural language
+- Create custom automations with task chains
+- Deploy secure, extensible copilot experiences
+- Own the entire stack - no black-box dependencies
 
 ---
 
-## 🔌 Architecture
+## 🚀 Core Capabilities
+
+| Feature | What It Enables |
+|---------|----------------|
+| **🧠 Task Chains** | Stateful workflows with branching logic and hooks |
+| **🔍 RAG Engine** | Q&A over documents with Vald vector search |
+| **🤖 Bot Framework** | Create GitHub/TG bots that execute tasks |
+| **🪝 Extensible Hooks** | Connect APIs, databases, and custom logic |
+| **🔌 Multi-LLM Gateway** | Unified interface for Ollama/vLLM/OpenAI/Gemini |
+| **💬 Chat Commands** | Execute tasks via `/search`, `/help` etc. |
+
+---
+
+## 🧠 In short
+
+The primary aim of this MVP is to refine the DSL and core capabilities, while ensuring the system can be reliably operated — including model lifecycles, observability, usage analytics, security, and regulatory compliance.
+
+A secondary goal is to showcase the performance and scalability of the underlying infrastructure and services.
+
+> **Note**: ⚠️ The codebase is under active development and may change frequently until the first stable release.
+See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the Progress roadmap.
+
+---
+
+## ⚙️ Architecture
 
 | Layer | Technology |
 |-------|------------|
@@ -36,17 +46,35 @@ Secondary aim of the MVP is to demonstrate the capacity and performance of the s
 | Auth | JWT, custom access control |
 | Deployment | Docker |
 
-Key components include:
 
-- **Task Engine**: Configurable chain engine supporting branching, retries, and model routing.
-- **Hook System**: Extensible side-effect execution (e.g., send email, call API).
-- **RAG Pipeline**: Document parsing → embedding → vector storage → retrieval.
-- **Security Model**: JWT tokens, BFF pattern, access control.
+## 🔌 Technical Highlights
+- **Task Engine**: Go-based state machine for workflow execution
+- **Vector Pipeline**: Document parsing → embedding → indexing → retrieval
+- **Auth**: JWT with granular access policies
+- **Frontend**: React/TS admin UI for configuration
+- **Bots**: Connect to GitHub, Telegram, Slack
+
+
+### Tooling and Structure
+- **Go-based Core**: Handles orchestration, business logic, and integrations.
+- **React Frontend**: Lightweight UI for chat, admin, and configuration.
+- **Python Workers**: Asynchronous processing of jobs like document indexing.
+- **API Tests**: Python-based tests for verifying backend functionality.
+- **Docker Setup**: Easy containerization for local development and demo deployments.
+
+
+See [STRUCTURE.md](STRUCTURE.md) for the codebase architecture
 
 ---
 
-## Example
+## Tasks-Chains
 
+Task Chains are declarative, configurations for the state machine to perform composed of modular steps (tasks) with branching logic and hooks. These chains can power chat interactions, automation flows, or agent reasoning.
+Create tasks-chains on runtime via the admin panel and assign them to frontends and bots.
+
+A working example:
+
+### Example
 ```yaml
 id: chat_chain
 description: Standard chat processing pipeline with hooks
@@ -197,20 +225,14 @@ tasks:
 
 ## 🛠️ Development
 
-This project includes tooling and structure to help developers explore and extend the system.
+Getting started is simple.
+Create a .env from .env-example.
+& Run:
 
-- **Go-based Core**: Handles orchestration, business logic, and integrations.
-- **React Frontend**: Lightweight UI for chat, admin, and configuration.
-- **Python Workers**: Asynchronous processing of jobs like document indexing.
-- **API Tests**: Python-based tests for verifying backend functionality.
-- **Docker Setup**: Easy containerization for local development and demo deployments.
-
-Getting started is simple:
 ```bash
 make run       # Start all services
 make ui-run    # Run frontend dev server
 ```
 
 Access the UI at `http://localhost:8081` and register as `admin@admin.com`.
-
----
+(Note the frontend is proxied through the core-backend server, use the backend's port not Vite's port)
