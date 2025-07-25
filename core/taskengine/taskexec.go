@@ -149,7 +149,7 @@ func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, ll
 	if strings.Contains(clean, "-") {
 		parts := strings.Split(clean, "-")
 		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid range format: %s", rangeStr)
+			return "", fmt.Errorf("invalid range format: prompt %s", rangeStr)
 		}
 		_, err = strconv.Atoi(parts[0])
 		if err != nil {
@@ -164,7 +164,7 @@ func (exe *SimpleExec) rang(ctx context.Context, resolver llmresolver.Policy, ll
 
 	// Fallback: try parsing as a single number
 	if _, err := strconv.Atoi(clean); err != nil {
-		return "", fmt.Errorf("invalid number format: %s", rangeStr)
+		return "", fmt.Errorf("invalid number format: prompt %s answer %s %w", prompt, response, err)
 	}
 
 	// Treat a single number as a degenerate range like "6-6"
@@ -179,7 +179,7 @@ func (exe *SimpleExec) number(ctx context.Context, resolver llmresolver.Policy, 
 	}
 	i, err := strconv.Atoi(response)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("invalid number format: prompt %s answer %s %w", prompt, response, err)
 	}
 	return i, nil
 }
@@ -291,7 +291,6 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			}
 			return nil, DataTypeAny, "", errors.New(message)
 		}
-
 	case ModelExecution:
 		if currentTask.ExecuteConfig == nil {
 			return nil, DataTypeAny, "", fmt.Errorf("missing llm_execution config")

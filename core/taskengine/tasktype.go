@@ -179,7 +179,7 @@ type LLMExecutionConfig struct {
 	Providers []string `yaml:"providers,omitempty" json:"providers,omitempty"`
 }
 
-type AppendMessageConfig struct {
+type MessageConfig struct {
 	Role    string `yaml:"role" json:"role"` // user/system/assistant
 	Content string `yaml:"content,omitempty" json:"content,omitempty"`
 }
@@ -199,13 +199,17 @@ type HookCall struct {
 // Each task has a type that dictates how its prompt will be processed.
 //
 // Field validity by task type:
-// | Field            | ConditionKey | ParseNumber | ParseScore | ParseRange | RawString | Hook |
-// |------------------|--------------|-------------|------------|------------|-----------|------|
-// | ValidConditions  | Required     | -           | -          | -          | -         | -    |
-// | Hook             | -            | -           | -          | -          | -         | Req  |
-// | Template         | Required     | Required    | Required   | Required   | Required  | -    |
-// | Print            | Optional     | Optional    | Optional   | Optional   | Optional  | Opt  |
-// | PreferredModels  | Optional     | Optional    | Optional   | Optional   | Optional  | -    |
+// | Field               | ConditionKey | ParseNumber | ParseScore | ParseRange | RawString | Hook  | Noop  |
+// |---------------------|--------------|-------------|------------|------------|-----------|-------|-------|
+// | ValidConditions     | Required     | -           | -          | -          | -         | -     | -     |
+// | Hook                | -            | -           | -          | -          | -         | Req   | -     |
+// | PromptTemplate      | Required     | Required    | Required   | Required   | Required  | -     | Opt   |
+// | Print               | Optional     | Optional    | Optional   | Optional   | Optional  | Opt   | Opt   |
+// | ExecuteConfig       | Optional     | Optional    | Optional   | Optional   | Optional  | -     | -     |
+// | InputVar            | Optional     | Optional    | Optional   | Optional   | Optional  | Opt   | Opt   |
+// | SystemInstruction   | Optional     | Optional    | Optional   | Optional   | Optional  | Opt   | Opt   |
+// | Compose             | Optional     | Optional    | Optional   | Optional   | Optional  | Opt   | Opt   |
+// | Transition          | Required     | Required    | Required   | Required   | Required  | Req   | Req   |
 type ChainTask struct {
 	// ID uniquely identifies the task within the chain.
 	ID string `yaml:"id" json:"id"`
@@ -249,6 +253,10 @@ type ChainTask struct {
 	// Each task stores its output in a variable named with it's task id.
 	InputVar string `yaml:"input_var,omitempty" json:"input_var,omitempty"`
 
+	// Compose merges the specified the output with the withVar side.
+	// Optional. compose is applied before the input reaches the task execution,
+	Compose *ComposeTask `yaml:"compose,omitempty" json:"compose,omitempty"`
+
 	// Transition defines what to do after this task completes.
 	Transition TaskTransition `yaml:"transition" json:"transition"`
 
@@ -261,6 +269,24 @@ type ChainTask struct {
 	// Applies to all task types including Hooks.
 	// Default: 0 (no retries)
 	RetryOnFailure int `yaml:"retry_on_failure,omitempty" json:"retry_on_failure,omitempty"`
+}
+
+// ComposeTask is a task that composes multiple variables into a single output.
+// the composed output is stored in a variable named after the task ID with "_composed" suffix.
+// and is also directly mutating the task's output.
+// example:
+//
+// compose:
+//
+//	with_var: "chat2"
+//	strategy: "override"
+type ComposeTask struct {
+	WithVar string `yaml:"with_var,omitempty" json:"with_var,omitempty"`
+	// Strategy defines how values should be merged ("override", "merge_chat_histories", "append_string_to_chat_history").
+	// Optional; defaults to "override" or "merge_chat_histories" if both output and WithVar values are ChatHistory.
+	// "merge_chat_histories": If both output and WithVar values are ChatHistory,
+	// appends the WithVar's Messages to the output's Messages.
+	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
 }
 
 // ChainWithTrigger is a convenience struct that combines triggers and chain definition.

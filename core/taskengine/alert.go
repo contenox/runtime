@@ -10,11 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
+type AlertSink interface {
+	SendAlert(ctx context.Context, message string, kvPairMetadata ...string) error
+	FetchAlerts(ctx context.Context, limit int) ([]*Alert, error)
+}
+
 type SimpleAlertSink struct {
 	kvManager libkv.KVManager
 }
 
-func NewAlertSink(kvManager libkv.KVManager) *SimpleAlertSink {
+func NewAlertSink(kvManager libkv.KVManager) AlertSink {
 	return &SimpleAlertSink{
 		kvManager: kvManager,
 	}
