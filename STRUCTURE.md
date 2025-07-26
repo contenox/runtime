@@ -60,6 +60,12 @@ It's modularized by functionality:
 - `systemapi`: Routes for system information/status (`/system`).
 - `tokenizerapi`: Handles tokenization requests. It uses gRPC for communication.
 - `usersapi`: Routes for user management, authentication, and access control (`/users`, `/auth`, `/access`).
+- `botservice`: Manages bot configurations and integrations
+- `chainservice`: Handles workflow chain definitions
+- `execservice`: Executes runtime tasks and environments
+- `githubservice`: GitHub integration and repo processing
+- `telegramservice`: Telegram bot integration
+
 
 ```bash
 │   ├── serverapi
@@ -440,10 +446,11 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 - `libbus`: Message bus interface (implemented via NATS) for event data streaming and coordination of async processes, like canceling downloads.
 - `libcipher`: Cryptography (hashing, encryption).
 - `libdb`: Database abstraction (PostgreSQL).
-- `libkv`: Key-Value store abstraction (TiKV, Valkey/Redis, NATS), will be used for distributed cache.
+- `libkv`: Key-Value store abstraction (Valkey/Redis).
 - `libollama`: Library for interacting with Ollama features not exposed via ollama-API (tokenization).
 - `libroutine`: Goroutine management utilities, like circuit breaker.
 - `libtestenv`: Utilities for setting up testing environments for integration tests.
+- `libmodelprovider`: Contains the Model provider interface and multiple LLM integrations, like OpenAI, Gemini, vLLM and Ollama.
 
 ## API Tests (`apitests`)
 ```bash
