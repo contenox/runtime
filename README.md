@@ -31,7 +31,7 @@ The **primary goal** of this MVP is to demonstrate how the same state-machine ca
 
 A **secondary goal** is to showcase the performance and scalability of the agent dispatch infrastructure.
 
-> ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release.
+> ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release. Not all features are poli yet.
 > See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the progress roadmap.
 
 ---
