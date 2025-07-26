@@ -5,7 +5,7 @@
 This MVP demonstrates the vision for building **agent systems**:
 
 * Execute chained sequences of operations through natural language
-+ Route events to contextual agents with dynamic behavior loading
+* Route events to contextual agents with dynamic behavior loading
 * Create custom automations using Task Chains
 * Deploy secure, extensible copilot experiences
 * Own the entire stack — no black-box dependencies
@@ -16,12 +16,12 @@ This MVP demonstrates the vision for building **agent systems**:
 
 | Feature                  | What It Enables                                           |
 | ------------------------ | --------------------------------------------------------- |
-| **🧠 Task Chains**       | Define agent personalities via DSL; load behaviors dynamically at runtime          |
-| **🔍 RAG Engine**        | Semantic search + Q&A over documents, powered by Vald for scalable vector search              |
-| **🤖 Agent Dispatch**    | Process external events through a multi-stage job system (sync → process → respond) |
-| **🪝 Extensible Hooks**  | Connect APIs, databases, and custom logic with contextual parameters |
-| **🔁 LLM Orchestration** | Seamlessly switch between OpenAI, vLLM, Gemini, and more via pluggable backends and intelligent routing |
-| **💬 Chat Commands**     | Trigger tasks with `/search`, `/help`, and other commands |
+| 🧠 Task Chains       | Define agent personalities via DSL; load behaviors dynamically at runtime          |
+| 🔍 RAG Engine        | Semantic search + Q&A over documents, powered by Vald for scalable vector search              |
+| 🤖 Agent Dispatch    | Process external events through a multi-stage job system (sync → process → respond) |
+| 🪝 Extensible Hooks  | Connect APIs, databases, and custom logic with contextual parameters |
+| 🔁 LLM Orchestration | Seamlessly switch between OpenAI, vLLM, Gemini, and more via pluggable backends and intelligent routing |
+| 💬 Chat Commands     | Trigger tasks with `/search`, `/help`, and other commands |
 
 ---
 
@@ -31,14 +31,14 @@ The **primary goal** of this MVP is to demonstrate how the same state-machine ca
 
 A **secondary goal** is to showcase the performance and scalability of the agent dispatch infrastructure.
 
-> ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release. Not all features are poli yet.
+> ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release. Not all features are polished yet.
 > See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the progress roadmap.
 
 ---
 
 ## 🌐 Interaction Models
 
-contenox supports two primary interaction patterns
+Two primary interaction patterns will be supported:
 
 ### 👤 Co-Pilots (Frontends)
 User-facing interfaces where humans interact directly with task chains:
@@ -58,8 +58,7 @@ Task chains that operate autonomously on external systems:
 
 *Autonomous Agents detect events, process them through task chains, and take actions on external systems - all while maintaining context-specific conversation histories.*
 
-Both patterns use the same DSL and execution engine, but differ in how they're triggered and where they operate.
-
+The admin will be able to create and manage bots and frontends, configure their task chains, upload documents for the RAG, and monitor them via the admin dashboard.
 ---
 
 ## ⚙️ Architecture
@@ -101,10 +100,9 @@ See [STRUCTURE.md](STRUCTURE.md) for a breakdown of the codebase architecture.
 
 ## 🧩 Task Chains & Contextual Execution
 
-Task Chains are declarative, state-machine configurations made up of modular steps (called *tasks*), which support variables, branching logic, and pluggable hooks. These chains power both Co-Pilots and Autonomous Agents.
+Task chains are declarative, state-machine configurations made up of modular steps (called *tasks*), which support variables, branching logic, and pluggable hooks. These chains power both Co-Pilots and Autonomous Agents.
 
-Chains can be created at runtime via the admin UI and assigned to frontends or bots. Crucially, they support **contextual execution** - when triggered by external events (like GitHub comments), the system dynamically injects context parameters (such as `subject_id: repo:pr`) into the chain.
-
+Chains can be created at runtime via the admin UI and assigned to frontends or bots.
 This enables the same behavior definition to work across multiple contexts while maintaining separate conversation histories.
 
 ### 🧪 Example Task Chain with Context
@@ -181,6 +179,17 @@ contenox processes external events through a multi-stage job system:
 
 This pattern enables contextual agent execution where the same behavior definition works across different contexts (e.g., multiple GitHub PRs), with each context maintaining its own conversation history.
 
+---
+
+## Authentication
+```mermaid
+sequenceDiagram
+    Frontend->>+serverapi: /auth/login
+    serverapi->>+libauth: Validate credentials
+    libauth->>store: Verify user
+    store-->>-libauth: User record
+    libauth-->>-serverapi: JWT
+    serverapi-->>-Frontend: Set cookie
 ---
 
 ## 🛠️ Development
