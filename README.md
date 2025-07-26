@@ -108,7 +108,9 @@ Chains can be created at runtime via the admin UI and assigned to frontends or b
 This enables the same behavior definition to work across multiple contexts while maintaining separate conversation histories.
 
 ### 🧪 Example Task Chain with Context
-(illustrative example)
+
+_illustrative example_
+
 ```yaml
 id: github_comment_chain
 description: Process GitHub comments with contextual awareness
@@ -173,15 +175,8 @@ contenox processes external events through a multi-stage job system:
    // Loads the bot's task chain
    chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
 
-   // Injects context (repo:pr) into the chain
-   subjectID := fmt.Sprintf("%s:%d", payload.RepoID, payload.PR)
-   for i := range chain.Tasks {
-     task := &chain.Tasks[i]
-     task.Hook.Args["subject_id"] = subjectID
-   }
-
    // Executes the chain
-   result, _, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
+   result, stacktrace, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
    ```
 
 This pattern enables contextual agent execution where the same behavior definition works across different contexts (e.g., multiple GitHub PRs), with each context maintaining its own conversation history.
