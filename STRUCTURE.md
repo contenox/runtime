@@ -60,11 +60,6 @@ It's modularized by functionality:
 - `systemapi`: Routes for system information/status (`/system`).
 - `tokenizerapi`: Handles tokenization requests. It uses gRPC for communication.
 - `usersapi`: Routes for user management, authentication, and access control (`/users`, `/auth`, `/access`).
-- `botservice`: Manages bot configurations and integrations
-- `chainservice`: Handles workflow chain definitions
-- `execservice`: Executes runtime tasks and environments
-- `githubservice`: GitHub integration and repo processing
-- `telegramservice`: Telegram bot integration
 
 
 ```bash

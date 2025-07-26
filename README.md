@@ -6,7 +6,7 @@ This MVP showcases a vision for building **agent systems** that:
 
 * Execute chained operations using natural language
 * Route events to contextual agents with dynamic behavior loading
-* Enable custom automations via Task Chains
+* Enable custom automations via **Task Chains**
 * Support secure, extensible Co-Pilot experiences
 * Offer full control — no black-box dependencies
 
@@ -14,36 +14,32 @@ This MVP showcases a vision for building **agent systems** that:
 
 ## 🚀 Core Capabilities
 
-| Feature              | Enables                                                                |
-| -------------------- | ---------------------------------------------------------------------- |
-| 🧠 Task Chains       | Define agent behaviors via DSL; load dynamically at runtime            |
-| 🔍 RAG Engine        | Semantic search + Q\&A over documents with scalable Vald vector search |
-| 🤖 Agent Dispatch    | Multi-stage job system for processing external events                  |
-| 🪝 Extensible Hooks  | Connect APIs, databases, or custom logic with contextual params        |
-| 🔁 LLM Orchestration | Route to OpenAI, vLLM, Gemini, and more with pluggable backends        |
-| 💬 Chat Commands     | Trigger tasks like `/search`, `/help`, etc. from any interface         |
+| Feature              | Enables                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| 🧠 **Task Chains**       | Define agent behaviors via DSL; load dynamically at runtime             |
+| 🔍 **RAG Engine**        | Semantic search + Q&A over documents with scalable **Vald vector search** |
+| 🤖 **Agent Dispatch**    | Multi-stage job system for processing external events                   |
+| 🪝 **Extensible Hooks**  | Connect APIs, databases, or custom logic with contextual params         |
+| 🔁 **LLM Orchestration** | Route to **OpenAI, vLLM, Gemini, Ollama**, and more with pluggable backends |
+| 💬 **Chat Commands**     | Trigger tasks like `/search`, `/help`, etc. from any interface          |
 
 ---
 
 ## 🧠 In Short
 
-The **primary goal** of this MVP is to prove how a single state-machine can power both user-facing Co-Pilots and fully autonomous Agents — with support for observability, security, and compliance.
+The **primary goal** of this MVP is to prove how a single state-machine can power both user-facing Co-Pilots and fully autonomous Agents — with support for **observability**, **security**, and **compliance**.
 
 A **secondary goal** is to demonstrate the scalability of the dispatch infrastructure under real-world loads.
 
 > ⚠️ **Note**: This codebase is actively evolving. Not all features are final.
-> See [DEVELOPMENT\_SLICES.md](DEVELOPMENT_SLICES.md) for the roadmap.
+> See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the roadmap.
 
 ---
 
 ## 🌐 Interaction Models
 
-Two interaction models are supported:
-
-### 👤 Co-Pilots (Frontends)
-
+### 👤 **Co-Pilots (Frontends)**
 User-facing interfaces where humans interact directly with task chains:
-
 * Telegram bot
 * OpenAI-compatible API endpoints
 * Custom web chat UIs
@@ -51,20 +47,15 @@ User-facing interfaces where humans interact directly with task chains:
 
 > Co-Pilots maintain per-user conversation history and respond in real time.
 
----
-
-### 🤖 Autonomous Agents (Bots)
-
+### 🤖 **Autonomous Agents (Bots)**
 Agents that monitor and act on external systems:
-
 * GitHub PR comment processing
 * Content moderation
 * Social media workflows
 * Internal dev automation
 
 > Bots maintain independent context histories per source (e.g., GitHub PR) and operate continuously via event-driven jobs.
-
-The admin can manage bots and Co-Pilots, assign task chains, upload documents, and monitor agents through the web dashboard.
+> The admin can manage bots and Co-Pilots, assign task chains, upload documents, and monitor agents through the web dashboard.
 
 ---
 
@@ -72,22 +63,27 @@ The admin can manage bots and Co-Pilots, assign task chains, upload documents, a
 
 | Layer      | Tech Stack                   |
 | ---------- | ---------------------------- |
-| Backend    | Go                           |
-| Frontend   | React + TypeScript           |
-| LLMs       | Ollama, vLLM, OpenAI, Gemini |
-| Vector DB  | Vald                         |
-| Database   | PostgreSQL                   |
-| Auth       | JWT + custom ACL             |
-| Deployment | Docker                       |
+| **Backend**    | **Go** (core logic, task engine, LLM orchestration) |
+| **Frontend**   | **React + TypeScript** (admin UI, chat interfaces) |
+| **LLMs**       | **Ollama, vLLM, OpenAI, Gemini** (via `libmodelprovider`) |
+| **Vector DB**  | **Vald** (semantic search, document embeddings) |
+| **Database**   | **PostgreSQL** (state storage, job tracking) |
+| **Auth**       | **JWT + custom ACL** (role-based access control) |
+| **Deployment** | **Docker** (microservices, workers, vector DB) |
+
+> **Additional Components**:
+> - **Tokenizer Service** (Go microservice via gRPC for token counting)
+> - **Python Workers** (async pipelines for doc processing)
+> - **NATS/pubsub** (event-driven communication between services)
 
 ---
 
 ## 🔌 Technical Highlights
 
 * **Agent Dispatch**: Multi-stage pipeline for external event handling
-* **Task Engine**: Go-based state machine that powers both Bots and Co-Pilots
+* **Task Engine**: Go-based state machine with **task leasing, chaining, and variable composition**
 * **Vector Pipeline**: End-to-end document processing + semantic retrieval
-* **Authentication**: Fine-grained access control via JWT
+* **Authentication**: Fine-grained access control via JWT and custom ACL
 * **Frontend**: Lightweight admin and interaction dashboard
 * **Bot Integrations**: GitHub (ready), Telegram (ready), Slack (in progress)
 
@@ -101,7 +97,7 @@ The admin can manage bots and Co-Pilots, assign task chains, upload documents, a
 * **API Tests**: Python test suite
 * **Dockerized Dev**: Container setup for local development
 
-More in [STRUCTURE.md](STRUCTURE.md).
+> More in [STRUCTURE.md](STRUCTURE.md).
 
 ---
 
@@ -150,14 +146,12 @@ tasks:
 contenox processes external events through a structured pipeline:
 
 1. **Event Detection**:
-
    ```go
    // GitHub comment poller
    comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
    ```
 
 2. **Job Creation**:
-
    ```go
    job := &store.Job{
      ID:        uuid.NewString(),
@@ -168,7 +162,6 @@ contenox processes external events through a structured pipeline:
    ```
 
 3. **Agent Execution**:
-
    ```go
    bots, err := storeInstance.ListBotsByJobType(ctx, job.TaskType)
    chain, err := tasksrecipes.GetChainDefinition(ctx, p.db, bot.TaskChainID)
