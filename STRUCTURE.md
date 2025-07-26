@@ -170,9 +170,11 @@ Manages reconciling the ollama backend to match the desired state, including mod
 │   ├── taskengine
 │   │   ├── taskenv.go
 │   │   ├── taskexec.go
+│   │   ├── activity.go
+│   │   ├── alert.go
 │   │   └── tasktype.go
 ```
-The Task Engine provides the core capability to define, manage, and execute complex, chained sequences of operations (workflows). It is designed to enable automation, including multi-step interactions with Large Language Models (LLMs), conditional logic, and integration with other internal or external systems via hooks.
+The Task Engine contains the state-machine that provides the core capability to define, manage, and execute complex, chained sequences of operations. It is designed to enable automation, including multi-step interactions with Large Language Models (LLMs), conditional logic, and integration with other internal or external systems via hooks.
 
 
 Thank you for the detailed code and explanation. Based on your input, I will now add a new section to the structure document that explains the **`hookrecipes`** package and its role in the system.

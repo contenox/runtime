@@ -1,10 +1,11 @@
 # contenox/runtime-mvp
 
-> **Build agent-based applications with LLMs** — An open runtime for chat-driven automation, RAG systems, and copilot experiences.
+> **Build context-aware AI systems with LLMs** — An open runtime for Autonomous Agents (Bots) and Co-Pilots (Frontends) with shared behavior logic.
 
 This MVP demonstrates the vision for building **production-ready agent systems**:
 
-* Execute complex workflows through natural language
+* Execute chained sequences of operations through natural language
++ Route events to contextual agents with dynamic behavior loading
 * Create custom automations using Task Chains
 * Deploy secure, extensible copilot experiences
 * Own the entire stack — no black-box dependencies
@@ -15,23 +16,49 @@ This MVP demonstrates the vision for building **production-ready agent systems**
 
 | Feature                  | What It Enables                                           |
 | ------------------------ | --------------------------------------------------------- |
-| **🧠 Task Chains**       | Stateful workflows with branching logic and hooks         |
-| **🔍 RAG Engine**        | Q\&A over documents using Vald vector search              |
-| **🤖 Bot Framework**     | Create GitHub/Telegram bots that execute tasks            |
-| **🪝 Extensible Hooks**  | Connect APIs, databases, and custom logic                 |
-| **🔌 Multi-LLM Gateway** | Unified interface for Ollama, vLLM, OpenAI, Gemini        |
+| **🧠 Task Chains**       | Define agent personalities via DSL; load behaviors dynamically at runtime          |
+| **🔍 RAG Engine**        | Semantic search + Q&A over documents, powered by Vald for scalable vector search              |
+| **🤖 Agent Dispatch**    | Process external events through a multi-stage job system (sync → process → respond) |
+| **🪝 Extensible Hooks**  | Connect APIs, databases, and custom logic with contextual parameters |
+| **🔁 LLM Orchestration** | Seamlessly switch between OpenAI, vLLM, Gemini, and more via pluggable backends and intelligent routing |
 | **💬 Chat Commands**     | Trigger tasks with `/search`, `/help`, and other commands |
 
 ---
 
 ## 🧠 In Short
 
-The **primary goal** of this MVP is to refine the internal DSL and core capabilities, while ensuring the system is production-grade across areas like model lifecycles, observability, usage analytics, security, and regulatory compliance.
+The **primary goal** of this MVP is to demonstrate how the same state-machine can power both user-facing Co-Pilots and Autonomous Agents, while ensuring the system is production-grade across areas like observability, security, and regulatory compliance.
 
-A **secondary goal** is to demonstrate the performance and scalability of the infrastructure and services powering the runtime.
+A **secondary goal** is to showcase the performance and scalability of the agent dispatch infrastructure.
 
 > ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release.
-> See [DEVELOPMENT\_SLICES.md](DEVELOPMENT_SLICES.md) for the progress roadmap.
+> See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the progress roadmap.
+
+---
+
+## 🌐 Interaction Models
+
+contenox supports two primary interaction patterns
+
+### 👤 Co-Pilots (Frontends)
+User-facing interfaces where humans interact directly with task chains:
+- Telegram chat interface
+- OpenAI API-compatible endpoints
+- Custom chat UIs
+- CLI interfaces
+
+*Co-Pilots maintain conversation history with users and respond directly to their inputs.*
+
+### 🤖 Autonomous Agents (Bots)
+Task chains that operate autonomously on external systems:
+- GitHub PR comment processors
+- Content moderation systems
+- Social media managers
+- Internal workflow automations
+
+*Autonomous Agents detect events, process them through task chains, and take actions on external systems - all while maintaining context-specific conversation histories.*
+
+Both patterns use the same DSL and execution engine, but differ in how they're triggered and where they operate.
 
 ---
 
@@ -51,11 +78,12 @@ A **secondary goal** is to demonstrate the performance and scalability of the in
 
 ## 🔌 Technical Highlights
 
-* **Task Engine**: Go-based state machine for workflow execution
+* **Agent Dispatch System**: Multi-stage job processing for event-driven agent execution
+* **Task Engine**: Go-based state machine for execution of sequences
 * **Vector Pipeline**: Document parsing → embedding → indexing → retrieval
 * **Authentication**: JWT with fine-grained access control
 * **Frontend**: React/TypeScript UI for admin and configuration
-* **Bot Integrations**: GitHub (WiP), Telegram, Slack (WiP) support
+* **Bot Integrations**: GitHub (fully implemented), Telegram, Slack (in progress)
 
 ---
 
@@ -71,40 +99,24 @@ See [STRUCTURE.md](STRUCTURE.md) for a breakdown of the codebase architecture.
 
 ---
 
-## 🧩 Task Chains
+## 🧩 Task Chains & Contextual Execution
 
-Task Chains are declarative, state-machine configurations made up of modular steps (called *tasks*), which support variables, branching logic, and pluggable hooks. These chains power chat flows, automations, and agent reasoning.
+Task Chains are declarative, state-machine configurations made up of modular steps (called *tasks*), which support variables, branching logic, and pluggable hooks. These chains power both Co-Pilots and Autonomous Agents.
 
-Chains can be created at runtime via the admin UI and assigned to frontends or bots.
+Chains can be created at runtime via the admin UI and assigned to frontends or bots. Crucially, they support **contextual execution** - when triggered by external events (like GitHub comments), the system dynamically injects context parameters (such as `subject_id: repo:pr`) into the chain.
 
-### 🧪 Example Task Chain
+This enables the same behavior definition to work across multiple contexts while maintaining separate conversation histories.
 
+### 🧪 Example Task Chain with Context
+(illustrative example)
 ```yaml
-id: chat_chain
-description: Standard chat processing pipeline with hooks
-debug: true
+id: github_comment_chain
+description: Process GitHub comments with contextual awareness
 tasks:
-  - id: mux_input
-    description: Check for commands like /echo
-    type: parse_transition
-    transition:
-      branches:
-        - operator: default
-          goto: moderate
-        - operator: equals
-          when: echo
-          goto: echo_message
-        - operator: equals
-          when: help
-          goto: print_help_message
-        - operator: equals
-          when: search
-          goto: search_knowledge
-
   - id: moderate
     description: Moderate the input
     type: parse_number
-    prompt_template: "Classify the input as safe (0) or spam (10). Respond with a numeric value between 0 and 10. Input: {{.input}}"
+    prompt_template: "Classify input safety (0=safe, 10=spam): {{.input}}"
     input_var: input
     transition:
       branches:
@@ -112,120 +124,67 @@ tasks:
           when: "4"
           goto: reject_request
         - operator: default
-          goto: do_we_need_context
-      on_failure: request_failed
+          goto: execute_chat_model
 
-  - id: do_we_need_context
-    description: Add context to the conversation
-    type: raw_string
-    prompt_template: "Rate how likely it is that the answer requires access to internal information. Respond with a value between 0 (not likely) and 10 (highly likely). Input: {{.input}}"
-    input_var: input
-    transition:
-      branches:
-        - operator: default
-          goto: swap_to_input
-        - operator: ">"
-          when: "4"
-          goto: search_knowledge
-
-  - id: swap_to_input
-    type: noop
-    input_var: input
-    transition:
-      branches:
-        - operator: default
-          goto: execute_model_on_messages
-          alert_on_match: Test Alert
-
-  - id: echo_message
-    description: Echo the message
-    type: hook
-    hook:
-      type: echo
-    transition:
-      branches:
-        - operator: default
-          goto: end
-
-  - id: search_knowledge
-    description: Search the knowledge base
-    type: hook
-    hook:
-      type: search_knowledge
-    transition:
-      branches:
-        - operator: default
-          goto: append_search_results
-
-  - id: append_search_results
-    type: noop
-    prompt_template: "Here are the search results: {{.search_knowledge}}"
-    compose:
-      with_var: input
-      strategy: append_string_to_chat_history
-    transition:
-      branches:
-        - operator: default
-          goto: execute_model_on_messages
-
-  - id: print_help_message
-    description: Display help message
-    type: hook
-    hook:
-      type: print
-      args:
-        message: |
-          Available commands:
-          /echo <text>
-          /help
-          /search <query>
-    transition:
-      branches:
-        - operator: default
-          goto: end
-
-  - id: reject_request
-    description: Reject the request
-    type: raw_string
-    prompt_template: "Your request was rejected due to input moderation: {{.input}}"
-    input_var: input
-    transition:
-      branches:
-        - operator: default
-          goto: raise_error
-
-  - id: request_failed
-    description: Fallback if moderation fails
-    type: raw_string
-    prompt_template: "Classification of the request failed. Input: {{.input}}"
-    input_var: input
-    transition:
-      branches:
-        - operator: default
-          goto: raise_error
-
-  - id: raise_error
-    description: Raise an error
-    type: raise_error
-    prompt_template: "Error processing: {{.input}}"
-    input_var: input
-    transition:
-      branches:
-        - operator: default
-          goto: end
-
-  - id: execute_model_on_messages
+  - id: execute_chat_model
     description: Run inference using selected LLM
     type: model_execution
-    system_instruction: "You're a helpful assistant in the Contenox system. Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. Keep the conversation friendly."
+    system_instruction: "You're a helpful GitHub assistant. Reference PR context when relevant."
     execute_config:
-      models: []
-      providers: []
+      models:
+        - gemini-2.5-flash
+      providers:
+        - gemini
+    input_var: input
     transition:
       branches:
         - operator: default
           goto: end
 ```
+
+---
+
+## ⚡ How Agent Dispatch Works
+
+contenox processes external events through a multi-stage job system:
+
+1. **Event Detection** (e.g., GitHub comment):
+   ```go
+   // Worker detects new GitHub comments
+   comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
+   ```
+
+2. **Job Creation**:
+   ```go
+   // Creates LLM processing job for each new comment
+   job := &store.Job{
+     ID:        uuid.NewString(),
+     TaskType:  JobTypeGitHubProcessCommentLLM,
+     Subject:   fmt.Sprintf("%s:%d", repoID, prNumber),
+     Payload:   payload,
+   }
+   ```
+
+3. **Agent Execution**:
+   ```go
+   // Processor finds matching bot by job type
+   bots, err := storeInstance.ListBotsByJobType(ctx, job.TaskType)
+
+   // Loads the bot's task chain
+   chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
+
+   // Injects context (repo:pr) into the chain
+   subjectID := fmt.Sprintf("%s:%d", payload.RepoID, payload.PR)
+   for i := range chain.Tasks {
+     task := &chain.Tasks[i]
+     task.Hook.Args["subject_id"] = subjectID
+   }
+
+   // Executes the chain
+   result, _, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
+   ```
+
+This pattern enables contextual agent execution where the same behavior definition works across different contexts (e.g., multiple GitHub PRs), with each context maintaining its own conversation history.
 
 ---
 
@@ -237,10 +196,10 @@ Getting started is simple:
 2. Run the services:
 
 ```bash
-make run       # Start backend, workers, and vector search
-make ui-run    # Start frontend dev server
+make run        # Start backend, workers, and vector DB
+make ui-run     # Start React frontend (proxied via backend)
 ```
 
 Access the UI at [http://localhost:8081](http://localhost:8081) and register as `admin@admin.com`.
 
-> **Note**: The frontend is **proxied through the backend**. Use the backend's port (8081), not Vite's default port.
+> **Note**: The frontend is **proxied through the backend** on port `8081`. Do not use Vite's default port.
