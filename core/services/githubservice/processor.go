@@ -120,37 +120,15 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		reportErr(err)
 		return
 	}
-
+	err = p.chatManager.PersistDiff(ctx, p.db.WithoutTransaction(), subjectID, hist.Messages)
+	if err != nil {
+		err = fmt.Errorf("failed to persist chat history: %w", err)
+		reportErr(err)
+		return
+	}
 	// Post response to GitHub
 	if err = p.githubSvc.PostComment(ctx, payload.RepoID, payload.PR, lastMsg.Content); err != nil {
 		err = fmt.Errorf("failed to post GitHub comment: %w", err)
-		reportErr(err)
-		return
-	}
-
-	// Store assistant message
-	type chatMessage struct {
-		Role    string
-		Message string
-	}
-	jsonBytes, err := json.Marshal(chatMessage{
-		Role:    lastMsg.Role,
-		Message: lastMsg.Content,
-	})
-	if err != nil {
-		err = fmt.Errorf("failed to marshal chat message: %w", err)
-		reportErr(err)
-		return
-	}
-	messageID := fmt.Sprintf("%v-%v", payload.PR, payload.CommentID)
-	message := store.Message{
-		ID:      fmt.Sprintf("response-%s", messageID),
-		IDX:     subjectID,
-		AddedAt: time.Now().UTC(),
-		Payload: jsonBytes,
-	}
-	if err = storeInstance.AppendMessages(ctx, &message); err != nil {
-		err = fmt.Errorf("failed to store response message: %w", err)
 		reportErr(err)
 		return
 	}

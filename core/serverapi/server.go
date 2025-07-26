@@ -117,6 +117,7 @@ func New(
 	)
 
 	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, chatManager, githubservice.New(dbInstance), serveropsChainedTracker)
+
 	libroutine.GetPool().StartLoop(
 		ctx,
 		"github-comment-processor",
