@@ -183,9 +183,14 @@ Each job routes to the appropriate bot and executes its assigned chain, preservi
 
 ```mermaid
 sequenceDiagram
+    participant Frontend
+    participant serverapi
+    participant libauth
+    participant store
+
     Frontend->>+serverapi: /auth/login
     serverapi->>+libauth: Validate credentials
-    libauth->>store: Verify user
+    libauth->>+store: Verify user
     store-->>-libauth: User record
     libauth-->>-serverapi: JWT
     serverapi-->>-Frontend: Set cookie
