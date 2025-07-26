@@ -27,7 +27,7 @@ This MVP showcases a vision for building **agent systems** that:
 
 ## 🧠 In Short
 
-The **primary goal** of this MVP is to prove how a single state-machine can power both user-facing Co-Pilots and fully autonomous Agents — with production-ready support for observability, security, and compliance.
+The **primary goal** of this MVP is to prove how a single state-machine can power both user-facing Co-Pilots and fully autonomous Agents — with support for observability, security, and compliance.
 
 A **secondary goal** is to demonstrate the scalability of the dispatch infrastructure under real-world loads.
 
