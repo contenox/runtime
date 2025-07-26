@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
@@ -15,16 +16,18 @@ import (
 )
 
 type GitHubCommentProcessor struct {
-	db      libdb.DBManager
-	env     taskengine.EnvExecutor
-	tracker serverops.ActivityTracker
+	db          libdb.DBManager
+	env         taskengine.EnvExecutor
+	chatManager *chat.Manager
+	tracker     serverops.ActivityTracker
+	githubSvc   Service
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
+func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, chatManager *chat.Manager, githubSvc Service, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker}
+	return &GitHubCommentProcessor{db: db, env: env, chatManager: chatManager, githubSvc: githubSvc, tracker: tracker}
 }
 
 func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job) (err error) {
@@ -42,7 +45,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	var changeData map[string]interface{}
 	defer func() {
 		if err == nil && changeData != nil {
-			reportChange(changeData["message_id"].(string), changeData)
+			reportChange(fmt.Sprintf("%s", changeData["message_id"]), changeData)
 		}
 	}()
 
@@ -78,21 +81,26 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		return
 	}
 
-	// Configure chain with subject context
 	subjectID := fmt.Sprintf("%s:%d", payload.RepoID, payload.PR)
-	for i := range chain.Tasks {
-		task := &chain.Tasks[i]
-		if task.Hook == nil {
-			continue
-		}
-		if task.Hook.Args == nil {
-			task.Hook.Args = make(map[string]string)
-		}
-		task.Hook.Args["subject_id"] = subjectID
+	messages, err := p.chatManager.ListMessages(ctx, p.db.WithoutTransaction(), subjectID)
+	if err != nil {
+		return fmt.Errorf("failed to get chat history: %w", err)
 	}
 
+	// Create chat history object
+	history := taskengine.ChatHistory{
+		Messages: messages,
+	}
+
+	// Append new message
+	history.Messages = append(history.Messages, taskengine.Message{
+		Role:      "user",
+		Content:   payload.Content,
+		Timestamp: time.Now().UTC(),
+	})
+
 	// Execute chain
-	result, _, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
+	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		err = fmt.Errorf("failed to execute chain: %w", err)
 		reportErr(err)
@@ -114,7 +122,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	}
 
 	// Post response to GitHub
-	if err = p.postGitHubComment(ctx, payload.RepoID, payload.PR, lastMsg.Content); err != nil {
+	if err = p.githubSvc.PostComment(ctx, payload.RepoID, payload.PR, lastMsg.Content); err != nil {
 		err = fmt.Errorf("failed to post GitHub comment: %w", err)
 		reportErr(err)
 		return
@@ -157,9 +165,4 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	}
 
 	return nil
-}
-
-func (p *GitHubCommentProcessor) postGitHubComment(ctx context.Context, repoID string, prNumber int, comment string) error {
-	githubService := New(p.db)
-	return githubService.PostComment(ctx, repoID, prNumber, comment)
 }
