@@ -2,119 +2,122 @@
 
 > **Build context-aware AI systems with LLMs** — An open runtime for Autonomous Agents (Bots) and Co-Pilots (Frontends) with shared behavior logic.
 
-This MVP demonstrates the vision for building **agent systems**:
+This MVP showcases a vision for building **agent systems** that:
 
-* Execute chained sequences of operations through natural language
+* Execute chained operations using natural language
 * Route events to contextual agents with dynamic behavior loading
-* Create custom automations using Task Chains
-* Deploy secure, extensible copilot experiences
-* Own the entire stack — no black-box dependencies
+* Enable custom automations via Task Chains
+* Support secure, extensible Co-Pilot experiences
+* Offer full control — no black-box dependencies
 
 ---
 
 ## 🚀 Core Capabilities
 
-| Feature                  | What It Enables                                           |
-| ------------------------ | --------------------------------------------------------- |
-| 🧠 Task Chains       | Define agent personalities via DSL; load behaviors dynamically at runtime          |
-| 🔍 RAG Engine        | Semantic search + Q&A over documents, powered by Vald for scalable vector search              |
-| 🤖 Agent Dispatch    | Process external events through a multi-stage job system (sync → process → respond) |
-| 🪝 Extensible Hooks  | Connect APIs, databases, and custom logic with contextual parameters |
-| 🔁 LLM Orchestration | Seamlessly switch between OpenAI, vLLM, Gemini, and more via pluggable backends and intelligent routing |
-| 💬 Chat Commands     | Trigger tasks with `/search`, `/help`, and other commands |
+| Feature              | Enables                                                                |
+| -------------------- | ---------------------------------------------------------------------- |
+| 🧠 Task Chains       | Define agent behaviors via DSL; load dynamically at runtime            |
+| 🔍 RAG Engine        | Semantic search + Q\&A over documents with scalable Vald vector search |
+| 🤖 Agent Dispatch    | Multi-stage job system for processing external events                  |
+| 🪝 Extensible Hooks  | Connect APIs, databases, or custom logic with contextual params        |
+| 🔁 LLM Orchestration | Route to OpenAI, vLLM, Gemini, and more with pluggable backends        |
+| 💬 Chat Commands     | Trigger tasks like `/search`, `/help`, etc. from any interface         |
 
 ---
 
 ## 🧠 In Short
 
-The **primary goal** of this MVP is to demonstrate how the same state-machine can power both user-facing Co-Pilots and Autonomous Agents, while ensuring the system is production-grade across areas like observability, security, and regulatory compliance.
+The **primary goal** of this MVP is to prove how a single state-machine can power both user-facing Co-Pilots and fully autonomous Agents — with production-ready support for observability, security, and compliance.
 
-A **secondary goal** is to showcase the performance and scalability of the agent dispatch infrastructure.
+A **secondary goal** is to demonstrate the scalability of the dispatch infrastructure under real-world loads.
 
-> ⚠️ **Note**: The codebase is under active development and may change frequently until the first stable release. Not all features are polished yet.
-> See [DEVELOPMENT_SLICES.md](DEVELOPMENT_SLICES.md) for the progress roadmap.
+> ⚠️ **Note**: This codebase is actively evolving. Not all features are final.
+> See [DEVELOPMENT\_SLICES.md](DEVELOPMENT_SLICES.md) for the roadmap.
 
 ---
 
 ## 🌐 Interaction Models
 
-Two primary interaction patterns will be supported:
+Two interaction models are supported:
 
 ### 👤 Co-Pilots (Frontends)
+
 User-facing interfaces where humans interact directly with task chains:
-- Telegram chat interface
-- OpenAI API-compatible endpoints
-- Custom chat UIs
-- CLI interfaces
 
-*Co-Pilots maintain conversation history with users and respond directly to their inputs.*
+* Telegram bot
+* OpenAI-compatible API endpoints
+* Custom web chat UIs
+* CLI interfaces
 
-### 🤖 Autonomous Agents (Bots)
-Task chains that operate autonomously on external systems:
-- GitHub PR comment processors
-- Content moderation systems
-- Social media managers
-- Internal workflow automations
+> Co-Pilots maintain per-user conversation history and respond in real time.
 
-*Autonomous Agents detect events, process them through task chains, and take actions on external systems - all while maintaining context-specific conversation histories.*
-
-The admin will be able to create and manage bots and frontends, configure their task chains, upload documents for the RAG, and monitor them via the admin dashboard.
 ---
 
-## ⚙️ Architecture
+### 🤖 Autonomous Agents (Bots)
 
-| Layer      | Technology                   |
+Agents that monitor and act on external systems:
+
+* GitHub PR comment processing
+* Content moderation
+* Social media workflows
+* Internal dev automation
+
+> Bots maintain independent context histories per source (e.g., GitHub PR) and operate continuously via event-driven jobs.
+
+The admin can manage bots and Co-Pilots, assign task chains, upload documents, and monitor agents through the web dashboard.
+
+---
+
+## ⚙️ Architecture Overview
+
+| Layer      | Tech Stack                   |
 | ---------- | ---------------------------- |
 | Backend    | Go                           |
 | Frontend   | React + TypeScript           |
 | LLMs       | Ollama, vLLM, OpenAI, Gemini |
 | Vector DB  | Vald                         |
 | Database   | PostgreSQL                   |
-| Auth       | JWT, custom access control   |
+| Auth       | JWT + custom ACL             |
 | Deployment | Docker                       |
 
 ---
 
 ## 🔌 Technical Highlights
 
-* **Agent Dispatch System**: Multi-stage job processing for event-driven agent execution
-* **Task Engine**: Go-based state machine for execution of sequences
-* **Vector Pipeline**: Document parsing → embedding → indexing → retrieval
-* **Authentication**: JWT with fine-grained access control
-* **Frontend**: React/TypeScript UI for admin and configuration
-* **Bot Integrations**: GitHub (fully implemented), Telegram, Slack (in progress)
+* **Agent Dispatch**: Multi-stage pipeline for external event handling
+* **Task Engine**: Go-based state machine that powers both Bots and Co-Pilots
+* **Vector Pipeline**: End-to-end document processing + semantic retrieval
+* **Authentication**: Fine-grained access control via JWT
+* **Frontend**: Lightweight admin and interaction dashboard
+* **Bot Integrations**: GitHub (ready), Telegram (ready), Slack (in progress)
 
 ---
 
-### 🧰 Tooling and Structure
+### 🧰 Codebase & Tooling
 
-* **Go Core**: Handles orchestration, business logic, and integrations
-* **React Frontend**: Lightweight admin and chat interface
-* **Python Workers**: Async jobs for document processing and indexing
-* **API Tests**: Python-based test suite for backend validation
-* **Docker Setup**: Local development and deployment via containers
+* **Go Core**: Orchestration, logic, integrations
+* **React Admin**: Chat + admin UI
+* **Python Workers**: Async pipelines for doc processing
+* **API Tests**: Python test suite
+* **Dockerized Dev**: Container setup for local development
 
-See [STRUCTURE.md](STRUCTURE.md) for a breakdown of the codebase architecture.
+More in [STRUCTURE.md](STRUCTURE.md).
 
 ---
 
 ## 🧩 Task Chains & Contextual Execution
 
-Task chains are declarative, state-machine configurations made up of modular steps (called *tasks*), which support variables, branching logic, and pluggable hooks. These chains power both Co-Pilots and Autonomous Agents.
+Task chains are declarative state machine instances composed of modular steps (called *tasks*). Tasks support variables, branching, and pluggable hooks. They power both Co-Pilots and Agents.
 
-Chains can be created at runtime via the admin UI and assigned to frontends or bots.
-This enables the same behavior definition to work across multiple contexts while maintaining separate conversation histories.
+Chains can be created live via the admin UI and shared across different agents while keeping their own context and state.
 
-### 🧪 Example Task Chain with Context
-
-_illustrative example_
+### 🧪 Example: GitHub Comment Moderation
 
 ```yaml
 id: github_comment_chain
 description: Process GitHub comments with contextual awareness
 tasks:
   - id: moderate
-    description: Moderate the input
     type: parse_number
     prompt_template: "Classify input safety (0=safe, 10=spam): {{.input}}"
     input_var: input
@@ -127,7 +130,6 @@ tasks:
           goto: execute_chat_model
 
   - id: execute_chat_model
-    description: Run inference using selected LLM
     type: model_execution
     system_instruction: "You're a helpful GitHub assistant. Reference PR context when relevant."
     execute_config:
@@ -137,26 +139,26 @@ tasks:
         - gemini
     input_var: input
     transition:
-      branches:
-        - operator: default
-          goto: end
+      - operator: default
+        goto: end
 ```
 
 ---
 
 ## ⚡ How Agent Dispatch Works
 
-contenox processes external events through a multi-stage job system:
+contenox processes external events through a structured pipeline:
 
-1. **Event Detection** (e.g., GitHub comment):
+1. **Event Detection**:
+
    ```go
-   // Worker detects new GitHub comments
+   // GitHub comment poller
    comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
    ```
 
 2. **Job Creation**:
+
    ```go
-   // Creates LLM processing job for each new comment
    job := &store.Job{
      ID:        uuid.NewString(),
      TaskType:  JobTypeGitHubProcessCommentLLM,
@@ -166,22 +168,19 @@ contenox processes external events through a multi-stage job system:
    ```
 
 3. **Agent Execution**:
+
    ```go
-   // Processor finds matching bot by job type
    bots, err := storeInstance.ListBotsByJobType(ctx, job.TaskType)
-
-   // Loads the bot's task chain
-   chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
-
-   // Executes the chain
-   result, stacktrace, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
+   chain, err := tasksrecipes.GetChainDefinition(ctx, p.db, bot.TaskChainID)
+   result, trace, err := p.env.ExecEnv(ctx, chain, payload.Content, taskengine.DataTypeString)
    ```
 
-This pattern enables contextual agent execution where the same behavior definition works across different contexts (e.g., multiple GitHub PRs), with each context maintaining its own conversation history.
+Each job routes to the appropriate bot and executes its assigned chain, preserving per-subject history.
 
 ---
 
-## Authentication
+## 🔐 Authentication Flow
+
 ```mermaid
 sequenceDiagram
     Frontend->>+serverapi: /auth/login
@@ -190,20 +189,26 @@ sequenceDiagram
     store-->>-libauth: User record
     libauth-->>-serverapi: JWT
     serverapi-->>-Frontend: Set cookie
----
-
-## 🛠️ Development
-
-Getting started is simple:
-
-1. Copy `.env-example` to `.env`
-2. Run the services:
-
-```bash
-make run        # Start backend, workers, and vector DB
-make ui-run     # Start React frontend (proxied via backend)
 ```
 
-Access the UI at [http://localhost:8081](http://localhost:8081) and register as `admin@admin.com`.
+---
 
-> **Note**: The frontend is **proxied through the backend** on port `8081`. Do not use Vite's default port.
+## 🛠️ Getting Started
+
+1. Copy the example env file:
+
+```bash
+cp .env-example .env
+```
+
+2. Start the services:
+
+```bash
+make run        # backend + workers + vector DB
+make ui-run     # React frontend (proxied via backend)
+```
+
+3. Access the UI at: [http://localhost:8081](http://localhost:8081)
+   Login as `admin@admin.com`.
+
+> **Note**: The UI runs through the backend proxy on port `8081` — not Vite’s default.
