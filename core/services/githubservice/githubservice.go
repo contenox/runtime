@@ -70,7 +70,7 @@ func (s *service) ListPRs(ctx context.Context, repoID string) ([]*PullRequest, e
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	repo, err := storeInstance.GetGitHubRepo(ctx, repoID)
 	if err != nil {
-		return nil, fmt.Errorf("repo not found: %w", err)
+		return nil, fmt.Errorf("ListPRs: failed to get repo: %w", err)
 	}
 
 	client := s.createGitHubClient(ctx, repo.AccessToken)
@@ -209,15 +209,19 @@ func (s *service) PR(ctx context.Context, repoID string, prNumber int) (*PullReq
 }
 
 func (s *service) PostComment(ctx context.Context, repoID string, prNumber int, comment string) error {
+	// Validate repo first
+	if exists, err := s.RepoExists(ctx, repoID); err != nil || !exists {
+		return fmt.Errorf("repository %s does not exist or is not connected", repoID)
+	}
+
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
 	if err != nil {
-		return fmt.Errorf("repo not found: %w", err)
+		return fmt.Errorf("PostComment: failed to get repo: %w", err)
 	}
 
 	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
 
-	// Create GitHub comment
 	_, _, err = client.Issues.CreateComment(
 		ctx,
 		repoMeta.Owner,
@@ -235,7 +239,7 @@ func (s *service) ListComments(ctx context.Context, repoID string, prNumber int,
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
 	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
 	if err != nil {
-		return nil, fmt.Errorf("repo not found: %w", err)
+		return nil, fmt.Errorf("ListComments: failed to get repo: %w", err)
 	}
 
 	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
@@ -289,4 +293,13 @@ type PullRequest struct {
 	AuthorLogin string     `json:"authorLogin"`
 	ClosedAt    *time.Time `json:"closedAt,omitempty"`
 	MergedAt    *time.Time `json:"mergedAt,omitempty"`
+}
+
+func (s *service) RepoExists(ctx context.Context, repoID string) (bool, error) {
+	storeInstance := store.New(s.dbInstance.WithoutTransaction())
+	_, err := storeInstance.GetGitHubRepo(ctx, repoID)
+	if errors.Is(err, libdb.ErrNotFound) {
+		return false, nil
+	}
+	return err == nil, err
 }

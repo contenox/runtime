@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -204,7 +203,7 @@ func (w *worker) processLeasedJob(
 }
 
 type GithubMessage struct {
-	CommentID int64  `json:"commentID"`
+	CommentID string `json:"commentID"`
 	UserName  string `json:"userName"`
 	UserEmail string `json:"userEmail"`
 	UserID    string `json:"userID"`
@@ -286,52 +285,59 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 	}
 	messagesFromGithub := make([]store.Message, 0, len(messagesFromStore))
 	for _, comment := range comments {
-		messageID := ""
-		if comment.ID == nil {
-			reportErr(errors.New("comment ID is nil"))
-			continue // There is no way in syncing without a ID
-		}
-		messageID = fmt.Sprintf("%v-%v", prNumber, comment.GetID())
-		type Message struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		}
-		m := Message{
-			Role: "user",
-		}
-		if user := comment.GetUser(); user != nil {
-			name := user.GetName()
-			if name == "" {
-				name = user.GetEmail()
-			}
-			if name == "" {
-				name = user.GetLogin()
-			}
-			m.Content = "[" + name + "] " + comment.GetBody()
-			if user.GetEmail() == serverops.DefaultAdminUser {
-				m.Role = "system"
-			}
+		// Parse comment data
+		commentID := fmt.Sprint(comment.GetID())
+		if commentID == "0" {
+			reportErr(errors.New("invalid comment ID"))
+			continue
 		}
 
-		createdAt := time.Now().UTC()
-		if t := comment.CreatedAt.GetTime(); t != nil {
-			createdAt = *t
+		// Generate deterministic message ID
+		messageID := fmt.Sprintf("gh-%d-%s", prNumber, commentID)
+
+		// Create message content
+		user := comment.GetUser()
+		userName := "unknown"
+		if user != nil {
+			userName = user.GetLogin()
+			if userName == "" {
+				userName = user.GetName()
+			}
 		}
-		payload, err := json.Marshal(m)
+		createdAt := comment.GetCreatedAt().Time
+		if createdAt.IsZero() {
+			createdAt = time.Now().UTC()
+		}
+
+		content := comment.GetBody()
+		if content == "" {
+			reportErr(errors.New("empty comment content"))
+			continue
+		}
+
+		// Store message with full context
+		messageData := map[string]interface{}{
+			"repo_id":    repoID,
+			"pr_number":  prNumber,
+			"comment_id": commentID,
+			"user_name":  userName,
+			"content":    content,
+			"created_at": comment.GetCreatedAt().Time,
+		}
+
+		payload, err := json.Marshal(messageData)
 		if err != nil {
-			err = fmt.Errorf("failed to marshal message payload: %w", err)
-			reportErr(err)
-			return err
+			reportErr(fmt.Errorf("failed to marshal message: %w", err))
+			continue
 		}
+
 		message := store.Message{
 			ID:      messageID,
 			IDX:     streamID,
 			AddedAt: createdAt,
 			Payload: payload,
 		}
-		messagesFromGithub = append(messagesFromGithub,
-			message,
-		)
+		messagesFromGithub = append(messagesFromGithub, message)
 	}
 	missingMessages := []*store.Message{}
 
@@ -356,58 +362,57 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 
 	// Create LLM jobs for each new comment
 	for _, msg := range missingMessages {
-		// Extract GitHub comment ID from message ID
-		parts := strings.Split(msg.ID, "-")
-		var commentID string
-		if len(parts) > 1 {
-			commentID = parts[1]
-		} else {
-			return fmt.Errorf("invalid message ID format")
+		var msgData map[string]interface{}
+		if err := json.Unmarshal(msg.Payload, &msgData); err != nil {
+			reportErr(fmt.Errorf("failed to parse message: %w", err))
+			continue
+		}
+		repoId, ok := msgData["repo_id"].(string)
+		if !ok {
+			reportErr(fmt.Errorf("failed to parse repo_id"))
+			continue
+		}
+		prNumber, ok := msgData["pr_number"].(float64)
+		if !ok {
+			reportErr(fmt.Errorf("failed to parse pr_number"))
+			continue
+		}
+		commentId, ok := msgData["comment_id"].(string)
+		if !ok {
+			reportErr(fmt.Errorf("failed to parse comment_id"))
+			continue
+		}
+		content, ok := msgData["content"].(string)
+		if !ok {
+			reportErr(fmt.Errorf("failed to parse content"))
+			continue
 		}
 
-		// Parse the message payload
-		var githubMsg GithubMessage
-		if err := json.Unmarshal(msg.Payload, &githubMsg); err != nil {
-			reportErr(fmt.Errorf("failed to parse message payload: %w", err))
-			return fmt.Errorf("failed to parse message payload: %w", err)
+		// Create job with extracted data
+		jobPayload := GithubMessage{
+			RepoID:    repoId,
+			PR:        int(prNumber),
+			CommentID: commentId,
+			Content:   content,
 		}
 
-		// Create job payload
-		payload, err := json.Marshal(struct {
-			RepoID    string `json:"repo_id"`
-			PRNumber  int    `json:"pr_number"`
-			CommentID string `json:"comment_id"`
-			MessageID string `json:"message_id"`
-			UserName  string `json:"user_name"`
-			Content   string `json:"content"`
-		}{
-			RepoID:    repoID,
-			PRNumber:  prNumber,
-			CommentID: commentID,
-			MessageID: msg.ID,
-			UserName:  githubMsg.UserName,
-			Content:   githubMsg.Content,
-		})
+		payloadBytes, err := json.Marshal(jobPayload)
 		if err != nil {
 			reportErr(fmt.Errorf("failed to marshal job payload: %w", err))
-			return fmt.Errorf("failed to marshal job payload: %w", err)
+			continue
 		}
-		reportJobErr, _, endJob := w.tracker.Start(ctx, "append", "job", "type", JobTypeGitHubProcessCommentLLM)
-		defer endJob()
 
-		// Create and append job
 		job := &store.Job{
 			ID:        uuid.NewString(),
 			TaskType:  JobTypeGitHubProcessCommentLLM,
 			CreatedAt: time.Now().UTC(),
 			Operation: "process_comment_llm",
-			Payload:   payload,
-			Subject:   fmt.Sprintf("%s:%d", repoID, prNumber),
+			Payload:   payloadBytes,
+			Subject:   fmt.Sprintf("%s:%", repoID, prNumber),
 		}
 
 		if err := storeInstance.AppendJob(ctx, *job); err != nil {
-			reportJobErr(fmt.Errorf("failed to append job: %w", err))
-			return fmt.Errorf("failed to append job: %w", err)
+			reportErr(fmt.Errorf("failed to append job: %w", err))
 		}
 	}
 	err = commit(ctx)
