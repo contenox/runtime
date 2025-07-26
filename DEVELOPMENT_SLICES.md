@@ -1,6 +1,6 @@
 # DEVELOPMENT_SLICES.md
 
-This document tracks development efforts by slice/month, showing what was planned, what was delivered, and what remains for future work.
+> This document tracks development efforts by slice/month, showing what was planned, what was delivered, and what remains for future work.
 
 ## Development Approach
 
