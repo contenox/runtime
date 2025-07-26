@@ -2,7 +2,7 @@
 
 > **Build context-aware AI systems with LLMs** — An open runtime for Autonomous Agents (Bots) and Co-Pilots (Frontends) with shared behavior logic.
 
-This MVP demonstrates the vision for building **production-ready agent systems**:
+This MVP demonstrates the vision for building **agent systems**:
 
 * Execute chained sequences of operations through natural language
 + Route events to contextual agents with dynamic behavior loading
