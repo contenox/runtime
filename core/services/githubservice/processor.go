@@ -23,11 +23,11 @@ type GitHubCommentProcessor struct {
 	githubSvc   Service
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, chatManager *chat.Manager, githubSvc Service, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
+func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubSvc Service, chatManager *chat.Manager, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	return &GitHubCommentProcessor{db: db, env: env, chatManager: chatManager, githubSvc: githubSvc, tracker: tracker}
+	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker, chatManager: chatManager, githubSvc: githubSvc}
 }
 
 func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job) (err error) {
@@ -127,6 +127,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		return
 	}
 	// Post response to GitHub
+
 	if err = p.githubSvc.PostComment(ctx, payload.RepoID, payload.PR, lastMsg.Content); err != nil {
 		err = fmt.Errorf("failed to post GitHub comment: %w", err)
 		reportErr(err)
