@@ -20,7 +20,7 @@ type OllamaProvider struct {
 	SupportsStream bool
 	SupportsPrompt bool
 	httpClient     *http.Client
-	Backends       []string // assuming that Backend IDs are urls to the instance
+	Backends       []string
 }
 
 func (p *OllamaProvider) GetBackendIDs() []string {
@@ -74,7 +74,7 @@ func (p *OllamaProvider) GetChatConnection(ctx context.Context, backendID string
 	// Create and return the wrapper client
 	chatClient := &OllamaChatClient{
 		ollamaClient: ollamaAPIClient,
-		modelName:    p.ModelName(), // Use the full model name (e.g., "llama3:latest")
+		modelName:    p.ModelName(),
 		backendURL:   backendID,
 	}
 
@@ -168,6 +168,8 @@ var (
 		"mistral":            8192,
 		"mixtral":            32768,
 		"phi":                2048,
+		"phi4-mini":          2048,
+		"phi4-mini:3.8b":     2048,
 		"codellama":          16384,
 		"codellama:34b-100k": 100000,
 		"gemma":              8192,
@@ -203,14 +205,16 @@ var (
 		"codellama:34b-100k": 100000,
 		"mixtral-8x7b":       32768,
 		"qwen2.5:3b":         8192,
+		"phi4-mini:3.8b":     2048,
 	}
 
 	canChat = map[string]bool{
 		"llama2": true, "llama3": true, "mistral": true,
-		"mixtral": true, "phi": true, "codellama": true,
-		"gemma": true, "openhermes": true, "notux": true,
+		"mixtral": true, "phi": true, "phi4-mini": true,
+		"codellama": true, "gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
-		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
+		"phi4-mini:3.8b": true,
+		"zephyr":         true, "neural-chat": true, "dolphin-mixtral": true,
 		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true, "qwen2.5": true, "qwen2.5:3b": true,
 	}
 
@@ -248,9 +252,12 @@ var (
 		"vicuna":              true,
 		"guanaco":             true,
 		"wizardlm":            true,
+		"phi":                 true,
+		"phi4-mini":           true,
 		"airoboros":           true,
 		"llama2-70b":          true,
 		"llama2-70b-chat":     true,
+		"phi4-mini:3.8b":      true,
 		"llama3-instruct":     true,
 		"llama3-70b-instruct": true,
 		"open-orca":           true,
@@ -259,11 +266,12 @@ var (
 
 	canStreaming = map[string]bool{
 		"llama2": true, "llama3": true, "mistral": true,
-		"mixtral": true, "phi": true, "codellama": true,
-		"gemma": true, "openhermes": true, "notux": true,
+		"mixtral": true, "phi": true, "phi4-mini": true,
+		"codellama": true, "gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"zephyr": true, "neural-chat": true, "dolphin-mixtral": true,
 		"smollm2:135m": true, "qwen2.5:1.5b": true, "qwen2": true,
+		"phi4-mini:3.8b":      true,
 		"llama2-uncensored":   true,
 		"llama2-70b":          true,
 		"llama2-70b-chat":     true,
