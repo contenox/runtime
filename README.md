@@ -1,5 +1,7 @@
 # contenox/runtime-mvp
 
+`shifting agency from the LLM to defined behavior`
+
 > **Build context-aware AI systems with LLMs** — An open runtime for Autonomous Agents (Bots) and Co-Pilots (Frontends) with shared behavior logic.
 
 This MVP showcases a vision for building **agent systems** that:
