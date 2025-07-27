@@ -109,7 +109,7 @@ func (w *worker) createJobForPR(repoID string, prNumber int) (*store.Job, error)
 		CreatedAt: time.Now().UTC(),
 		Operation: "sync_pr",
 		Payload:   payload,
-		Subject:   fmt.Sprintf("%s:%d", repoID, prNumber),
+		Subject:   FormatSubjectID(repoID, prNumber),
 	}, nil
 }
 
@@ -241,7 +241,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 
 	// Store comments
 	var storedCount int
-	streamID := fmt.Sprintf("%v-%v", repoID, prNumber)
+	streamID := FormatSubjectID(repoID, prNumber)
 	tx, commit, release, err := w.dbInstance.WithTransaction(ctx)
 	defer release()
 	if err != nil {
@@ -314,7 +314,14 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			reportErr(errors.New("empty comment content"))
 			continue
 		}
-
+		//  // TODO add type and fix missing role.
+		// 		{
+		//     "role": "",
+		//     "content": "this is a test message to ping the bot",
+		//     "sentAt": "2025-07-27T08:47:01Z",
+		//     "isUser": false,
+		//     "isLatest": false
+		// }
 		// Store message with full context
 		messageData := map[string]interface{}{
 			"repo_id":    repoID,
@@ -408,7 +415,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			CreatedAt: time.Now().UTC(),
 			Operation: "process_comment_llm",
 			Payload:   payloadBytes,
-			Subject:   fmt.Sprintf("%s:%", repoID, prNumber),
+			Subject:   FormatSubjectID(repoID, prNumber),
 		}
 
 		if err := storeInstance.AppendJob(ctx, *job); err != nil {

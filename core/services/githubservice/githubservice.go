@@ -303,3 +303,7 @@ func (s *service) RepoExists(ctx context.Context, repoID string) (bool, error) {
 	}
 	return err == nil, err
 }
+
+func FormatSubjectID(repoID string, prNumber any) string {
+	return fmt.Sprintf("%v-%v", repoID, prNumber)
+}
