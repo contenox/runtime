@@ -195,20 +195,23 @@ sequenceDiagram
 
 ## 🛠️ Getting Started
 
-1. Copy the example env file:
+1. Ensure `go` `docker` and `corepack` + `yarn` are **installed**.
+> Note: only linux is supported.
+
+2. Copy the example env file:
 
 ```bash
 cp .env-example .env
 ```
 
-2. Start the services:
+3. Start the services:
 
 ```bash
 make run        # backend + workers + vector DB
 make ui-run     # React frontend (proxied via backend)
 ```
 
-3. Access the UI at: [http://localhost:8081](http://localhost:8081)
+4. Access the UI at: [http://localhost:8081](http://localhost:8081)
    Login as `admin@admin.com`.
 
 > **Note**: The UI runs through the backend proxy on port `8081` — not Vite’s default.
