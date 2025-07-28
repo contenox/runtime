@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
@@ -71,7 +72,7 @@ func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error
 
 	// Append new user message
 	userMessage := payload.Update.Message.Text
-	messages, err = p.chatManager.AppendMessage(ctx, messages, userMessage, "user")
+	messages, err = p.chatManager.AppendMessage(ctx, messages, time.Now().UTC(), userMessage, "user")
 	if err != nil {
 		return fmt.Errorf("appending user message: %w", err)
 	}

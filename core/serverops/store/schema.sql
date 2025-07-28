@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS github_repos (
     id VARCHAR(255) PRIMARY KEY,
     user_id VARCHAR(512) NOT NULL,
+    bot_user_name VARCHAR(512) NOT NULL,
     owner VARCHAR(512) NOT NULL,
     repo_name VARCHAR(512) NOT NULL,
     access_token VARCHAR(512) NOT NULL,
@@ -188,11 +189,13 @@ CREATE TABLE IF NOT EXISTS message_indices (
 );
 
 CREATE TABLE IF NOT EXISTS messages (
-    id VARCHAR(255) PRIMARY KEY,
+    id VARCHAR(255),
     idx_id VARCHAR(255) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
 
     payload JSONB NOT NULL,
-    added_at TIMESTAMP NOT NULL
+    added_at TIMESTAMP NOT NULL,
+
+    PRIMARY KEY (id, idx_id)
 );
 
 CREATE TABLE IF NOT EXISTS kv (

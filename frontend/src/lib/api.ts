@@ -283,6 +283,7 @@ export const api = {
   connectGitHubRepo: (data: {
     userID: string;
     owner: string;
+    botUserName: string;
     repoName: string;
     accessToken: string;
   }) => apiFetch<GitHubRepo>('/api/github/connect', options('POST', data)),

@@ -134,6 +134,7 @@ const resources = {
         user_id: 'User ID',
         connect_repo: 'Connect GitHub Repository',
         connect_action: 'Connect Repository',
+        bot_user_name: 'Bot User Name',
         connect_error: 'Error connecting repository',
         connected_repos: 'Connected Repositories',
         owner: 'Owner',

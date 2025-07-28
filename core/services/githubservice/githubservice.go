@@ -20,7 +20,7 @@ var (
 
 type Service interface {
 	serverops.ServiceMeta
-	ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string) (*store.GitHubRepo, error)
+	ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string, botUserName string) (*store.GitHubRepo, error)
 	ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error)
 	ListRepos(ctx context.Context) ([]*store.GitHubRepo, error)
 	DisconnectRepo(ctx context.Context, repoID string) error
@@ -37,8 +37,8 @@ func New(db libdb.DBManager) Service {
 	return &service{dbInstance: db}
 }
 
-func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string) (*store.GitHubRepo, error) {
-	if userID == "" || owner == "" || repoName == "" || accessToken == "" {
+func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string, botUserName string) (*store.GitHubRepo, error) {
+	if userID == "" || owner == "" || repoName == "" || accessToken == "" || botUserName == "" {
 		return nil, ErrInvalidGitHubConfig
 	}
 
@@ -55,6 +55,7 @@ func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, acce
 		Owner:       owner,
 		RepoName:    repoName,
 		AccessToken: accessToken,
+		BotUserName: botUserName,
 		CreatedAt:   time.Now().UTC(),
 		UpdatedAt:   time.Now().UTC(),
 	}
@@ -227,7 +228,15 @@ func (s *service) PostComment(ctx context.Context, repoID string, prNumber int, 
 		repoMeta.Owner,
 		repoMeta.RepoName,
 		prNumber,
-		&github.IssueComment{Body: &comment},
+		&github.IssueComment{
+			Body: &comment,
+			CreatedAt: &github.Timestamp{
+				Time: time.Now().UTC(),
+			},
+			UpdatedAt: &github.Timestamp{
+				Time: time.Now().UTC(),
+			},
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("%w: failed to post comment: %v", ErrGitHubAPIError, err)
@@ -302,4 +311,8 @@ func (s *service) RepoExists(ctx context.Context, repoID string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
+}
+
+func FormatSubjectID(repoID string, prNumber any) string {
+	return fmt.Sprintf("%v-%v", repoID, prNumber)
 }

@@ -117,7 +117,7 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	if err != nil {
 		return "", 0, 0, nil, err
 	}
-	messages, err = s.chatManager.AppendMessage(ctx, messages, req.Message, "user")
+	messages, err = s.chatManager.AppendMessage(ctx, messages, time.Now().UTC(), req.Message, "user")
 	if err != nil {
 		return "", 0, 0, nil, err
 	}
@@ -167,6 +167,7 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 
 // ChatMessage is the public representation of a message in a chat.
 type ChatMessage struct {
+	ID       string    `json:"id"`       // unique identifier
 	Role     string    `json:"role"`     // user/assistant/system
 	Content  string    `json:"content"`  // message text
 	SentAt   time.Time `json:"sentAt"`   // timestamp

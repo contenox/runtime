@@ -28,6 +28,8 @@ The approach proved effective for managing complexity, though some features (lik
   - Exportable conversation transcripts
   - Model fine-tuning management
   - MCP compatibility implementation
+  - Fix the ollama model-provider implementation
+  - Fix the openai model-provider implementation
 
 ---
 

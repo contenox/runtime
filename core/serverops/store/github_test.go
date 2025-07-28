@@ -18,6 +18,7 @@ func TestGitHubRepoCRUD(t *testing.T) {
 	repo := &store.GitHubRepo{
 		ID:          uuid.New().String(),
 		UserID:      userID,
+		BotUserName: "bot-user",
 		Owner:       "test-owner",
 		RepoName:    "test-repo",
 		AccessToken: "test-token",
@@ -37,6 +38,7 @@ func TestGitHubRepoCRUD(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, repo.ID, retrieved.ID)
 		require.Equal(t, repo.UserID, retrieved.UserID)
+		require.Equal(t, repo.BotUserName, retrieved.BotUserName)
 		require.Equal(t, repo.Owner, retrieved.Owner)
 		require.Equal(t, repo.RepoName, retrieved.RepoName)
 		require.Equal(t, repo.AccessToken, retrieved.AccessToken)
@@ -50,6 +52,7 @@ func TestGitHubRepoCRUD(t *testing.T) {
 		repo2 := &store.GitHubRepo{
 			ID:          uuid.New().String(),
 			UserID:      userID,
+			BotUserName: "bot-user",
 			Owner:       "another-owner",
 			RepoName:    "another-repo",
 			AccessToken: "another-token",
