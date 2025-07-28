@@ -3,6 +3,7 @@ package chat_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/kv"
@@ -50,7 +51,7 @@ func TestManagerSystem(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("AddInstruction_inserts_system_message", func(t *testing.T) {
-		err := manager.AddInstruction(ctx, dbInstance.WithoutTransaction(), subjectID, systemMessage)
+		err := manager.AddInstruction(ctx, dbInstance.WithoutTransaction(), subjectID, time.Now().UTC(), systemMessage)
 		require.NoError(t, err)
 
 		messages, err := manager.ListMessages(ctx, dbInstance.WithoutTransaction(), subjectID)
@@ -65,7 +66,7 @@ func TestManagerSystem(t *testing.T) {
 			{Role: "system", Content: systemMessage},
 		}
 
-		newHistory, err := manager.AppendMessage(ctx, initial, userMessage, "user")
+		newHistory, err := manager.AppendMessage(ctx, initial, time.Now().UTC(), userMessage, "user")
 		require.NoError(t, err)
 		require.Len(t, newHistory, 2)
 		require.Equal(t, "user", newHistory[1].Role)

@@ -34,6 +34,7 @@ type TelegramFrontend struct {
 type GitHubRepo struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"userId"`
+	BotUserName string    `json:"botUserName"`
 	Owner       string    `json:"owner"`
 	RepoName    string    `json:"repoName"`
 	AccessToken string    `json:"accessToken"`

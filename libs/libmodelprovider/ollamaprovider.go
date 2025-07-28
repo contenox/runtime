@@ -161,6 +161,7 @@ func NewOllamaModelProvider(name string, backends []string, httpClient *http.Cli
 var (
 	modelContextLengths = map[string]int{
 		"smollm2:135m":       100000,
+		"qwen3:4b":           8192,
 		"qwen2.5":            8192,
 		"llama2":             4096,
 		"llama3":             8192,
@@ -203,6 +204,7 @@ var (
 	modelContextLengthsFullNames = map[string]int{
 		"smollm2:135m":       1024,
 		"codellama:34b-100k": 100000,
+		"qwen3:4b":           32768,
 		"mixtral-8x7b":       32768,
 		"qwen2.5:3b":         8192,
 		"phi4-mini:3.8b":     2048,
@@ -210,7 +212,8 @@ var (
 
 	canChat = map[string]bool{
 		"llama2": true, "llama3": true, "mistral": true,
-		"mixtral": true, "phi": true, "phi4-mini": true,
+		"qwen3:4b": true,
+		"mixtral":  true, "phi": true, "phi4-mini": true,
 		"codellama": true, "gemma": true, "openhermes": true, "notux": true,
 		"llava": true, "deepseek": true, "qwen": true,
 		"phi4-mini:3.8b": true,
@@ -246,6 +249,7 @@ var (
 		"gemma":               true,
 		"qwen":                true,
 		"qwen2":               true,
+		"qwen3:4b":            true,
 		"qwen2.5":             true,
 		"qwen2.5:3b":          true,
 		"deepseek":            true,

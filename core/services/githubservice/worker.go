@@ -9,6 +9,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
+	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 		}
 
 		for _, pr := range prs {
-			job, err := w.createJobForPR(repo.ID, pr.Number)
+			job, err := w.createJobForPR(repo.ID, repo.BotUserName, pr.Number)
 			if err != nil {
 				reportErr(fmt.Errorf("failed to create job for repo %s pr %d: %w", repo.ID, pr.Number, err))
 				return fmt.Errorf("failed to create job for repo %s pr %d: %w", repo.ID, pr.Number, err)
@@ -91,14 +92,13 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 	return nil
 }
 
-func (w *worker) createJobForPR(repoID string, prNumber int) (*store.Job, error) {
-	payload, err := json.Marshal(struct {
-		RepoID   string `json:"repo_id"`
-		PRNumber int    `json:"pr_number"`
-	}{
-		RepoID:   repoID,
-		PRNumber: prNumber,
-	})
+func (w *worker) createJobForPR(repoID string, botID string, prNumber int) (*store.Job, error) {
+	var payload processLeasedJobPayload
+	payload.RepoID = repoID
+	payload.PRNumber = prNumber
+	payload.BotID = botID
+
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (w *worker) createJobForPR(repoID string, prNumber int) (*store.Job, error)
 		TaskType:  JobTypeGitHubCommentSync,
 		CreatedAt: time.Now().UTC(),
 		Operation: "sync_pr",
-		Payload:   payload,
+		Payload:   payloadBytes,
 		Subject:   FormatSubjectID(repoID, prNumber),
 	}, nil
 }
@@ -135,6 +135,12 @@ func (w *worker) ProcessTick(ctx context.Context) error {
 	return w.processLeasedJob(ctx, storeInstance, leasedJob, leaseID)
 }
 
+type processLeasedJobPayload struct {
+	RepoID   string `json:"repoId"`
+	BotID    string `json:"botId"`
+	PRNumber int    `json:"prNumber"`
+}
+
 func (w *worker) processLeasedJob(
 	ctx context.Context,
 	storeInstance store.Store,
@@ -154,11 +160,7 @@ func (w *worker) processLeasedJob(
 	if err := storeInstance.AppendLeasedJob(ctx, *leasedJob, leaseDuration, leaseID); err != nil {
 		return fmt.Errorf("lease job: %w", err)
 	}
-
-	var payload struct {
-		RepoID   string `json:"repo_id"`
-		PRNumber int    `json:"pr_number"`
-	}
+	var payload processLeasedJobPayload
 	if err := json.Unmarshal(leasedJob.Payload, &payload); err != nil {
 		_ = storeInstance.DeleteLeasedJob(ctx, leasedJob.ID)
 		return fmt.Errorf("unmarshal payload: %w", err)
@@ -172,7 +174,7 @@ func (w *worker) processLeasedJob(
 	if w.bootLastSyncTime.After(lsync.Time) {
 		lsync.Time = w.bootLastSyncTime
 	}
-	processErr = w.syncPRComments(ctx, payload.RepoID, payload.PRNumber, lsync.Time)
+	processErr = w.syncPRComments(ctx, payload.BotID, payload.RepoID, payload.PRNumber, lsync.Time)
 	if processErr == nil {
 		updateSyncTime := lastSync{
 			Time: time.Now().UTC(),
@@ -212,7 +214,31 @@ type GithubMessage struct {
 	Content   string `json:"content"`
 }
 
-func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int, lastSync time.Time) error {
+//	 // TODO add type and fix missing role.
+//			{
+//	    "role": "",
+//	    "content": "this is a test message to ping the bot",
+//	    "sentAt": "2025-07-27T08:47:01Z",
+//	    "isUser": false,
+//	    "isLatest": false
+//	}
+//
+// Store message with full context
+type MessagePayload struct {
+	// "repo_id":    repoID,
+	// "pr_number":  prNumber,
+	// "comment_id": commentID,
+	// "user_name":  userName,
+	// "content":    content,
+	// "sent_at":    sendAt,
+	RepoID    string `json:"repoID"`
+	PRNumber  int    `json:"prNumber"`
+	CommentID string `json:"commentID"`
+	UserName  string `json:"userName"`
+	chatservice.ChatMessage
+}
+
+func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string, prNumber int, lastSync time.Time) error {
 	// Track PR processing
 	reportErr, reportChange, end := w.tracker.Start(
 		ctx,
@@ -284,6 +310,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		return err
 	}
 	messagesFromGithub := make([]store.Message, 0, len(messagesFromStore))
+	isUser := map[string]bool{}
 	for _, comment := range comments {
 		// Parse comment data
 		commentID := fmt.Sprint(comment.GetID())
@@ -303,10 +330,9 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			if userName == "" {
 				userName = user.GetName()
 			}
-		}
-		createdAt := comment.GetCreatedAt().Time
-		if createdAt.IsZero() {
-			createdAt = time.Now().UTC()
+			if userName == "" {
+				userName = user.GetEmail()
+			}
 		}
 
 		content := comment.GetBody()
@@ -314,23 +340,29 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 			reportErr(errors.New("empty comment content"))
 			continue
 		}
-		//  // TODO add type and fix missing role.
-		// 		{
-		//     "role": "",
-		//     "content": "this is a test message to ping the bot",
-		//     "sentAt": "2025-07-27T08:47:01Z",
-		//     "isUser": false,
-		//     "isLatest": false
-		// }
-		// Store message with full context
-		messageData := map[string]interface{}{
-			"repo_id":    repoID,
-			"pr_number":  prNumber,
-			"comment_id": commentID,
-			"user_name":  userName,
-			"content":    content,
-			"created_at": comment.GetCreatedAt().Time,
+		content = removeFooter(content)
+		sendAt := time.Now().UTC()
+		if !comment.GetCreatedAt().IsZero() {
+			sendAt = comment.GetCreatedAt().Time
 		}
+		messageData := MessagePayload{
+			RepoID:    repoID,
+			PRNumber:  prNumber,
+			CommentID: commentID,
+			UserName:  userName,
+			ChatMessage: chatservice.ChatMessage{
+				ID:      messageID,
+				Role:    "user",
+				Content: content,
+				SentAt:  sendAt,
+				IsUser:  true,
+			},
+		}
+		if botID == userName {
+			messageData.ChatMessage.Role = "assistant"
+			messageData.ChatMessage.IsUser = false
+		}
+		isUser[messageID] = messageData.ChatMessage.IsUser
 
 		payload, err := json.Marshal(messageData)
 		if err != nil {
@@ -341,7 +373,7 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 		message := store.Message{
 			ID:      messageID,
 			IDX:     streamID,
-			AddedAt: createdAt,
+			AddedAt: sendAt,
 			Payload: payload,
 		}
 		messagesFromGithub = append(messagesFromGithub, message)
@@ -369,52 +401,15 @@ func (w *worker) syncPRComments(ctx context.Context, repoID string, prNumber int
 
 	// Create LLM jobs for each new comment
 	for _, msg := range missingMessages {
-		var msgData map[string]interface{}
-		if err := json.Unmarshal(msg.Payload, &msgData); err != nil {
-			reportErr(fmt.Errorf("failed to parse message: %w", err))
+		if !isUser[msg.ID] {
 			continue
 		}
-		repoId, ok := msgData["repo_id"].(string)
-		if !ok {
-			reportErr(fmt.Errorf("failed to parse repo_id"))
-			continue
-		}
-		prNumber, ok := msgData["pr_number"].(float64)
-		if !ok {
-			reportErr(fmt.Errorf("failed to parse pr_number"))
-			continue
-		}
-		commentId, ok := msgData["comment_id"].(string)
-		if !ok {
-			reportErr(fmt.Errorf("failed to parse comment_id"))
-			continue
-		}
-		content, ok := msgData["content"].(string)
-		if !ok {
-			reportErr(fmt.Errorf("failed to parse content"))
-			continue
-		}
-
-		// Create job with extracted data
-		jobPayload := GithubMessage{
-			RepoID:    repoId,
-			PR:        int(prNumber),
-			CommentID: commentId,
-			Content:   content,
-		}
-
-		payloadBytes, err := json.Marshal(jobPayload)
-		if err != nil {
-			reportErr(fmt.Errorf("failed to marshal job payload: %w", err))
-			continue
-		}
-
 		job := &store.Job{
 			ID:        uuid.NewString(),
 			TaskType:  JobTypeGitHubProcessCommentLLM,
 			CreatedAt: time.Now().UTC(),
 			Operation: "process_comment_llm",
-			Payload:   payloadBytes,
+			Payload:   msg.Payload,
 			Subject:   FormatSubjectID(repoID, prNumber),
 		}
 

@@ -25,6 +25,7 @@ type connReq struct {
 	Owner       string `json:"owner"`
 	RepoName    string `json:"repoName"`
 	AccessToken string `json:"accessToken"`
+	BotUserName string `json:"botUserName"`
 }
 
 func connectRepo(svc githubservice.Service) http.HandlerFunc {
@@ -36,7 +37,7 @@ func connectRepo(svc githubservice.Service) http.HandlerFunc {
 			_ = serverops.Error(w, r, err, serverops.CreateOperation)
 			return
 		}
-		repo, err := svc.ConnectRepo(ctx, req.UserID, req.Owner, req.RepoName, req.AccessToken)
+		repo, err := svc.ConnectRepo(ctx, req.UserID, req.Owner, req.RepoName, req.AccessToken, req.BotUserName)
 		if err != nil {
 			serverops.Error(w, r, err, serverops.CreateOperation)
 			return

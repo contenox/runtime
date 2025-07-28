@@ -31,16 +31,17 @@ func (d *activityTrackerDecorator) GetServiceGroup() string {
 	return d.service.GetServiceGroup()
 }
 
-func (d *activityTrackerDecorator) ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string) (*store.GitHubRepo, error) {
+func (d *activityTrackerDecorator) ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string, botUserName string) (*store.GitHubRepo, error) {
 	reportErr, reportChange, end := d.tracker.Start(
 		ctx, "connect", "github-repo",
 		"user_id", userID,
 		"owner", owner,
 		"repo", repoName,
+		"bot_user_name", botUserName,
 	)
 	defer end()
 
-	repo, err := d.service.ConnectRepo(ctx, userID, owner, repoName, accessToken)
+	repo, err := d.service.ConnectRepo(ctx, userID, owner, repoName, accessToken, botUserName)
 	if err != nil {
 		reportErr(err)
 		return nil, err

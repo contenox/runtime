@@ -12,8 +12,13 @@ export function useListGitHubRepos() {
 export function useConnectGitHubRepo() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { userID: string; owner: string; repoName: string; accessToken: string }) =>
-      api.connectGitHubRepo(data),
+    mutationFn: (data: {
+      userID: string;
+      owner: string;
+      botUserName: string;
+      repoName: string;
+      accessToken: string;
+    }) => api.connectGitHubRepo(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: githubKeys.repos() });
     },

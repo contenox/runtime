@@ -361,6 +361,7 @@ export type ActivityAlertsResponse = Alert[];
 export interface GitHubRepo {
   id: string;
   userID: string;
+  botUserName: string;
   owner: string;
   repoName: string;
   accessToken: string;

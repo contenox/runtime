@@ -187,7 +187,7 @@ func New(
 	githubService := githubservice.New(dbInstance)
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
-	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*31))
+	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*2))
 	libroutine.GetPool().StartLoop(ctx, "github-worker-pull", 4, time.Minute, time.Minute, func(ctx context.Context) error {
 		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
 		return githubworker.ReceiveTick(ctx)

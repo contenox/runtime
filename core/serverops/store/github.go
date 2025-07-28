@@ -17,10 +17,11 @@ func (s *store) CreateGitHubRepo(ctx context.Context, repo *GitHubRepo) error {
 
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO github_repos
-		(id, user_id, owner, repo_name, access_token, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		(id, user_id, bot_user_name, owner, repo_name, access_token, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		repo.ID,
 		repo.UserID,
+		repo.BotUserName,
 		repo.Owner,
 		repo.RepoName,
 		repo.AccessToken,
@@ -33,13 +34,14 @@ func (s *store) CreateGitHubRepo(ctx context.Context, repo *GitHubRepo) error {
 func (s *store) GetGitHubRepo(ctx context.Context, id string) (*GitHubRepo, error) {
 	var repo GitHubRepo
 	err := s.Exec.QueryRowContext(ctx, `
-		SELECT id, user_id, owner, repo_name, access_token, created_at, updated_at
+		SELECT id, user_id, bot_user_name, owner, repo_name, access_token, created_at, updated_at
 		FROM github_repos
 		WHERE id = $1`,
 		id,
 	).Scan(
 		&repo.ID,
 		&repo.UserID,
+		&repo.BotUserName,
 		&repo.Owner,
 		&repo.RepoName,
 		&repo.AccessToken,
@@ -67,7 +69,7 @@ func (s *store) DeleteGitHubRepo(ctx context.Context, id string) error {
 
 func (s *store) ListGitHubRepos(ctx context.Context) ([]*GitHubRepo, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, user_id, owner, repo_name, access_token, created_at, updated_at
+		SELECT id, user_id, bot_user_name, owner, repo_name, access_token, created_at, updated_at
 		FROM github_repos
 		ORDER BY created_at DESC`)
 	if err != nil {
@@ -81,6 +83,7 @@ func (s *store) ListGitHubRepos(ctx context.Context) ([]*GitHubRepo, error) {
 		if err := rows.Scan(
 			&repo.ID,
 			&repo.UserID,
+			&repo.BotUserName,
 			&repo.Owner,
 			&repo.RepoName,
 			&repo.AccessToken,

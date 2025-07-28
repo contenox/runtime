@@ -28,17 +28,19 @@ export default function GitHubReposSection() {
   const [owner, setOwner] = useState('');
   const [repoName, setRepoName] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [botUserName, setBotUserName] = useState('');
   const [deletingRepoId, setDeletingRepoId] = useState<string | null>(null);
 
   const handleConnectRepo = (e: React.FormEvent) => {
     e.preventDefault();
     connectRepoMutation.mutate(
-      { userID: userId, owner, repoName, accessToken },
+      { userID: userId, owner, repoName, accessToken, botUserName },
       {
         onSuccess: () => {
           setUserId('');
           setOwner('');
           setRepoName('');
+          setBotUserName('');
           setAccessToken('');
         },
       },
@@ -101,7 +103,13 @@ export default function GitHubReposSection() {
               placeholder="organization"
             />
           </FormField>
-
+          <FormField label={t('github.bot_user_name')} required>
+            <Input
+              value={botUserName}
+              onChange={e => setBotUserName(e.target.value)}
+              placeholder="bot-user"
+            />
+          </FormField>
           <FormField label={t('github.repo_name')} required>
             <Input
               value={repoName}

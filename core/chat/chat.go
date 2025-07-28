@@ -38,35 +38,36 @@ func New(
 }
 
 // AddInstruction inserts a system message into an existing chat.
-func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, message string) error {
-	now := time.Now().UTC()
+func (m *Manager) AddInstruction(ctx context.Context, tx libdb.Exec, id string, sendAt time.Time, message string) error {
 	msg := taskengine.Message{
 		Role:      "system",
 		Content:   message,
-		Timestamp: now,
+		Timestamp: sendAt,
 	}
 	payload, err := json.Marshal(&msg)
 	if err != nil {
 		return err
 	}
-
-	messageID := generateMessageID(id, payload)
+	messageID := msg.ID
+	if messageID == "" {
+		messageID = generateMessageID(id, &msg)
+	}
 
 	err = store.New(tx).AppendMessages(ctx, &store.Message{
 		ID:      messageID,
 		IDX:     id,
 		Payload: payload,
-		AddedAt: now,
+		AddedAt: sendAt,
 	})
 	return err
 }
 
 // AppendMessage appends a message to an existing message slice.
-func (m *Manager) AppendMessage(ctx context.Context, messages []taskengine.Message, message string, role string) ([]taskengine.Message, error) {
+func (m *Manager) AppendMessage(ctx context.Context, messages []taskengine.Message, sendAt time.Time, message string, role string) ([]taskengine.Message, error) {
 	userMsg := taskengine.Message{
 		Role:      role,
 		Content:   message,
-		Timestamp: time.Now().UTC(),
+		Timestamp: sendAt,
 	}
 	messages = append(messages, userMsg)
 
@@ -119,8 +120,14 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, subjectID s
 		return fmt.Errorf("failed to marshal assistant message data: %w", err)
 	}
 
-	inputID := generateMessageID(subjectID, inputPayload)
-	responseID := generateMessageID(subjectID, responsePayload)
+	inputID := inputMessage.ID
+	if inputID == "" {
+		inputID = generateMessageID(subjectID, inputMessage)
+	}
+	responseID := responseMessage.ID
+	if responseID == "" {
+		responseID = generateMessageID(subjectID, responseMessage)
+	}
 
 	return store.New(tx).AppendMessages(ctx,
 		&store.Message{
@@ -195,8 +202,10 @@ func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID stri
 		if err != nil {
 			return fmt.Errorf("failed to marshal message: %w", err)
 		}
-
-		messageID := generateMessageID(subjectID, payload)
+		if msg.ID == "" {
+			msg.ID = generateMessageID(subjectID, &msg)
+		}
+		messageID := msg.ID
 
 		if existingIDs[messageID] {
 			continue
@@ -221,9 +230,12 @@ func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID stri
 const tokenizerMaxPromptBytes = 16 * 1024 // 16 KiB
 
 // Helper function for consistent message ID generation
-func generateMessageID(subjectID string, payload []byte) string {
+func generateMessageID(subjectID string, msg *taskengine.Message) string {
 	h := sha1.New()
 	h.Write([]byte(subjectID))
-	h.Write(payload)
+	h.Write([]byte(msg.Content))
+	h.Write([]byte(msg.Role))
+	h.Write([]byte(msg.Timestamp.Format(time.RFC3339))) // Time-Clock drift issue
+
 	return fmt.Sprintf("%x", h.Sum(nil))
 }

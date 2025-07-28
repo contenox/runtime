@@ -23,12 +23,13 @@ func (c *OllamaChatClient) Chat(ctx context.Context, messages []Message, options
 			Content: msg.Content,
 		})
 	}
-
+	think := false
 	stream := false
 	req := &api.ChatRequest{
 		Model:    c.modelName,
 		Messages: apiMessages,
 		Stream:   &stream,
+		Think:    &think,
 	}
 
 	var finalResponse api.ChatResponse
