@@ -61,11 +61,11 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Activity tracking view improvements
 - [x] Token count bug fixes
 - [x] Keyword extraction feature
+- [x] GitHub PR Moderator (core functionality complete but needs final polish)
+- [x] Fix Task-Engine design (refactoring planned for next slice)
 
 ### Remaining Items
 - [ ] Package a Persona-Chat Application
-- [ ] GitHub PR Moderator (core functionality complete but needs final polish)
-- [ ] Fix Task-Engine design (refactoring planned for next slice)
 - [ ] Permission Model Improvements (partially implemented)
 
 ### Effort Estimate
