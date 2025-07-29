@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libdb"
@@ -21,7 +22,7 @@ var (
 type Service interface {
 	serverops.ServiceMeta
 	ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string, botUserName string) (*store.GitHubRepo, error)
-	ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error)
+	ListPRs(ctx context.Context, repoID string) ([]*githubclient.PullRequest, error)
 	ListRepos(ctx context.Context) ([]*store.GitHubRepo, error)
 	DisconnectRepo(ctx context.Context, repoID string) error
 	PR(ctx context.Context, repoID string, prNumber int) (*PullRequestDetails, error)
@@ -30,11 +31,12 @@ type Service interface {
 }
 
 type service struct {
-	dbInstance libdb.DBManager
+	dbInstance   libdb.DBManager
+	githubClient githubclient.Client
 }
 
-func New(db libdb.DBManager) Service {
-	return &service{dbInstance: db}
+func New(db libdb.DBManager, githubClient githubclient.Client) Service {
+	return &service{dbInstance: db, githubClient: githubClient}
 }
 
 func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, accessToken string, botUserName string) (*store.GitHubRepo, error) {
@@ -67,59 +69,12 @@ func (s *service) ConnectRepo(ctx context.Context, userID, owner, repoName, acce
 	return repo, nil
 }
 
-func (s *service) ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error) {
-	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	repo, err := storeInstance.GetGitHubRepo(ctx, repoID)
-	if err != nil {
-		return nil, fmt.Errorf("ListPRs: failed to get repo: %w", err)
-	}
-
-	client := s.createGitHubClient(ctx, repo.AccessToken)
-
-	var allPRs []*github.PullRequest
-	opt := &github.PullRequestListOptions{
-		State: "open",
-		ListOptions: github.ListOptions{
-			Page:    1,
-			PerPage: 100,
-		},
-	}
-	maxpages := 10
-	for {
-		prs, resp, err := client.PullRequests.List(ctx, repo.Owner, repo.RepoName, opt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list PRs: %w, Response: %+v", err, resp)
-		}
-		allPRs = append(allPRs, prs...)
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-		maxpages -= 1
-		if maxpages < 0 {
-			break
-		}
-	}
-
-	result := make([]*PullRequest, len(allPRs))
-	for i, pr := range allPRs {
-		result[i] = &PullRequest{
-			ID:          pr.GetID(),
-			Number:      pr.GetNumber(),
-			Title:       pr.GetTitle(),
-			State:       pr.GetState(),
-			URL:         pr.GetHTMLURL(),
-			CreatedAt:   pr.GetCreatedAt().Time,
-			UpdatedAt:   pr.GetUpdatedAt().Time,
-			AuthorLogin: pr.GetUser().GetLogin(),
-		}
-	}
-	return result, nil
+func (s *service) ListPRs(ctx context.Context, repoID string) ([]*githubclient.PullRequest, error) {
+	return s.githubClient.ListPRs(ctx, repoID)
 }
 
 func (s *service) ListRepos(ctx context.Context) ([]*store.GitHubRepo, error) {
-	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	return storeInstance.ListGitHubRepos(ctx)
+	return s.githubClient.ListRepos(ctx)
 }
 
 func (s *service) DisconnectRepo(ctx context.Context, repoID string) error {
@@ -210,74 +165,12 @@ func (s *service) PR(ctx context.Context, repoID string, prNumber int) (*PullReq
 }
 
 func (s *service) PostComment(ctx context.Context, repoID string, prNumber int, comment string) error {
-	// Validate repo first
-	if exists, err := s.RepoExists(ctx, repoID); err != nil || !exists {
-		return fmt.Errorf("repository %s does not exist or is not connected", repoID)
-	}
-
-	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
-	if err != nil {
-		return fmt.Errorf("PostComment: failed to get repo: %w", err)
-	}
-
-	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
-
-	_, _, err = client.Issues.CreateComment(
-		ctx,
-		repoMeta.Owner,
-		repoMeta.RepoName,
-		prNumber,
-		&github.IssueComment{
-			Body: &comment,
-			CreatedAt: &github.Timestamp{
-				Time: time.Now().UTC(),
-			},
-			UpdatedAt: &github.Timestamp{
-				Time: time.Now().UTC(),
-			},
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("%w: failed to post comment: %v", ErrGitHubAPIError, err)
-	}
-	return nil
+	return s.githubClient.PostComment(ctx, repoID, prNumber, comment)
 }
 
 func (s *service) ListComments(ctx context.Context, repoID string, prNumber int, since time.Time) ([]*github.IssueComment, error) {
-	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
-	if err != nil {
-		return nil, fmt.Errorf("ListComments: failed to get repo: %w", err)
-	}
 
-	client := s.createGitHubClient(ctx, repoMeta.AccessToken)
-
-	var allComments []*github.IssueComment
-	opt := &github.IssueListCommentsOptions{
-		Since:       &since,
-		ListOptions: github.ListOptions{PerPage: 100},
-	}
-
-	for {
-		comments, resp, err := client.Issues.ListComments(
-			ctx,
-			repoMeta.Owner,
-			repoMeta.RepoName,
-			prNumber,
-			opt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("%w: failed to list comments: %v", ErrGitHubAPIError, err)
-		}
-		allComments = append(allComments, comments...)
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-
-	return allComments, nil
+	return s.githubClient.ListComments(ctx, repoID, prNumber, since)
 }
 
 func (s *service) createGitHubClient(ctx context.Context, accessToken string) *github.Client {
@@ -311,8 +204,4 @@ func (s *service) RepoExists(ctx context.Context, repoID string) (bool, error) {
 		return false, nil
 	}
 	return err == nil, err
-}
-
-func FormatSubjectID(repoID string, prNumber any) string {
-	return fmt.Sprintf("%v-%v", repoID, prNumber)
 }

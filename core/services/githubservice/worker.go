@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
@@ -28,7 +29,7 @@ type Worker interface {
 }
 
 type worker struct {
-	githubService    Service
+	githubClient     githubclient.Client
 	kvManager        libkv.KVManager
 	tracker          serverops.ActivityTracker
 	dbInstance       libdb.DBManager
@@ -36,14 +37,14 @@ type worker struct {
 }
 
 func NewWorker(
-	githubService Service,
+	githubClient githubclient.Client,
 	kvManager libkv.KVManager,
 	tracker serverops.ActivityTracker,
 	dbInstance libdb.DBManager,
 	bootLastSyncTime time.Time,
 ) Worker {
 	return &worker{
-		githubService:    githubService,
+		githubClient:     githubClient,
 		kvManager:        kvManager,
 		tracker:          tracker,
 		dbInstance:       dbInstance,
@@ -58,7 +59,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 
 	storeInstance := store.New(w.dbInstance.WithoutTransaction())
 
-	repos, err := w.githubService.ListRepos(ctx)
+	repos, err := w.githubClient.ListRepos(ctx)
 	if err != nil {
 		reportErr(fmt.Errorf("failed to list repositories: %w", err))
 		return err
@@ -66,7 +67,7 @@ func (w *worker) ReceiveTick(ctx context.Context) error {
 
 	jobs := []*store.Job{}
 	for _, repo := range repos {
-		prs, err := w.githubService.ListPRs(ctx, repo.ID)
+		prs, err := w.githubClient.ListPRs(ctx, repo.ID)
 		if err != nil {
 			reportErr(fmt.Errorf("failed to list PRs for repo %s: %w", repo.ID, err))
 			return fmt.Errorf("failed to list PRs for repo %s: %w", repo.ID, err)
@@ -109,7 +110,7 @@ func (w *worker) createJobForPR(repoID string, botID string, prNumber int) (*sto
 		CreatedAt: time.Now().UTC(),
 		Operation: "sync_pr",
 		Payload:   payloadBytes,
-		Subject:   FormatSubjectID(repoID, prNumber),
+		Subject:   githubclient.FormatSubjectID(repoID, prNumber),
 	}, nil
 }
 
@@ -250,7 +251,7 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 	defer end()
 
 	// Fetch new comments
-	comments, err := w.githubService.ListComments(ctx, repoID, prNumber, lastSync)
+	comments, err := w.githubClient.ListComments(ctx, repoID, prNumber, lastSync)
 	if err != nil {
 		err := fmt.Errorf("failed to list comments: %w", err)
 		reportErr(err)
@@ -267,7 +268,7 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 
 	// Store comments
 	var storedCount int
-	streamID := FormatSubjectID(repoID, prNumber)
+	streamID := githubclient.FormatSubjectID(repoID, prNumber)
 	tx, commit, release, err := w.dbInstance.WithTransaction(ctx)
 	defer release()
 	if err != nil {
@@ -410,7 +411,7 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 			CreatedAt: time.Now().UTC(),
 			Operation: "process_comment_llm",
 			Payload:   msg.Payload,
-			Subject:   FormatSubjectID(repoID, prNumber),
+			Subject:   githubclient.FormatSubjectID(repoID, prNumber),
 		}
 
 		if err := storeInstance.AppendJob(ctx, *job); err != nil {

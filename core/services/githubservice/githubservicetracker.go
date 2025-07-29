@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/google/go-github/v58/github"
@@ -58,7 +59,7 @@ func (d *activityTrackerDecorator) ConnectRepo(ctx context.Context, userID, owne
 	return repo, nil
 }
 
-func (d *activityTrackerDecorator) ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error) {
+func (d *activityTrackerDecorator) ListPRs(ctx context.Context, repoID string) ([]*githubclient.PullRequest, error) {
 	reportErr, _, end := d.tracker.Start(
 		ctx, "list", "github-prs",
 		"repo_id", repoID,

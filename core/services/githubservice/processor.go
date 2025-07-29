@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/contenox/runtime-mvp/core/chat"
+	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
@@ -16,18 +17,18 @@ import (
 )
 
 type GitHubCommentProcessor struct {
-	db          libdb.DBManager
-	env         taskengine.EnvExecutor
-	chatManager *chat.Manager
-	tracker     serverops.ActivityTracker
-	githubSvc   Service
+	db           libdb.DBManager
+	env          taskengine.EnvExecutor
+	chatManager  *chat.Manager
+	tracker      serverops.ActivityTracker
+	githubClient githubclient.Client
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubSvc Service, chatManager *chat.Manager, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
+func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubClient githubclient.Client, chatManager *chat.Manager, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
 		tracker = serverops.NoopTracker{}
 	}
-	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker, chatManager: chatManager, githubSvc: githubSvc}
+	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker, chatManager: chatManager, githubClient: githubClient}
 }
 
 func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job) (err error) {
@@ -81,7 +82,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		return
 	}
 
-	subjectID := FormatSubjectID(payload.RepoID, payload.PRNumber)
+	subjectID := githubclient.FormatSubjectID(payload.RepoID, payload.PRNumber)
 	messages, err := p.chatManager.ListMessages(ctx, p.db.WithoutTransaction(), subjectID)
 	if err != nil {
 		return fmt.Errorf("failed to get chat history: %w", err)
@@ -135,7 +136,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 	lastIndex := len(hist.Messages) - 1
 	hist.Messages[lastIndex].Content = addFooter(hist.Messages[lastIndex].Content)
 
-	if err = p.githubSvc.PostComment(ctx, payload.RepoID, payload.PRNumber, hist.Messages[lastIndex].Content); err != nil {
+	if err = p.githubClient.PostComment(ctx, payload.RepoID, payload.PRNumber, hist.Messages[lastIndex].Content); err != nil {
 		err = fmt.Errorf("failed to post GitHub comment: %w", err)
 		reportErr(err)
 		return

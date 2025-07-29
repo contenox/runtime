@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
+	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverapi/activityapi"
@@ -53,6 +54,7 @@ import (
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
+	"github.com/google/go-github/v58/github"
 	"github.com/google/uuid"
 )
 
@@ -115,8 +117,8 @@ func New(
 		10*time.Second,         // interval
 		state.RunDownloadCycle, // operation
 	)
-
-	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, githubservice.New(dbInstance), chatManager, serveropsChainedTracker)
+	gbClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
+	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, gbClient, chatManager, serveropsChainedTracker)
 
 	libroutine.GetPool().StartLoop(
 		ctx,
@@ -187,7 +189,7 @@ func New(
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityService = activityservice.WithAuthorization(activityService, dbInstance)
 	activityapi.AddActivityRoutes(mux, config, activityService)
-	githubService := githubservice.New(dbInstance)
+	githubService := githubservice.New(dbInstance, gbClient)
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
 	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*2))
