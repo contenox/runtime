@@ -16,13 +16,13 @@ import (
 	"github.com/contenox/runtime-mvp/core/kv"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
-	"github.com/contenox/runtime-mvp/core/serverapi"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
+	"github.com/contenox/runtime-mvp/gateway/serverapi"
+	"github.com/contenox/runtime-mvp/gateway/tokenizerapi"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libkv"
@@ -119,7 +119,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	tokenizerSvc, cleanup, err := tokenizerservice.NewGRPCTokenizer(ctx, tokenizerservice.ConfigGRPC{
+	tokenizerSvc, cleanup, err := tokenizerapi.NewGRPCTokenizer(ctx, tokenizerapi.ConfigGRPC{
 		ServerAddress: config.TokenizerServiceURL,
 	})
 	if err != nil {

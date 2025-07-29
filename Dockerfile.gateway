@@ -6,6 +6,7 @@ ARG CORE_VERSION=unset
 WORKDIR /app
 # Copy modules
 COPY core/go.mod core/go.sum ./core/
+COPY gateway/go.mod gateway/go.sum ./gateway/
 COPY libs/libauth/go.mod libs/libauth/go.sum ./libs/libauth/
 COPY libs/libbus/go.mod libs/libbus/go.sum ./libs/libbus/
 COPY libs/libcipher/go.mod libs/libcipher/go.sum ./libs/libcipher/
@@ -15,8 +16,10 @@ COPY libs/libroutine/go.mod libs/libroutine/go.sum ./libs/libroutine/
 COPY libs/libtestenv/go.mod libs/libtestenv/go.sum ./libs/libtestenv/
 COPY libs/ ./libs/
 COPY core/ ./core/
+COPY gateway/ ./gateway/
 
-WORKDIR /app/core
+
+WORKDIR /app/gateway
 RUN go mod tidy && go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build \

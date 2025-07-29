@@ -2,7 +2,7 @@ services:
   runtime-mvp:
     build:
       context: ./
-      dockerfile: Dockerfile.core
+      dockerfile: Dockerfile.gateway
     container_name: contenox-runtime-mvp
     env_file:
       - .env

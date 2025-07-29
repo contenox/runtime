@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package tokenizerservicepb;
 
-option go_package = "github.com/contenox/runtime-mvp/core/serverapi/tokenizerapi/proto";
+option go_package = "github.com/contenox/runtime-mvp/gateway/tokenizerapi/proto";
 
 import "google/protobuf/empty.proto";
 

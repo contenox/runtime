@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/contenox/runtime-mvp/core/serverapi/tokenizerapi"
 	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/runtime-mvp/gateway/tokenizerapi"
 	"github.com/contenox/runtime-mvp/tokenizer/service"
 
 	"google.golang.org/grpc"

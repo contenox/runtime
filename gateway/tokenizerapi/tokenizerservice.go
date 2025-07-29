@@ -1,34 +1,29 @@
-package tokenizerservice
+package tokenizerapi
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/runtime-mvp/core/serverapi/tokenizerapi/proto"
+	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
+	"github.com/contenox/runtime-mvp/gateway/tokenizerapi/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
-
-type Tokenizer interface {
-	Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error)
-	CountTokens(ctx context.Context, modelName string, prompt string) (int, error)
-	OptimalModel(ctx context.Context, baseModel string) (string, error)
-}
 
 type grpcClient struct {
 	client proto.TokenizerServiceClient
 	conn   *grpc.ClientConn
 }
 
-var _ Tokenizer = (*grpcClient)(nil)
+var _ tokenizerservice.Tokenizer = (*grpcClient)(nil)
 
 type ConfigGRPC struct {
 	ServerAddress string
 	DialOptions   []grpc.DialOption
 }
 
-func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (Tokenizer, func() error, error) {
+func NewGRPCTokenizer(ctx context.Context, cfg ConfigGRPC) (tokenizerservice.Tokenizer, func() error, error) {
 	clean := func() error { return nil }
 	opts := cfg.DialOptions
 	if len(opts) == 0 {

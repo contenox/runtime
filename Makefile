@@ -85,4 +85,4 @@ api-test-docker:
 	docker run --rm --network=host contenox-apitests
 
 proto:
-	protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative core/serverapi/tokenizerapi/proto/tokenizerapi.proto
+	protoc --go_out=. --go_opt=paths=source_relative     --go-grpc_out=. --go-grpc_opt=paths=source_relative gateway/tokenizerapi/proto/tokenizerapi.proto

@@ -11,6 +11,12 @@ type activityTrackerDecorator struct {
 	tracker serverops.ActivityTracker
 }
 
+type Tokenizer interface {
+	Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error)
+	CountTokens(ctx context.Context, modelName string, prompt string) (int, error)
+	OptimalModel(ctx context.Context, baseModel string) (string, error)
+}
+
 func (d *activityTrackerDecorator) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
 	reportErrFn, _, endFn := d.tracker.Start(
 		ctx,
