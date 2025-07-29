@@ -379,8 +379,7 @@ func TestRoutine_ExecuteWithRetry(t *testing.T) {
 func TestRoutine_Loop_Trigger(t *testing.T) {
 	defer quiet()()
 	rm := libroutine.NewRoutine(1, time.Minute)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	triggerChan := make(chan struct{}, 1)
 	executedChan := make(chan bool, 2)
@@ -416,57 +415,58 @@ func TestRoutine_Loop_Trigger(t *testing.T) {
 	}
 }
 
-// TestRoutine_Loop_ErrHandling verifies the error handling callback is invoked.
 func TestRoutine_Loop_ErrHandling(t *testing.T) {
 	defer quiet()()
-	rm := libroutine.NewRoutine(1, time.Minute)
+	resetTimeout := 200 * time.Millisecond // Short reset timeout
+	interval := 20 * time.Millisecond      // Short interval for trigger sleep
+	rm := libroutine.NewRoutine(1, resetTimeout)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	triggerChan := make(chan struct{}, 1)
-	errChan := make(chan error, 1) // Channel to receive error from callback
+	errChan := make(chan error, 2) // Buffer for 2 errors
 	testErr := errors.New("loop function error")
 
 	fn := func(ctx context.Context) error {
-		return testErr // Always return an error
+		return testErr
 	}
 
-	errHandling := func(err error) {
+	go rm.Loop(ctx, interval, triggerChan, fn, func(err error) {
 		select {
-		case errChan <- err: // Send error to test goroutine
+		case errChan <- err:
 		default:
 		}
-	}
+	})
 
-	// Start loop with a long interval, rely on trigger
-	go rm.Loop(ctx, 1*time.Minute, triggerChan, fn, errHandling)
-
-	// Trigger execution
-	triggerChan <- struct{}{}
-
-	// Wait for the error handling callback to signal
+	// 1. Wait for initial run (automatic on loop start)
 	select {
-	case receivedErr := <-errChan:
-		if !errors.Is(receivedErr, testErr) {
-			t.Errorf("Error handler received unexpected error. Got %v, want %v", receivedErr, testErr)
-		}
+	case <-errChan: // Drain initial error
 	case <-time.After(100 * time.Millisecond):
-		t.Fatal("Error handler was not called within timeout")
+		t.Fatal("Timeout waiting for initial error")
 	}
 
-	// Test ErrCircuitOpen case
-	if rm.GetState() != libroutine.Open {
-		t.Fatalf("Circuit should be Open after one failure")
-	}
-	// Trigger again
+	// 2. Trigger while circuit is still open (before reset timeout)
 	triggerChan <- struct{}{}
 	select {
-	case receivedErr := <-errChan:
-		if !errors.Is(receivedErr, libroutine.ErrCircuitOpen) {
-			t.Errorf("Error handler received unexpected error when circuit open. Got %v, want %v", receivedErr, libroutine.ErrCircuitOpen)
+	case err := <-errChan:
+		if !errors.Is(err, libroutine.ErrCircuitOpen) {
+			t.Errorf("Expected ErrCircuitOpen, got %v", err)
 		}
 	case <-time.After(100 * time.Millisecond):
-		t.Fatal("Error handler was not called within timeout when circuit was open")
+		t.Fatal("Timeout waiting for open state error")
 	}
 
+	// 3. Wait for reset timeout to expire
+	time.Sleep(resetTimeout + 10*time.Millisecond)
+
+	// 4. Verify half-open state allows test execution
+	triggerChan <- struct{}{}
+	select {
+	case err := <-errChan:
+		if !errors.Is(err, testErr) {
+			t.Errorf("Expected test error, got %v", err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Timeout waiting for half-open execution")
+	}
 }

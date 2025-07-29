@@ -100,52 +100,59 @@ func New(
 	pool := libroutine.GetPool()
 
 	// Start managed loops using the pool
+
 	pool.StartLoop(
 		ctx,
-		"backendCycle",        // unique key for this operation
-		3,                     // failure threshold
-		10*time.Second,        // reset timeout
-		10*time.Second,        // interval
-		state.RunBackendCycle, // operation
+		&libroutine.LoopConfig{
+			Key:          "backendCycle",
+			Threshold:    3,
+			ResetTimeout: 10 * time.Second,
+			Interval:     10 * time.Second,
+			Operation:    state.RunBackendCycle,
+		},
 	)
 
 	pool.StartLoop(
 		ctx,
-		"downloadCycle",        // unique key for this operation
-		3,                      // failure threshold
-		10*time.Second,         // reset timeout
-		10*time.Second,         // interval
-		state.RunDownloadCycle, // operation
+		&libroutine.LoopConfig{
+			Key:          "downloadCycle",
+			Threshold:    3,
+			ResetTimeout: 10 * time.Second,
+			Interval:     10 * time.Second,
+			Operation:    state.RunDownloadCycle,
+		},
 	)
 	gbClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
 	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, gbClient, chatManager, serveropsChainedTracker)
 
 	libroutine.GetPool().StartLoop(
 		ctx,
-		"github-comment-processor",
-		4,
-		10*time.Second,
-		10*time.Second,
-		func(ctx context.Context) error {
-			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-comment-processor-"+uuid.New().String())
-			storeInstance := store.New(dbInstance.WithoutTransaction())
-			job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubProcessCommentLLM)
-			if err != nil {
-				if errors.Is(err, libdb.ErrNotFound) {
-					return nil
+		&libroutine.LoopConfig{
+			Key:          "github-comment-processor",
+			Threshold:    3,
+			ResetTimeout: 10 * time.Second,
+			Interval:     10 * time.Second,
+			Operation: func(ctx context.Context) error {
+				ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-comment-processor-"+uuid.New().String())
+				storeInstance := store.New(dbInstance.WithoutTransaction())
+				job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubProcessCommentLLM)
+				if err != nil {
+					if errors.Is(err, libdb.ErrNotFound) {
+						return nil
+					}
+					return fmt.Errorf("fetching GitHub comment job: %w", err)
 				}
-				return fmt.Errorf("fetching GitHub comment job: %w", err)
-			}
 
-			// Process the job
-			if err := githubProcessor.ProcessJob(ctx, job); err != nil {
-				if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
-					return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+				// Process the job
+				if err := githubProcessor.ProcessJob(ctx, job); err != nil {
+					if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+						return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+					}
+					return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
 				}
-				return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
-			}
 
-			return nil
+				return nil
+			},
 		},
 	)
 	fileService := fileservice.New(dbInstance, config)
@@ -193,14 +200,29 @@ func New(
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
 	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*2))
-	libroutine.GetPool().StartLoop(ctx, "github-worker-pull", 4, time.Minute, time.Minute, func(ctx context.Context) error {
-		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
-		return githubworker.ReceiveTick(ctx)
-	})
-	libroutine.GetPool().StartLoop(ctx, "github-worker-sync", 4, time.Minute, time.Minute, func(ctx context.Context) error {
-		ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
-		return githubworker.ProcessTick(ctx)
-	})
+	cfgGithubWorkerPull := &libroutine.LoopConfig{
+		Key:          "github-worker-pull",
+		Interval:     time.Minute,
+		Threshold:    4,
+		ResetTimeout: time.Minute,
+		Operation: func(ctx context.Context) error {
+			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
+			return githubworker.ReceiveTick(ctx)
+		},
+	}
+	libroutine.GetPool().StartLoop(ctx, cfgGithubWorkerPull)
+
+	cfgGithubWorkerSync := &libroutine.LoopConfig{
+		Key:          "github-worker-sync",
+		Interval:     time.Minute,
+		Threshold:    4,
+		ResetTimeout: time.Minute,
+		Operation: func(ctx context.Context) error {
+			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
+			return githubworker.ProcessTick(ctx)
+		},
+	}
+	libroutine.GetPool().StartLoop(ctx, cfgGithubWorkerSync)
 
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
@@ -214,25 +236,23 @@ func New(
 
 	botService := botservice.New(dbInstance)
 	botapi.AddBotRoutes(mux, botService)
-
 	// Start Telegram poller
 	pool.StartLoop(
 		ctx,
-		"telegram-poller",
-		1,
-		15*time.Second,
-		1*time.Second,
-		poller.Tick,
+		&libroutine.LoopConfig{
+			Key:          "telegram-poller",
+			Threshold:    3,
+			ResetTimeout: time.Second * 10,
+			Interval:     3 * time.Second,
+			Operation:    poller.Tick,
+		},
 	)
-
-	// Start Telegram worker
-	pool.StartLoop(
-		ctx,
-		"telegram-worker",
-		1,
-		1*time.Second, // Check for jobs every second
-		0,             // No initial delay
-		func(ctx context.Context) error {
+	cfgTelegramWorker := &libroutine.LoopConfig{
+		Key:          "telegram-worker",
+		ResetTimeout: 10 * time.Second,
+		Interval:     1 * time.Second,
+		Threshold:    4,
+		Operation: func(ctx context.Context) error {
 			storeInstance := store.New(dbInstance.WithoutTransaction())
 
 			// Fetch next job
@@ -258,6 +278,11 @@ func New(
 			}
 			return nil
 		},
+	}
+	// Start Telegram worker
+	pool.StartLoop(
+		ctx,
+		cfgTelegramWorker,
 	)
 
 	handler = enableCORS(config, handler)

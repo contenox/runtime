@@ -36,6 +36,14 @@ func GetPool() *Pool {
 	return poolInstance
 }
 
+type LoopConfig struct {
+	Key          string                          // A unique string identifier for this routine. Used to prevent duplicates and manage state.
+	Threshold    int                             // The number of consecutive failures of `fn` before the circuit breaker opens.
+	ResetTimeout time.Duration                   // The duration the circuit breaker stays open before transitioning to half-open.
+	Interval     time.Duration                   // The time duration between executions of `fn` when the circuit is closed or half-open (and the attempt succeeds).
+	Operation    func(ctx context.Context) error // The function to execute periodically. It receives the context and should return an error on failure
+}
+
 // StartLoop initiates and manages a background loop for a specific task identified by `key`.
 //
 // The loop repeatedly executes the provided function `fn` at the specified `interval`.
@@ -49,11 +57,7 @@ func GetPool() *Pool {
 //
 // Params:
 //   - ctx: Context for managing the loop's lifecycle. Cancellation stops the loop.
-//   - key: A unique string identifier for this routine. Used to prevent duplicates and manage state.
-//   - threshold: The number of consecutive failures of `fn` before the circuit breaker opens.
-//   - resetTimeout: The duration the circuit breaker stays open before transitioning to half-open.
-//   - interval: The time duration between executions of `fn` when the circuit is closed or half-open (and the attempt succeeds).
-//   - fn: The function to execute periodically. It receives the context and should return an error on failure.
+//   - cfg: Configuration for the loop.
 //
 // Example:
 //
@@ -62,56 +66,58 @@ func GetPool() *Pool {
 //	pool := libroutine.GetPool()
 //	pool.StartLoop(
 //	    ctx,
-//	    "my-data-processor",
-//	    3, // Open circuit after 3 failures
-//	    1*time.Minute, // Wait 1 minute before trying again
-//	    10*time.Second, // Run every 10 seconds
-//	    func(ctx context.Context) error {
-//	        log.Println("Processing data...")
-//	        // ... perform task ...
-//	        // return errors.New("failed to process data") // On failure
-//	        return nil // On success
+//	    &LoopConfig{
+//	        Key: "my-data-processor",
+//	        Threshold: 3, // Open circuit after 3 failures
+//	        ResetTimeout: 1*time.Minute, // Wait 1 minute before trying again
+//	        Interval: 10*time.Second, // Run every 10 seconds
+//	        Fn: func(ctx context.Context) error {
+//	            log.Println("Processing data...")
+//	            // ... perform task ...
+//	            // return errors.New("failed to process data") // On failure
+//	            return nil // On success
+//	        },
 //	    },
 //	)
 //	// The loop now runs in the background.
-func (p *Pool) StartLoop(ctx context.Context, key string, threshold int, resetTimeout time.Duration, interval time.Duration, fn func(ctx context.Context) error) {
+func (p *Pool) StartLoop(ctx context.Context, cfg *LoopConfig) {
 	p.mu.Lock()
-	log.Printf("Starting loop for key: %s", key)
+	log.Printf("Starting loop for key: %s", cfg.Key)
 	defer p.mu.Unlock()
 
 	// Create a new Routine if none exists for the key.
-	if _, exists := p.managers[key]; !exists {
-		log.Printf("Creating new routine manager for key: %s", key)
-		p.managers[key] = NewRoutine(threshold, resetTimeout)
+	if _, exists := p.managers[cfg.Key]; !exists {
+		log.Printf("Creating new routine manager for key: %s", cfg.Key)
+		p.managers[cfg.Key] = NewRoutine(cfg.Threshold, cfg.ResetTimeout)
 	}
 
 	// If a loop for this key is already active, do nothing.
-	if p.loops[key] {
-		log.Printf("Loop for key %s is already active", key)
+	if p.loops[cfg.Key] {
+		log.Printf("Loop for key %s is already active", cfg.Key)
 		return
 	}
 
 	// Create a new trigger channel for this loop.
 	triggerChan := make(chan struct{}, 1)
-	p.triggerChs[key] = triggerChan
+	p.triggerChs[cfg.Key] = triggerChan
 
 	// Mark the loop as active.
-	p.loops[key] = true
+	p.loops[cfg.Key] = true
 
 	// Start the loop in a new goroutine.
 	go func() {
-		log.Printf("Loop started for key: %s", key)
-		p.managers[key].Loop(ctx, interval, triggerChan, fn, func(err error) {
+		log.Printf("Loop started for key: %s", cfg.Key)
+		p.managers[cfg.Key].Loop(ctx, cfg.Interval, triggerChan, cfg.Operation, func(err error) {
 			if err != nil {
-				log.Printf("Error in loop for key %s: %v", key, err)
+				log.Printf("Error in loop for key %s: %v", cfg.Key, err)
 			}
 		})
 		// Clean up when the loop exits.
 		p.mu.Lock()
-		delete(p.loops, key)
-		delete(p.triggerChs, key)
+		delete(p.loops, cfg.Key)
+		delete(p.triggerChs, cfg.Key)
 		p.mu.Unlock()
-		log.Printf("Loop stopped for key: %s", key)
+		log.Printf("Loop stopped for key: %s", cfg.Key)
 	}()
 }
 
