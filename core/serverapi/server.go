@@ -165,7 +165,9 @@ func New(
 	usersapi.AddUserRoutes(mux, config, userService)
 
 	accessService := accessservice.New(dbInstance)
+	accessService = accessservice.WithAuthorization(accessService, dbInstance)
 	accessService = accessservice.WithActivityTracker(accessService, serveropsChainedTracker)
+
 	usersapi.AddAccessRoutes(mux, config, accessService)
 	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
 
@@ -183,6 +185,7 @@ func New(
 	providerService = providerservice.WithActivityTracker(providerService, serveropsChainedTracker)
 	providersapi.AddProviderRoutes(mux, config, providerService)
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
+	activityService = activityservice.WithAuthorization(activityService, dbInstance)
 	activityapi.AddActivityRoutes(mux, config, activityService)
 	githubService := githubservice.New(dbInstance)
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
@@ -204,7 +207,7 @@ func New(
 	telegramService = telegramservice.WithServiceActivityTracker(telegramService, serveropsChainedTracker)
 	telegramapi.AddTelegramRoutes(mux, telegramService)
 	pool = libroutine.GetPool()
-	poller := telegramservice.NewPoller(dbInstance, telegramService)
+	poller := telegramservice.NewPoller(dbInstance)
 	processor := telegramservice.NewProcessor(dbInstance, environmentExec, chatManager)
 
 	botService := botservice.New(dbInstance)

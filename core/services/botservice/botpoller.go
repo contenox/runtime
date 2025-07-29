@@ -18,12 +18,12 @@ type BotPoller struct {
 	service Service
 }
 
-func NewBotPoller(db libdb.DBManager, service Service) *BotPoller {
-	return &BotPoller{db: db, service: service}
+func NewBotPoller(db libdb.DBManager) *BotPoller {
+	return &BotPoller{db: db}
 }
 
 func (p *BotPoller) Tick(ctx context.Context) error {
-	bots, err := p.service.ListBots(ctx)
+	bots, err := store.New(p.db.WithoutTransaction()).ListBots(ctx)
 	if err != nil {
 		return fmt.Errorf("listing bots: %w", err)
 	}

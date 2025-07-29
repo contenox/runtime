@@ -15,16 +15,15 @@ import (
 )
 
 type Poller struct {
-	db      libdb.DBManager
-	service Service
+	db libdb.DBManager
 }
 
-func NewPoller(db libdb.DBManager, service Service) *Poller {
-	return &Poller{db: db, service: service}
+func NewPoller(db libdb.DBManager) *Poller {
+	return &Poller{db: db}
 }
 
 func (p *Poller) Tick(ctx context.Context) error {
-	frontends, err := p.service.List(ctx)
+	frontends, err := store.New(p.db.WithoutTransaction()).ListTelegramFrontends(ctx)
 	if err != nil {
 		return fmt.Errorf("listing telegram frontends: %w", err)
 	}
