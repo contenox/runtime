@@ -16,15 +16,8 @@ The approach proved effective for managing complexity, though some features (lik
 
 ## Future Slices (Planned)
 
-  - Decouple monolithic store architecture
-  - Implement state management improvements
-  - Add variable composition enhancements
-  - Improve error handling and observability
   - Complete permission model improvements
   - Implement shared chat sessions
-  - Add audit logging capabilities
-  - Begin UI dashboard for compliance tooling
-  - Slack bot integrations
   - Exportable conversation transcripts
   - Model fine-tuning management
   - MCP compatibility implementation
@@ -63,6 +56,7 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Keyword extraction feature
 - [x] GitHub PR Moderator (core functionality complete but needs final polish)
 - [x] Fix Task-Engine design (refactoring planned for next slice)
+- [x] Add variable composition enhancements
 
 ### Remaining Items
 - [ ] Package a Persona-Chat Application
