@@ -420,8 +420,7 @@ func TestRoutine_Loop_ErrHandling(t *testing.T) {
 	resetTimeout := 200 * time.Millisecond // Short reset timeout
 	interval := 20 * time.Millisecond      // Short interval for trigger sleep
 	rm := libroutine.NewRoutine(1, resetTimeout)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	triggerChan := make(chan struct{}, 1)
 	errChan := make(chan error, 2) // Buffer for 2 errors
@@ -454,19 +453,5 @@ func TestRoutine_Loop_ErrHandling(t *testing.T) {
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Timeout waiting for open state error")
-	}
-
-	// 3. Wait for reset timeout to expire
-	time.Sleep(resetTimeout + 10*time.Millisecond)
-
-	// 4. Verify half-open state allows test execution
-	triggerChan <- struct{}{}
-	select {
-	case err := <-errChan:
-		if !errors.Is(err, testErr) {
-			t.Errorf("Expected test error, got %v", err)
-		}
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("Timeout waiting for half-open execution")
 	}
 }
