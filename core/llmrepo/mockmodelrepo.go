@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -29,11 +29,11 @@ func (m *MockModelRepo) GetRuntime(ctx context.Context) runtimestate.ProviderFro
 	}
 }
 
-func (m *MockModelRepo) GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error) {
+func (m *MockModelRepo) GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error) {
 	if m.Provider == nil {
 		return nil, fmt.Errorf("provider is nil for prompt execution")
 	}
-	return tokenizerservice.MockTokenizer{}, nil
+	return ollamatokenizer.MockTokenizer{}, nil
 }
 
 func (m *MockModelRepo) GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error) {

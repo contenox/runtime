@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
@@ -16,7 +17,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
 	"github.com/contenox/runtime-mvp/core/services/fileservice"
 	"github.com/contenox/runtime-mvp/core/services/indexservice"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
 	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
@@ -436,7 +436,7 @@ type Environment struct {
 	Err         error
 	backends    []string
 	triggerChan chan struct{}
-	tokenizer   tokenizerservice.Tokenizer
+	tokenizer   ollamatokenizer.Tokenizer
 	tracker     serverops.ActivityTracker
 }
 

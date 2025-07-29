@@ -2,7 +2,7 @@ module github.com/contenox/runtime-mvp/gateway
 
 go 1.24.5
 
-// libauth libbus  libcipher  libdb  libkv  libollama  libroutine libtestenv
+// libauth libbus  libcipher  libdb  libkv  libroutine libtestenv
 replace github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
 
 replace github.com/contenox/runtime-mvp/libs/libbus => ../libs/libbus

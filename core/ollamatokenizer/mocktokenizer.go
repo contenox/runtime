@@ -1,4 +1,4 @@
-package tokenizerservice
+package ollamatokenizer
 
 import (
 	"context"

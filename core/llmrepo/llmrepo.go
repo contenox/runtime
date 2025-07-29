@@ -6,17 +6,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
 type ModelRepo interface {
 	GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error)
-	GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error)
+	GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error)
 	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
 	GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error)
 }
@@ -54,7 +54,7 @@ func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb
 	}, com(ctx)
 }
 
-func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State, tokenizer tokenizerservice.Tokenizer) (ModelRepo, error) {
+func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State, tokenizer ollamatokenizer.Tokenizer) (ModelRepo, error) {
 	tx, com, r, err := dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return nil, err
@@ -93,7 +93,7 @@ type modelManager struct {
 	model      *store.Model
 	dbInstance libdb.DBManager
 	runtime    *runtimestate.State
-	tokenizer  tokenizerservice.Tokenizer
+	tokenizer  ollamatokenizer.Tokenizer
 	embed      bool
 	prompt     bool
 }
@@ -141,7 +141,7 @@ func (e *modelManager) GetDefaultSystemProvider(ctx context.Context) (libmodelpr
 	return provider, nil
 }
 
-func (e *modelManager) GetTokenizer(ctx context.Context) (tokenizerservice.Tokenizer, error) {
+func (e *modelManager) GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error) {
 	if e.tokenizer == nil {
 		return nil, errors.New("tokenizer not initialized")
 	}

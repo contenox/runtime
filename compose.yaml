@@ -25,24 +25,21 @@ services:
       timeout: 1s
       retries: 20
   tokenizer:
-    build:
-      context: ./
-      dockerfile: Dockerfile.tokenizer
+    image: ghcr.io/contenox/ollamatokenizer-api:v0.0.7
+    container_name: contenox-tokenizer
     environment:
       - PRELOAD_MODELS=granite-embedding-30m,tiny
       - TOKENIZER_TIMEOUT=30s
       - FALLBACK_MODEL=granite-embedding-30m
       - USE_DEFAULT_URLS=true
-      - ADDR=0.0.0.0:50051
+      - ADDR=:50051
     ports:
       - "50051:50051"
-      - "8083:8081"
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/healthz"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:50051/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
-    container_name: contenox-tokenizer
   vald:
     build:
       context: ./

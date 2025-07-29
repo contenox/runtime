@@ -7,10 +7,10 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/kv"
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +41,7 @@ func TestManagerSystem(t *testing.T) {
 	require.NoError(t, err)
 	defer cleanup()
 
-	tokenizer := tokenizerservice.MockTokenizer{}
+	tokenizer := ollamatokenizer.MockTokenizer{}
 	settings := kv.NewLocalCache(tenv.GetDBInstance(), "test:")
 
 	manager := chat.New(backendState, tokenizer, settings)

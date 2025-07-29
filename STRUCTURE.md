@@ -414,7 +414,7 @@ Uses components from the separate packages/ui library. This component Library is
 **Purpose**: A separate microservice dedicated to handling text tokenization.
 Done separately to potentially scale out and to reduce build time due to CGO requirements.
 **Communication**: gRPC to the core; later, the core may expose some features via HTTP.
-**Implementation**: Uses libollama for the actual tokenization logic via Ollama.
+**Implementation**: Uses ollamatokenizer for the actual tokenization logic via Ollama.
 **Dockerfile** (`Dockerfile.tokenizer`): Corresponding Dockerfile.
 
 ```bash
@@ -442,7 +442,6 @@ Done separately to potentially scale out and to reduce build time due to CGO req
 - `libcipher`: Cryptography (hashing, encryption).
 - `libdb`: Database abstraction (PostgreSQL).
 - `libkv`: Key-Value store abstraction (Valkey/Redis).
-- `libollama`: Library for interacting with Ollama features not exposed via ollama-API (tokenization).
 - `libroutine`: Goroutine management utilities, like circuit breaker.
 - `libtestenv`: Utilities for setting up testing environments for integration tests.
 - `libmodelprovider`: Contains the Model provider interface and multiple LLM integrations, like OpenAI, Gemini, vLLM and Ollama.

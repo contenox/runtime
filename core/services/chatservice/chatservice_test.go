@@ -11,10 +11,10 @@ import (
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
@@ -40,7 +40,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	defer cleanup()
 	require.NoError(t, err)
 
-	tokenizer := tokenizerservice.MockTokenizer{}
+	tokenizer := ollamatokenizer.MockTokenizer{}
 	settings := kv.NewLocalCache(dbInstance, "test:")
 	manager := chat.New(backendState, tokenizer, settings)
 	chatHook := hooks.NewChatHook(dbInstance, manager)

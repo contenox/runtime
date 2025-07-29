@@ -7,10 +7,10 @@ import (
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -38,7 +38,7 @@ func TestSystemChatHooks(t *testing.T) {
 	defer cleanup()
 
 	// Initialize chat manager with mock tokenizer
-	tokenizer := tokenizerservice.MockTokenizer{}
+	tokenizer := ollamatokenizer.MockTokenizer{}
 	settings := kv.NewLocalCache(dbInstance, "test:")
 	chatManager := chat.New(backendState, tokenizer, settings)
 	chatHook := hooks.NewChatHook(dbInstance, chatManager)

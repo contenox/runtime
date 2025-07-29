@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/kv"
+	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/services/tokenizerservice"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
@@ -21,13 +21,13 @@ import (
 type Manager struct {
 	state     *runtimestate.State
 	settings  kv.Repo
-	tokenizer tokenizerservice.Tokenizer
+	tokenizer ollamatokenizer.Tokenizer
 }
 
 // New creates a new Manager for chat processing.
 func New(
 	state *runtimestate.State,
-	tokenizer tokenizerservice.Tokenizer,
+	tokenizer ollamatokenizer.Tokenizer,
 	settings kv.Repo,
 ) *Manager {
 	return &Manager{
