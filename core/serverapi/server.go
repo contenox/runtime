@@ -217,7 +217,7 @@ func New(
 	pool.StartLoop(
 		ctx,
 		"telegram-poller",
-		1, // Only one poller needed
+		1,
 		15*time.Second,
 		1*time.Second,
 		poller.Tick,
