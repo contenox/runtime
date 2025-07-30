@@ -10,7 +10,6 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
@@ -81,7 +80,7 @@ func (exe *SimpleExec) Prompt(ctx context.Context, resolver llmresolver.Policy, 
 	if llmCall.Models != nil {
 		modelNames = append(modelNames, llmCall.Models...)
 	}
-	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
+	var runtimeStateResolution llmresolver.ProviderFromRuntimeState
 	if len(modelNames) == 0 && len(providerNames) == 0 {
 		reportChange("runtime_state_resolution", "no explicit model/provider, using default system provider (Ollama)")
 		defaultProvider, err := exe.promptExec.GetDefaultSystemProvider(ctx) // Fetch the actual default provider
@@ -416,7 +415,7 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	if llmCall.Models != nil {
 		modelNames = append(modelNames, llmCall.Models...)
 	}
-	var runtimeStateResolution runtimestate.ProviderFromRuntimeState
+	var runtimeStateResolution llmresolver.ProviderFromRuntimeState
 	if len(modelNames) == 0 && len(providerNames) == 0 {
 		reportChange("runtime_state_resolution", "no explicit model/provider, using default system provider (Ollama)")
 		runtimeStateResolution = exe.promptExec.GetRuntime(ctx)

@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
@@ -32,7 +31,7 @@ type Request struct {
 func filterCandidates(
 	ctx context.Context,
 	req Request,
-	getModels runtimestate.ProviderFromRuntimeState,
+	getModels ProviderFromRuntimeState,
 	capCheck func(libmodelprovider.Provider) bool,
 ) ([]libmodelprovider.Provider, error) {
 	providerTypes := req.ProviderTypes
@@ -235,7 +234,7 @@ func NormalizeModelName(modelName string) string {
 func Chat(
 	ctx context.Context,
 	req Request,
-	getModels runtimestate.ProviderFromRuntimeState,
+	getModels ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMChatClient, string, error) {
 	tracker := req.Tracker
@@ -295,7 +294,7 @@ type EmbedRequest struct {
 func Embed(
 	ctx context.Context,
 	embedReq EmbedRequest,
-	getModels runtimestate.ProviderFromRuntimeState,
+	getModels ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMEmbedClient, error) {
 	tracker := embedReq.tracker
@@ -344,7 +343,7 @@ func Embed(
 func Stream(
 	ctx context.Context,
 	req Request,
-	getModels runtimestate.ProviderFromRuntimeState,
+	getModels ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMStreamClient, error) {
 	tracker := req.Tracker
@@ -389,7 +388,7 @@ type PromptRequest struct {
 func PromptExecute(
 	ctx context.Context,
 	reqExec PromptRequest,
-	getModels runtimestate.ProviderFromRuntimeState,
+	getModels ProviderFromRuntimeState,
 	resolver Policy,
 ) (libmodelprovider.LLMPromptExecClient, error) {
 	tracker := reqExec.Tracker
@@ -437,3 +436,6 @@ func PromptExecute(
 	})
 	return provider.GetPromptConnection(ctx, backend)
 }
+
+// ProviderFromRuntimeState retrieves available model providers
+type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error)

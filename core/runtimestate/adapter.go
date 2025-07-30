@@ -4,14 +4,12 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
-// ProviderFromRuntimeState retrieves available model providers
-type ProviderFromRuntimeState func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error)
-
 // LocalProviderAdapter creates providers for self-hosted backends (Ollama, vLLM)
-func LocalProviderAdapter(ctx context.Context, runtime map[string]LLMState) ProviderFromRuntimeState {
+func LocalProviderAdapter(ctx context.Context, runtime map[string]LLMState) llmresolver.ProviderFromRuntimeState {
 	// Create a two-level map: backendType -> modelName -> []baseURLs
 	modelsByBackendType := make(map[string]map[string][]LLMState)
 

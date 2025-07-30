@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -21,7 +21,7 @@ func (m *MockModelRepo) GetDefaultSystemProvider(ctx context.Context) (libmodelp
 }
 
 // TODO: Implement GetRuntime method
-func (m *MockModelRepo) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
+func (m *MockModelRepo) GetRuntime(ctx context.Context) llmresolver.ProviderFromRuntimeState {
 	return func(_ context.Context, providerTypes ...string) ([]libmodelprovider.Provider, error) {
 		return []libmodelprovider.Provider{
 			m.Provider,

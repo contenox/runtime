@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -17,7 +18,7 @@ import (
 type ModelRepo interface {
 	GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error)
 	GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error)
-	GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState
+	GetRuntime(ctx context.Context) llmresolver.ProviderFromRuntimeState
 	GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error)
 }
 
@@ -99,7 +100,7 @@ type modelManager struct {
 }
 
 // GetRuntime implements Embedder.
-func (e *modelManager) GetRuntime(ctx context.Context) runtimestate.ProviderFromRuntimeState {
+func (e *modelManager) GetRuntime(ctx context.Context) llmresolver.ProviderFromRuntimeState {
 	provider, err := e.GetDefaultSystemProvider(ctx)
 
 	return func(ctx context.Context, backendTypes ...string) ([]libmodelprovider.Provider, error) {
