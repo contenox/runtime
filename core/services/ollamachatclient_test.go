@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
-	ctx, backendState, _, cleanup, err := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	ctx, backendState, _, cleanup, err := testingsetup.New(context.Background(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
 		WithDBManager().

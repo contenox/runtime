@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
@@ -20,7 +21,7 @@ func TestSystemRag(t *testing.T) {
 		JWTExpiry:  "1h",
 		EmbedModel: "nomic-embed-text:latest",
 	}
-	testenv := testingsetup.New(t.Context(), serverops.NoopTracker{}).
+	testenv := testingsetup.New(t.Context(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(config).
 		WithDBConn("test").

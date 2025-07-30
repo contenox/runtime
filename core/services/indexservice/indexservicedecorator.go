@@ -3,12 +3,12 @@ package indexservice
 import (
 	"context"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 )
 
 type activityTrackerDecorator struct {
 	service Service
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 func (d *activityTrackerDecorator) Index(ctx context.Context, request *IndexRequest) (*IndexResponse, error) {
@@ -91,7 +91,7 @@ func (d *activityTrackerDecorator) GetServiceGroup() string {
 }
 
 // Wrap a Service with an activity tracker.
-func WithActivityTracker(service Service, tracker serverops.ActivityTracker) Service {
+func WithActivityTracker(service Service, tracker activitytracker.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		service: service,
 		tracker: tracker,

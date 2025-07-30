@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -28,7 +28,7 @@ type TaskExecutor interface {
 type SimpleExec struct {
 	promptExec   llmrepo.ModelRepo
 	hookProvider HookRepo
-	tracker      serverops.ActivityTracker
+	tracker      activitytracker.ActivityTracker
 }
 
 // NewExec creates a new SimpleExec instance
@@ -36,7 +36,7 @@ func NewExec(
 	_ context.Context,
 	promptExec llmrepo.ModelRepo,
 	hookProvider HookRepo,
-	tracker serverops.ActivityTracker,
+	tracker activitytracker.ActivityTracker,
 ) (TaskExecutor, error) {
 	if hookProvider == nil {
 		return nil, fmt.Errorf("hook provider is nil")

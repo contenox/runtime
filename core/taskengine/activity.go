@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
 )
@@ -57,7 +57,7 @@ func (t *KVActivitySink) Start(
 		Start:     startTime,
 		Metadata:  metadata,
 	}
-	if reqID, ok := ctx.Value(serverops.ContextKeyRequestID).(string); ok {
+	if reqID, ok := ctx.Value(activitytracker.ContextKeyRequestID).(string); ok {
 		event.RequestID = reqID
 	}
 	// Define lifecycle handlers

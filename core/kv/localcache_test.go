@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/kv"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/google/uuid"
@@ -18,7 +18,7 @@ import (
 // testSetup creates a new testing environment with cache instance
 func testSetup(t *testing.T, prefix string) (context.Context, store.Store, kv.Repo) {
 	ctx := t.Context()
-	tenv := testingsetup.New(ctx, serverops.NewLogActivityTracker(slog.Default())).WithDBConn("test").WithDBManager()
+	tenv := testingsetup.New(ctx, activitytracker.NewLogActivityTracker(slog.Default())).WithDBConn("test").WithDBManager()
 	require.NoError(t, tenv.Err)
 	build := tenv.Build()
 	require.NoError(t, build.Err)

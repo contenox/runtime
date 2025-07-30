@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
@@ -130,6 +130,6 @@ func (f *fileVectorizationJobCreator) Start(ctx context.Context, operation strin
 	return reportErr, reportChange, end
 }
 
-func NewFileVectorizationJobCreator(dbinstance libdb.DBManager) serverops.ActivityTracker {
+func NewFileVectorizationJobCreator(dbinstance libdb.DBManager) activitytracker.ActivityTracker {
 	return &fileVectorizationJobCreator{dbinstance: dbinstance}
 }

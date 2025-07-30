@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/google/uuid"
@@ -22,7 +23,7 @@ func setupTestEnvironment() (*serverops.Config, *testingsetup.Environment) {
 		SigningKey:          "test-signing-key",
 	}
 
-	return config, testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	return config, testingsetup.New(context.Background(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
 		WithDBManager().

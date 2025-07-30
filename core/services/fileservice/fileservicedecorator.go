@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 )
 
 type activityTrackerDecorator struct {
 	fileservice Service
-	tracker     serverops.ActivityTracker
+	tracker     activitytracker.ActivityTracker
 }
 
 // sanitizeFile removes sensitive data fields before logging
@@ -66,7 +66,7 @@ func (d *activityTrackerDecorator) MoveFolder(ctx context.Context, folderID stri
 	return movedFolder, opErr
 }
 
-func WithActivityTracker(fileservice Service, tracker serverops.ActivityTracker) Service {
+func WithActivityTracker(fileservice Service, tracker activitytracker.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		fileservice: fileservice,
 		tracker:     tracker,

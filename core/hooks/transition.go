@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 // Transition simply returns a transition value without modifying input
 type Transition struct {
 	transition string
-	tracker    serverops.ActivityTracker
+	tracker    activitytracker.ActivityTracker
 }
 
-func NewTransition(transition string, tracker serverops.ActivityTracker) *Transition {
+func NewTransition(transition string, tracker activitytracker.ActivityTracker) *Transition {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &Transition{
 		transition: transition,

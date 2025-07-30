@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
@@ -22,7 +23,7 @@ import (
 )
 
 func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing.T) {
-	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(t.Context(), serverops.NewLogActivityTracker(slog.Default())).
+	ctx, backendState, dbInstance, cleanup, err := testingsetup.New(t.Context(), activitytracker.NewLogActivityTracker(slog.Default())).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").
@@ -49,7 +50,7 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 	// Mux for handling commands like /echo
 	hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 		"echo": echocmd,
-	}, serverops.NoopTracker{})
+	}, activitytracker.NoopTracker{})
 
 	// Combine all hooks into one registry
 	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
@@ -58,11 +59,11 @@ func TestSystem_ChatService_FullLifecycleWithHistoryAndModelInference(t *testing
 		"persist_messages":    chatHook,
 	})
 
-	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks, serverops.NoopTracker{})
+	exec, err := taskengine.NewExec(ctx, &llmrepo.MockModelRepo{}, hooks, activitytracker.NoopTracker{})
 	if err != nil {
 		log.Fatalf("initializing task engine engine failed: %v", err)
 	}
-	environmentExec, err := taskengine.NewEnv(ctx, serverops.NewLogActivityTracker(slog.Default()), taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
+	environmentExec, err := taskengine.NewEnv(ctx, activitytracker.NewLogActivityTracker(slog.Default()), taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing task engine failed: %v", err)
 	}

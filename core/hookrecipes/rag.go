@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
@@ -16,10 +16,10 @@ const name = "search_knowledge"
 // NewSearchThenResolveHook creates a new SearchThenResolveHook with optional ActivityTracker
 func NewSearchThenResolveHook(
 	searchThenResolveHook SearchThenResolveHook,
-	tracker serverops.ActivityTracker,
+	tracker activitytracker.ActivityTracker,
 ) taskengine.HookRepo {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &SearchThenResolveHook{
 		SearchHook:     searchThenResolveHook.SearchHook,
@@ -42,7 +42,7 @@ type SearchThenResolveHook struct {
 	DefaultPos     int
 	DefaultEpsilon float64
 	DefaultRadius  float64
-	tracker        serverops.ActivityTracker
+	tracker        activitytracker.ActivityTracker
 }
 
 var _ taskengine.HookRepo = (*SearchThenResolveHook)(nil)

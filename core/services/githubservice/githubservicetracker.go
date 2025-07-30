@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/githubclient"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/google/go-github/v58/github"
 )
 
 type activityTrackerDecorator struct {
 	service Service
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 // New decorator factory
-func WithActivityTracker(service Service, tracker serverops.ActivityTracker) Service {
+func WithActivityTracker(service Service, tracker activitytracker.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		service: service,
 		tracker: tracker,

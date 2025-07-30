@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
@@ -17,9 +17,9 @@ type Mux struct {
 }
 
 // NewMux creates a new Mux hook router with registered sub-hooks.
-func NewMux(hooks map[string]taskengine.HookRepo, tracker serverops.ActivityTracker) taskengine.HookRepo {
+func NewMux(hooks map[string]taskengine.HookRepo, tracker activitytracker.ActivityTracker) taskengine.HookRepo {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &Mux{
 		hooks: hooks,

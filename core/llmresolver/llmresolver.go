@@ -8,7 +8,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 )
 
@@ -25,7 +25,7 @@ type Request struct {
 	ProviderTypes []string // Optional: if empty, uses all default providers
 	ModelNames    []string // Optional: if empty, any model is considered
 	ContextLength int      // Minimum required context length
-	Tracker       serverops.ActivityTracker
+	Tracker       activitytracker.ActivityTracker
 }
 
 func filterCandidates(
@@ -239,7 +239,7 @@ func Chat(
 ) (libmodelprovider.LLMChatClient, string, error) {
 	tracker := req.Tracker
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
@@ -288,7 +288,7 @@ func Chat(
 type EmbedRequest struct {
 	ModelName    string
 	ProviderType string // Optional. Empty uses default.
-	tracker      serverops.ActivityTracker
+	tracker      activitytracker.ActivityTracker
 }
 
 func Embed(
@@ -299,7 +299,7 @@ func Embed(
 ) (libmodelprovider.LLMEmbedClient, error) {
 	tracker := embedReq.tracker
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
@@ -348,7 +348,7 @@ func Stream(
 ) (libmodelprovider.LLMStreamClient, error) {
 	tracker := req.Tracker
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	reportErr, reportChange, endFn := tracker.Start(
 		ctx,
@@ -381,7 +381,7 @@ func Stream(
 type PromptRequest struct {
 	ModelNames    []string
 	ProviderTypes []string // Optional. Empty uses default.
-	Tracker       serverops.ActivityTracker
+	Tracker       activitytracker.ActivityTracker
 	ContextLength int
 }
 
@@ -393,7 +393,7 @@ func PromptExecute(
 ) (libmodelprovider.LLMPromptExecClient, error) {
 	tracker := reqExec.Tracker
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	reportErr, reportChange, endFn := tracker.Start(
 		ctx,

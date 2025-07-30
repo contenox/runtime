@@ -3,12 +3,13 @@ package providerservice
 import (
 	"context"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/serverops"
 )
 
 type activityTrackerDecorator struct {
 	service Service
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
@@ -92,7 +93,7 @@ func (d *activityTrackerDecorator) GetServiceGroup() string {
 	return d.service.GetServiceGroup()
 }
 
-func WithActivityTracker(service Service, tracker serverops.ActivityTracker) Service {
+func WithActivityTracker(service Service, tracker activitytracker.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		service: service,
 		tracker: tracker,

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 )
 
 // HTTPClient implements the Tokenizer interface using HTTP calls to the tokenizer service.
@@ -168,7 +168,7 @@ func (c *HTTPClient) OptimalModel(ctx context.Context, baseModel string) (string
 
 type activityTrackerDecorator struct {
 	client  Tokenizer
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 type Tokenizer interface {
@@ -231,7 +231,7 @@ func (d *activityTrackerDecorator) OptimalModel(ctx context.Context, baseModel s
 }
 
 // WithActivityTracker decorates the given Tokenizer with activity tracking
-func WithActivityTracker(client Tokenizer, tracker serverops.ActivityTracker) Tokenizer {
+func WithActivityTracker(client Tokenizer, tracker activitytracker.ActivityTracker) Tokenizer {
 	return &activityTrackerDecorator{
 		client:  client,
 		tracker: tracker,

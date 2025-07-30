@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
@@ -21,13 +21,13 @@ type GitHubCommentProcessor struct {
 	db           libdb.DBManager
 	env          taskengine.EnvExecutor
 	chatManager  *chat.Manager
-	tracker      serverops.ActivityTracker
+	tracker      activitytracker.ActivityTracker
 	githubClient githubclient.Client
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubClient githubclient.Client, chatManager *chat.Manager, tracker serverops.ActivityTracker) *GitHubCommentProcessor {
+func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubClient githubclient.Client, chatManager *chat.Manager, tracker activitytracker.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &GitHubCommentProcessor{db: db, env: env, tracker: tracker, chatManager: chatManager, githubClient: githubClient}
 }
@@ -159,7 +159,7 @@ type GitHubCodeReviewProcessor struct {
 	db           libdb.DBManager
 	env          taskengine.EnvExecutor
 	chatManager  *chat.Manager
-	tracker      serverops.ActivityTracker
+	tracker      activitytracker.ActivityTracker
 	githubClient githubclient.Client
 }
 
@@ -168,10 +168,10 @@ func NewGitHubCodeReviewProcessor(
 	env taskengine.EnvExecutor,
 	githubClient githubclient.Client,
 	chatManager *chat.Manager,
-	tracker serverops.ActivityTracker,
+	tracker activitytracker.ActivityTracker,
 ) *GitHubCodeReviewProcessor {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &GitHubCodeReviewProcessor{
 		db:           db,

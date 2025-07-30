@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
@@ -23,7 +24,7 @@ func TestSystemSearchThenResolveWithFiles(t *testing.T) {
 		JWTExpiry:  "1h",
 		EmbedModel: "nomic-embed-text:latest",
 	}
-	testenv := testingsetup.New(t.Context(), serverops.NoopTracker{}).
+	testenv := testingsetup.New(t.Context(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(config).
 		WithDBConn("test").

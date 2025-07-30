@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/execservice"
@@ -21,7 +22,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 		TasksModel: "qwen2.5:0.5b",
 	}
 
-	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	testenv := testingsetup.New(context.Background(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(config).
 		WithDBConn("test").
@@ -40,11 +41,11 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, hooks.NewMockHookRegistry(), &serverops.NoopTracker{})
+	exec, err := taskengine.NewExec(ctx, execRepo, hooks.NewMockHookRegistry(), &activitytracker.NoopTracker{})
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
-	env, err := taskengine.NewEnv(ctx, serverops.NoopTracker{}, taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
+	env, err := taskengine.NewEnv(ctx, activitytracker.NoopTracker{}, taskengine.NewAlertSink(&libkv.VKManager{}), exec, taskengine.SimpleInspector{})
 	if err != nil {
 		log.Fatalf("initializing the tasksenv failed: %v", err)
 	}

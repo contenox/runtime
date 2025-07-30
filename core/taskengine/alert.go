@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/google/uuid"
 )
@@ -55,7 +55,7 @@ func (as *SimpleAlertSink) SendAlert(ctx context.Context, message string, kvPair
 		ID:        uuid.NewString(),
 		Timestamp: time.Now().UTC(),
 	}
-	if reqID, ok := ctx.Value(serverops.ContextKeyRequestID).(string); ok {
+	if reqID, ok := ctx.Value(activitytracker.ContextKeyRequestID).(string); ok {
 		event.RequestID = reqID
 	}
 	ev, err := json.Marshal(event)

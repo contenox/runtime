@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"dario.cat/mergo"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
-	"github.com/contenox/runtime-mvp/core/serverops"
 )
 
 const (
@@ -92,7 +92,7 @@ type HookRegistry interface {
 // progress using an ActivityTracker.
 type SimpleEnv struct {
 	exec           TaskExecutor
-	tracker        serverops.ActivityTracker
+	tracker        activitytracker.ActivityTracker
 	inspector      Inspector
 	alertCollector AlertSink
 }
@@ -100,7 +100,7 @@ type SimpleEnv struct {
 // NewEnv creates a new SimpleEnv with the given tracker and task executor.
 func NewEnv(
 	_ context.Context,
-	tracker serverops.ActivityTracker,
+	tracker activitytracker.ActivityTracker,
 	alertCollector AlertSink,
 	exec TaskExecutor,
 	inspector Inspector,

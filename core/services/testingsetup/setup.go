@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
@@ -39,13 +40,13 @@ type Builder struct {
 	cleanups     []func()
 	stateErrs    []error
 	downloadErrs []error
-	tracker      serverops.ActivityTracker
+	tracker      activitytracker.ActivityTracker
 	backends     []string
 }
 
-func New(ctx context.Context, tracker serverops.ActivityTracker) *Builder {
+func New(ctx context.Context, tracker activitytracker.ActivityTracker) *Builder {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 
 	return &Builder{
@@ -437,7 +438,7 @@ type Environment struct {
 	backends    []string
 	triggerChan chan struct{}
 	tokenizer   ollamatokenizer.Tokenizer
-	tracker     serverops.ActivityTracker
+	tracker     activitytracker.ActivityTracker
 }
 
 func (builder *Builder) Build() *Environment {
@@ -775,7 +776,7 @@ func (env *Environment) NewFileservice(config *serverops.Config) (fileservice.Se
 	return fileservice.New(env.dbManager, config), nil
 }
 
-func (env *Environment) NewFileVectorizationJobCreator(config *serverops.Config) (serverops.ActivityTracker, error) {
+func (env *Environment) NewFileVectorizationJobCreator(config *serverops.Config) (activitytracker.ActivityTracker, error) {
 	if env.Err != nil {
 		return nil, env.Err
 	}

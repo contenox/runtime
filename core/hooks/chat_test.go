@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestSystemChatHooks(t *testing.T) {
-	tenv := testingsetup.New(t.Context(), serverops.NoopTracker{}).
+	tenv := testingsetup.New(t.Context(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").

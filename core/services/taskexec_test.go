@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
@@ -31,7 +32,7 @@ func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
 		Provider: mockProvider,
 	}
 
-	exec, err := taskengine.NewExec(context.Background(), mockRepo, hooks.NewMockHookRegistry(), &serverops.LogActivityTracker{})
+	exec, err := taskengine.NewExec(context.Background(), mockRepo, hooks.NewMockHookRegistry(), &activitytracker.LogActivityTracker{})
 	require.NoError(t, err)
 
 	task := &taskengine.ChainTask{
@@ -49,7 +50,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 		TasksModel: "qwen2.5:1.5b",
 	}
 
-	testenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	testenv := testingsetup.New(context.Background(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithDBConn("test").
 		WithDBManager().
@@ -68,7 +69,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	exec, err := taskengine.NewExec(ctx, execRepo, &hooks.MockHookRepo{}, &serverops.LogActivityTracker{})
+	exec, err := taskengine.NewExec(ctx, execRepo, &hooks.MockHookRepo{}, &activitytracker.LogActivityTracker{})
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}

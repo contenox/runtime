@@ -3,13 +3,13 @@ package backendservice
 import (
 	"context"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 )
 
 type activityTrackerDecorator struct {
 	service Service
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 func (d *activityTrackerDecorator) Create(ctx context.Context, backend *store.Backend) error {
@@ -117,7 +117,7 @@ func (d *activityTrackerDecorator) GetServiceGroup() string {
 	return d.service.GetServiceGroup()
 }
 
-func WithActivityTracker(service Service, tracker serverops.ActivityTracker) Service {
+func WithActivityTracker(service Service, tracker activitytracker.ActivityTracker) Service {
 	return &activityTrackerDecorator{
 		service: service,
 		tracker: tracker,

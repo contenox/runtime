@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func TestUnit_SimpleEnv_ExecEnv_SingleTask(t *testing.T) {
 		MockError:       nil,
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(t.Context(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestUnit_SimpleEnv_ExecEnv_FailsAfterRetries(t *testing.T) {
 		MockError: errors.New("permanent failure"),
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestUnit_SimpleEnv_ExecEnv_TransitionsToNextTask(t *testing.T) {
 		MockError:       nil,
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -120,7 +120,7 @@ func TestUnit_SimpleEnv_ExecEnv_ErrorTransition(t *testing.T) {
 		MockRawResponse: "recovered",
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -158,7 +158,7 @@ func TestUnit_SimpleEnv_ExecEnv_PrintTemplate(t *testing.T) {
 		MockRawResponse: "printed-value",
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -190,7 +190,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_OriginalInput(t *testing.T) {
 		MockError:       nil,
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_PreviousTaskOutput(t *testing.T) {
 		MockRawResponseSequence: []string{"42", "processed: 42"},
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -262,7 +262,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_WithModeration(t *testing.T) {
 		MockRawResponseSequence: []string{"8", "user message stored"},
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -313,7 +313,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_WithModeration(t *testing.T) {
 func TestUnit_SimpleEnv_ExecEnv_InputVar_InvalidVariable(t *testing.T) {
 	mockExec := &taskengine.MockTaskExecutor{} // Shouldn't be called
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 
@@ -344,7 +344,7 @@ func TestUnit_SimpleEnv_ExecEnv_InputVar_DefaultBehavior(t *testing.T) {
 		MockRawResponseSequence: []string{"first", "second"},
 	}
 
-	tracker := serverops.NoopTracker{}
+	tracker := activitytracker.NoopTracker{}
 	env, err := taskengine.NewEnv(context.Background(), tracker, taskengine.NewAlertSink(&libkv.VKManager{}), mockExec, &taskengine.SimpleInspector{})
 	require.NoError(t, err)
 

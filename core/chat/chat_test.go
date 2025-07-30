@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/kv"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
@@ -21,7 +22,7 @@ func TestManagerSystem(t *testing.T) {
 	const subjectID = "test-subject-id-12345"
 
 	// Shared setup across all sub-tests
-	tenv := testingsetup.New(context.Background(), serverops.NoopTracker{}).
+	tenv := testingsetup.New(context.Background(), activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(&serverops.Config{JWTExpiry: "1h"}).
 		WithDBConn("test").

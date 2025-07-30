@@ -1,8 +1,6 @@
 module github.com/contenox/runtime-mvp/core
 
-go 1.24.4
-
-toolchain go1.24.5
+go 1.24.5
 
 // libauth libbus  libcipher  libdb  libkv  libroutine libtestenv
 replace github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
@@ -43,6 +41,7 @@ require (
 )
 
 require (
+	github.com/contenox/activitytracker v0.0.2 // indirect
 	github.com/contenox/ollamatokenizer v0.0.0-20250729144017-1e0ab653295d // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect

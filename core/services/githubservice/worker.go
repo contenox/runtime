@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
@@ -33,7 +34,7 @@ type Worker interface {
 type worker struct {
 	githubClient     githubclient.Client
 	kvManager        libkv.KVManager
-	tracker          serverops.ActivityTracker
+	tracker          activitytracker.ActivityTracker
 	dbInstance       libdb.DBManager
 	bootLastSyncTime time.Time
 }
@@ -41,7 +42,7 @@ type worker struct {
 func NewWorker(
 	githubClient githubclient.Client,
 	kvManager libkv.KVManager,
-	tracker serverops.ActivityTracker,
+	tracker activitytracker.ActivityTracker,
 	dbInstance libdb.DBManager,
 	bootLastSyncTime time.Time,
 ) Worker {

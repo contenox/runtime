@@ -3,13 +3,13 @@ package execservice
 import (
 	"context"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 type activityTrackerTaskEnvDecorator struct {
 	service TasksEnvService
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 func (d *activityTrackerTaskEnvDecorator) Execute(ctx context.Context, chain *taskengine.ChainDefinition, input string) (any, []taskengine.CapturedStateUnit, error) {
@@ -57,7 +57,7 @@ func (d *activityTrackerTaskEnvDecorator) AttachToConnector(ctx context.Context,
 	panic("unimplemented")
 }
 
-func EnvWithActivityTracker(service TasksEnvService, tracker serverops.ActivityTracker) TasksEnvService {
+func EnvWithActivityTracker(service TasksEnvService, tracker activitytracker.ActivityTracker) TasksEnvService {
 	return &activityTrackerTaskEnvDecorator{
 		service: service,
 		tracker: tracker,

@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 )
 
 // Print implements a simple hook that returns predefined messages
 type Print struct {
-	tracker serverops.ActivityTracker
+	tracker activitytracker.ActivityTracker
 }
 
 // NewPrint creates a new Print instance
-func NewPrint(tracker serverops.ActivityTracker) *Print {
+func NewPrint(tracker activitytracker.ActivityTracker) *Print {
 	if tracker == nil {
-		tracker = serverops.NoopTracker{}
+		tracker = activitytracker.NoopTracker{}
 	}
 	return &Print{tracker: tracker}
 }

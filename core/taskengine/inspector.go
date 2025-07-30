@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/serverops"
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/libs/libkv"
 )
 
@@ -64,7 +64,7 @@ type SimpleInspector struct {
 
 func (m SimpleInspector) Start(ctx context.Context) StackTrace {
 	// Extract requestID from context
-	reqID, ok := ctx.Value(serverops.ContextKeyRequestID).(string)
+	reqID, ok := ctx.Value(activitytracker.ContextKeyRequestID).(string)
 	if !ok {
 		log.Printf("SERVERBUG: Missing requestID in context during Start")
 		// Proceed to return the StackTrace even without a requestID
@@ -108,7 +108,7 @@ type SimpleStackTrace struct {
 func (s *SimpleStackTrace) RecordStep(step CapturedStateUnit) {
 	if s.kvManager != nil {
 		// Extract request ID from context
-		reqID, ok := s.ctx.Value(serverops.ContextKeyRequestID).(string)
+		reqID, ok := s.ctx.Value(activitytracker.ContextKeyRequestID).(string)
 		if !ok {
 			log.Printf("SERVERBUG: Missing requestID in context")
 			return
