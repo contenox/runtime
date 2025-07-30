@@ -24,7 +24,7 @@ type Client interface {
 	ListRepos(ctx context.Context) ([]*store.GitHubRepo, error)
 	ListPRs(ctx context.Context, repoID string) ([]*PullRequest, error)
 	ListComments(ctx context.Context, repoID string, prNumber int, since time.Time) ([]*github.IssueComment, error)
-
+	GetPRDiff(ctx context.Context, repoID string, prNumber int) (string, error)
 	// Methods used by Processor
 	PostComment(ctx context.Context, repoID string, prNumber int, comment string) error
 }
@@ -170,6 +170,34 @@ func (s *client) createGitHubClient(ctx context.Context, accessToken string) *gi
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	return github.NewClient(tc)
+}
+
+func (c *client) GetPRDiff(ctx context.Context, repoID string, prNumber int) (string, error) {
+	// 1. Get repository metadata from store
+	storeInstance := store.New(c.dbInstance.WithoutTransaction())
+	repoMeta, err := storeInstance.GetGitHubRepo(ctx, repoID)
+	if err != nil {
+		return "", fmt.Errorf("GetPRDiff: failed to get repo metadata: %w", err)
+	}
+
+	// 2. Create authenticated GitHub client
+	client := c.createGitHubClient(ctx, repoMeta.AccessToken)
+
+	// 3. Fetch raw diff in patch format
+	diffBytes, _, err := client.PullRequests.GetRaw(
+		ctx,
+		repoMeta.Owner,
+		repoMeta.RepoName,
+		prNumber,
+		github.RawOptions{
+			Type: github.Diff,
+		},
+	)
+	if err != nil {
+		return "", fmt.Errorf("%w: failed to get PR diff: %v", ErrGitHubAPIError, err)
+	}
+
+	return string(diffBytes), nil
 }
 
 func (s *client) RepoExists(ctx context.Context, repoID string) (bool, error) {

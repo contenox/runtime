@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
@@ -249,20 +248,8 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	provider := ""
-	if strings.HasPrefix(req.Model, "openai") {
-		provider = "openai"
-	}
-	if strings.HasPrefix(req.Model, "ollama") {
-		provider = "ollama"
-	}
-	if strings.HasPrefix(req.Model, "gemini") {
-		provider = "gemini"
-	}
-	if strings.HasPrefix(req.Model, "vllm") {
-		provider = "vllm"
-	}
-	chain := tasksrecipes.BuildOpenAIChatChain(req.Model, provider)
+
+	chain := tasksrecipes.BuildOpenAIChatChain()
 
 	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
 	if err != nil {

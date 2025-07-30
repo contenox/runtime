@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime-mvp/core/githubclient"
@@ -19,6 +20,7 @@ import (
 const (
 	JobTypeGitHubCommentSync       = "github_comment_sync"
 	JobTypeGitHubProcessCommentLLM = "github_process_comment_llm"
+	JobTypeGitHubCodeReview        = "github_code_review"
 	DefaultLeaseDuration           = 30 * time.Second
 )
 
@@ -140,6 +142,12 @@ type processLeasedJobPayload struct {
 	RepoID   string `json:"repoId"`
 	BotID    string `json:"botId"`
 	PRNumber int    `json:"prNumber"`
+}
+
+type codeReviewPayload struct {
+	RepoID      string    `json:"repoId"`
+	PRNumber    int       `json:"prNumber"`
+	TriggerTime time.Time `json:"triggerTime"`
 }
 
 func (w *worker) processLeasedJob(
@@ -363,6 +371,9 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 			messageData.ChatMessage.Role = "assistant"
 			messageData.ChatMessage.IsUser = false
 		}
+		if messageData.ChatMessage.IsUser {
+			messageData.ChatMessage.Content = "[" + userName + " - " + sendAt.Format(time.RFC822) + "]: " + messageData.ChatMessage.Content
+		}
 		isUser[messageID] = messageData.ChatMessage.IsUser
 
 		payload, err := json.Marshal(messageData)
@@ -418,6 +429,111 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 			reportErr(fmt.Errorf("failed to append job: %w", err))
 		}
 	}
+
+	// Check if this is a new PR (no existing messages)
+	isNewPR := len(messagesFromStore)+len(missingMessages) == 0
+
+	// Create code review job for new PRs
+	if isNewPR && len(missingMessages) > 0 {
+		// Create a code review job
+		codeReviewPayload := codeReviewPayload{
+			RepoID:      repoID,
+			PRNumber:    prNumber,
+			TriggerTime: time.Now().UTC(),
+		}
+		codeReviewPayloadBytes, err := json.Marshal(codeReviewPayload)
+		if err != nil {
+			reportErr(fmt.Errorf("failed to marshal code review payload: %w", err))
+		} else {
+			codeReviewJob := &store.Job{
+				ID:        uuid.NewString(),
+				TaskType:  JobTypeGitHubCodeReview,
+				CreatedAt: time.Now().UTC(),
+				Operation: "code_review",
+				Payload:   codeReviewPayloadBytes,
+				Subject:   githubclient.FormatSubjectID(repoID, prNumber),
+			}
+			if err := storeInstance.AppendJob(ctx, *codeReviewJob); err != nil {
+				reportErr(fmt.Errorf("failed to append code review job: %w", err))
+			} else {
+				reportChange("code_review_job_created", map[string]interface{}{
+					"repo_id":   repoID,
+					"pr_number": prNumber,
+					"reason":    "new_pr",
+				})
+			}
+		}
+	}
+
+	// Check for code review trigger comments
+	for _, msg := range missingMessages {
+		if !isUser[msg.ID] {
+			continue // Skip bot messages
+		}
+
+		var payload MessagePayload
+		if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+			continue
+		}
+
+		// Check if comment contains a code review trigger
+		normalizedContent := strings.ToLower(strings.TrimSpace(payload.Content))
+		if normalizedContent == "/review" || normalizedContent == "review" ||
+			strings.Contains(normalizedContent, "/review") ||
+			strings.Contains(normalizedContent, "please review") {
+
+			// Create a code review job
+			codeReviewPayload := codeReviewPayload{
+				RepoID:      repoID,
+				PRNumber:    prNumber,
+				TriggerTime: time.Now().UTC(),
+			}
+			codeReviewPayloadBytes, err := json.Marshal(codeReviewPayload)
+			if err != nil {
+				reportErr(fmt.Errorf("failed to marshal code review payload: %w", err))
+				continue
+			}
+
+			codeReviewJob := &store.Job{
+				ID:        uuid.NewString(),
+				TaskType:  JobTypeGitHubCodeReview,
+				CreatedAt: time.Now().UTC(),
+				Operation: "code_review",
+				Payload:   codeReviewPayloadBytes,
+				Subject:   githubclient.FormatSubjectID(repoID, prNumber),
+			}
+			if err := storeInstance.AppendJob(ctx, *codeReviewJob); err != nil {
+				reportErr(fmt.Errorf("failed to append code review job: %w", err))
+			} else {
+				reportChange("code_review_job_created", map[string]interface{}{
+					"repo_id":            repoID,
+					"pr_number":          prNumber,
+					"trigger_comment_id": payload.CommentID,
+					"reason":             "explicit_trigger",
+				})
+			}
+		}
+	}
+
+	// Create LLM jobs for each new comment
+	for _, msg := range missingMessages {
+		if !isUser[msg.ID] {
+			continue
+		}
+		job := &store.Job{
+			ID:        uuid.NewString(),
+			TaskType:  JobTypeGitHubProcessCommentLLM,
+			CreatedAt: time.Now().UTC(),
+			Operation: "process_comment_llm",
+			Payload:   msg.Payload,
+			Subject:   githubclient.FormatSubjectID(repoID, prNumber),
+		}
+
+		if err := storeInstance.AppendJob(ctx, *job); err != nil {
+			reportErr(fmt.Errorf("failed to append job: %w", err))
+		}
+	}
+
 	err = commit(ctx)
 	if err != nil {
 		reportErr(err)

@@ -21,11 +21,9 @@ const (
 func InitializeDefaultChains(ctx context.Context, cfg *serverops.Config, db libdb.DBManager) error {
 	// Create chains with proper IDs
 	chains := []*taskengine.ChainDefinition{
-		BuildOpenAIChatChain(cfg.TasksModel, "ollama"),
-		BuildChatChain(BuildChatChainReq{
-			PreferredModelNames: []string{cfg.TasksModel},
-			Provider:            "ollama",
-		}),
+		BuildOpenAIChatChain(),
+		BuildChatChain(),
+		BuildCodeReviewChain(),
 	}
 	tx, comm, end, err := db.WithTransaction(ctx)
 	defer end()
@@ -48,7 +46,7 @@ func InitializeDefaultChains(ctx context.Context, cfg *serverops.Config, db libd
 	return comm(ctx)
 }
 
-func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDefinition {
+func BuildOpenAIChatChain() *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		ID:          "openai_chat_chain",
 		Description: "OpenAI Style chat processing pipeline with hooks",
@@ -68,13 +66,10 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 				},
 			},
 			{
-				ID:          "execute_model_on_messages",
-				Description: "Run inference using selected LLM",
-				Type:        taskengine.ModelExecution,
-				ExecuteConfig: &taskengine.LLMExecutionConfig{
-					Model:    model,
-					Provider: llmProvider,
-				},
+				ID:            "execute_model_on_messages",
+				Description:   "Run inference using selected LLM",
+				Type:          taskengine.ModelExecution,
+				ExecuteConfig: &taskengine.LLMExecutionConfig{},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: "default", Goto: "convert_history_to_openai"},
@@ -87,9 +82,7 @@ func BuildOpenAIChatChain(model string, llmProvider string) *taskengine.ChainDef
 				Type:        taskengine.Hook,
 				Hook: &taskengine.HookCall{
 					Type: "convert_history_to_openai",
-					Args: map[string]string{
-						"model": model,
-					},
+					Args: map[string]string{},
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
@@ -106,7 +99,7 @@ type BuildChatChainReq struct {
 	Provider            string
 }
 
-func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
+func BuildChatChain() *taskengine.ChainDefinition {
 	return &taskengine.ChainDefinition{
 		ID:          "chat_chain",
 		Description: "Standard chat processing pipeline with hooks",
@@ -294,11 +287,33 @@ func BuildChatChain(req BuildChatChainReq) *taskengine.ChainDefinition {
 				SystemInstruction: "You're a helpful assistant in the contenox system. " +
 					"Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. " +
 					"Keep conversation friendly.",
-				ExecuteConfig: &taskengine.LLMExecutionConfig{
-					Models:    req.PreferredModelNames,
-					Providers: []string{req.Provider},
-				},
+				ExecuteConfig: &taskengine.LLMExecutionConfig{},
 				// InputVar: "append_user_message",
+				Transition: taskengine.TaskTransition{
+					Branches: []taskengine.TransitionBranch{
+						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
+					},
+				},
+			},
+		},
+	}
+}
+
+func BuildCodeReviewChain() *taskengine.ChainDefinition {
+	return &taskengine.ChainDefinition{
+		ID:          "code_review_chain",
+		Description: "Specialized chain for GitHub code reviews",
+		Debug:       true,
+		Tasks: []taskengine.ChainTask{
+			{
+				ID:                "execute_code_review",
+				Description:       "Run inference using selected LLM for code review",
+				SystemInstruction: "You are an expert code reviewer. Analyze the provided code changes and provide structured feedback with actionable suggestions.",
+				Type:              taskengine.ModelExecution,
+				ExecuteConfig: &taskengine.LLMExecutionConfig{
+					Models:    []string{"gemini-2.5-flash"},
+					Providers: []string{"gemini"},
+				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: taskengine.OpDefault, Goto: taskengine.TermEnd},
