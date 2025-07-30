@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/modelprovider"
+	modelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
