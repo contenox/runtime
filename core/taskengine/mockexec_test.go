@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 	"github.com/stretchr/testify/require"
 )
 

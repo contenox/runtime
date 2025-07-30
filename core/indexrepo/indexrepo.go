@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 )
 
 type Args struct {

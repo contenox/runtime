@@ -10,11 +10,11 @@ import (
 	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

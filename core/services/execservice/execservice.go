@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libdb"
+	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 	"github.com/google/uuid"
 )
 
