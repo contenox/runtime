@@ -431,7 +431,7 @@ func (w *worker) syncPRComments(ctx context.Context, botID string, repoID string
 	}
 
 	// Check if this is a new PR (no existing messages)
-	isNewPR := len(messagesFromStore) == 0
+	isNewPR := len(messagesFromStore)+len(missingMessages) == 0
 
 	// Create code review job for new PRs
 	if isNewPR && len(missingMessages) > 0 {
