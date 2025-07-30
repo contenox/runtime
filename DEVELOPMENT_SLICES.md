@@ -26,6 +26,24 @@ The approach proved effective for managing complexity, though some features (lik
 
 ---
 
+## August 2025 – Task Engine Refinement & Live Deployment
+
+### Original Goals
+
+- Refactor the engine to establish service boundaries
+- Rewire existing frontends and bots
+- Deploy a GitHub PR reviewer
+- Documentation of the task engine spec
+- Improve the modelprovider
+
+### Key Deliverables
+
+- Hook-Based Integration System: Replace dedicated workers with proper hook implementations
+- GitHub Comment Synchronization: Fix the critical "no way to compute a diff" issue
+- Production-Ready PR Reviewer: Deploy a working GitHub PR review solution
+- Task Engine Specification: Complete documentation for chain definition and hook system
+
+
 ## July 2025 – Building a demo application
 
 ### Original Goals
