@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/modelprovider"
+	modelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/llmrepo"

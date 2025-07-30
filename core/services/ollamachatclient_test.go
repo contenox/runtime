@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/modelprovider"
+	modelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
