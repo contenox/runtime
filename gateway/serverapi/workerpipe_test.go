@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
 	"github.com/contenox/runtime-mvp/core/llmresolver"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
@@ -64,7 +65,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	}
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Minute*5))
 	defer cancel()
-	testenv := testingsetup.New(ctx, serverops.NoopTracker{}).
+	testenv := testingsetup.New(ctx, activitytracker.NoopTracker{}).
 		WithTriggerChan().
 		WithServiceManager(config).
 		WithDBConn("test").

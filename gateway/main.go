@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
@@ -173,8 +174,8 @@ func main() {
 		log.Printf("SERVER Error in settings.ProcessTick: %v", err)
 	})
 	tracker := taskengine.NewKVActivityTracker(kvManager)
-	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
-	serveropsChainedTracker := serverops.ChainedTracker{
+	stdOuttracker := activitytracker.NewLogActivityTracker(slog.Default())
+	serveropsChainedTracker := activitytracker.ChainedTracker{
 		tracker,
 		stdOuttracker,
 	}
@@ -188,10 +189,10 @@ func main() {
 		DefaultPos:     0,
 		DefaultEpsilon: 0.5,
 		DefaultRadius:  40,
-	}, serverops.NewLogActivityTracker(slog.Default()))
+	}, activitytracker.NewLogActivityTracker(slog.Default()))
 	// Mux for handling commands like /echo
 	// transition := hooks.NewTransition("help", serverops.NewLogActivityTracker(slog.Default()))
-	printHook := hooks.NewPrint(serverops.NewLogActivityTracker(slog.Default()))
+	printHook := hooks.NewPrint(activitytracker.NewLogActivityTracker(slog.Default()))
 	// hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
 	// 	"echo":             echocmd,
 	// 	"search_knowledge": knowledgeHook,
