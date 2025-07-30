@@ -122,8 +122,8 @@ func New(
 			Operation:    state.RunDownloadCycle,
 		},
 	)
-	gbClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
-	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, gbClient, chatManager, serveropsChainedTracker)
+	githubClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
+	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, githubClient, chatManager, serveropsChainedTracker)
 
 	libroutine.GetPool().StartLoop(
 		ctx,
@@ -196,10 +196,10 @@ func New(
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityService = activityservice.WithAuthorization(activityService, dbInstance)
 	activityapi.AddActivityRoutes(mux, config, activityService)
-	githubService := githubservice.New(dbInstance, gbClient)
+	githubService := githubservice.New(dbInstance, githubClient)
 	githubService = githubservice.WithActivityTracker(githubService, serveropsChainedTracker)
 	githubapi.AddGitHubRoutes(mux, config, githubService)
-	githubworker := githubservice.NewWorker(githubService, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*2))
+	githubworker := githubservice.NewWorker(githubClient, kvManager, serveropsChainedTracker, dbInstance, time.Now().Add(-time.Hour*24*2))
 	cfgGithubWorkerPull := &libroutine.LoopConfig{
 		Key:          "github-worker-pull",
 		Interval:     time.Minute,
@@ -223,7 +223,45 @@ func New(
 		},
 	}
 	libroutine.GetPool().StartLoop(ctx, cfgGithubWorkerSync)
-
+	codeReviewProcessor := githubservice.NewGitHubCodeReviewProcessor(
+		dbInstance,
+		environmentExec,
+		githubClient,
+		chatManager,
+		serveropsChainedTracker,
+	)
+	libroutine.GetPool().StartLoop(
+		ctx,
+		&libroutine.LoopConfig{
+			Key:          "github-code-review-processor",
+			Threshold:    3,
+			ResetTimeout: 10 * time.Second,
+			Interval:     10 * time.Second,
+			Operation: func(ctx context.Context) error {
+				ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-code-review-processor-"+uuid.New().String())
+				storeInstance := store.New(dbInstance.WithoutTransaction())
+				job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubCodeReview)
+				if err != nil {
+					if errors.Is(err, libdb.ErrNotFound) {
+						return nil
+					}
+					return fmt.Errorf("fetching GitHub code review job: %w", err)
+				}
+				// Process the job
+				if err := codeReviewProcessor.ProcessJob(ctx, job); err != nil {
+					if job.RetryCount < 5 {
+						job.RetryCount++
+						if requeueErr := storeInstance.AppendJob(ctx, *job); requeueErr != nil {
+							return fmt.Errorf("processing failed: %w, requeue failed: %v", err, requeueErr)
+						}
+						return fmt.Errorf("job requeued (retry %d): %w", job.RetryCount, err)
+					}
+					return fmt.Errorf("abandoning code review job after 5 retries: %w", err)
+				}
+				return nil
+			},
+		},
+	)
 	chainService := chainservice.New(dbInstance)
 	chainsapi.AddChainRoutes(mux, config, chainService)
 

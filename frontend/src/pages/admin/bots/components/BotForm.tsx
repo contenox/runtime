@@ -80,7 +80,10 @@ export default function BotForm({
           value={formData.jobType || ''}
           onChange={e => handleChange('jobType', e.target.value)}
           placeholder={t('bots.job_type_placeholder')}
-          options={[{ value: 'github_process_comment_llm', label: 'GitHub' }]}>
+          options={[
+            { value: 'github_process_comment_llm', label: 'GitHub' },
+            { value: 'github_code_review', label: 'GitHub-Review' },
+          ]}>
           {jobTypes.map(type => (
             <option key={type} value={type}>
               {type}

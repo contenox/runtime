@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
@@ -150,6 +151,135 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		"message_id":         payload.CommentID,
 		"assistant_response": lastMsg.Content,
 	}
+
+	return nil
+}
+
+type GitHubCodeReviewProcessor struct {
+	db           libdb.DBManager
+	env          taskengine.EnvExecutor
+	chatManager  *chat.Manager
+	tracker      serverops.ActivityTracker
+	githubClient githubclient.Client
+}
+
+func NewGitHubCodeReviewProcessor(
+	db libdb.DBManager,
+	env taskengine.EnvExecutor,
+	githubClient githubclient.Client,
+	chatManager *chat.Manager,
+	tracker serverops.ActivityTracker,
+) *GitHubCodeReviewProcessor {
+	if tracker == nil {
+		tracker = serverops.NoopTracker{}
+	}
+	return &GitHubCodeReviewProcessor{
+		db:           db,
+		env:          env,
+		chatManager:  chatManager,
+		tracker:      tracker,
+		githubClient: githubClient,
+	}
+}
+
+func (p *GitHubCodeReviewProcessor) ProcessJob(ctx context.Context, job *store.Job) (err error) {
+	// Start activity tracking
+	reportErr, reportChange, end := p.tracker.Start(
+		ctx,
+		"process",
+		"code-review-job",
+		"job_id", job.ID,
+		"task_type", job.TaskType,
+	)
+	defer end()
+
+	// Unmarshal payload
+	var payload codeReviewPayload
+	if err = json.Unmarshal(job.Payload, &payload); err != nil {
+		err = fmt.Errorf("failed to unmarshal job payload: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Get PR diff
+	diff, err := p.githubClient.GetPRDiff(ctx, payload.RepoID, payload.PRNumber)
+	if err != nil {
+		err = fmt.Errorf("failed to get PR diff: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Find code review bot
+	storeInstance := store.New(p.db.WithoutTransaction())
+	bots, err := storeInstance.ListBotsByJobType(ctx, job.TaskType)
+	if err != nil {
+		err = fmt.Errorf("failed to find bot for job type: %w", err)
+		reportErr(err)
+		return
+	}
+	if len(bots) == 0 {
+		err = fmt.Errorf("no bot found for job type: %s", job.TaskType)
+		reportErr(err)
+		return
+	}
+	bot := bots[0]
+
+	// Get task chain for code review
+	chain, err := tasksrecipes.GetChainDefinition(ctx, p.db.WithoutTransaction(), bot.TaskChainID)
+	if err != nil {
+		err = fmt.Errorf("failed to get task chain: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Create context for code review
+	history := taskengine.ChatHistory{
+		Messages: []taskengine.Message{
+			{
+				Role:      "user",
+				Content:   fmt.Sprintf("Analyze these code changes for PR #%d:\n\n%s", payload.PRNumber, diff),
+				Timestamp: time.Now().UTC(),
+			},
+		},
+	}
+
+	// Execute chain
+	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
+	if err != nil {
+		err = fmt.Errorf("failed to execute chain: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Extract response
+	hist, ok := result.(taskengine.ChatHistory)
+	if !ok || len(hist.Messages) == 0 {
+		err = errors.New("invalid chain result - expected chat history")
+		reportErr(err)
+		return
+	}
+
+	lastMsg := hist.Messages[len(hist.Messages)-1]
+	if lastMsg.Role != "assistant" {
+		err = fmt.Errorf("unexpected message role in response: %s", lastMsg.Role)
+		reportErr(err)
+		return
+	}
+
+	// Format and post review as GitHub comment
+	reviewContent := addFooter(lastMsg.Content)
+
+	if err = p.githubClient.PostComment(ctx, payload.RepoID, payload.PRNumber, reviewContent); err != nil {
+		err = fmt.Errorf("failed to post GitHub comment: %w", err)
+		reportErr(err)
+		return
+	}
+
+	// Track successful review
+	reportChange("code_review_posted", map[string]interface{}{
+		"repo_id":   payload.RepoID,
+		"pr_number": payload.PRNumber,
+	})
 
 	return nil
 }
