@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
@@ -86,8 +87,8 @@ func New(
 		return nil, cleanup, err
 	}
 	tracker := taskengine.NewKVActivityTracker(kvManager)
-	stdOuttracker := serverops.NewLogActivityTracker(slog.Default())
-	serveropsChainedTracker := serverops.ChainedTracker{
+	stdOuttracker := activitytracker.NewLogActivityTracker(slog.Default())
+	serveropsChainedTracker := activitytracker.ChainedTracker{
 		tracker,
 		stdOuttracker,
 	}
@@ -133,7 +134,7 @@ func New(
 			ResetTimeout: 10 * time.Second,
 			Interval:     10 * time.Second,
 			Operation: func(ctx context.Context) error {
-				ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-comment-processor-"+uuid.New().String())
+				ctx = context.WithValue(ctx, activitytracker.ContextKeyRequestID, "github-comment-processor-"+uuid.New().String())
 				storeInstance := store.New(dbInstance.WithoutTransaction())
 				job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubProcessCommentLLM)
 				if err != nil {
@@ -206,7 +207,7 @@ func New(
 		Threshold:    4,
 		ResetTimeout: time.Minute,
 		Operation: func(ctx context.Context) error {
-			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
+			ctx = context.WithValue(ctx, activitytracker.ContextKeyRequestID, "github-worker-pull:"+uuid.NewString())
 			return githubworker.ReceiveTick(ctx)
 		},
 	}
@@ -218,7 +219,7 @@ func New(
 		Threshold:    4,
 		ResetTimeout: time.Minute,
 		Operation: func(ctx context.Context) error {
-			ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
+			ctx = context.WithValue(ctx, activitytracker.ContextKeyRequestID, "github-worker-sync:"+uuid.NewString())
 			return githubworker.ProcessTick(ctx)
 		},
 	}
@@ -238,7 +239,7 @@ func New(
 			ResetTimeout: 10 * time.Second,
 			Interval:     10 * time.Second,
 			Operation: func(ctx context.Context) error {
-				ctx = context.WithValue(ctx, serverops.ContextKeyRequestID, "github-code-review-processor-"+uuid.New().String())
+				ctx = context.WithValue(ctx, activitytracker.ContextKeyRequestID, "github-code-review-processor-"+uuid.New().String())
 				storeInstance := store.New(dbInstance.WithoutTransaction())
 				job, err := storeInstance.PopJobForType(ctx, githubservice.JobTypeGitHubCodeReview)
 				if err != nil {
@@ -474,7 +475,7 @@ func jwtRefreshMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 func requestIDMiddleware(_ *serverops.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := uuid.New().String()
-		ctx := context.WithValue(r.Context(), serverops.ContextKeyRequestID, requestID)
+		ctx := context.WithValue(r.Context(), activitytracker.ContextKeyRequestID, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
