@@ -17,8 +17,6 @@ replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 
 replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
 
-replace github.com/contenox/runtime-mvp/libs/libmodelprovider => ../libs/libmodelprovider
-
 replace github.com/contenox/runtime-mvp/core => ../core
 
 require (
@@ -34,8 +32,11 @@ require (
 	github.com/ollama/ollama v0.9.6
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.38.0
-	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.6
+)
+
+require (
+	google.golang.org/grpc v1.74.2 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 )
 
 require (
@@ -49,8 +50,8 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/contenox/activitytracker v0.0.2
+	github.com/contenox/modelprovider v0.0.2
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
-	github.com/contenox/runtime-mvp/libs/libmodelprovider v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libmodelprovider "github.com/contenox/modelprovider"
+	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 )
 
 // TaskExecutor defines the interface for executing a individual tasks.

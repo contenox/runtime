@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	"github.com/contenox/modelprovider"
+	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
 	"github.com/contenox/runtime-mvp/core/taskengine"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_SimpleExec_TaskExec_PromptToString(t *testing.T) {
-	mockProvider := &libmodelprovider.MockProvider{
+	mockProvider := &modelprovider.MockProvider{
 		Name:          "mock-model",
 		CanPromptFlag: true,
 		ContextLength: 2048,

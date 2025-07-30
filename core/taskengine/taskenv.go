@@ -12,7 +12,7 @@ import (
 
 	"dario.cat/mergo"
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
+	"github.com/contenox/modelprovider/llmresolver"
 )
 
 const (

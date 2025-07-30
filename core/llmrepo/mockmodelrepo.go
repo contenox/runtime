@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	libmodelprovider "github.com/contenox/modelprovider"
+	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
 )
 
 type MockModelRepo struct {

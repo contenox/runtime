@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider/llmresolver"
+	libmodelprovider "github.com/contenox/modelprovider"
+	"github.com/contenox/modelprovider/llmresolver"
 )
 
 // LocalProviderAdapter creates providers for self-hosted backends (Ollama, vLLM)

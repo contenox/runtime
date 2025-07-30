@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/contenox/activitytracker"
+	"github.com/contenox/modelprovider"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
-	"github.com/contenox/runtime-mvp/libs/libmodelprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +36,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		url = state.Backend.BaseURL
 	}
 	require.NotEmpty(t, url, "Failed to get backend URL from test setup")
-	provider := libmodelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, http.DefaultClient, libmodelprovider.WithChat(true))
+	provider := modelprovider.NewOllamaModelProvider("smollm2:135m", []string{url}, http.DefaultClient, modelprovider.WithChat(true))
 	require.True(t, provider.CanChat())
 
 	client, err := provider.GetChatConnection(ctx, url)
@@ -44,14 +44,14 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 	require.NotNil(t, client)
 	t.Run("SinglePrompt_ShouldReturnAssistantReply", func(t *testing.T) {
 		// First chat call
-		response, err := client.Chat(ctx, []libmodelprovider.Message{
+		response, err := client.Chat(ctx, []modelprovider.Message{
 			{Content: "Hello, world!", Role: "user"},
 		})
 		require.NoError(t, err)
 		t.Logf("Response 1: %s", response.Content)
 		require.NotEmpty(t, response.Content)
 		require.Equal(t, "assistant", response.Role)
-		response2, err := client.Chat(ctx, []libmodelprovider.Message{
+		response2, err := client.Chat(ctx, []modelprovider.Message{
 			{Content: "Hello, world!", Role: "user"},
 			response,
 			{Content: "How are you?", Role: "user"},
@@ -62,7 +62,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 		require.Equal(t, "assistant", response2.Role)
 	})
 	t.Run("MultiTurnConversation_ShouldMaintainState", func(t *testing.T) {
-		userMessages := []libmodelprovider.Message{
+		userMessages := []modelprovider.Message{
 			{Content: "Hello, world!", Role: "user"},
 			{Content: "How are you?", Role: "user"},
 			{Content: "How old are you?", Role: "user"},
@@ -73,8 +73,8 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 			{Content: "What is your favorite movie?", Role: "user"},
 			{Content: "What is your favorite sport?", Role: "user"},
 		}
-		conversation := func(chat []libmodelprovider.Message, prompt string) []libmodelprovider.Message {
-			chat = append(chat, libmodelprovider.Message{Role: "user", Content: prompt})
+		conversation := func(chat []modelprovider.Message, prompt string) []modelprovider.Message {
+			chat = append(chat, modelprovider.Message{Role: "user", Content: prompt})
 			response, err := client.Chat(ctx, chat)
 			require.NoError(t, err)
 			require.NotEmpty(t, response.Content)
@@ -84,7 +84,7 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 			chat = append(chat, response)
 			return chat
 		}
-		chat := []libmodelprovider.Message{}
+		chat := []modelprovider.Message{}
 		for _, message := range userMessages {
 			chat = conversation(chat, message.Content)
 		}
@@ -112,14 +112,14 @@ func TestSystem_OllamaProvider_ChatIntegration(t *testing.T) {
 	// })
 	t.Run("InvalidModel_ShouldReturnDescriptiveError", func(t *testing.T) {
 		nonExistentModel := "this-model-definitely-does-not-exist-12345:latest"
-		badProvider := libmodelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, http.DefaultClient, libmodelprovider.WithChat(true))
+		badProvider := modelprovider.NewOllamaModelProvider(nonExistentModel, []string{url}, http.DefaultClient, modelprovider.WithChat(true))
 		require.True(t, badProvider.CanChat())
 
 		invalidClient, err := badProvider.GetChatConnection(context.Background(), url)
 		require.NoError(t, err, "Getting the client should succeed even if model doesn't exist yet")
 		require.NotNil(t, invalidClient)
 
-		_, err = invalidClient.Chat(ctx, []libmodelprovider.Message{
+		_, err = invalidClient.Chat(ctx, []modelprovider.Message{
 			{Content: "Does not matter", Role: "user"},
 		})
 
@@ -135,7 +135,7 @@ func TestUnit_OllamaProvider_RejectsChatWhenDisabled(t *testing.T) {
 	backends := []string{dummyURL}
 	modelName := "smollm2:135m"
 
-	provider := libmodelprovider.NewOllamaModelProvider(modelName, backends, http.DefaultClient, libmodelprovider.WithChat(false))
+	provider := modelprovider.NewOllamaModelProvider(modelName, backends, http.DefaultClient, modelprovider.WithChat(false))
 	require.False(t, provider.CanChat(), "Provider should report CanChat as false")
 	client, err := provider.GetChatConnection(context.Background(), dummyURL)
 	require.Error(t, err, "Expected an error when getting chat connection for a non-chat provider")

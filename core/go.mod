@@ -17,16 +17,15 @@ replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 
 replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
 
-replace github.com/contenox/runtime-mvp/libs/libmodelprovider => ../libs/libmodelprovider
-
 require (
 	dario.cat/mergo v1.0.2
+	github.com/contenox/activitytracker v0.0.2
+	github.com/contenox/modelprovider v0.0.2
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/runtime-mvp/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250714091341-746b94b8a904
-	github.com/contenox/runtime-mvp/libs/libmodelprovider v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libroutine v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
@@ -41,8 +40,6 @@ require (
 )
 
 require (
-	github.com/contenox/activitytracker v0.0.2 // indirect
-	github.com/contenox/ollamatokenizer v0.0.0-20250729144017-1e0ab653295d // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
