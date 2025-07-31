@@ -10,6 +10,10 @@ export const StateVisualizer = ({ state }: StateVisualizerProps) => {
   if (!state || state.length === 0) {
     return null;
   }
+  const formatDuration = (ms: number): string => {
+    if (ms < 1000) return `${Math.round(ms)} ms`;
+    return `${(ms / 1000).toFixed(2)} s`;
+  };
 
   return (
     <Table
@@ -29,7 +33,7 @@ export const StateVisualizer = ({ state }: StateVisualizerProps) => {
           <TableCell>{unit.inputType}</TableCell>
           <TableCell>{unit.outputType}</TableCell>
           <TableCell className="max-w-xs truncate">{unit.transition || '-'}</TableCell>
-          <TableCell>{unit.duration} ms</TableCell>
+          <TableCell>{formatDuration(unit.duration)}</TableCell>{' '}
           <TableCell>
             {unit.error ? <span className="text-error">{unit.error.error}</span> : '-'}
           </TableCell>

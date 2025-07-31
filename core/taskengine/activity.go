@@ -31,9 +31,20 @@ type TrackedEvent struct {
 	Error      *string           `json:"error,omitempty"`
 	EntityID   *string           `json:"entityID,omitempty"`
 	EntityData any               `json:"entityData,omitempty"`
-	DurationMS *int64            `json:"durationMS,omitempty"`
+	Duration   float64           `json:"duration"` // Duration in milliseconds
 	Metadata   map[string]string `json:"metadata,omitempty"`
 	RequestID  string            `json:"requestID,omitempty"`
+}
+
+func (c *CapturedStateUnit) MarshalJSON() ([]byte, error) {
+	type Alias CapturedStateUnit
+	return json.Marshal(&struct {
+		Duration float64 `json:"duration"` // Convert to milliseconds
+		*Alias
+	}{
+		Duration: float64(c.Duration) / float64(time.Millisecond),
+		Alias:    (*Alias)(c),
+	})
 }
 
 type TrackedRequest struct {
@@ -75,9 +86,10 @@ func (t *KVActivitySink) Start(
 	end := func() {
 		now := time.Now().UTC()
 		event.End = &now
-		duration := now.Sub(startTime).Milliseconds()
-		event.DurationMS = &duration
-
+		duration := time.Since(startTime)
+		if duration > 0 {
+			event.Duration = float64(duration) / float64(time.Millisecond)
+		}
 		// Prepare event for storage
 		data, err := json.Marshal(event)
 		if err != nil {
