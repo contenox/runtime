@@ -18,9 +18,14 @@ import (
 
 type ModelRepo interface {
 	GetDefaultSystemProvider(ctx context.Context) (libmodelprovider.Provider, error)
-	GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error)
+	GetTokenizer(ctx context.Context, modelName string) (Tokenizer, error)
 	GetRuntime(ctx context.Context) llmresolver.ProviderFromRuntimeState
 	GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error)
+}
+
+type Tokenizer interface {
+	Tokenize(ctx context.Context, prompt string) ([]int, error)
+	CountTokens(ctx context.Context, prompt string) (int, error)
 }
 
 func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
@@ -143,11 +148,22 @@ func (e *modelManager) GetDefaultSystemProvider(ctx context.Context) (libmodelpr
 	return provider, nil
 }
 
-func (e *modelManager) GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error) {
+func (e *modelManager) GetTokenizer(ctx context.Context, modelName string) (Tokenizer, error) {
 	if e.tokenizer == nil {
 		return nil, errors.New("tokenizer not initialized")
 	}
-	return e.tokenizer, nil
+
+	// Get the optimal model for tokenization
+	modelForTokenization, err := e.tokenizer.OptimalModel(ctx, modelName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return an adapter that uses the optimal model
+	return &tokenizerAdapter{
+		tokenizer: e.tokenizer,
+		modelName: modelForTokenization,
+	}, nil
 }
 
 func (e *modelManager) backendIsInPool(ctx context.Context, backendToVerify store.Backend) (bool, error) {
@@ -193,4 +209,17 @@ func (e *modelManager) GetAvailableProviders(ctx context.Context) ([]libmodelpro
 		providers = append(providers, provider)
 	}
 	return providers, nil
+}
+
+type tokenizerAdapter struct {
+	tokenizer ollamatokenizer.Tokenizer
+	modelName string
+}
+
+func (a *tokenizerAdapter) Tokenize(ctx context.Context, prompt string) ([]int, error) {
+	return a.tokenizer.Tokenize(ctx, a.modelName, prompt)
+}
+
+func (a *tokenizerAdapter) CountTokens(ctx context.Context, prompt string) (int, error) {
+	return a.tokenizer.CountTokens(ctx, a.modelName, prompt)
 }

@@ -388,14 +388,14 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 	if llmCall.Providers != nil {
 		providerNames = append(providerNames, llmCall.Providers...)
 	}
-	tokenizer, err := exe.promptExec.GetTokenizer(ctx)
+	tokenizer, err := exe.promptExec.GetTokenizer(ctx, llmCall.Model)
 	if err != nil {
 		reportErr(fmt.Errorf("tokenizer failed: %w", err))
 		return nil, DataTypeAny, "", fmt.Errorf("tokenizer failed: %w", err)
 	}
 	if input.InputTokens <= 0 {
 		for _, m := range input.Messages {
-			InputCount, err := tokenizer.CountTokens(ctx, "tiny", m.Content)
+			InputCount, err := tokenizer.CountTokens(ctx, m.Content)
 			if err != nil {
 				reportErr(fmt.Errorf("token count failed: %w", err))
 				return nil, DataTypeAny, "", fmt.Errorf("token count failed: %w", err)
@@ -466,19 +466,8 @@ func (exe *SimpleExec) executeLLM(ctx context.Context, input ChatHistory, ctxLen
 		Content:   resp.Content,
 		Timestamp: time.Now().UTC(),
 	})
-	p, err := exe.promptExec.GetDefaultSystemProvider(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to get provider: %w", err)
-		reportErr(err)
-		return nil, DataTypeAny, "", err
-	}
-	modelForTokenization, err := tokenizer.OptimalModel(ctx, p.ModelName())
-	if err != nil {
-		err = fmt.Errorf("failed to get model for tokenization: %w", err)
-		reportErr(err)
-		return nil, DataTypeAny, "", err
-	}
-	outputTokensCount, err := tokenizer.CountTokens(ctx, modelForTokenization, resp.Content)
+
+	outputTokensCount, err := tokenizer.CountTokens(ctx, resp.Content)
 	if err != nil {
 		err = fmt.Errorf("tokenizer failed: %w", err)
 		reportErr(err)

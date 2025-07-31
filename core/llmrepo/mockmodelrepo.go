@@ -6,7 +6,6 @@ import (
 
 	libmodelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/modelprovider/llmresolver"
-	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 )
 
 type MockModelRepo struct {
@@ -29,15 +28,48 @@ func (m *MockModelRepo) GetRuntime(ctx context.Context) llmresolver.ProviderFrom
 	}
 }
 
-func (m *MockModelRepo) GetTokenizer(ctx context.Context) (ollamatokenizer.Tokenizer, error) {
+// Fixed: Added modelName parameter to match interface
+func (m *MockModelRepo) GetTokenizer(ctx context.Context, modelName string) (Tokenizer, error) {
 	if m.Provider == nil {
 		return nil, fmt.Errorf("provider is nil for prompt execution")
 	}
-	return ollamatokenizer.MockTokenizer{}, nil
+
+	// Create a mock tokenizer implementation
+	mockTokenizer := &mockOllamaTokenizer{
+		modelName: modelName,
+	}
+
+	// Return an adapter that implements llmrepo.Tokenizer
+	return &tokenizerAdapter{
+		tokenizer: mockTokenizer,
+		modelName: modelName,
+	}, nil
 }
 
 func (m *MockModelRepo) GetAvailableProviders(ctx context.Context) ([]libmodelprovider.Provider, error) {
 	return []libmodelprovider.Provider{
 		m.Provider,
 	}, nil
+}
+
+// mockOllamaTokenizer implements ollamatokenizer.Tokenizer
+type mockOllamaTokenizer struct {
+	modelName string
+}
+
+func (m *mockOllamaTokenizer) Tokenize(ctx context.Context, modelName string, prompt string) ([]int, error) {
+	// Simple mock implementation - return token count as a slice of indices
+	tokens := make([]int, len(prompt)/5+1) // Rough estimate
+	for i := range tokens {
+		tokens[i] = i
+	}
+	return tokens, nil
+}
+
+func (m *mockOllamaTokenizer) CountTokens(ctx context.Context, modelName string, prompt string) (int, error) {
+	return len(prompt)/5 + 1, nil // Rough estimate
+}
+
+func (m *mockOllamaTokenizer) OptimalModel(ctx context.Context, baseModel string) (string, error) {
+	return m.modelName, nil
 }
