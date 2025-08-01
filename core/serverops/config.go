@@ -36,8 +36,6 @@ func (pc ProviderConfig) MarshalJSON() ([]byte, error) {
 var CoreVersion = "CORE-UNSET-dev"
 
 const (
-	EmbedPoolID   = "internal_embed_pool"
-	EmbedPoolName = "Embedder"
 	TasksPoolID   = "internal_tasks_pool"
 	TasksPoolName = "Tasks"
 	TenantID      = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"

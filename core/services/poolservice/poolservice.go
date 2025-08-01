@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	libdb "github.com/contenox/dbexec"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/google/uuid"
@@ -68,7 +69,7 @@ func (s *service) GetByName(ctx context.Context, name string) (*store.Pool, erro
 }
 
 func (s *service) Update(ctx context.Context, pool *store.Pool) error {
-	if pool.ID == serverops.EmbedPoolID {
+	if pool.ID == llmrepo.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
 	tx := s.dbInstance.WithoutTransaction()
@@ -79,7 +80,7 @@ func (s *service) Update(ctx context.Context, pool *store.Pool) error {
 }
 
 func (s *service) Delete(ctx context.Context, id string) error {
-	if id == serverops.EmbedPoolID {
+	if id == llmrepo.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
 	tx := s.dbInstance.WithoutTransaction()
@@ -146,7 +147,7 @@ func (s *service) AssignModel(ctx context.Context, poolID, modelID string) error
 }
 
 func (s *service) RemoveModel(ctx context.Context, poolID, modelID string) error {
-	if poolID == serverops.EmbedPoolID {
+	if poolID == llmrepo.EmbedPoolID {
 		return serverops.ErrImmutablePool
 	}
 	tx := s.dbInstance.WithoutTransaction()

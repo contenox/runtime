@@ -14,6 +14,7 @@ import (
 	"github.com/contenox/activitytracker"
 	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
@@ -90,7 +91,7 @@ func TestSystem_WorkerPipeline_ProcessesFileAndReturnsSearchResult(t *testing.T)
 	if err != nil {
 		log.Fatalf("initializing exec repo failed: %v", err)
 	}
-	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.AssignBackends(llmrepo.EmbedPoolID).Err)
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 

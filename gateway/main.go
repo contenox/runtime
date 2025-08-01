@@ -116,7 +116,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing runtime state failed: %v", err)
 	}
-	embedder, err := llmrepo.NewEmbedder(ctx, config, dbInstance, state)
+	embedder, err := llmrepo.NewEmbedder(ctx, &llmrepo.Config{
+		DatabaseURL:         config.DatabaseURL,
+		SigningKey:          config.SigningKey,
+		EmbedModel:          config.EmbedModel,
+		TasksModel:          config.TasksModel,
+		WorkerUserAccountID: config.WorkerUserAccountID,
+		WorkerUserPassword:  config.WorkerUserPassword,
+		WorkerUserEmail:     config.WorkerUserEmail,
+	}, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
@@ -128,7 +136,16 @@ func main() {
 		log.Fatalf("initializing tokenizer service failed: %v", err)
 	}
 
-	execRepo, err := llmrepo.NewExecRepo(ctx, config, dbInstance, state, tokenizerSvc)
+	execRepo, err := llmrepo.NewExecRepo(ctx, &llmrepo.Config{
+		DatabaseURL:         config.DatabaseURL,
+		SigningKey:          config.SigningKey,
+		EmbedModel:          config.EmbedModel,
+		TasksModel:          config.TasksModel,
+		WorkerUserAccountID: config.WorkerUserAccountID,
+		WorkerUserPassword:  config.WorkerUserPassword,
+		WorkerUserEmail:     config.WorkerUserEmail,
+		TenantID:            serverops.TenantID,
+	}, dbInstance, state, tokenizerSvc)
 	if err != nil {
 		log.Fatalf("initializing promptexec failed: %v", err)
 	}

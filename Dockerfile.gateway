@@ -9,7 +9,6 @@ COPY core/go.mod core/go.sum ./core/
 COPY gateway/go.mod gateway/go.sum ./gateway/
 COPY libs/libauth/go.mod libs/libauth/go.sum ./libs/libauth/
 COPY libs/libcipher/go.mod libs/libcipher/go.sum ./libs/libcipher/
-COPY libs/libdb/go.mod libs/libdb/go.sum ./libs/libdb/
 COPY libs/libroutine/go.mod libs/libroutine/go.sum ./libs/libroutine/
 COPY libs/libtestenv/go.mod libs/libtestenv/go.sum ./libs/libtestenv/
 COPY libs/ ./libs/

@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/activitytracker"
 	libkv "github.com/contenox/kvstore"
 	"github.com/contenox/runtime-mvp/core/hooks"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/execservice"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
@@ -51,7 +52,7 @@ func TestSystem_ExecService_FullTaskExecutionPipeline(t *testing.T) {
 	}
 	service := execservice.NewTasksEnv(ctx, env, testenv.GetDBInstance(), hooks.NewMockHookRegistry())
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
-	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.AssignBackends(llmrepo.EmbedPoolID).Err)
 	t.Run("simple echo task", func(t *testing.T) {
 		output, _, err := service.Execute(ctx, &taskengine.ChainDefinition{
 			ID:              "echo-chain",

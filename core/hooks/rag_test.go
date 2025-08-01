@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/activitytracker"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/testingsetup"
@@ -59,7 +60,7 @@ func TestSystemRag(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)
 	}
-	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.AssignBackends(llmrepo.EmbedPoolID).Err)
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 
 	dbInstance := testenv.GetDBInstance()

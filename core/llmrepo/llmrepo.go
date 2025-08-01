@@ -8,12 +8,22 @@ import (
 
 	libmodelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/modelprovider/llmresolver"
+	"github.com/google/uuid"
 
 	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
+)
+
+const (
+	EmbedPoolID   = "internal_embed_pool"
+	EmbedPoolName = "Embedder"
+)
+
+const (
+	TasksPoolID   = "internal_tasks_pool"
+	TasksPoolName = "Tasks"
 )
 
 type ModelRepo interface {
@@ -28,28 +38,24 @@ type Tokenizer interface {
 	CountTokens(ctx context.Context, prompt string) (int, error)
 }
 
-func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
+func NewEmbedder(ctx context.Context, config *Config, dbInstance libdb.DBManager, runtime *runtimestate.State) (ModelRepo, error) {
 	tx, com, r, err := dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer r()
 
-	pool, err := serverops.InitEmbedPool(ctx, config, tx, false)
+	pool, err := initEmbedPool(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init pool: %w", err)
 	}
-	model, err := serverops.InitEmbedModel(ctx, config, tx, false)
+	model, err := initEmbedModel(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init model: %w", err)
 	}
-	err = serverops.AssignModelToPool(ctx, config, tx, model, pool)
+	err = assignModelToPool(ctx, config, tx, model, pool)
 	if err != nil {
 		return nil, fmt.Errorf("assign model to pool: %w", err)
-	}
-	err = serverops.InitCredentials(ctx, config, tx)
-	if err != nil {
-		return nil, fmt.Errorf("init credentials: %w", err)
 	}
 	return &modelManager{
 		pool:       pool,
@@ -61,28 +67,24 @@ func NewEmbedder(ctx context.Context, config *serverops.Config, dbInstance libdb
 	}, com(ctx)
 }
 
-func NewExecRepo(ctx context.Context, config *serverops.Config, dbInstance libdb.DBManager, runtime *runtimestate.State, tokenizer ollamatokenizer.Tokenizer) (ModelRepo, error) {
+func NewExecRepo(ctx context.Context, config *Config, dbInstance libdb.DBManager, runtime *runtimestate.State, tokenizer ollamatokenizer.Tokenizer) (ModelRepo, error) {
 	tx, com, r, err := dbInstance.WithTransaction(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer r()
 
-	pool, err := serverops.InitEmbedPool(ctx, config, tx, false)
+	pool, err := initEmbedPool(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init pool: %w", err)
 	}
-	model, err := serverops.InitTasksModel(ctx, config, tx, false)
+	model, err := initTasksModel(ctx, config, tx, false)
 	if err != nil {
 		return nil, fmt.Errorf("init model: %w", err)
 	}
-	err = serverops.AssignModelToPool(ctx, config, tx, model, pool)
+	err = assignModelToPool(ctx, config, tx, model, pool)
 	if err != nil {
 		return nil, fmt.Errorf("assign model to pool: %w", err)
-	}
-	err = serverops.InitCredentials(ctx, config, tx)
-	if err != nil {
-		return nil, fmt.Errorf("init credentials: %w", err)
 	}
 	return &modelManager{
 		pool:       pool,
@@ -222,4 +224,123 @@ func (a *tokenizerAdapter) Tokenize(ctx context.Context, prompt string) ([]int, 
 
 func (a *tokenizerAdapter) CountTokens(ctx context.Context, prompt string) (int, error) {
 	return a.tokenizer.CountTokens(ctx, a.modelName, prompt)
+}
+
+func initEmbedPool(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Pool, error) {
+	pool, err := store.New(tx).GetPool(ctx, EmbedPoolID)
+	if !created && errors.Is(err, libdb.ErrNotFound) {
+		err = store.New(tx).CreatePool(ctx, &store.Pool{
+			ID:          EmbedPoolID,
+			Name:        EmbedPoolName,
+			PurposeType: "Internal Embeddings",
+		})
+		if err != nil {
+			return nil, err
+		}
+		return initEmbedPool(ctx, config, tx, true)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return pool, nil
+}
+
+func initTasksPool(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Pool, error) {
+	pool, err := store.New(tx).GetPool(ctx, TasksPoolID)
+	if !created && errors.Is(err, libdb.ErrNotFound) {
+		err = store.New(tx).CreatePool(ctx, &store.Pool{
+			ID:          TasksPoolID,
+			Name:        TasksPoolName,
+			PurposeType: "Internal Tasks",
+		})
+		if err != nil {
+			return nil, err
+		}
+		return initTasksPool(ctx, config, tx, true)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return pool, nil
+}
+
+func initEmbedModel(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Model, error) {
+	tenantID, err := uuid.Parse(config.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	modelID := uuid.NewSHA1(tenantID, []byte(config.EmbedModel))
+	storeInstance := store.New(tx)
+
+	model, err := storeInstance.GetModelByName(ctx, config.EmbedModel)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("get model: %w", err)
+	}
+	if !created && errors.Is(err, libdb.ErrNotFound) {
+		err = storeInstance.AppendModel(ctx, &store.Model{
+			Model: config.EmbedModel,
+			ID:    modelID.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return initEmbedModel(ctx, config, tx, true)
+	}
+	return model, nil
+}
+
+func initTasksModel(ctx context.Context, config *Config, tx libdb.Exec, created bool) (*store.Model, error) {
+	tenantID, err := uuid.Parse(config.TenantID)
+	if err != nil {
+		return nil, err
+	}
+	modelID := uuid.NewSHA1(tenantID, []byte(config.TasksModel))
+	storeInstance := store.New(tx)
+
+	model, err := storeInstance.GetModelByName(ctx, config.TasksModel)
+	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return nil, fmt.Errorf("get model: %w", err)
+	}
+	if !created && errors.Is(err, libdb.ErrNotFound) {
+		err = storeInstance.AppendModel(ctx, &store.Model{
+			Model: config.TasksModel,
+			ID:    modelID.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return initTasksModel(ctx, config, tx, true)
+	}
+	return model, nil
+}
+
+func assignModelToPool(ctx context.Context, _ *Config, tx libdb.Exec, model *store.Model, pool *store.Pool) error {
+	storeInstance := store.New(tx)
+
+	models, err := storeInstance.ListModelsForPool(ctx, pool.ID)
+	if err != nil {
+		return err
+	}
+	for _, presentModel := range models {
+		if presentModel.ID == model.ID {
+			return nil
+		}
+	}
+	if err := storeInstance.AssignModelToPool(ctx, pool.ID, model.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
+type Config struct {
+	DatabaseURL         string `json:"database_url"`
+	SigningKey          string `json:"signing_key"`
+	EmbedModel          string `json:"embed_model"`
+	TasksModel          string `json:"tasks_model"`
+	WorkerUserAccountID string `json:"worker_user_account_id"`
+	WorkerUserPassword  string `json:"worker_user_password"`
+	WorkerUserEmail     string `json:"worker_user_email"`
+	TenantID            string `json:"tenant_id"`
 }

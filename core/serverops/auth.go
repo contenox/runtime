@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/libs/libauth"
 	"github.com/contenox/runtime-mvp/libs/libcipher"
@@ -222,4 +223,52 @@ func CheckPassword(password, encodedHash, salt, signingKey string) (bool, error)
 
 	// Verify password
 	return libcipher.CheckHash(signingKey, salt, password, hashBytes)
+}
+
+func initCredentials(ctx context.Context, config *Config, tx dbexec.Exec) error {
+	storeInstance := store.New(tx)
+	passwordHash, salt, err := NewPasswordHash(config.WorkerUserPassword, config.SigningKey)
+	if err != nil {
+		return err
+	}
+	entries, err := storeInstance.GetAccessEntriesByIdentity(ctx, config.WorkerUserAccountID)
+	if err != nil {
+		return err
+	}
+	if len(entries) != 0 {
+		return nil
+	}
+
+	err = storeInstance.CreateUser(ctx, &store.User{
+		Email:          config.WorkerUserEmail,
+		ID:             config.WorkerUserAccountID,
+		Subject:        config.WorkerUserAccountID,
+		FriendlyName:   "Internal Worker Account",
+		HashedPassword: passwordHash,
+		Salt:           salt,
+	})
+	if err != nil {
+		return err
+	}
+	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
+		ID:           config.WorkerUserAccountID + "1",
+		Identity:     config.WorkerUserAccountID,
+		Resource:     DefaultServerGroup, // TODO: reduce privilege
+		ResourceType: DefaultServerGroup,
+		Permission:   store.PermissionManage,
+	})
+	if err != nil {
+		return err
+	}
+	err = storeInstance.CreateAccessEntry(ctx, &store.AccessEntry{
+		ID:           config.WorkerUserAccountID + "2",
+		Identity:     config.WorkerUserAccountID,
+		Resource:     store.ResourceTypeFiles,
+		ResourceType: store.ResourceTypeSystem,
+		Permission:   store.PermissionView,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

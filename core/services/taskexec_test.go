@@ -73,7 +73,7 @@ func TestSystem_SimpleExec_TaskExecSystemTest(t *testing.T) {
 	if err != nil {
 		log.Fatalf("initializing the taskengine failed: %v", err)
 	}
-	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.AssignBackends(llmrepo.EmbedPoolID).Err)
 	require.NoError(t, testenv.WaitForModel(config.TasksModel).Err)
 
 	provider, err := execRepo.GetDefaultSystemProvider(ctx)

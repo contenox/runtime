@@ -594,7 +594,16 @@ func (env *Environment) NewEmbedder(config *serverops.Config) (llmrepo.ModelRepo
 		return nil, err
 	}
 
-	repo, err := llmrepo.NewEmbedder(env.Ctx, config, env.dbManager, env.state)
+	repo, err := llmrepo.NewEmbedder(env.Ctx, &llmrepo.Config{
+		DatabaseURL:         config.DatabaseURL,
+		SigningKey:          config.SigningKey,
+		EmbedModel:          config.EmbedModel,
+		TasksModel:          config.TasksModel,
+		WorkerUserAccountID: config.WorkerUserAccountID,
+		WorkerUserPassword:  config.WorkerUserPassword,
+		WorkerUserEmail:     config.WorkerUserEmail,
+		TenantID:            serverops.TenantID,
+	}, env.dbManager, env.state)
 	if err != nil {
 		env.Err = err
 		reportErr(err)
@@ -687,7 +696,15 @@ func (env *Environment) NewExecRepo(config *serverops.Config) (llmrepo.ModelRepo
 		return nil, env.Err
 	}
 
-	return llmrepo.NewExecRepo(env.Ctx, config, env.dbManager, env.state, env.tokenizer)
+	return llmrepo.NewExecRepo(env.Ctx, &llmrepo.Config{
+		DatabaseURL:         config.DatabaseURL,
+		SigningKey:          config.SigningKey,
+		EmbedModel:          config.EmbedModel,
+		TasksModel:          config.TasksModel,
+		WorkerUserAccountID: config.WorkerUserAccountID,
+		WorkerUserPassword:  config.WorkerUserPassword,
+		WorkerUserEmail:     config.WorkerUserEmail,
+	}, env.dbManager, env.state, env.tokenizer)
 }
 
 func (env *Environment) WaitForModel(model string) *Environment {

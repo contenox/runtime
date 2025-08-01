@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
+	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
@@ -54,7 +55,7 @@ func TestSystemSearchThenResolveWithFiles(t *testing.T) {
 	// Setup embedder
 	embedder, err := testenv.NewEmbedder(config)
 	require.NoError(t, err)
-	require.NoError(t, testenv.AssignBackends(serverops.EmbedPoolID).Err)
+	require.NoError(t, testenv.AssignBackends(llmrepo.EmbedPoolID).Err)
 	require.NoError(t, testenv.WaitForModel(config.EmbedModel).Err)
 
 	// Create file service
