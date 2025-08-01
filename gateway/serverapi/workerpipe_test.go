@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libauth "github.com/contenox/authz"
 	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
@@ -27,7 +28,6 @@ import (
 	"github.com/contenox/runtime-mvp/gateway/indexapi"
 	"github.com/contenox/runtime-mvp/gateway/serverapi"
 	"github.com/contenox/runtime-mvp/gateway/usersapi"
-	"github.com/contenox/runtime-mvp/libs/libauth"
 	"github.com/contenox/runtime-mvp/libs/libtestenv"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"

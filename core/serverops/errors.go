@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	libauth "github.com/contenox/authz"
 	libdb "github.com/contenox/dbexec"
-	"github.com/contenox/runtime-mvp/libs/libauth"
 )
 
 var (

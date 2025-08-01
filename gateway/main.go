@@ -14,6 +14,7 @@ import (
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
+	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
 	"github.com/contenox/runtime-mvp/core/hooks"
@@ -27,7 +28,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/gateway/serverapi"
-	"github.com/contenox/runtime-mvp/libs/libroutine"
 )
 
 var (

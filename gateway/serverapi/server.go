@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libauth "github.com/contenox/authz"
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
+	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
@@ -53,8 +55,7 @@ import (
 	"github.com/contenox/runtime-mvp/gateway/systemapi"
 	"github.com/contenox/runtime-mvp/gateway/telegramapi"
 	"github.com/contenox/runtime-mvp/gateway/usersapi"
-	"github.com/contenox/runtime-mvp/libs/libauth"
-	"github.com/contenox/runtime-mvp/libs/libroutine"
+
 	"github.com/google/go-github/v58/github"
 	"github.com/google/uuid"
 )

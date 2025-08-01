@@ -10,9 +10,9 @@ import (
 
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
+	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/contenox/runtime-mvp/libs/libtestenv"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
