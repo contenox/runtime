@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
 	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
 )
 

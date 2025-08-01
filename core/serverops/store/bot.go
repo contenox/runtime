@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/runtime-mvp/libs/libdb"
+	libdb "github.com/contenox/dbexec"
 )
 
 func (s *store) CreateBot(ctx context.Context, bot *Bot) error {

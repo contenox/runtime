@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/runtime-mvp/libs/libdb"
+	libdb "github.com/contenox/dbexec"
 
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/google/go-github/v58/github"

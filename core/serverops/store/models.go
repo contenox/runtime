@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/contenox/runtime-mvp/libs/libdb"
+	libdb "github.com/contenox/dbexec"
 )
 
 func (s *store) AppendModel(ctx context.Context, model *Model) error {

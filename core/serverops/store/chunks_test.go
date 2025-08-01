@@ -3,8 +3,8 @@ package store_test
 import (
 	"testing"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )

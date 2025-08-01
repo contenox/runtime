@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	libdb "github.com/contenox/dbexec"
 	libmodelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type Args struct {

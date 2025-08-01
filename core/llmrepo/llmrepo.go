@@ -9,11 +9,11 @@ import (
 	libmodelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/modelprovider/llmresolver"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type ModelRepo interface {

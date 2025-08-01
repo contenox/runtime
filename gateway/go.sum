@@ -22,6 +22,8 @@ github.com/contenox/activitytracker v0.0.2 h1:EFQMETuwr9Yy+KTOgfQ2oxVaH7MsReXhnx
 github.com/contenox/activitytracker v0.0.2/go.mod h1:wFF0Fn9QAgCzT/jB4kSoEJYO7f+yccY3yFAvtF/RWI4=
 github.com/contenox/bus v0.0.2 h1:DJBCI2gYUxM7CzICuUlaZorYUIKmQm2ASUimFdRXnJg=
 github.com/contenox/bus v0.0.2/go.mod h1:2Y/H33XvOnU5JvOb1U/ANoB2jP1Thv1bCaY8+XxlYqA=
+github.com/contenox/dbexec v0.0.2 h1:gmKCnMSmeMHBgrgulf1IaHYjPMvMMgBDr083oh2GXcU=
+github.com/contenox/dbexec v0.0.2/go.mod h1:NEGLZSBi4Fj2biiBKThP5eF7WNET3337digu2wVuX5s=
 github.com/contenox/kvstore v0.0.1 h1:caWl8UoL7ZhT52QEnwc8q0II06hX2K08g0iD5aAIalE=
 github.com/contenox/kvstore v0.0.1/go.mod h1:vPAABNgqO8Xz+AotFyOAIW883uiiPrO+GYCnXK4S/dU=
 github.com/contenox/modelprovider v0.0.2 h1:KH0OwY9peM1l2M0OhWpAKXQvKV92VZkY90v1mTvByrY=

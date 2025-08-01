@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"strings"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type Service interface {

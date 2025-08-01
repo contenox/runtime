@@ -7,9 +7,9 @@ import (
 	"math/rand"
 	"time"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 type JobInfo struct {

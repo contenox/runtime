@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/providerservice"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 func AddProviderRoutes(mux *http.ServeMux, config *serverops.Config, providerService providerservice.Service) {

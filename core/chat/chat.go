@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"time"
 
+	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/kv"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/taskengine"
-	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 
 // Manager coordinates chat message management and LLM execution.
