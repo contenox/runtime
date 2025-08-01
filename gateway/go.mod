@@ -15,16 +15,14 @@ replace github.com/contenox/runtime-mvp/libs/libroutine => ../libs/libroutine
 
 replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 
-replace github.com/contenox/runtime-mvp/libs/libkv => ../libs/libkv
-
 replace github.com/contenox/runtime-mvp/core => ../core
 
 require (
+	github.com/contenox/kvstore v0.0.1
 	github.com/contenox/runtime-mvp/core v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
 	github.com/contenox/runtime-mvp/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000
-	github.com/contenox/runtime-mvp/libs/libkv v0.0.0-20250714091341-746b94b8a904
 	github.com/contenox/runtime-mvp/libs/libroutine v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/google/go-github/v58 v58.0.0

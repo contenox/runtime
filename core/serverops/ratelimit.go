@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/contenox/runtime-mvp/libs/libkv"
+	libkv "github.com/contenox/kvstore"
 )
 
 const bucketKey = "ratelimiter"

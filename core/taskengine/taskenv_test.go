@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/contenox/activitytracker"
+	libkv "github.com/contenox/kvstore"
 	"github.com/contenox/runtime-mvp/core/taskengine"
-	"github.com/contenox/runtime-mvp/libs/libkv"
 	"github.com/stretchr/testify/require"
 )
 
