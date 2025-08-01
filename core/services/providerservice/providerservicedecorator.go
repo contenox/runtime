@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/contenox/activitytracker"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 )
 
@@ -12,7 +13,7 @@ type activityTrackerDecorator struct {
 	tracker activitytracker.ActivityTracker
 }
 
-func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
+func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *runtimestate.ProviderConfig) error {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,
 		"set",
@@ -26,7 +27,7 @@ func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, provid
 	if err != nil {
 		reportErrFn(err)
 	} else {
-		var configMasked serverops.ProviderConfig
+		var configMasked runtimestate.ProviderConfig
 		configMasked.Type = config.Type
 		configMasked.APIKey = "********"
 		reportChangeFn(providerType, configMasked)
@@ -35,7 +36,7 @@ func (d *activityTrackerDecorator) SetProviderConfig(ctx context.Context, provid
 	return err
 }
 
-func (d *activityTrackerDecorator) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {
+func (d *activityTrackerDecorator) GetProviderConfig(ctx context.Context, providerType string) (*runtimestate.ProviderConfig, error) {
 	// reportErrFn, _, endFn := d.tracker.Start(
 	// 	ctx,
 	// 	"get",
@@ -70,7 +71,7 @@ func (d *activityTrackerDecorator) DeleteProviderConfig(ctx context.Context, pro
 	return err
 }
 
-func (d *activityTrackerDecorator) ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error) {
+func (d *activityTrackerDecorator) ListProviderConfigs(ctx context.Context) ([]*runtimestate.ProviderConfig, error) {
 	reportErrFn, _, endFn := d.tracker.Start(
 		ctx,
 		"list",

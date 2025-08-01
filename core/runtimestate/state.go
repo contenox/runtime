@@ -18,7 +18,6 @@ import (
 
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
-	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/ollama/ollama/api"
 )
@@ -595,9 +594,9 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *store.Backend
 	}
 
 	// Retrieve API key configuration
-	cfg := serverops.ProviderConfig{}
+	cfg := ProviderConfig{}
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	if err := storeInstance.GetKV(ctx, serverops.GeminiKey, &cfg); err != nil {
+	if err := storeInstance.GetKV(ctx, GeminiKey, &cfg); err != nil {
 		if errors.Is(err, libdb.ErrNotFound) {
 			stateInstance.Error = "API key not configured"
 		} else {
@@ -683,9 +682,9 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *store.Backend
 	}
 
 	// Retrieve API key configuration
-	cfg := serverops.ProviderConfig{}
+	cfg := ProviderConfig{}
 	storeInstance := store.New(s.dbInstance.WithoutTransaction())
-	if err := storeInstance.GetKV(ctx, serverops.OpenaiKey, &cfg); err != nil {
+	if err := storeInstance.GetKV(ctx, OpenaiKey, &cfg); err != nil {
 		if errors.Is(err, libdb.ErrNotFound) {
 			stateInstance.Error = "API key not configured"
 		} else {

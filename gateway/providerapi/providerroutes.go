@@ -8,6 +8,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/dbexec"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/providerservice"
 )
@@ -50,7 +51,7 @@ func (p *providerManager) configure(providerType string) func(w http.ResponseWri
 			return
 		}
 
-		cfg := &serverops.ProviderConfig{
+		cfg := &runtimestate.ProviderConfig{
 			APIKey: req.APIKey,
 			Type:   providerType,
 		}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	libdb "github.com/contenox/dbexec"
+	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 )
@@ -17,10 +18,10 @@ const (
 )
 
 type Service interface {
-	SetProviderConfig(ctx context.Context, providerType string, upsert bool, config *serverops.ProviderConfig) error
-	GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error)
+	SetProviderConfig(ctx context.Context, providerType string, upsert bool, config *runtimestate.ProviderConfig) error
+	GetProviderConfig(ctx context.Context, providerType string) (*runtimestate.ProviderConfig, error)
 	DeleteProviderConfig(ctx context.Context, providerType string) error
-	ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error)
+	ListProviderConfigs(ctx context.Context) ([]*runtimestate.ProviderConfig, error)
 	GetServiceName() string
 	GetServiceGroup() string
 }
@@ -43,7 +44,7 @@ func New(dbInstance libdb.DBManager) Service {
 	return &service{dbInstance: dbInstance}
 }
 
-func (s *service) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *serverops.ProviderConfig) error {
+func (s *service) SetProviderConfig(ctx context.Context, providerType string, replace bool, config *runtimestate.ProviderConfig) error {
 	// Input validation
 	if providerType != ProviderTypeOpenAI && providerType != ProviderTypeGemini {
 		return fmt.Errorf("invalid provider type: %s", providerType)
@@ -62,7 +63,7 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, re
 	defer r()
 
 	storeInstance := store.New(tx)
-	key := serverops.ProviderKeyPrefix + providerType
+	key := runtimestate.ProviderKeyPrefix + providerType
 
 	// Check existence if not replacing
 	if !replace {
@@ -117,13 +118,13 @@ func (s *service) SetProviderConfig(ctx context.Context, providerType string, re
 	return com(ctx)
 }
 
-func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*serverops.ProviderConfig, error) {
+func (s *service) GetProviderConfig(ctx context.Context, providerType string) (*runtimestate.ProviderConfig, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionView); err != nil {
 		return nil, err
 	}
-	var config serverops.ProviderConfig
-	key := serverops.ProviderKeyPrefix + providerType
+	var config runtimestate.ProviderConfig
+	key := runtimestate.ProviderKeyPrefix + providerType
 	storeInstance := store.New(tx)
 	err := storeInstance.GetKV(ctx, key, &config)
 	if err != nil {
@@ -139,25 +140,25 @@ func (s *service) DeleteProviderConfig(ctx context.Context, providerType string)
 	}
 	storeInstance := store.New(tx)
 
-	key := serverops.ProviderKeyPrefix + providerType
+	key := runtimestate.ProviderKeyPrefix + providerType
 	return storeInstance.DeleteKV(ctx, key)
 }
 
-func (s *service) ListProviderConfigs(ctx context.Context) ([]*serverops.ProviderConfig, error) {
+func (s *service) ListProviderConfigs(ctx context.Context) ([]*runtimestate.ProviderConfig, error) {
 	tx := s.dbInstance.WithoutTransaction()
 	if err := serverops.CheckServiceAuthorization(ctx, store.New(tx), s, store.PermissionManage); err != nil {
 		return nil, err
 	}
 	storeInstance := store.New(tx)
 
-	kvs, err := storeInstance.ListKVPrefix(ctx, serverops.ProviderKeyPrefix)
+	kvs, err := storeInstance.ListKVPrefix(ctx, runtimestate.ProviderKeyPrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	var configs []*serverops.ProviderConfig
+	var configs []*runtimestate.ProviderConfig
 	for _, kv := range kvs {
-		var config serverops.ProviderConfig
+		var config runtimestate.ProviderConfig
 		if err := json.Unmarshal(kv.Value, &config); err == nil {
 			configs = append(configs, &config)
 		}
