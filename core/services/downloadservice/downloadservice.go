@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
+	libbus "github.com/contenox/bus"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 )
 

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	libbus "github.com/contenox/bus"
 	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/contenox/runtime-mvp/libs/libtestenv"

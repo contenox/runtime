@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libbus "github.com/contenox/bus"
 	modelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
@@ -20,7 +21,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/services/fileservice"
 	"github.com/contenox/runtime-mvp/core/services/indexservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
-	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
 	"github.com/contenox/runtime-mvp/libs/libtestenv"

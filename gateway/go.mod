@@ -5,8 +5,6 @@ go 1.24.5
 // libauth libbus  libcipher  libdb  libkv  libroutine libtestenv
 replace github.com/contenox/runtime-mvp/libs/libauth => ../libs/libauth
 
-replace github.com/contenox/runtime-mvp/libs/libbus => ../libs/libbus
-
 replace github.com/contenox/runtime-mvp/libs/libcipher => ../libs/libcipher
 
 replace github.com/contenox/runtime-mvp/libs/libdb => ../libs/libdb
@@ -18,10 +16,10 @@ replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 replace github.com/contenox/runtime-mvp/core => ../core
 
 require (
+	github.com/contenox/bus v0.0.2
 	github.com/contenox/kvstore v0.0.1
 	github.com/contenox/runtime-mvp/core v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libauth v0.0.0-20250626094131-df93eea0ce6a
-	github.com/contenox/runtime-mvp/libs/libbus v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libdb v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libroutine v0.0.0-00010101000000-000000000000
 	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000

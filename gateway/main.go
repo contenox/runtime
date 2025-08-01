@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
+	libbus "github.com/contenox/bus"
 	libkv "github.com/contenox/kvstore"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
@@ -25,7 +26,6 @@ import (
 	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/gateway/serverapi"
-	"github.com/contenox/runtime-mvp/libs/libbus"
 	"github.com/contenox/runtime-mvp/libs/libdb"
 	"github.com/contenox/runtime-mvp/libs/libroutine"
 )
