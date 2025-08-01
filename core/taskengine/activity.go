@@ -3,8 +3,8 @@ package taskengine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/contenox/activitytracker"
@@ -98,24 +98,24 @@ func (t *KVActivitySink) Start(
 		}
 
 		// Store in key-value system
-		kv, err := t.kvManager.Operation(ctx)
+		kv, err := t.kvManager.Executor(ctx)
 		if err != nil {
-			log.Printf("SERVERBUG: Failed to get KV operation: %v", err)
+			log.Printf("SERVERBUG: Failed to get KV executor: %v", err)
 			return
 		}
 
 		// Push to activity log and trim
-		if err := kv.LPush(ctx, []byte("activity:log"), data); err != nil {
+		if err := kv.ListPush(ctx, "activity:log", data); err != nil {
 			log.Printf("SERVERBUG: Failed to push activity event: %v", err)
 		}
 
 		// Maintain last 1000 events
-		if err := kv.LTrim(ctx, []byte("activity:log"), 0, 999); err != nil {
+		if err := kv.ListTrim(ctx, "activity:log", 0, 999); err != nil {
 			log.Printf("SERVERBUG: Failed to trim activity log: %v", err)
 		}
 		if event.RequestID != "" {
-			reqKey := []byte("activity:request:" + event.RequestID)
-			if err := kv.LPush(ctx, reqKey, data); err != nil {
+			reqKey := "activity:request:" + event.RequestID
+			if err := kv.ListPush(ctx, reqKey, data); err != nil {
 				log.Printf("SERVERBUG: Failed to push requestID activity event: %v", err)
 			}
 			trackedRequest := TrackedRequest{
@@ -125,10 +125,10 @@ func (t *KVActivitySink) Start(
 			if err != nil {
 				log.Printf("SERVERBUG: Failed to marshal tracked request: %v", err)
 			}
-			if err := kv.SAdd(ctx, []byte("activity:requests"), treq); err != nil {
+			if err := kv.SetAdd(ctx, "activity:requests", treq); err != nil {
 				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
 			}
-			if err := kv.SAdd(ctx, []byte("activity:"+event.Operation+","+event.Subject), treq); err != nil {
+			if err := kv.SetAdd(ctx, "activity:"+event.Operation+","+event.Subject, treq); err != nil {
 				log.Printf("SERVERBUG: Failed to track requestID: %v", err)
 			}
 			op := Operation{Operation: event.Operation, Subject: event.Subject}
@@ -136,7 +136,7 @@ func (t *KVActivitySink) Start(
 			if err != nil {
 				log.Printf("SERVERBUG: Failed to marshal operation: %v", err)
 			} else {
-				if err := kv.SAdd(ctx, []byte("activity:operations"), opData); err != nil {
+				if err := kv.SetAdd(ctx, "activity:operations", opData); err != nil {
 					log.Printf("SERVERBUG: Failed to track operation: %v", err)
 				}
 			}
@@ -163,12 +163,12 @@ func (t *KVActivitySink) GetRecentRequestIDs(ctx context.Context, limit int) ([]
 		limit = 100
 	}
 
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	rawItems, err := kv.SMembers(ctx, []byte("activity:requests"))
+	rawItems, err := kv.SetMembers(ctx, "activity:requests")
 	if err != nil {
 		return nil, err
 	}
@@ -179,8 +179,7 @@ func (t *KVActivitySink) GetRecentRequestIDs(ctx context.Context, limit int) ([]
 	for _, raw := range rawItems {
 		var req TrackedRequest
 		if err := json.Unmarshal(raw, &req); err != nil {
-			log.Printf("SERVERBUG: Failed to unmarshal tracked request: %v", err)
-			continue
+			return nil, fmt.Errorf("SERVERBUG: Failed to unmarshal tracked request: %v", err)
 		}
 		if _, exists := seen[req.ID]; !exists {
 			seen[req.ID] = struct{}{}
@@ -192,7 +191,7 @@ func (t *KVActivitySink) GetRecentRequestIDs(ctx context.Context, limit int) ([]
 }
 
 func (t *KVActivitySink) GetActivityLogs(ctx context.Context, limit int) ([]TrackedEvent, error) {
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +201,7 @@ func (t *KVActivitySink) GetActivityLogs(ctx context.Context, limit int) ([]Trac
 	}
 
 	// Get list length
-	listLen, err := kv.LLen(ctx, []byte("activity:log"))
+	listLen, err := kv.ListLength(ctx, "activity:log")
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +213,7 @@ func (t *KVActivitySink) GetActivityLogs(ctx context.Context, limit int) ([]Trac
 		stop = listLen - 1
 	}
 
-	rawItems, err := kv.LRange(ctx, []byte("activity:log"), start, stop)
+	rawItems, err := kv.ListRange(ctx, "activity:log", start, stop)
 	if err != nil {
 		return nil, err
 	}
@@ -236,12 +235,12 @@ type Operation struct {
 }
 
 func (t *KVActivitySink) GetKnownOperations(ctx context.Context) ([]Operation, error) {
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	rawItems, err := kv.SMembers(ctx, []byte("activity:operations"))
+	rawItems, err := kv.SetMembers(ctx, "activity:operations")
 	if err != nil {
 		return nil, err
 	}
@@ -252,28 +251,15 @@ func (t *KVActivitySink) GetKnownOperations(ctx context.Context) ([]Operation, e
 	for _, raw := range rawItems {
 		var op Operation
 		// First try to unmarshal as JSON
-		if err := json.Unmarshal(raw, &op); err == nil {
-			// Check if we've seen this operation
-			key := op.Operation + ":" + op.Subject
-			if _, exists := seen[key]; !exists {
-				seen[key] = struct{}{}
-				results = append(results, op)
-			}
-			continue
+		err := json.Unmarshal(raw, &op)
+		if err != nil {
+			return nil, err
 		}
-
-		// If not JSON, try to parse as old format
-		parts := strings.Split(string(raw), ",")
-		if len(parts) >= 2 {
-			op := Operation{
-				Operation: parts[0],
-				Subject:   parts[1],
-			}
-			key := op.Operation + ":" + op.Subject
-			if _, exists := seen[key]; !exists {
-				seen[key] = struct{}{}
-				results = append(results, op)
-			}
+		// Check if we've seen this operation
+		key := op.Operation + ":" + op.Subject
+		if _, exists := seen[key]; !exists {
+			seen[key] = struct{}{}
+			results = append(results, op)
 		}
 	}
 
@@ -281,14 +267,14 @@ func (t *KVActivitySink) GetKnownOperations(ctx context.Context) ([]Operation, e
 }
 
 func (t *KVActivitySink) GetRequestIDByOperation(ctx context.Context, operation Operation) ([]TrackedRequest, error) {
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := []byte("activity:" + operation.Operation + "," + operation.Subject)
+	key := "activity:" + operation.Operation + "," + operation.Subject
 
-	rawItems, err := kv.SMembers(ctx, key)
+	rawItems, err := kv.SetMembers(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -309,14 +295,14 @@ func (t *KVActivitySink) GetActivityLogsByRequestID(ctx context.Context, request
 		return nil, nil
 	}
 
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := []byte("activity:request:" + requestID)
+	key := "activity:request:" + requestID
 
-	rawItems, err := kv.LRange(ctx, key, 0, -1)
+	rawItems, err := kv.ListRange(ctx, key, 0, -1)
 	if err != nil {
 		return nil, err
 	}
@@ -337,14 +323,14 @@ func (t *KVActivitySink) GetExecutionStateByRequestID(ctx context.Context, reque
 		return nil, nil
 	}
 
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := []byte("state:" + requestID)
+	key := "state:" + requestID
 
-	rawItems, err := kv.LRange(ctx, key, 0, -1)
+	rawItems, err := kv.ListRange(ctx, key, 0, -1)
 	if err != nil {
 		return nil, err
 	}
@@ -363,13 +349,13 @@ func (t *KVActivitySink) GetExecutionStateByRequestID(ctx context.Context, reque
 }
 
 func (t *KVActivitySink) GetStatefulRequests(ctx context.Context) ([]string, error) {
-	kv, err := t.kvManager.Operation(ctx)
+	kv, err := t.kvManager.Executor(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	key := []byte("state:requests")
-	rawItems, err := kv.SMembers(ctx, key)
+	key := "state:requests"
+	rawItems, err := kv.SetMembers(ctx, key)
 	if err != nil {
 		return nil, err
 	}

@@ -29,7 +29,7 @@ type Event struct {
 // Under high concurrency, with multiple nodes it may allow more than `limit` requests.
 // This implementation is lock-free.
 func (r *RateLimiter) Allow(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
-	op, err := r.kvManager.Operation(ctx)
+	op, err := r.kvManager.Executor(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -44,12 +44,12 @@ func (r *RateLimiter) Allow(ctx context.Context, key string, limit int, window t
 	}
 
 	// Add new event (atomic)
-	if err := op.LPush(ctx, []byte(bucketKey), b); err != nil {
+	if err := op.ListPush(ctx, bucketKey, b); err != nil {
 		return false, err
 	}
 
 	// Get all events (it's ok that this isn't atomic with LPush)
-	events, err := op.LRange(ctx, []byte(bucketKey), 0, -1)
+	events, err := op.ListRange(ctx, bucketKey, 0, -1)
 	if errors.Is(err, libkv.ErrNotFound) {
 		return true, nil
 	}
@@ -83,7 +83,7 @@ func (r *RateLimiter) Allow(ctx context.Context, key string, limit int, window t
 
 	// trimming of expired events
 	if firstExpired != -1 {
-		if err := op.LTrim(ctx, []byte(bucketKey), 0, int64(firstExpired)); err != nil {
+		if err := op.ListTrim(ctx, bucketKey, 0, int64(firstExpired)); err != nil {
 			return false, err
 		}
 	}

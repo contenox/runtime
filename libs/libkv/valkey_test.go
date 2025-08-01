@@ -2,6 +2,7 @@ package libkv_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/valkey"
 )
 
-// SetupLocalValKeyInstance is provided by the user
+// SetupLocalValKeyInstance remains unchanged
 func SetupLocalValKeyInstance(ctx context.Context) (string, testcontainers.Container, func(), error) {
 	cleanup := func() {}
 
@@ -37,18 +38,17 @@ func SetupLocalValKeyInstance(ctx context.Context) (string, testcontainers.Conta
 	return conn, container, cleanup, nil
 }
 
-func TestValkeyCRUD(t *testing.T) {
+func TestUnit_ValkeyCRUD(t *testing.T) {
 	ctx := context.Background()
 
 	connStr, _, cleanup, err := SetupLocalValKeyInstance(ctx)
 	require.NoError(t, err)
 	defer cleanup()
-	// Parse connection string properly
+
 	u, err := url.Parse(connStr)
 	require.NoError(t, err)
+	addr := u.Host
 
-	// Extract host:port
-	addr := u.Host // e.g., "localhost:32769"
 	cfg := libkv.Config{
 		Addr:     addr,
 		Password: "",
@@ -57,17 +57,14 @@ func TestValkeyCRUD(t *testing.T) {
 	require.NoError(t, err)
 	defer manager.Close()
 
-	kv, err := manager.Operation(ctx)
+	kv, err := manager.Executor(ctx) // Changed from Operation to Executor
 	require.NoError(t, err)
 
-	key := []byte("testkey")
-	value := []byte("testvalue")
+	key := "testkey"
+	value := json.RawMessage(`"testvalue"`)
 
-	// Test Set
-	err = kv.Set(ctx, libkv.KeyValue{
-		Key:   key,
-		Value: value,
-	})
+	// Test Set (using separate key/value parameters)
+	err = kv.Set(ctx, key, value) // Changed from KeyValue struct
 	require.NoError(t, err)
 
 	// Test Get
@@ -94,18 +91,17 @@ func TestValkeyCRUD(t *testing.T) {
 	assert.False(t, exists)
 }
 
-func TestValkeyTTL(t *testing.T) {
+func TestUnit_ValkeyTTL(t *testing.T) {
 	ctx := context.Background()
 
 	connStr, _, cleanup, err := SetupLocalValKeyInstance(ctx)
 	require.NoError(t, err)
 	defer cleanup()
-	// Parse connection string properly
+
 	u, err := url.Parse(connStr)
 	require.NoError(t, err)
+	addr := u.Host
 
-	// Extract host:port
-	addr := u.Host // e.g., "localhost:32769"
 	cfg := libkv.Config{
 		Addr:     addr,
 		Password: "",
@@ -114,19 +110,14 @@ func TestValkeyTTL(t *testing.T) {
 	require.NoError(t, err)
 	defer manager.Close()
 
-	kv, err := manager.Operation(ctx)
+	kv, err := manager.Executor(ctx) // Changed from Operation to Executor
 	require.NoError(t, err)
 
-	key := []byte("ttlkey")
-	value := []byte("ttlvalue")
+	key := "ttlkey"
+	value := json.RawMessage(`"ttlvalue"`)
 
-	// Set with TTL
-	ttl := time.Now().Add(2 * time.Second)
-	err = kv.Set(ctx, libkv.KeyValue{
-		Key:   key,
-		Value: value,
-		TTL:   ttl,
-	})
+	// Set with TTL (using duration instead of absolute time)
+	err = kv.SetWithTTL(ctx, key, value, 2*time.Second) // Changed method and parameter
 	require.NoError(t, err)
 
 	// Wait for TTL to expire
@@ -137,18 +128,17 @@ func TestValkeyTTL(t *testing.T) {
 	assert.ErrorIs(t, err, libkv.ErrNotFound)
 }
 
-func TestValkeyList(t *testing.T) {
+func TestUnit_ValkeyList(t *testing.T) {
 	ctx := context.Background()
 
 	connStr, _, cleanup, err := SetupLocalValKeyInstance(ctx)
 	require.NoError(t, err)
 	defer cleanup()
-	// Parse connection string properly
+
 	u, err := url.Parse(connStr)
 	require.NoError(t, err)
+	addr := u.Host
 
-	// Extract host:port
-	addr := u.Host // e.g., "localhost:32769"
 	cfg := libkv.Config{
 		Addr:     addr,
 		Password: "",
@@ -157,25 +147,19 @@ func TestValkeyList(t *testing.T) {
 	require.NoError(t, err)
 	defer manager.Close()
 
-	kv, err := manager.Operation(ctx)
+	kv, err := manager.Executor(ctx) // Changed from Operation to Executor
 	require.NoError(t, err)
 
-	// Set multiple keys
-	keys := [][]byte{
-		[]byte("key1"),
-		[]byte("key2"),
-		[]byte("key3"),
-	}
+	keys := []string{"key1", "key2", "key3"}
+	value := json.RawMessage(`"value"`)
+
 	for _, key := range keys {
-		err := kv.Set(ctx, libkv.KeyValue{
-			Key:   key,
-			Value: []byte("value"),
-		})
+		err := kv.Set(ctx, key, value) // Changed to separate parameters
 		require.NoError(t, err)
 	}
 
-	// List keys
-	listed, err := kv.List(ctx)
+	// List keys using pattern (changed from List() to Keys())
+	listed, err := kv.Keys(ctx, "*") // Pattern-based listing
 	require.NoError(t, err)
 
 	// Convert to map for easy comparison
@@ -185,6 +169,125 @@ func TestValkeyList(t *testing.T) {
 	}
 
 	for _, key := range keys {
-		assert.True(t, listedMap[string(key)])
+		assert.True(t, listedMap[key])
+	}
+}
+
+func TestUnit_ValkeyListOperations(t *testing.T) {
+	ctx := context.Background()
+
+	connStr, _, cleanup, err := SetupLocalValKeyInstance(ctx)
+	require.NoError(t, err)
+	defer cleanup()
+
+	u, err := url.Parse(connStr)
+	require.NoError(t, err)
+	addr := u.Host
+
+	cfg := libkv.Config{
+		Addr:     addr,
+		Password: "",
+	}
+	manager, err := libkv.NewManager(cfg, 10*time.Second)
+	require.NoError(t, err)
+	defer manager.Close()
+
+	kv, err := manager.Executor(ctx) // Changed from Operation to Executor
+	require.NoError(t, err)
+
+	listKey := "testlist"
+
+	values := []json.RawMessage{
+		json.RawMessage(`"item1"`),
+		json.RawMessage(`"item2"`),
+		json.RawMessage(`"item3"`),
+	}
+
+	// Test ListPush (changed from LPush)
+	for _, v := range values {
+		err := kv.ListPush(ctx, listKey, v)
+		require.NoError(t, err)
+	}
+
+	// Test ListRange (changed from LRange)
+	items, err := kv.ListRange(ctx, listKey, 0, -1)
+	require.NoError(t, err)
+	assert.Equal(t, len(values), len(items))
+
+	// Verify items in reverse order
+	for i, expected := range []string{"item3", "item2", "item1"} {
+		var actual string
+		err := json.Unmarshal(items[i], &actual)
+		require.NoError(t, err)
+		assert.Equal(t, expected, actual)
+	}
+
+	// Test ListRPop (changed from RPop)
+	popped, err := kv.ListRPop(ctx, listKey)
+	require.NoError(t, err)
+
+	var poppedValue string
+	err = json.Unmarshal(popped, &poppedValue)
+	require.NoError(t, err)
+	assert.Equal(t, "item1", poppedValue)
+
+	// Test ListLength (changed from LLen)
+	length, err := kv.ListLength(ctx, listKey)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), length)
+}
+
+func TestUnit_ValkeySetOperations(t *testing.T) {
+	ctx := context.Background()
+
+	connStr, _, cleanup, err := SetupLocalValKeyInstance(ctx)
+	require.NoError(t, err)
+	defer cleanup()
+
+	u, err := url.Parse(connStr)
+	require.NoError(t, err)
+	addr := u.Host
+
+	cfg := libkv.Config{
+		Addr:     addr,
+		Password: "",
+	}
+	manager, err := libkv.NewManager(cfg, 10*time.Second)
+	require.NoError(t, err)
+	defer manager.Close()
+
+	kv, err := manager.Executor(ctx) // Changed from Operation to Executor
+	require.NoError(t, err)
+
+	setKey := "testset"
+
+	members := []json.RawMessage{
+		json.RawMessage(`"member1"`),
+		json.RawMessage(`"member2"`),
+		json.RawMessage(`"member3"`),
+	}
+
+	// Test SetAdd (changed from SAdd)
+	for _, m := range members {
+		err := kv.SetAdd(ctx, setKey, m)
+		require.NoError(t, err)
+	}
+
+	// Test SetMembers (changed from SMembers)
+	setMembers, err := kv.SetMembers(ctx, setKey)
+	require.NoError(t, err)
+	assert.Equal(t, len(members), len(setMembers))
+
+	// Verify all members exist
+	memberMap := make(map[string]bool)
+	for _, m := range setMembers {
+		var s string
+		err := json.Unmarshal(m, &s)
+		require.NoError(t, err)
+		memberMap[s] = true
+	}
+
+	for _, expected := range []string{"member1", "member2", "member3"} {
+		assert.True(t, memberMap[expected])
 	}
 }

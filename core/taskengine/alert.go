@@ -36,7 +36,7 @@ type Alert struct {
 func (as *SimpleAlertSink) SendAlert(ctx context.Context, message string, kvPairMetadata ...string) error {
 	opCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	op, err := as.kvManager.Operation(opCtx)
+	op, err := as.kvManager.Executor(opCtx)
 	if err != nil {
 		return err
 	}
@@ -62,11 +62,11 @@ func (as *SimpleAlertSink) SendAlert(ctx context.Context, message string, kvPair
 	if err != nil {
 		return err
 	}
-	err = op.LPush(ctx, []byte("alert"), ev)
+	err = op.ListPush(ctx, "alert", ev)
 	if err != nil {
 		return err
 	}
-	err = op.LTrim(ctx, []byte("alert"), 0, 99)
+	err = op.ListTrim(ctx, "alert", 0, 99)
 	if err != nil {
 		return err
 	}
@@ -77,12 +77,12 @@ func (as *SimpleAlertSink) SendAlert(ctx context.Context, message string, kvPair
 func (as *SimpleAlertSink) FetchAlerts(ctx context.Context, limit int) ([]*Alert, error) {
 	opCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	op, err := as.kvManager.Operation(opCtx)
+	op, err := as.kvManager.Executor(opCtx)
 	if err != nil {
 		return nil, err
 	}
 	alerts := []*Alert{}
-	l, err := op.LRange(ctx, []byte("alert"), 0, int64(limit))
+	l, err := op.ListRange(ctx, "alert", 0, int64(limit))
 	if err != nil {
 		return nil, err
 	}

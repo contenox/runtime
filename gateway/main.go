@@ -151,15 +151,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing kv manager failed: %v", err)
 	}
-	kvExec, err := kvManager.Operation(ctx)
+	kvExec, err := kvManager.Executor(ctx)
 	if err != nil {
 		log.Fatalf("initializing kv manager 1 failed: %v", err)
 	}
-	err = kvExec.Set(ctx, libkv.KeyValue{
-		Key:   []byte("test"),
-		Value: []byte("test"),
-		TTL:   time.Now().Add(time.Second),
-	})
+	err = kvExec.SetWithTTL(ctx, "test", []byte("test"), time.Second)
 	if err != nil {
 		log.Fatalf("initializing kv manager 2 failed: %v", err)
 	}

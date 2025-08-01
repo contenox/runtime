@@ -2,6 +2,8 @@ package libkv
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/valkey-io/valkey-go"
@@ -31,8 +33,8 @@ func NewManager(cfg Config, ttl time.Duration) (*VKManager, error) {
 	}, nil
 }
 
-func (m *VKManager) Operation(ctx context.Context) (KVExec, error) {
-	return &VKExec{
+func (m *VKManager) Executor(ctx context.Context) (KVExecutor, error) {
+	return &VKExecutor{
 		client: m.client,
 		ttl:    m.ttl,
 	}, nil
@@ -43,123 +45,199 @@ func (m *VKManager) Close() error {
 	return nil
 }
 
-type VKExec struct {
+// VKExecutor implements KVExecutor for Valkey
+type VKExecutor struct {
 	client valkey.Client
 	ttl    time.Duration
 }
 
-func (r *VKExec) Get(ctx context.Context, key []byte) ([]byte, error) {
+func (r *VKExecutor) Get(ctx context.Context, key Key) (json.RawMessage, error) {
 	cmd := r.client.B().Get().Key(string(key)).Build()
 	res, err := r.client.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		if valkey.IsValkeyNil(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
+
+	switch {
+	case valkey.IsValkeyNil(err):
+		return nil, ErrNotFound
+	case errors.Is(err, context.Canceled):
+		return nil, context.Canceled
+	case err != nil:
+		return nil, errors.Join(ErrConnectionFailed, err)
+	default:
+		return res, nil
 	}
-	return res, nil
 }
 
-func (r *VKExec) Set(ctx context.Context, kv KeyValue) error {
-	keyStr := string(kv.Key)
-	value := kv.Value
+func (r *VKExecutor) Set(ctx context.Context, key Key, value json.RawMessage) error {
+	return r.SetWithTTL(ctx, key, value, 0)
+}
 
-	var ttl time.Duration
-	switch {
-	case !kv.TTL.IsZero():
-		ttl = time.Until(kv.TTL)
-	case r.ttl > 0:
+func (r *VKExecutor) SetWithTTL(ctx context.Context, key Key, value json.RawMessage, ttl time.Duration) error {
+	if ttl <= 0 && r.ttl > 0 {
 		ttl = r.ttl
 	}
 
 	var cmd valkey.Completed
-	switch {
-	case ttl > 0:
+	if ttl > 0 {
 		ttlMs := max(ttl.Milliseconds(), 1)
-		cmd = r.client.B().Set().Key(keyStr).Value(string(value)).PxMilliseconds(ttlMs).Build()
-	case ttl < 0:
-		cmd = r.client.B().Set().Key(keyStr).Value(string(value)).PxMilliseconds(1).Build()
-	default:
-		cmd = r.client.B().Set().Key(keyStr).Value(string(value)).Build()
+		cmd = r.client.B().Set().
+			Key(string(key)).
+			Value(string(value)).
+			PxMilliseconds(ttlMs).
+			Build()
+	} else {
+		cmd = r.client.B().Set().
+			Key(string(key)).
+			Value(string(value)).
+			Build()
 	}
 
-	return r.client.Do(ctx, cmd).Error()
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
 }
 
-func (r *VKExec) Delete(ctx context.Context, key []byte) error {
+func (r *VKExecutor) Delete(ctx context.Context, key Key) error {
 	cmd := r.client.B().Del().Key(string(key)).Build()
 	_, err := r.client.Do(ctx, cmd).AsInt64()
-	return err
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
 }
 
-func (r *VKExec) Exists(ctx context.Context, key []byte) (bool, error) {
+func (r *VKExecutor) Exists(ctx context.Context, key Key) (bool, error) {
 	cmd := r.client.B().Exists().Key(string(key)).Build()
 	res, err := r.client.Do(ctx, cmd).AsInt64()
 	if err != nil {
-		return false, err
+		return false, errors.Join(ErrConnectionFailed, err)
 	}
 	return res > 0, nil
 }
 
-func (r *VKExec) List(ctx context.Context) ([]string, error) {
-	cmd := r.client.B().Keys().Pattern("*").Build()
-	return r.client.Do(ctx, cmd).AsStrSlice()
-}
-
-func (r *VKExec) LPush(ctx context.Context, key []byte, value []byte) error {
-	cmd := r.client.B().Lpush().Key(string(key)).Element(string(value)).Build()
-	return r.client.Do(ctx, cmd).Error()
-}
-
-func (r *VKExec) LRange(ctx context.Context, key []byte, start, stop int64) ([][]byte, error) {
-	cmd := r.client.B().Lrange().Key(string(key)).Start(start).Stop(stop).Build()
-	s, err := r.client.Do(ctx, cmd).AsStrSlice()
+func (r *VKExecutor) Keys(ctx context.Context, pattern string) ([]Key, error) {
+	cmd := r.client.B().Keys().Pattern(pattern).Build()
+	strSlice, err := r.client.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(ErrConnectionFailed, err)
 	}
-	bSlice := make([][]byte, len(s))
-	for i, v := range s {
-		bSlice[i] = []byte(v)
-	}
-	return bSlice, nil
+
+	keys := make([]Key, len(strSlice))
+	copy(keys, strSlice)
+	return keys, nil
 }
 
-func (r *VKExec) RPop(ctx context.Context, key []byte) ([]byte, error) {
+func (r *VKExecutor) ListPush(ctx context.Context, key Key, value json.RawMessage) error {
+	cmd := r.client.B().Lpush().
+		Key(string(key)).
+		Element(string(value)).
+		Build()
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
+}
+
+func (r *VKExecutor) ListRange(ctx context.Context, key Key, start, stop int64) ([]json.RawMessage, error) {
+	cmd := r.client.B().Lrange().
+		Key(string(key)).
+		Start(start).
+		Stop(stop).
+		Build()
+
+	strSlice, err := r.client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, errors.Join(ErrConnectionFailed, err)
+	}
+
+	result := make([]json.RawMessage, len(strSlice))
+	for i, s := range strSlice {
+		result[i] = []byte(s)
+	}
+	return result, nil
+}
+
+func (r *VKExecutor) ListTrim(ctx context.Context, key Key, start, stop int64) error {
+	cmd := r.client.B().Ltrim().
+		Key(string(key)).
+		Start(start).
+		Stop(stop).
+		Build()
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
+}
+
+func (r *VKExecutor) ListLength(ctx context.Context, key Key) (int64, error) {
+	cmd := r.client.B().Llen().Key(string(key)).Build()
+	length, err := r.client.Do(ctx, cmd).AsInt64()
+	if err != nil {
+		return 0, errors.Join(ErrConnectionFailed, err)
+	}
+	return length, nil
+}
+
+func (r *VKExecutor) ListRPop(ctx context.Context, key Key) (json.RawMessage, error) {
 	cmd := r.client.B().Rpop().Key(string(key)).Build()
 	res, err := r.client.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		if valkey.IsValkeyNil(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
+	switch {
+	case valkey.IsValkeyNil(err):
+		return nil, ErrNotFound
+	case errors.Is(err, context.Canceled):
+		return nil, context.Canceled
+	case err != nil:
+		return nil, errors.Join(ErrConnectionFailed, err)
+	default:
+		return res, nil
 	}
-	return res, nil
 }
 
-func (r *VKExec) LTrim(ctx context.Context, key []byte, start, stop int64) error {
-	cmd := r.client.B().Ltrim().Key(string(key)).Start(start).Stop(stop).Build()
-	return r.client.Do(ctx, cmd).Error()
+func (r *VKExecutor) SetAdd(ctx context.Context, key Key, member json.RawMessage) error {
+	cmd := r.client.B().Sadd().
+		Key(string(key)).
+		Member(string(member)).
+		Build()
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
 }
 
-func (r *VKExec) LLen(ctx context.Context, key []byte) (int64, error) {
-	cmd := r.client.B().Llen().Key(string(key)).Build()
-	return r.client.Do(ctx, cmd).AsInt64()
-}
-
-func (r *VKExec) SAdd(ctx context.Context, key []byte, value []byte) error {
-	cmd := r.client.B().Sadd().Key(string(key)).Member(string(value)).Build()
-	return r.client.Do(ctx, cmd).Error()
-}
-
-func (r *VKExec) SMembers(ctx context.Context, key []byte) ([][]byte, error) {
+func (r *VKExecutor) SetMembers(ctx context.Context, key Key) ([]json.RawMessage, error) {
 	cmd := r.client.B().Smembers().Key(string(key)).Build()
-	s, err := r.client.Do(ctx, cmd).AsStrSlice()
+	strSlice, err := r.client.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(ErrConnectionFailed, err)
 	}
-	bSlice := make([][]byte, len(s))
-	for i, v := range s {
-		bSlice[i] = []byte(v)
+
+	result := make([]json.RawMessage, len(strSlice))
+	for i, s := range strSlice {
+		result[i] = []byte(s)
 	}
-	return bSlice, nil
+	return result, nil
+}
+
+func (r *VKExecutor) SetRemove(ctx context.Context, key Key, member json.RawMessage) error {
+	cmd := r.client.B().Srem().
+		Key(string(key)).
+		Member(string(member)).
+		Build()
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil {
+		return errors.Join(ErrConnectionFailed, err)
+	}
+	return nil
+}
+
+// Utility function
+func max(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }

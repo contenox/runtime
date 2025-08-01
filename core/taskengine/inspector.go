@@ -72,15 +72,15 @@ func (m SimpleInspector) Start(ctx context.Context) StackTrace {
 
 	// Store requestID in KV set if kvManager exists and requestID is valid
 	if m.kvManager != nil && ok {
-		kvOp, err := m.kvManager.Operation(ctx)
+		kvOp, err := m.kvManager.Executor(ctx)
 		if err != nil {
 			log.Printf("SERVERBUG: Failed to get KV operation during Start: %v", err)
 		} else {
-			setStateKey := []byte("state:requests") // Set key for request IDs with state
+			setStateKey := "state:requests" // Set key for request IDs with state
 			reqIDBytes := []byte(reqID)
 
 			// Add requestID to the set
-			if err := kvOp.SAdd(ctx, setStateKey, reqIDBytes); err != nil {
+			if err := kvOp.SetAdd(ctx, setStateKey, reqIDBytes); err != nil {
 				log.Printf("SERVERBUG: Failed to add requestID to state set: %v", err)
 			}
 		}
@@ -115,7 +115,7 @@ func (s *SimpleStackTrace) RecordStep(step CapturedStateUnit) {
 		}
 
 		// Define key with prefix and requestID
-		key := []byte("state:" + reqID)
+		key := "state:" + reqID
 
 		// Marshal the step to JSON
 		data, err := json.Marshal(step)
@@ -127,23 +127,23 @@ func (s *SimpleStackTrace) RecordStep(step CapturedStateUnit) {
 		// Get KV operation handle
 		opCtx, timeout := context.WithTimeout(context.Background(), time.Second*10)
 		defer timeout()
-		kvOp, err := s.kvManager.Operation(opCtx)
+		kvOp, err := s.kvManager.Executor(opCtx)
 		if err != nil {
 			log.Printf("SERVERBUG: Failed to get KV operation: %v", err)
 			return
 		}
 
 		// Push step to KV list
-		if err := kvOp.LPush(opCtx, key, data); err != nil {
+		if err := kvOp.ListPush(opCtx, key, data); err != nil {
 			log.Printf("SERVERBUG: Failed to store step in KV: %v", err)
 			return
 		}
 
-		listLen, err := kvOp.LLen(opCtx, key)
+		listLen, err := kvOp.ListLength(opCtx, key)
 		if err != nil {
 			log.Printf("SERVERBUG: Failed to get list length: %v", err)
 		} else if listLen > 1000 {
-			if err := kvOp.LTrim(opCtx, key, 0, 999); err != nil {
+			if err := kvOp.ListTrim(opCtx, key, 0, 999); err != nil {
 				log.Printf("SERVERBUG: Failed to trim KV list: %v", err)
 			}
 		}
