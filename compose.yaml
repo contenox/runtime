@@ -55,19 +55,19 @@ services:
       - "8081:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget",
-          "-q",
-          "-O",
-          "-",
-          http://127.0.0.1:8080/api/health || exit 1",
-        ]
-      interval: 1s
-      timeout: 1s
-      retries: 20
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD-SHELL",
+    #       "wget",
+    #       "-q",
+    #       "-O",
+    #       "-",
+    #       http://127.0.0.1:8080/api/health || exit 1",
+    #     ]
+    #   interval: 1s
+    #   timeout: 1s
+    #   retries: 20
 
   tokenizer:
     image: ghcr.io/contenox/ollamatokenizer-api:v0.0.7
@@ -132,9 +132,9 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.worker
-    depends_on:
-      gateway:
-        condition: service_healthy
+    # depends_on:
+    #   gateway:
+    #     condition: service_healthy
     environment:
       API_BASE_URL: http://gateway:8080/api
       WORKER_TYPE: plaintext

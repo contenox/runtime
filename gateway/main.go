@@ -124,6 +124,7 @@ func main() {
 		WorkerUserAccountID: config.WorkerUserAccountID,
 		WorkerUserPassword:  config.WorkerUserPassword,
 		WorkerUserEmail:     config.WorkerUserEmail,
+		TenantID:            serverops.TenantID,
 	}, dbInstance, state)
 	if err != nil {
 		log.Fatalf("initializing embedding pool failed: %v", err)

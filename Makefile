@@ -32,7 +32,7 @@ run: down build
 	docker compose up -d
 
 logs: run
-	docker compose logs -f runtime-mvp
+	docker compose logs -f gateway
 
 compose-wipe:
 	docker compose down --volumes --rmi all
