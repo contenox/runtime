@@ -1,29 +1,74 @@
+version: "3.8"
+
 services:
-  runtime-mvp:
-    build:
-      context: ./
-      dockerfile: Dockerfile.gateway
-    container_name: contenox-runtime-mvp
-    env_file:
-      - .env
+  # Core kernel runtime
+  runtime:
+    image: ghcr.io/contenox/runtime-api:latest
+    container_name: contenox-runtime
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://username:password@postgres-kernel:5432/postgres?sslmode=disable
+      PORT: 8080
+      TOKENIZER_SERVICE_URL: http://tokenizer:50051
+      EMBED_MODEL: nomic-embed-text:latest
+      WORKER_USER_EMAIL: worker-kernel@example.com
+      TASK_MODEL: qwen3:4b
+      KV_HOST: valkey:6379
     depends_on:
-      postgres:
+      postgres-kernel:
         condition: service_healthy
       nats:
         condition: service_started
-      # opensearch:
-      #   condition: service_healthy
-      # tokenizer:
-      #   condition: service_healthy
+    ports:
+      - "8083:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget",
+          "-q",
+          "-O",
+          "-",
+          http://127.0.0.1:8080/api/health || exit 1",
+        ]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  # API Gateway
+  gateway:
+    build:
+      context: ./
+      dockerfile: Dockerfile.gateway
+    container_name: contenox-gateway
+    env_file: .env
+    depends_on:
+      postgres-mvp:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      runtime:
+        condition: service_started
     ports:
       - "8081:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/api/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget",
+          "-q",
+          "-O",
+          "-",
+          http://127.0.0.1:8080/api/health || exit 1",
+        ]
       interval: 1s
       timeout: 1s
       retries: 20
+
   tokenizer:
     image: ghcr.io/contenox/ollamatokenizer-api:v0.0.7
     container_name: contenox-tokenizer
@@ -40,25 +85,39 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
   vald:
     build:
       context: ./
       dockerfile: Dockerfile.vald
     ports:
-      - "8082:8081"
-  postgres:
+      - "8084:8081"
+
+  postgres-kernel:
     image: postgres:17-bookworm
-    env_file:
-      - .env
-    ports:
-      - "5432:5432"
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U username"]
       interval: 5s
       timeout: 5s
-      retries:
-        10
-        # postgres-data:
+      retries: 10
+
+  # Dedicated MVP database (NO HOST PORT CONFLICT)
+  postgres-mvp:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U username"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   nats:
     image: nats:latest
     command: "-js"
@@ -68,21 +127,23 @@ services:
     environment:
       - NATS_USER=natsuser
       - NATS_PASSWORD=natspassword
+
   text-worker:
     build:
       context: ./
       dockerfile: Dockerfile.worker
     depends_on:
-      runtime-mvp:
+      gateway:
         condition: service_healthy
     environment:
-      API_BASE_URL: http://runtime-mvp:8080/api
+      API_BASE_URL: http://gateway:8080/api
       WORKER_TYPE: plaintext
       WORKER_EMAIL: worker@example.com
       WORKER_PASSWORD: workerpassword
       WORKER_LEASER_ID: Text Worker 1
       WORKER_LEASE_DURATION_SECONDS: 30
       WORKER_REQUEST_TIMEOUT_SECONDS: 2
+
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -94,6 +155,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
   valkey:
     image: valkey/valkey:alpine
     ports:
@@ -103,6 +165,6 @@ services:
       interval: 1s
       timeout: 3s
       retries: 50
+
 volumes:
-  #   postgres-data:
   ollama-data:
