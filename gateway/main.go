@@ -4,30 +4,23 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"time"
 
-	"github.com/contenox/activitytracker"
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
 	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
-	"github.com/contenox/runtime-mvp/core/hookrecipes"
-	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
-	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/gateway/serverapi"
+	"github.com/contenox/runtime/runtimesdk"
 )
 
 var (
@@ -104,7 +97,6 @@ func main() {
 		log.Fatalf("initializing database failed: %v", err)
 	}
 	defer dbInstance.Close()
-
 	ps, err := initPubSub(ctx, config)
 	if err != nil {
 		log.Fatalf("initializing PubSub failed: %v", err)
@@ -112,45 +104,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing OpenSearch failed: %v", err)
 	}
-	state, err := runtimestate.New(ctx, dbInstance, ps, runtimestate.WithPools())
-	if err != nil {
-		log.Fatalf("initializing runtime state failed: %v", err)
-	}
-	embedder, err := llmrepo.NewEmbedder(ctx, &llmrepo.Config{
-		DatabaseURL:         config.DatabaseURL,
-		SigningKey:          config.SigningKey,
-		EmbedModel:          config.EmbedModel,
-		TasksModel:          config.TasksModel,
-		WorkerUserAccountID: config.WorkerUserAccountID,
-		WorkerUserPassword:  config.WorkerUserPassword,
-		WorkerUserEmail:     config.WorkerUserEmail,
-		TenantID:            serverops.TenantID,
-	}, dbInstance, state)
-	if err != nil {
-		log.Fatalf("initializing embedding pool failed: %v", err)
-	}
-	tokenizerSvc, cleanup, err := ollamatokenizer.NewHTTPClient(ctx, ollamatokenizer.ConfigHTTP{
-		BaseURL: config.TokenizerServiceURL,
-	})
-	if err != nil {
-		cleanup()
-		log.Fatalf("initializing tokenizer service failed: %v", err)
-	}
-
-	execRepo, err := llmrepo.NewExecRepo(ctx, &llmrepo.Config{
-		DatabaseURL:         config.DatabaseURL,
-		SigningKey:          config.SigningKey,
-		EmbedModel:          config.EmbedModel,
-		TasksModel:          config.TasksModel,
-		WorkerUserAccountID: config.WorkerUserAccountID,
-		WorkerUserPassword:  config.WorkerUserPassword,
-		WorkerUserEmail:     config.WorkerUserEmail,
-		TenantID:            serverops.TenantID,
-	}, dbInstance, state, tokenizerSvc)
-	if err != nil {
-		log.Fatalf("initializing promptexec failed: %v", err)
-	}
-
 	vectorStore, cleanup, err := vectors.New(ctx, config.VectorStoreURL, vectors.Args{
 		Timeout: time.Second * 10, // TODO: Make this configurable
 		SearchArgs: vectors.SearchArgs{
@@ -177,69 +130,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing kv manager 2 failed: %v", err)
 	}
-	rag := hooks.NewSearch(embedder, vectorStore, dbInstance)
-	webcall := hooks.NewWebCaller()
-	// Hook instances
-	echocmd := hooks.NewEchoHook()
-	settings := kv.NewLocalCache(dbInstance, "")
-	breakerSettings := libroutine.NewRoutine(3, time.Second*10)
-	triggerChan := make(chan struct{})
-	go breakerSettings.Loop(ctx, time.Second*3, triggerChan, settings.ProcessTick, func(err error) {
-		log.Printf("SERVER Error in settings.ProcessTick: %v", err)
-	})
-	tracker := taskengine.NewKVActivityTracker(kvManager)
-	stdOuttracker := activitytracker.NewLogActivityTracker(slog.Default())
-	serveropsChainedTracker := activitytracker.ChainedTracker{
-		tracker,
-		stdOuttracker,
-	}
-	chatManager := chat.New(state, tokenizerSvc, settings)
-	chatHook := hooks.NewChatHook(dbInstance, chatManager)
-	knowledgeHook := hookrecipes.NewSearchThenResolveHook(hookrecipes.SearchThenResolveHook{
-		SearchHook:     rag,
-		ResolveHook:    hooks.NewSearchResolveHook(dbInstance),
-		DefaultTopK:    1,
-		DefaultDist:    40,
-		DefaultPos:     0,
-		DefaultEpsilon: 0.5,
-		DefaultRadius:  40,
-	}, activitytracker.NewLogActivityTracker(slog.Default()))
-	// Mux for handling commands like /echo
-	// transition := hooks.NewTransition("help", serverops.NewLogActivityTracker(slog.Default()))
-	printHook := hooks.NewPrint(activitytracker.NewLogActivityTracker(slog.Default()))
-	// hookMux := hooks.NewMux(map[string]taskengine.HookRepo{
-	// 	"echo":             echocmd,
-	// 	"search_knowledge": knowledgeHook,
-	// 	"vector_search":    rag,
-	// 	"help":             transition,
-	// }, serverops.NewLogActivityTracker(slog.Default()))
-
-	// Combine all hooks into one registry
-	hooks := hooks.NewSimpleProvider(map[string]taskengine.HookRepo{
-		"vector_search":    rag,
-		"webhook":          webcall,
-		"search_knowledge": knowledgeHook,
-		// "command_router":               hookMux,
-		"append_user_message":          chatHook,
-		"echo":                         echocmd,
-		"preappend_message_to_history": chatHook,
-		"convert_openai_to_history":    chatHook,
-		"convert_history_to_openai":    chatHook,
-		"append_system_message":        chatHook,
-		"persist_messages":             chatHook,
-		"help":                         printHook,
-		"print":                        printHook,
-	})
-	exec, err := taskengine.NewExec(ctx, execRepo, hooks, serveropsChainedTracker)
-	if err != nil {
-		log.Fatalf("initializing task engine engine failed: %v", err)
-	}
-	environmentExec, err := taskengine.NewEnv(ctx, serveropsChainedTracker, taskengine.NewAlertSink(kvManager), exec, taskengine.NewSimpleInspector(kvManager))
-	if err != nil {
-		log.Fatalf("initializing task engine failed: %v", err)
-	}
 	cleanups = append(cleanups, cleanup)
-	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, embedder, execRepo, environmentExec, state, vectorStore, hooks, chatManager, kvManager)
+	client, err := runtimesdk.NewClient(runtimesdk.Config{
+		BaseURL: config.RuntimeBaseUrl,
+		Token:   "test",
+	}, http.DefaultClient)
+	if err != nil {
+		log.Fatalf("initializing runtime client failed: %v", err)
+	}
+
+	chatManager := chat.New(kv.NewLocalCache(dbInstance, "chat-123"))
+
+	apiHandler, cleanup, err := serverapi.New(ctx, config, dbInstance, ps, vectorStore, kvManager, chatManager, client)
 	cleanups = append(cleanups, cleanup)
 	if err != nil {
 		log.Fatalf("initializing API handler failed: %v", err)

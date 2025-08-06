@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
-func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatservice.Service, stateService *runtimestate.State) {
-	h := &chatManagerHandler{service: chatManager, stateService: stateService}
+func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatservice.Service) {
+	h := &chatManagerHandler{service: chatManager}
 
 	mux.HandleFunc("POST /chats", h.createChat)
 	mux.HandleFunc("POST /chats/{id}/chat", h.chat)
@@ -22,8 +21,7 @@ func AddChatRoutes(mux *http.ServeMux, _ *serverops.Config, chatManager chatserv
 }
 
 type chatManagerHandler struct {
-	service      chatservice.Service
-	stateService *runtimestate.State
+	service chatservice.Service
 }
 
 type newChatInstanceRequest struct {

@@ -11,8 +11,9 @@ import (
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
+	"github.com/contenox/runtime/execservice"
+	"github.com/contenox/runtime/taskengine"
 	"github.com/google/uuid"
 )
 
@@ -33,12 +34,12 @@ type OpenAIChat interface {
 type service struct {
 	dbInstance  libdb.DBManager
 	chatManager *chat.Manager
-	env         taskengine.EnvExecutor
+	env         execservice.TasksEnvService
 }
 
 func New(
 	dbInstance libdb.DBManager,
-	env taskengine.EnvExecutor,
+	env execservice.TasksEnvService,
 	chatManager *chat.Manager,
 ) Service {
 	return &service{
@@ -93,7 +94,7 @@ func (s *service) AddInstruction(ctx context.Context, subjectID string, message 
 	chain := tasksrecipes.BuildAppendInstruction(subjectID)
 
 	// Run the chain using the environment executor
-	_, _, err := s.env.ExecEnv(ctx, chain, message, taskengine.DataTypeString)
+	_, _, err := s.env.Execute(ctx, chain, message, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)
 	}
@@ -135,14 +136,14 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 		if task.Hook == nil {
 			continue
 		}
-		if task.Type == taskengine.ModelExecution && task.ExecuteConfig != nil {
+		if task.Handler == taskengine.HandleModelExecution && task.ExecuteConfig != nil {
 			task.ExecuteConfig.Models = req.PreferredModelNames
 			task.ExecuteConfig.Provider = req.Provider
 		}
 	}
 
 	// Execute chain
-	result, stackTrace, err := s.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, stackTrace, err := s.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return "", 0, 0, stackTrace, fmt.Errorf("chain execution failed: %w", err)
 	}
@@ -251,7 +252,7 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 
 	chain := tasksrecipes.BuildOpenAIChatChain()
 
-	result, stackTrace, err := s.env.ExecEnv(ctx, chain, req, taskengine.DataTypeOpenAIChat)
+	result, stackTrace, err := s.env.Execute(ctx, chain, req, taskengine.DataTypeOpenAIChat)
 	if err != nil {
 		return nil, fmt.Errorf("chain execution failed: %w", err)
 	}

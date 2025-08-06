@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 // Transition simply returns a transition value without modifying input

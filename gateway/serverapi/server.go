@@ -17,45 +17,37 @@ import (
 	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
-	"github.com/contenox/runtime-mvp/core/llmrepo"
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
 	"github.com/contenox/runtime-mvp/core/services/accessservice"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
-	"github.com/contenox/runtime-mvp/core/services/backendservice"
 	"github.com/contenox/runtime-mvp/core/services/botservice"
 	"github.com/contenox/runtime-mvp/core/services/chainservice"
 	"github.com/contenox/runtime-mvp/core/services/chatservice"
 	"github.com/contenox/runtime-mvp/core/services/dispatchservice"
-	"github.com/contenox/runtime-mvp/core/services/downloadservice"
-	"github.com/contenox/runtime-mvp/core/services/execservice"
 	"github.com/contenox/runtime-mvp/core/services/fileservice"
 	"github.com/contenox/runtime-mvp/core/services/githubservice"
 	"github.com/contenox/runtime-mvp/core/services/indexservice"
-	"github.com/contenox/runtime-mvp/core/services/modelservice"
-	"github.com/contenox/runtime-mvp/core/services/poolservice"
-	"github.com/contenox/runtime-mvp/core/services/providerservice"
 	"github.com/contenox/runtime-mvp/core/services/telegramservice"
 	"github.com/contenox/runtime-mvp/core/services/userservice"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/gateway/activityapi"
-	"github.com/contenox/runtime-mvp/gateway/backendapi"
 	"github.com/contenox/runtime-mvp/gateway/botapi"
 	"github.com/contenox/runtime-mvp/gateway/chainsapi"
 	"github.com/contenox/runtime-mvp/gateway/chatapi"
 	"github.com/contenox/runtime-mvp/gateway/dispatchapi"
-	"github.com/contenox/runtime-mvp/gateway/execapi"
 	"github.com/contenox/runtime-mvp/gateway/filesapi"
 	"github.com/contenox/runtime-mvp/gateway/githubapi"
 	"github.com/contenox/runtime-mvp/gateway/indexapi"
-	"github.com/contenox/runtime-mvp/gateway/poolapi"
-	providersapi "github.com/contenox/runtime-mvp/gateway/providerapi"
 	"github.com/contenox/runtime-mvp/gateway/systemapi"
 	"github.com/contenox/runtime-mvp/gateway/telegramapi"
 	"github.com/contenox/runtime-mvp/gateway/usersapi"
-
+	"github.com/contenox/runtime/backendapi"
+	"github.com/contenox/runtime/execapi"
+	"github.com/contenox/runtime/poolapi"
+	"github.com/contenox/runtime/providerapi"
+	"github.com/contenox/runtime/runtimesdk"
+	"github.com/contenox/runtime/taskengine"
 	"github.com/google/go-github/v58/github"
 	"github.com/google/uuid"
 )
@@ -65,14 +57,10 @@ func New(
 	config *serverops.Config,
 	dbInstance libdb.DBManager,
 	pubsub libbus.Messenger,
-	embedder llmrepo.ModelRepo,
-	execmodelrepo llmrepo.ModelRepo,
-	environmentExec taskengine.EnvExecutor,
-	state *runtimestate.State,
 	vectorStore vectors.Store,
-	hookRegistry taskengine.HookRegistry,
-	chatManager *chat.Manager,
 	kvManager libkv.KVManager,
+	chatManager *chat.Manager,
+	client *runtimesdk.Client,
 ) (http.Handler, func() error, error) {
 	cleanup := func() error { return nil }
 	mux := http.NewServeMux()
@@ -93,39 +81,11 @@ func New(
 		tracker,
 		stdOuttracker,
 	}
-	backendService := backendservice.New(dbInstance)
-	backendService = backendservice.WithActivityTracker(backendService, serveropsChainedTracker)
-	backendapi.AddBackendRoutes(mux, config, backendService, state)
-	poolservice := poolservice.New(dbInstance)
-	poolapi.AddPoolRoutes(mux, config, poolservice)
-	// Get circuit breaker pool instance
-	pool := libroutine.GetPool()
+	backendapi.AddBackendRoutes(mux, config, client.BackendService, state)
+	poolapi.AddPoolRoutes(mux, client.PoolService)
 
-	// Start managed loops using the pool
-
-	pool.StartLoop(
-		ctx,
-		&libroutine.LoopConfig{
-			Key:          "backendCycle",
-			Threshold:    3,
-			ResetTimeout: 10 * time.Second,
-			Interval:     10 * time.Second,
-			Operation:    state.RunBackendCycle,
-		},
-	)
-
-	pool.StartLoop(
-		ctx,
-		&libroutine.LoopConfig{
-			Key:          "downloadCycle",
-			Threshold:    3,
-			ResetTimeout: 10 * time.Second,
-			Interval:     10 * time.Second,
-			Operation:    state.RunDownloadCycle,
-		},
-	)
 	githubClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
-	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, environmentExec, githubClient, chatManager, serveropsChainedTracker)
+	githubProcessor := githubservice.NewGitHubCommentProcessor(dbInstance, client.EnvService, githubClient, chatManager, serveropsChainedTracker)
 
 	libroutine.GetPool().StartLoop(
 		ctx,
@@ -161,16 +121,12 @@ func New(
 	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
 	fileService = fileservice.WithActivityTracker(fileService, serveropsChainedTracker)
 	filesapi.AddFileRoutes(mux, config, fileService)
-	downloadService := downloadservice.New(dbInstance, pubsub)
-	downloadService = downloadservice.WithActivityTracker(downloadService, serveropsChainedTracker)
 	backendapi.AddQueueRoutes(mux, config, downloadService)
-	modelService := modelservice.New(dbInstance, config)
-	modelService = modelservice.WithActivityTracker(modelService, serveropsChainedTracker)
-	backendapi.AddModelRoutes(mux, config, modelService, downloadService)
+	backendapi.AddModelRoutes(mux, config, client.ModelService, downloadService)
 
-	chatService := chatservice.New(dbInstance, environmentExec, chatManager)
+	chatService := chatservice.New(dbInstance, client.EnvService, chatManager)
 	chatService = chatservice.WithActivityTracker(chatService, serveropsChainedTracker)
-	chatapi.AddChatRoutes(mux, config, chatService, state)
+	chatapi.AddChatRoutes(mux, config, chatService)
 	userService := userservice.New(dbInstance, config)
 	userService = userservice.WithActivityTracker(userService, serveropsChainedTracker)
 	usersapi.AddUserRoutes(mux, config, userService)
@@ -180,21 +136,16 @@ func New(
 	accessService = accessservice.WithActivityTracker(accessService, serveropsChainedTracker)
 
 	usersapi.AddAccessRoutes(mux, config, accessService)
-	indexService := indexservice.New(ctx, embedder, execmodelrepo, vectorStore, dbInstance)
+	indexService := indexservice.New(ctx, client.EnvService, vectorStore, dbInstance)
 
 	indexService = indexservice.WithActivityTracker(indexService, serveropsChainedTracker)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	execService := execservice.NewExec(ctx, execmodelrepo, dbInstance)
-	execService = execservice.WithActivityTracker(execService, serveropsChainedTracker)
-	taskService := execservice.NewTasksEnv(ctx, environmentExec, dbInstance, hookRegistry)
-	execapi.AddExecRoutes(mux, config, execService, taskService)
+	execapi.AddExecRoutes(mux, client.ExecService, client.EnvService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)
-	providerService := providerservice.New(dbInstance)
-	providerService = providerservice.WithActivityTracker(providerService, serveropsChainedTracker)
-	providersapi.AddProviderRoutes(mux, config, providerService)
+	providerapi.AddProviderRoutes(mux, client.ProviderService)
 	activityService := activityservice.New(tracker, taskengine.NewAlertSink(kvManager))
 	activityService = activityservice.WithAuthorization(activityService, dbInstance)
 	activityapi.AddActivityRoutes(mux, config, activityService)
@@ -227,7 +178,7 @@ func New(
 	libroutine.GetPool().StartLoop(ctx, cfgGithubWorkerSync)
 	codeReviewProcessor := githubservice.NewGitHubCodeReviewProcessor(
 		dbInstance,
-		environmentExec,
+		client.EnvService,
 		githubClient,
 		chatManager,
 		serveropsChainedTracker,
@@ -270,9 +221,9 @@ func New(
 	telegramService := telegramservice.New(dbInstance)
 	telegramService = telegramservice.WithServiceActivityTracker(telegramService, serveropsChainedTracker)
 	telegramapi.AddTelegramRoutes(mux, telegramService)
-	pool = libroutine.GetPool()
+	pool := libroutine.GetPool()
 	poller := telegramservice.NewPoller(dbInstance)
-	processor := telegramservice.NewProcessor(dbInstance, environmentExec, chatManager)
+	processor := telegramservice.NewProcessor(dbInstance, client.EnvService, chatManager)
 
 	botService := botservice.New(dbInstance)
 	botapi.AddBotRoutes(mux, botService)
@@ -332,17 +283,12 @@ func New(
 	handler = JWTMiddleware(config, handler)
 	handler = rateLimitMiddleware(kvManager, 100, time.Minute)(handler)
 	services := []serverops.ServiceMeta{
-		modelService,
-		backendService,
 		chatService,
 		accessService,
 		userService,
-		downloadService,
 		fileService,
 		indexService,
 		dispatchService,
-		execService,
-		providerService,
 		chainService,
 		activityService,
 		githubService,

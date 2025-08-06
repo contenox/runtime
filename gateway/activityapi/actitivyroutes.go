@@ -6,7 +6,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/activityservice"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 func AddActivityRoutes(mux *http.ServeMux, _ *serverops.Config, activityService activityservice.Service) {

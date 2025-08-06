@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	libdb "github.com/contenox/dbexec"
-	"github.com/contenox/modelprovider/llmresolver"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
-	"github.com/contenox/runtime-mvp/core/llmrepo"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
+	"github.com/contenox/runtime/execservice"
+	"github.com/contenox/runtime/llmresolver"
 )
 
 type Service interface {
@@ -24,16 +24,14 @@ type Service interface {
 }
 
 type service struct {
-	embedder     llmrepo.ModelRepo
-	promptExec   llmrepo.ModelRepo
+	envService   execservice.TasksEnvService
 	vectorsStore vectors.Store
 	db           libdb.DBManager
 }
 
-func New(ctx context.Context, embedder, promptExec llmrepo.ModelRepo, vectorsStore vectors.Store, dbInstance libdb.DBManager) Service {
+func New(ctx context.Context, envService execservice.TasksEnvService, vectorsStore vectors.Store, dbInstance libdb.DBManager) Service {
 	return &service{
-		embedder:     embedder,
-		promptExec:   promptExec,
+		envService:   envService,
 		vectorsStore: vectorsStore,
 		db:           dbInstance,
 	}

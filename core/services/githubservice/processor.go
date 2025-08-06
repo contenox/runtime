@@ -13,19 +13,20 @@ import (
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/githubclient"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
+	"github.com/contenox/runtime/execservice"
+	"github.com/contenox/runtime/taskengine"
 )
 
 type GitHubCommentProcessor struct {
 	db           libdb.DBManager
-	env          taskengine.EnvExecutor
+	env          execservice.TasksEnvService
 	chatManager  *chat.Manager
 	tracker      activitytracker.ActivityTracker
 	githubClient githubclient.Client
 }
 
-func NewGitHubCommentProcessor(db libdb.DBManager, env taskengine.EnvExecutor, githubClient githubclient.Client, chatManager *chat.Manager, tracker activitytracker.ActivityTracker) *GitHubCommentProcessor {
+func NewGitHubCommentProcessor(db libdb.DBManager, env execservice.TasksEnvService, githubClient githubclient.Client, chatManager *chat.Manager, tracker activitytracker.ActivityTracker) *GitHubCommentProcessor {
 	if tracker == nil {
 		tracker = activitytracker.NoopTracker{}
 	}
@@ -98,7 +99,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		m.Content = removeFooter(m.Content)
 	}
 	// Execute chain
-	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		err = fmt.Errorf("failed to execute chain: %w", err)
 		reportErr(err)
@@ -157,7 +158,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 
 type GitHubCodeReviewProcessor struct {
 	db           libdb.DBManager
-	env          taskengine.EnvExecutor
+	env          execservice.TasksEnvService
 	chatManager  *chat.Manager
 	tracker      activitytracker.ActivityTracker
 	githubClient githubclient.Client
@@ -165,7 +166,7 @@ type GitHubCodeReviewProcessor struct {
 
 func NewGitHubCodeReviewProcessor(
 	db libdb.DBManager,
-	env taskengine.EnvExecutor,
+	env execservice.TasksEnvService,
 	githubClient githubclient.Client,
 	chatManager *chat.Manager,
 	tracker activitytracker.ActivityTracker,
@@ -244,7 +245,7 @@ func (p *GitHubCodeReviewProcessor) ProcessJob(ctx context.Context, job *store.J
 	}
 
 	// Execute chain
-	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		err = fmt.Errorf("failed to execute chain: %w", err)
 		reportErr(err)

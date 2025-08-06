@@ -45,6 +45,7 @@ type Config struct {
 	KVBackend           string `json:"kv_backend"`
 	KVHost              string `json:"kv_host"`
 	KVPassword          string `json:"kv_password"`
+	RuntimeBaseUrl      string `json:"runtime_base_url"`
 	// RateLimit           string `json:"rate_limit"`
 	// RateWindow          string `json:"rate_window"`
 }

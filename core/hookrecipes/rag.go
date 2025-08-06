@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/contenox/activitytracker"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 const name = "search_knowledge"
@@ -184,7 +184,7 @@ func (r *SearchThenResolveHook) Exec(
 		dataType,
 		transition,
 		&taskengine.HookCall{
-			Type: "search",
+			Name: "search",
 			Args: map[string]string{
 				"top_k":    strconv.Itoa(topK),
 				"epsilon":  strconv.FormatFloat(epsilon, 'f', -1, 64),
@@ -206,7 +206,7 @@ func (r *SearchThenResolveHook) Exec(
 		outType,
 		trans,
 		&taskengine.HookCall{
-			Type: "resolve_search_result",
+			Name: "resolve_search_result",
 			Args: map[string]string{
 				"distance": strconv.FormatFloat(distance, 'f', -1, 64),
 				"position": strconv.Itoa(position),

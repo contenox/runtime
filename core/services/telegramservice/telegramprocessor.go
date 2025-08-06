@@ -11,8 +11,9 @@ import (
 	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/taskengine"
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
+	"github.com/contenox/runtime/execservice"
+	"github.com/contenox/runtime/taskengine"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 )
@@ -20,11 +21,11 @@ import (
 type Processor struct {
 	db          libdb.DBManager
 	chatManager *chat.Manager
-	env         taskengine.EnvExecutor
+	envService  execservice.TasksEnvService
 }
 
-func NewProcessor(db libdb.DBManager, env taskengine.EnvExecutor, chatManager *chat.Manager) *Processor {
-	return &Processor{db: db, env: env, chatManager: chatManager}
+func NewProcessor(db libdb.DBManager, envService execservice.TasksEnvService, chatManager *chat.Manager) *Processor {
+	return &Processor{db: db, envService: envService, chatManager: chatManager}
 }
 
 func (p *Processor) ProcessJob(ctx context.Context, job *store.Job) error {
@@ -89,7 +90,7 @@ func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error
 	}
 
 	// Execute processing chain
-	result, _, err := p.env.ExecEnv(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, err := p.envService.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return fmt.Errorf("executing chain: %w", err)
 	}

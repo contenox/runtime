@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 // MockHookRepo is a mock implementation of the HookProvider interface.
@@ -76,7 +76,7 @@ func (m *MockHookRepo) Exec(
 
 	// Get response from map or use default
 	var resp HookResponse
-	if specificResp, ok := m.ResponseMap[args.Type]; ok {
+	if specificResp, ok := m.ResponseMap[args.Name]; ok {
 		resp = specificResp
 	} else {
 		resp = m.DefaultResponse

@@ -11,29 +11,21 @@ import (
 
 	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/kv"
-	"github.com/contenox/runtime-mvp/core/ollamatokenizer"
-	"github.com/contenox/runtime-mvp/core/runtimestate"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 // Manager coordinates chat message management and LLM execution.
 type Manager struct {
-	state     *runtimestate.State
-	settings  kv.Repo
-	tokenizer ollamatokenizer.Tokenizer
+	settings kv.Repo
 }
 
 // New creates a new Manager for chat processing.
 func New(
-	state *runtimestate.State,
-	tokenizer ollamatokenizer.Tokenizer,
 	settings kv.Repo,
 ) *Manager {
 	return &Manager{
-		state:     state,
-		tokenizer: tokenizer,
-		settings:  settings,
+		settings: settings,
 	}
 }
 
@@ -142,42 +134,6 @@ func (m *Manager) AppendMessages(ctx context.Context, tx libdb.Exec, subjectID s
 			Payload: responsePayload,
 			AddedAt: responseMessage.Timestamp,
 		})
-}
-
-// CalculateContextSize estimates the token count for the chat prompt history.
-func (m *Manager) CalculateContextSize(ctx context.Context, messages []taskengine.Message, baseModels ...string) (int, error) {
-	var prompt string
-	for _, m := range messages {
-		if m.Role == "user" {
-			prompt = prompt + "\n" + m.Content
-		}
-	}
-	var selectedModel string
-	for _, model := range baseModels {
-		optimal, err := m.tokenizer.OptimalModel(ctx, model)
-		if err != nil {
-			return 0, fmt.Errorf("BUG: failed to get optimal model for %q: %w", model, err)
-		}
-		// TODO: For now, pick the first valid one.
-		selectedModel = optimal
-		break
-	}
-	// If no base models were provided, use a fallback.
-	if selectedModel == "" {
-		selectedModel = "tiny"
-	}
-	count := 0
-	for start := 0; start < len(prompt); start += tokenizerMaxPromptBytes {
-		end := min(start+tokenizerMaxPromptBytes, len(prompt))
-		chunk := prompt[start:end]
-		tokens, err := m.tokenizer.CountTokens(ctx, selectedModel, chunk)
-		if err != nil {
-			return 0, fmt.Errorf("failed to estimate context size at chunk [%d:%d]: %w", start, end, err)
-		}
-		count += tokens
-	}
-
-	return count, nil
 }
 
 func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID string, hist []taskengine.Message) error {

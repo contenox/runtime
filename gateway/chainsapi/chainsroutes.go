@@ -7,7 +7,7 @@ import (
 
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/services/chainservice"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 )
 
 func AddChainRoutes(mux *http.ServeMux, config *serverops.Config, chainService chainservice.Service) {

@@ -7,7 +7,7 @@ import (
 
 	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/chat"
-	"github.com/contenox/runtime-mvp/core/taskengine"
+	"github.com/contenox/runtime/taskengine"
 	"github.com/google/uuid"
 )
 
@@ -53,7 +53,7 @@ func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataTyp
 	if hookCall.Args == nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("invalid hook call: missing type")
 	}
-	hookFunc, err := h.Get(hookCall.Type)
+	hookFunc, err := h.Get(hookCall.Name)
 	if err != nil {
 		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("failed to get hook function: %w", err)
 	}

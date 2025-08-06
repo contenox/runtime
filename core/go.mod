@@ -12,17 +12,14 @@ require (
 	dario.cat/mergo v1.0.2
 	github.com/contenox/activitytracker v0.0.2
 	github.com/contenox/authz v0.0.1
-	github.com/contenox/bus v0.0.2
 	github.com/contenox/dbexec v0.0.2
 	github.com/contenox/kvstore v0.0.1
-	github.com/contenox/modelprovider v0.0.2
-	github.com/contenox/routine v0.0.1
+	github.com/contenox/modelprovider v0.0.3
+	github.com/contenox/runtime v0.0.4
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
-	github.com/contenox/runtime-mvp/libs/libtestenv v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
-	github.com/ollama/ollama v0.9.6
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/vdaas/vald-client-go v1.7.17
@@ -31,7 +28,12 @@ require (
 )
 
 require (
+	github.com/contenox/bus v0.0.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/ollama/ollama v0.9.6 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0 // indirect
+	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
 
