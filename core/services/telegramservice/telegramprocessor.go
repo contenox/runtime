@@ -90,7 +90,7 @@ func (p *Processor) processUpdate(ctx context.Context, payload jobPayload) error
 	}
 
 	// Execute processing chain
-	result, _, err := p.envService.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, _, err := p.envService.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return fmt.Errorf("executing chain: %w", err)
 	}

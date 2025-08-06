@@ -94,7 +94,7 @@ func (s *service) AddInstruction(ctx context.Context, subjectID string, message 
 	chain := tasksrecipes.BuildAppendInstruction(subjectID)
 
 	// Run the chain using the environment executor
-	_, _, err := s.env.Execute(ctx, chain, message, taskengine.DataTypeString)
+	_, _, _, err := s.env.Execute(ctx, chain, message, taskengine.DataTypeString)
 	if err != nil {
 		return fmt.Errorf("chain execution failed: %w", err)
 	}
@@ -143,7 +143,7 @@ func (s *service) Chat(ctx context.Context, req ChatRequest) (string, int, int, 
 	}
 
 	// Execute chain
-	result, stackTrace, err := s.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, stackTrace, err := s.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		return "", 0, 0, stackTrace, fmt.Errorf("chain execution failed: %w", err)
 	}
@@ -252,7 +252,7 @@ func (s *service) OpenAIChatCompletions(ctx context.Context, req taskengine.Open
 
 	chain := tasksrecipes.BuildOpenAIChatChain()
 
-	result, stackTrace, err := s.env.Execute(ctx, chain, req, taskengine.DataTypeOpenAIChat)
+	result, _, stackTrace, err := s.env.Execute(ctx, chain, req, taskengine.DataTypeOpenAIChat)
 	if err != nil {
 		return nil, fmt.Errorf("chain execution failed: %w", err)
 	}

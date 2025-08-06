@@ -28,8 +28,8 @@ github.com/contenox/modelprovider v0.0.3 h1:ivJqfDR5uGGl5P8eRfOvntLT3RECHu0Pkg+P
 github.com/contenox/modelprovider v0.0.3/go.mod h1:nTGaLC2LEpRSwbL5LYdPy76mLa5e4UwqJoZXfa1KYqY=
 github.com/contenox/routine v0.0.1 h1:mOmh4ZkQ/+s9NOiAqrsNCtEKTpSQQQWzppr6knXFBv8=
 github.com/contenox/routine v0.0.1/go.mod h1:GOwV7xnzutfdWpRVbhfaAhTDUq+W49AqjubY3L6+mWQ=
-github.com/contenox/runtime v0.0.13 h1:iwG9cpQtiDRqRqh+C5ORRhuF32ca3AbgBDuABXrvUb8=
-github.com/contenox/runtime v0.0.13/go.mod h1:nqLzM+AHICUrJz1ssVMx4mz6iIaNvZjzgROs7Lixfr8=
+github.com/contenox/runtime v0.0.16 h1:TB1ismBQRwn5ZvCG7Hum42/1ws8Td/GvLZFYEiSNiUw=
+github.com/contenox/runtime v0.0.16/go.mod h1:nqLzM+AHICUrJz1ssVMx4mz6iIaNvZjzgROs7Lixfr8=
 github.com/cpuguy83/dockercfg v0.3.2 h1:DlJTyZGBDlXqUZ2Dk2Q3xHs/FtnooJJVaad2S9GKorA=
 github.com/cpuguy83/dockercfg v0.3.2/go.mod h1:sugsbF4//dDlL/i+S+rtpIWp+5h0BHJHfjj5/jFyUJc=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=

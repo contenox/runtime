@@ -283,7 +283,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
-				Handler:     taskengine.HandleNoop,
+				Handler:     taskengine.HandleModelExecution,
 				SystemInstruction: "You're a helpful assistant in the contenox system. " +
 					"Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. " +
 					"Keep conversation friendly.",

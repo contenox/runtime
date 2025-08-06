@@ -99,7 +99,7 @@ func (p *GitHubCommentProcessor) ProcessJob(ctx context.Context, job *store.Job)
 		m.Content = removeFooter(m.Content)
 	}
 	// Execute chain
-	result, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		err = fmt.Errorf("failed to execute chain: %w", err)
 		reportErr(err)
@@ -245,7 +245,7 @@ func (p *GitHubCodeReviewProcessor) ProcessJob(ctx context.Context, job *store.J
 	}
 
 	// Execute chain
-	result, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
+	result, _, _, err := p.env.Execute(ctx, chain, history, taskengine.DataTypeChatHistory)
 	if err != nil {
 		err = fmt.Errorf("failed to execute chain: %w", err)
 		reportErr(err)
