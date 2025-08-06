@@ -10,18 +10,18 @@ import (
 	libdb "github.com/contenox/dbexec"
 	"github.com/contenox/runtime-mvp/core/indexrepo"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime/llmrepo"
+	"github.com/contenox/runtime/embedservice"
 	"github.com/contenox/runtime/taskengine"
 )
 
 type Search struct {
-	embedder     llmrepo.ModelRepo
+	embedder     embedservice.Service
 	vectorsStore vectors.Store
 	dbInstance   libdb.DBManager
 }
 
 func NewSearch(
-	embedder llmrepo.ModelRepo,
+	embedder embedservice.Service,
 	vectorsStore vectors.Store,
 	dbInstance libdb.DBManager,
 ) taskengine.HookRepo {

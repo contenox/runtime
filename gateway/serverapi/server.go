@@ -43,6 +43,7 @@ import (
 	"github.com/contenox/runtime-mvp/gateway/telegramapi"
 	"github.com/contenox/runtime-mvp/gateway/usersapi"
 	"github.com/contenox/runtime/backendapi"
+	"github.com/contenox/runtime/downloadservice"
 	"github.com/contenox/runtime/execapi"
 	"github.com/contenox/runtime/poolapi"
 	"github.com/contenox/runtime/providerapi"
@@ -81,7 +82,7 @@ func New(
 		tracker,
 		stdOuttracker,
 	}
-	backendapi.AddBackendRoutes(mux, config, client.BackendService, state)
+	backendapi.AddBackendRoutes(mux, client.BackendService, client.StateService)
 	poolapi.AddPoolRoutes(mux, client.PoolService)
 
 	githubClient := githubclient.New(dbInstance, github.NewClient(http.DefaultClient))
@@ -121,8 +122,10 @@ func New(
 	fileService = fileservice.WithActivityTracker(fileService, fileservice.NewFileVectorizationJobCreator(dbInstance))
 	fileService = fileservice.WithActivityTracker(fileService, serveropsChainedTracker)
 	filesapi.AddFileRoutes(mux, config, fileService)
-	backendapi.AddQueueRoutes(mux, config, downloadService)
-	backendapi.AddModelRoutes(mux, config, client.ModelService, downloadService)
+	downloadService := client.DownloadService
+	downloadService = downloadservice.WithActivityTracker(downloadService, serveropsChainedTracker)
+	backendapi.AddQueueRoutes(mux, downloadService)
+	backendapi.AddModelRoutes(mux, client.ModelService, downloadService)
 
 	chatService := chatservice.New(dbInstance, client.EnvService, chatManager)
 	chatService = chatservice.WithActivityTracker(chatService, serveropsChainedTracker)
@@ -136,12 +139,12 @@ func New(
 	accessService = accessservice.WithActivityTracker(accessService, serveropsChainedTracker)
 
 	usersapi.AddAccessRoutes(mux, config, accessService)
-	indexService := indexservice.New(ctx, client.EnvService, vectorStore, dbInstance)
+	indexService := indexservice.New(ctx, client.EmbedService, client.ExecService, vectorStore, dbInstance)
 
 	indexService = indexservice.WithActivityTracker(indexService, serveropsChainedTracker)
 	indexapi.AddIndexRoutes(mux, config, indexService)
 
-	execapi.AddExecRoutes(mux, client.ExecService, client.EnvService)
+	execapi.AddExecRoutes(mux, client.ExecService, client.EnvService, client.EmbedService)
 	usersapi.AddAuthRoutes(mux, userService)
 	dispatchService := dispatchservice.New(dbInstance, config)
 	dispatchapi.AddDispatchRoutes(mux, config, dispatchService)

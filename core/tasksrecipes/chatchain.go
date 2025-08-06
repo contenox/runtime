@@ -54,9 +54,9 @@ func BuildOpenAIChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "convert_openai_to_history",
 				Description: "Convert OpenAI request to internal history",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "convert_openai_to_history",
+					Name: "convert_openai_to_history",
 					Args: map[string]string{},
 				},
 				Transition: taskengine.TaskTransition{
@@ -68,7 +68,7 @@ func BuildOpenAIChatChain() *taskengine.ChainDefinition {
 			{
 				ID:            "execute_model_on_messages",
 				Description:   "Run inference using selected LLM",
-				Type:          taskengine.ModelExecution,
+				Handler:       taskengine.HandleModelExecution,
 				ExecuteConfig: &taskengine.LLMExecutionConfig{},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
@@ -79,9 +79,9 @@ func BuildOpenAIChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "convert_history_to_openai",
 				Description: "Convert chat history to OpenAI response",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "convert_history_to_openai",
+					Name: "convert_history_to_openai",
 					Args: map[string]string{},
 				},
 				Transition: taskengine.TaskTransition{
@@ -108,7 +108,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "mux_input",
 				Description: "Check for commands like /echo",
-				Type:        taskengine.ParseTransition,
+				Handler:     taskengine.HandleParseTransition,
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
 						{Operator: taskengine.OpDefault, Goto: "moderate"},
@@ -133,7 +133,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:             "moderate",
 				Description:    "Moderate the input",
-				Type:           taskengine.ParseNumber,
+				Handler:        taskengine.HandleParseNumber,
 				PromptTemplate: "Classify the input as safe (0) or unsafe (10) respond with an numeric value between 0 for safe and 10 for unsafe. Input: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
@@ -154,7 +154,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:             "do_we_need_context",
 				Description:    "Add context to the conversation",
-				Type:           taskengine.RawString,
+				Handler:        taskengine.HandleRawString,
 				PromptTemplate: "Rate how likely it is that the answer requires access to this internal information respond with an numeric value between (0) not likely and (10) highly likely. Input {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
@@ -173,7 +173,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			},
 			{
 				ID:       "swap_to_input",
-				Type:     taskengine.Noop,
+				Handler:  taskengine.HandleNoop,
 				InputVar: "input",
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
@@ -187,9 +187,9 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "echo_message",
 				Description: "Echo the message",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "echo",
+					Name: "echo",
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
@@ -200,9 +200,9 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "search_knowledge",
 				Description: "Search knowledge base",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "search_knowledge",
+					Name: "search_knowledge",
 				},
 				Transition: taskengine.TaskTransition{
 					Branches: []taskengine.TransitionBranch{
@@ -212,7 +212,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			},
 			{
 				ID:             "append_search_results",
-				Type:           taskengine.Noop,
+				Handler:        taskengine.HandleNoop,
 				PromptTemplate: "here are the found search results for the requested document recap them for the user: {{.search_knowledge}}",
 				Compose: &taskengine.ComposeTask{
 					WithVar:  "input",
@@ -230,9 +230,9 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "print_help_message",
 				Description: "Display help message",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "print",
+					Name: "print",
 					Args: map[string]string{
 						"message": "Available commands:\n/echo <text>\n/help\n/search <query>",
 					},
@@ -247,7 +247,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:             "reject_request",
 				Description:    "Reject the request",
-				Type:           taskengine.RawString,
+				Handler:        taskengine.HandleNoop,
 				PromptTemplate: "respond to the user that request was rejected because the input was flagged: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
@@ -259,7 +259,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:             "request_failed",
 				Description:    "Reject the request",
-				Type:           taskengine.RawString,
+				Handler:        taskengine.HandleNoop,
 				PromptTemplate: "respond to the user that classification of the request failed for context the exact input: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
@@ -271,7 +271,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:             "raise_error",
 				Description:    "Raise an error",
-				Type:           taskengine.RaiseError,
+				Handler:        taskengine.HandleNoop,
 				PromptTemplate: "Error processing: {{.input}}",
 				InputVar:       "input",
 				Transition: taskengine.TaskTransition{
@@ -283,7 +283,7 @@ func BuildChatChain() *taskengine.ChainDefinition {
 			{
 				ID:          "execute_model_on_messages",
 				Description: "Run inference using selected LLM",
-				Type:        taskengine.ModelExecution,
+				Handler:     taskengine.HandleNoop,
 				SystemInstruction: "You're a helpful assistant in the contenox system. " +
 					"Respond helpfully and mention available commands (/help, /echo, /search) when appropriate. " +
 					"Keep conversation friendly.",
@@ -309,7 +309,7 @@ func BuildCodeReviewChain() *taskengine.ChainDefinition {
 				ID:                "execute_code_review",
 				Description:       "Run inference using selected LLM for code review",
 				SystemInstruction: "You are an expert code reviewer. Analyze the provided code changes and provide structured feedback with actionable suggestions.",
-				Type:              taskengine.ModelExecution,
+				Handler:           taskengine.HandleModelExecution,
 				ExecuteConfig: &taskengine.LLMExecutionConfig{
 					Models:    []string{"gemini-2.5-flash"},
 					Providers: []string{"gemini"},
@@ -330,9 +330,9 @@ func BuildAppendInstruction(subjectID string) *taskengine.ChainDefinition {
 			{
 				ID:          "append_system_message",
 				Description: "Append instruction message to chat history",
-				Type:        taskengine.Hook,
+				Handler:     taskengine.HandleHook,
 				Hook: &taskengine.HookCall{
-					Type: "append_system_message",
+					Name: "append_system_message",
 					Args: map[string]string{
 						"subject_id": subjectID,
 					},

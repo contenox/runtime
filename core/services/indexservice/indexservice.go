@@ -12,8 +12,8 @@ import (
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
+	"github.com/contenox/runtime/embedservice"
 	"github.com/contenox/runtime/execservice"
-	"github.com/contenox/runtime/llmresolver"
 )
 
 type Service interface {
@@ -24,14 +24,16 @@ type Service interface {
 }
 
 type service struct {
-	envService   execservice.TasksEnvService
+	embedder     embedservice.Service
+	promptExec   execservice.ExecService
 	vectorsStore vectors.Store
 	db           libdb.DBManager
 }
 
-func New(ctx context.Context, envService execservice.TasksEnvService, vectorsStore vectors.Store, dbInstance libdb.DBManager) Service {
+func New(ctx context.Context, embedder embedservice.Service, promptExec execservice.ExecService, vectorsStore vectors.Store, dbInstance libdb.DBManager) Service {
 	return &service{
-		envService:   envService,
+		embedder:     embedder,
+		promptExec:   promptExec,
 		vectorsStore: vectorsStore,
 		db:           dbInstance,
 	}
@@ -250,22 +252,13 @@ func (s *service) findKeywords(ctx context.Context, chunk string) (string, error
 
 	Return a comma-separated list of keywords.`, chunk)
 
-	provider, err := s.promptExec.GetDefaultSystemProvider(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get provider: %w", err)
-	}
-
-	promptClient, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelNames: []string{provider.ModelName()},
-	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve prompt client for model %s: %w", provider.ModelName(), err)
-	}
-	response, err := promptClient.Prompt(ctx, prompt)
+	response, err := s.promptExec.Execute(ctx, &execservice.TaskRequest{
+		Prompt: prompt,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to execute the prompt: %w", err)
 	}
-	return response, nil
+	return response.Response, nil
 }
 
 func (s *service) classifyQuestion(ctx context.Context, input string) (bool, error) {
@@ -293,24 +286,13 @@ func (s *service) convertQuestionQuery(ctx context.Context, query string) (strin
 }
 
 func (s *service) executePrompt(ctx context.Context, prompt string) (string, error) {
-	provider, err := s.promptExec.GetDefaultSystemProvider(ctx)
+	response, err := s.promptExec.Execute(ctx, &execservice.TaskRequest{
+		Prompt: prompt,
+	})
 	if err != nil {
-		return "", fmt.Errorf("provider resolution failed: %w", err)
+		return "", fmt.Errorf("failed to execute the prompt: %w", err)
 	}
-
-	client, err := llmresolver.PromptExecute(ctx, llmresolver.PromptRequest{
-		ModelNames: []string{provider.ModelName()},
-	}, s.promptExec.GetRuntime(ctx), llmresolver.Randomly)
-	if err != nil {
-		return "", fmt.Errorf("client resolution failed: %w", err)
-	}
-
-	response, err := client.Prompt(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("prompt execution failed: %w", err)
-	}
-
-	return strings.TrimSpace(response), nil
+	return strings.TrimSpace(response.Response), nil
 }
 
 func (s *service) ListKeywords(ctx context.Context) ([]string, error) {

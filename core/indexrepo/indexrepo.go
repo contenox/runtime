@@ -6,11 +6,9 @@ import (
 	"fmt"
 
 	libdb "github.com/contenox/dbexec"
-	libmodelprovider "github.com/contenox/modelprovider"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
 	"github.com/contenox/runtime-mvp/core/serverops/vectors"
-	"github.com/contenox/runtime/llmrepo"
-	"github.com/contenox/runtime/llmresolver"
+	"github.com/contenox/runtime/embedservice"
 )
 
 type Args struct {
@@ -28,7 +26,7 @@ type SearchResult struct {
 
 func ExecuteVectorSearch(
 	ctx context.Context,
-	embedder llmrepo.ModelRepo,
+	embedder embedservice.Service,
 	vectorsStore vectors.Store,
 	dbExec libdb.Exec,
 	queries []string,
@@ -42,19 +40,8 @@ func ExecuteVectorSearch(
 		if query == "" {
 			continue
 		}
-		provider, err := embedder.GetDefaultSystemProvider(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get embedder provider: %w", err)
-		}
 
-		embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-			ModelName: provider.ModelName(),
-		}, embedder.GetRuntime(ctx), llmresolver.Randomly)
-		if err != nil {
-			return nil, fmt.Errorf("failed to resolve embed client: %w", err)
-		}
-
-		vectorData, err := embedClient.Embed(ctx, query)
+		vectorData, err := embedder.Embed(ctx, query)
 		if err != nil {
 			return nil, fmt.Errorf("failed to embed query: %w", err)
 		}
@@ -122,7 +109,7 @@ func DummyaugmentStrategy(ctx context.Context, _, _, chunk string) (string, erro
 
 func IngestChunks(
 	ctx context.Context,
-	embedder llmrepo.ModelRepo,
+	embedder embedservice.Service,
 	vectorsStore vectors.Store,
 	dbExec libdb.Exec,
 	resourceID string,
@@ -130,22 +117,6 @@ func IngestChunks(
 	chunks []string,
 	augmentStrategy func(ctx context.Context, resourceID string, vectorID string, chunk string) (string, error),
 ) (vectorIDs []string, augmentedMetadata []string, err error) {
-	// Get embedding provider once
-	embedProvider, err := embedder.GetDefaultSystemProvider(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get embedder provider: %w", err)
-	}
-	embedClient, err := llmresolver.Embed(ctx, llmresolver.EmbedRequest{
-		ModelName: embedProvider.ModelName(),
-	}, embedder.GetRuntime(ctx), llmresolver.Randomly)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve embed client: %w", err)
-	}
-	if embedClient == nil {
-		return nil, nil, errors.New("embed client is nil")
-	}
-
-	modelName := embedProvider.ModelName()
 	storeInstance := store.New(dbExec)
 
 	vectorIDs = make([]string, 0, len(chunks))
@@ -159,7 +130,7 @@ func IngestChunks(
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
 
-		vectorData, err := embedText(ctx, embedClient, enriched)
+		vectorData, err := embedText(ctx, embedder, enriched)
 		if err != nil {
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: %w", i, err)
 		}
@@ -169,6 +140,10 @@ func IngestChunks(
 			// Return partial results + current error
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: failed to insert vector: %w", i, err)
 		}
+		model, err := embedder.DefaultModelName(ctx)
+		if err != nil {
+			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: failed to get default model name: %w", i, err)
+		}
 
 		if err := storeInstance.CreateChunkIndex(ctx, &store.ChunkIndex{
 			ID:             vectorID,
@@ -176,7 +151,7 @@ func IngestChunks(
 			VectorStore:    "vald",
 			ResourceID:     resourceID,
 			ResourceType:   resourceType,
-			EmbeddingModel: modelName,
+			EmbeddingModel: model,
 		}); err != nil {
 			return vectorIDs, augmentedMetadata, fmt.Errorf("chunk %d: failed to create chunk index: %w", i, err)
 		}
@@ -189,8 +164,8 @@ func IngestChunks(
 }
 
 // Helper function for text embedding
-func embedText(ctx context.Context, embedClient libmodelprovider.LLMEmbedClient, text string) ([]float32, error) {
-	vectorData, err := embedClient.Embed(ctx, text)
+func embedText(ctx context.Context, embeder embedservice.Service, text string) ([]float32, error) {
+	vectorData, err := embeder.Embed(ctx, text)
 	if err != nil {
 		return nil, fmt.Errorf("embedding failed: %w", err)
 	}
