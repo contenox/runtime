@@ -99,8 +99,6 @@ Agents that monitor and act on external systems:
 * **API Tests**: Python test suite
 * **Dockerized Dev**: Container setup for local development
 
-> More in [STRUCTURE.md](STRUCTURE.md).
-
 ---
 
 ## 🧩 Task Chains & Contextual Execution
