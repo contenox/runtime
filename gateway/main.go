@@ -133,7 +133,7 @@ func main() {
 	cleanups = append(cleanups, cleanup)
 	client, err := runtimesdk.NewClient(runtimesdk.Config{
 		BaseURL: config.RuntimeBaseUrl,
-		Token:   "test",
+		Token:   config.DownstreamToken,
 	}, http.DefaultClient)
 	if err != nil {
 		log.Fatalf("initializing runtime client failed: %v", err)
