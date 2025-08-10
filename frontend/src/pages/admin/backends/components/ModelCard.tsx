@@ -1,149 +1,50 @@
-import { Button, Label, P, Panel, Section, Select, Spinner } from '@contenox/ui';
+import { Button, ButtonGroup, P, Section, Span } from '@contenox/ui';
 import { t } from 'i18next';
-import { useEffect, useState } from 'react';
-import {
-  useAssignModelToPool,
-  usePools,
-  usePoolsForModel,
-  useRemoveModelFromPool,
-} from '../../../../hooks/usePool';
-import { OpenAIModel } from '../../../../lib/types';
+import { Model } from '../../../../lib/types';
 
 type ModelCardProps = {
-  model: OpenAIModel;
-  onDelete: (modelId: string) => void;
+  model: Model;
+  onEdit: (model: Model) => void;
+  onDelete: (id: string) => void;
   deletePending: boolean;
 };
 
-export function ModelCard({ model, onDelete, deletePending }: ModelCardProps) {
-  const [selectedPoolToAssign, setSelectedPoolToAssign] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-
-  const { data: allPools } = usePools();
-  const { data: associatedPools, isLoading: isLoadingAssociated } = usePoolsForModel(model.id);
-  const assignMutation = useAssignModelToPool();
-  const removeMutation = useRemoveModelFromPool();
-
-  const poolOptions = allPools?.map(pool => ({ value: pool.id, label: pool.name })) || [];
-
-  useEffect(() => {
-    if (errorMessage) {
-      const timer = setTimeout(() => setErrorMessage(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorMessage]);
-
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
-
-  const handleAssign = (poolId: string) => {
-    setSelectedPoolToAssign(poolId);
-    assignMutation.mutate(
-      { poolID: poolId, modelID: model.id },
-      {
-        onSuccess: () => {
-          setSelectedPoolToAssign('');
-          setSuccessMessage(t('model.pool_assigned_success'));
-        },
-        onError: error => {
-          console.error('Assign mutation failed:', error);
-          setSelectedPoolToAssign('');
-          setErrorMessage(error.message || t('model.pool_assign_error'));
-        },
-      },
-    );
-  };
-
-  const handleRemove = (poolID: string) => {
-    removeMutation.mutate(
-      { poolID, modelID: model.id },
-      {
-        onSuccess: () => setSuccessMessage(t('model.pool_removed_success')),
-        onError: error => setErrorMessage(error.message || t('model.pool_remove_error')),
-      },
-    );
-  };
-
-  const isRemovingPool = (poolId: string) =>
-    removeMutation.isPending && removeMutation.variables?.poolID === poolId;
-
+export function ModelCard({ model, onEdit, onDelete, deletePending }: ModelCardProps) {
   return (
-    <Section key={model.id} title={model.id}>
+    <Section key={model.id} title={model.model}>
       <div className="flex justify-between">
         <div>
-          {model.created && (
-            <P>
-              <small>
-                {t('common.created_at')} {new Date(model.created).toLocaleString()}
-              </small>
+          <P>
+            <Span variant="muted">{t('model.context_length')}:</Span> {model.contextLength}
+          </P>
+          <P>
+            <Span variant="muted">{t('model.capabilities')}:</Span>
+          </P>
+          <ul className="list-inside list-disc pl-2">
+            {model.canChat && <li>{t('model.capability_chat')}</li>}
+            {model.canEmbed && <li>{t('model.capability_embed')}</li>}
+            {model.canPrompt && <li>{t('model.capability_prompt')}</li>}
+            {model.canStream && <li>{t('model.capability_stream')}</li>}
+          </ul>
+          {model.createdAt && (
+            <P variant="muted" className="mt-2 text-xs">
+              {t('common.created_at')} {new Date(model.createdAt).toLocaleString()}
             </P>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(model.id)}
-          className="text-error"
-          disabled={deletePending}>
-          {deletePending ? t('common.deleting') : t('translation:model.model_delete')}
-        </Button>
-      </div>
-
-      {errorMessage && (
-        <Panel variant="error" className="mt-2">
-          {errorMessage}
-        </Panel>
-      )}
-
-      {successMessage && (
-        <Panel variant="flat" className="mt-2">
-          {successMessage}
-        </Panel>
-      )}
-
-      <div>
-        <P>{t('model.assigned_pools')}</P>
-        {isLoadingAssociated ? (
-          <Spinner size="sm" />
-        ) : associatedPools && associatedPools.length > 0 ? (
-          <ul className="list-inside list-disc pl-2">
-            {associatedPools.map(pool => (
-              <li key={pool.id} className="flex items-center justify-between py-1">
-                <span>{pool.name}</span>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleRemove(pool.id)}
-                  disabled={isRemovingPool(pool.id)}
-                  className="text-error">
-                  {isRemovingPool(pool.id) ? <Spinner size="sm" /> : t('common.remove')}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <P variant="muted">{t('model.not_assigned_to_any_pools')}</P>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 border-t pt-4">
-        <Label htmlFor={`assign-${model.id}`} className="text-sm font-medium">
-          {t('model.assign_to_pool')}
-        </Label>
-        <Select
-          id={`assign-${model.id}`}
-          className="flex-grow rounded border px-2 py-1 text-sm"
-          value={selectedPoolToAssign}
-          onChange={e => handleAssign(e.target.value)}
-          placeholder={t('model.select_pool_to_assign')}
-          disabled={assignMutation.isPending || poolOptions.length === 0}
-          options={poolOptions}
-        />
-        {assignMutation.isPending && <Spinner size="sm" />}
+        <ButtonGroup className="flex flex-col items-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => onEdit(model)} className="text-primary">
+            {t('common.edit')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(model.id)}
+            disabled={deletePending}
+            className="text-error">
+            {deletePending ? t('common.deleting') : t('model.model_delete')}
+          </Button>
+        </ButtonGroup>
       </div>
     </Section>
   );

@@ -18,7 +18,6 @@ import {
   InProgressJob,
   Job,
   Model,
-  ModelListResponse,
   PendingJob,
   Pool,
   PullRequest,
@@ -85,8 +84,10 @@ export const api = {
   deleteBackend: (id: string) => apiFetch<void>(`/api/backends/${id}`, options('DELETE')),
 
   // Model State
-  createModel: (model: string) => apiFetch<Model>('/api/models', options('POST', { model })),
-  getModels: () => apiFetch<ModelListResponse>('/api/models'),
+  createModel: (model: Partial<Model>) => apiFetch<Model>('/api/models', options('POST', model)),
+  updateModel: (id: string, data: Partial<Model>) =>
+    apiFetch<Model>(`/api/models/${id}`, options('PUT', data)),
+  getModels: () => apiFetch<Model[]>('/api/internal/models'),
   deleteModel: (model: string) => apiFetch<void>(`/api/models/${model}`, options('DELETE')),
 
   // Chats

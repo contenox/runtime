@@ -8,7 +8,7 @@ import {
   useUpdateBackend,
 } from '../../../../hooks/useBackends';
 import { useCreateModel } from '../../../../hooks/useModels';
-import { Backend, DownloadStatus } from '../../../../lib/types';
+import { Backend, DownloadStatus, Model } from '../../../../lib/types';
 import { BackendCard } from './BackendCard';
 import BackendForm from './BackendForm';
 import ModelForm from './ModelForm';
@@ -19,7 +19,15 @@ type BackendsSectionProps = {
 };
 
 export default function BackendsSection({ statusMap }: BackendsSectionProps) {
-  const [newModel, setNewModel] = useState('');
+  // State for creating a new model
+  const [createModelFormData, setCreateModelFormData] = useState<Partial<Model>>({
+    model: '',
+    contextLength: 4096,
+    canChat: true,
+    canEmbed: false,
+    canPrompt: true,
+    canStream: true,
+  });
 
   const createModelMutation = useCreateModel();
 
@@ -27,11 +35,19 @@ export default function BackendsSection({ statusMap }: BackendsSectionProps) {
   const createBackendMutation = useCreateBackend();
   const updateBackendMutation = useUpdateBackend();
   const deleteBackendMutation = useDeleteBackend();
-  const handleDeclareModel = (e: React.FormEvent) => {
+
+  const handleCreateModel = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newModel.trim()) return;
-    createModelMutation.mutate(newModel, {
-      onSuccess: () => setNewModel(''),
+    createModelMutation.mutate(createModelFormData, {
+      onSuccess: () =>
+        setCreateModelFormData({
+          model: '',
+          contextLength: 4096,
+          canChat: true,
+          canEmbed: false,
+          canPrompt: true,
+          canStream: true,
+        }),
     });
   };
 
@@ -71,7 +87,6 @@ export default function BackendsSection({ statusMap }: BackendsSectionProps) {
   const handleDelete = async (id: string) => {
     await deleteBackendMutation.mutateAsync(id);
   };
-  console.log(statusMap);
 
   return (
     <GridLayout variant="body">
@@ -103,27 +118,36 @@ export default function BackendsSection({ statusMap }: BackendsSectionProps) {
         />
 
         <ModelForm
-          newModel={newModel}
-          onSubmit={handleDeclareModel}
-          onChange={e => setNewModel(e.target.value)}
+          editingModel={null}
+          formData={createModelFormData}
+          setFormData={setCreateModelFormData}
+          onCancel={() =>
+            setCreateModelFormData({
+              model: '',
+              contextLength: 4096,
+              canChat: true,
+              canEmbed: false,
+              canPrompt: true,
+              canStream: true,
+            })
+          }
+          onSubmit={handleCreateModel}
           isPending={createModelMutation.isPending}
+          error={createModelMutation.isError}
         />
       </Section>
     </GridLayout>
   );
+
   function Backends() {
-    return backends.map(backend => (
+    return backends?.map(backend => (
       <div key={backend.id}>
-        {backends && backends.length > 0 ? (
-          <BackendCard
-            backend={backend}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            statusMap={statusMap}
-          />
-        ) : (
-          <Section>{t('backends.list_404')}</Section>
-        )}{' '}
+        <BackendCard
+          backend={backend}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          statusMap={statusMap}
+        />
       </div>
     ));
   }

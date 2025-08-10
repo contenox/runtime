@@ -40,18 +40,6 @@ export type Job = {
   createdAt: Date;
 };
 
-export type ModelListResponse = {
-  data: OpenAIModel[];
-  object: string;
-};
-
-export type OpenAIModel = {
-  id: string;
-  object: string;
-  created: string;
-  owned_by: string;
-};
-
 export type ChatSession = {
   id: string;
   startedAt: string;
@@ -102,6 +90,11 @@ export type QueueProgressStatus = {
 export type Model = {
   id: string;
   model: string;
+  contextLength: number;
+  canChat: boolean;
+  canEmbed: boolean;
+  canPrompt: boolean;
+  canStream: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

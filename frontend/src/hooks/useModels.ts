@@ -6,19 +6,34 @@ import {
 } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { modelKeys } from '../lib/queryKeys';
-import { Model, ModelListResponse } from '../lib/types';
+import { Model } from '../lib/types';
 
 export function useModels() {
-  return useSuspenseQuery<ModelListResponse>({
+  return useSuspenseQuery<Model[]>({
     queryKey: modelKeys.all,
     queryFn: api.getModels,
   });
 }
 
-export function useCreateModel(): UseMutationResult<Model, Error, string, unknown> {
+export function useCreateModel(): UseMutationResult<Model, Error, Partial<Model>, unknown> {
   const queryClient = useQueryClient();
-  return useMutation<Model, Error, string>({
+  return useMutation<Model, Error, Partial<Model>>({
     mutationFn: api.createModel,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: modelKeys.all });
+    },
+  });
+}
+
+export function useUpdateModel(): UseMutationResult<
+  Model,
+  Error,
+  { id: string; data: Partial<Model> },
+  unknown
+> {
+  const queryClient = useQueryClient();
+  return useMutation<Model, Error, { id: string; data: Partial<Model> }>({
+    mutationFn: ({ id, data }) => api.updateModel(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: modelKeys.all });
     },

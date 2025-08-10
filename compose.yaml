@@ -3,17 +3,21 @@ version: "3.8"
 services:
   # Core kernel runtime
   runtime:
-    image: ghcr.io/contenox/runtime-api:v0.0.16
+    image: ghcr.io/contenox/runtime-api:v0.0.19
     container_name: contenox-runtime
-    env_file: .env
+    #env_file: .env
     environment:
-      DATABASE_URL: postgres://username:password@postgres-kernel:5432/postgres?sslmode=disable
-      PORT: 8080
-      TOKENIZER_SERVICE_URL: http://tokenizer:50051
-      EMBED_MODEL: nomic-embed-text:latest
-      WORKER_USER_EMAIL: worker-kernel@example.com
-      TASK_MODEL: qwen3:4b
-      KV_HOST: valkey:6379
+      - DATABASE_URL=postgres://username:password@postgres-kernel:5432/postgres?sslmode=disable
+      - PORT=8080
+      - TOKENIZER_SERVICE_URL=http://tokenizer:50051
+      - EMBED_MODEL=nomic-embed-text:latest
+      - EMBED_MODEL_CONTEXT_LENGTH=2048
+      - TASK_MODEL=qwen3:4b
+      - TASK_MODEL_CONTEXT_LENGTH=2048
+      - KV_HOST=valkey:6379
+      - NATS_URL=nats://natsuser:natspassword@nats:4222
+      - NATS_USER=natsuser
+      - NATS_PASSWORD=natspassword
     depends_on:
       postgres-kernel:
         condition: service_healthy
