@@ -14,14 +14,14 @@ This project followed an iterative slice-based development approach where each m
 
 The approach proved effective for managing complexity, though some features (like the task engine design) required more iteration than initially anticipated. Future slices will focus on stabilizing the architecture while adding new capabilities.
 
-## Future Slices (Planned)
+## For Future Slices (Planned)
 
+  - Production Capabilities
   - Complete permission model improvements
   - Implement shared chat sessions
   - Exportable conversation transcripts
   - Model fine-tuning management
   - MCP compatibility implementation
-  - Fix the ollama model-provider implementation
   - Fix the openai model-provider implementation
 
 ---
@@ -43,6 +43,9 @@ The approach proved effective for managing complexity, though some features (lik
 - Production-Ready PR Reviewer: Deploying a working GitHub PR review solution
 - Task Engine Specification: Completing the documentation for chain definition and hook system
 - Model Provider: Refactoring into a standalone reusable library
+- Scope-Creep: Token billing
+- Scope-Creep: Prepwork for the DSL-UI-Builder
+- Scope-Creep: Bot & Frontend configuration instead of Forms
 
 ---
 
@@ -78,6 +81,8 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Fix Task-Engine design (refactoring planned for next slice)
 - [x] Add variable composition enhancements
 - [x] Integrated githubworker for PR handling
+- [x] Fix the ollama model-provider implementation
+
 
 ### Not Completed Items
 - Package a Persona-Chat Application

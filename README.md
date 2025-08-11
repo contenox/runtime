@@ -2,6 +2,11 @@
 
 `shifting agency from the LLM to defined behavior`
 
+
+![Active](https://img.shields.io/badge/status-active-brightgreen)
+![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)
+![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
+
 > **Build context-aware AI systems with LLMs** — An open runtime for Autonomous Agents (Bots) and Co-Pilots (Frontends) with shared behavior logic.
 
 This MVP showcases a vision for building **agent systems** that:
