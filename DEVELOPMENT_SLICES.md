@@ -38,11 +38,13 @@ The approach proved effective for managing complexity, though some features (lik
 
 ### Key Deliverables
 
-- Hook-Based Integration System: Replace dedicated workers with proper hook implementations
-- GitHub Comment Synchronization: Fix the critical "no way to compute a diff" issue
-- Production-Ready PR Reviewer: Deploy a working GitHub PR review solution
-- Task Engine Specification: Complete documentation for chain definition and hook system
+- Hook-Based Integration System: Migration from dedicated workers to user-defined remote server connections
+- GitHub Comment Synchronization: Fixing the critical "no way to compute a diff" issue
+- Production-Ready PR Reviewer: Deploying a working GitHub PR review solution
+- Task Engine Specification: Completing the documentation for chain definition and hook system
+- Model Provider: Refactoring into a standalone reusable library
 
+---
 
 ## July 2025 – Building a demo application
 
@@ -58,11 +60,11 @@ The approach proved effective for managing complexity, though some features (lik
 
 ### Key Deliverables
 - Task Engine Enhancements: Improved system instruction handling and variable composition
-- Activity Logging: Implemented tracking and visualization of system activity
-- GitHub Integration: Added PR tracking functionality and initial frontend
+- Activity Logging: Delivery of tracking and visualization of system activity
+- GitHub Integration: Delivery of PR tracking functionality and initial frontend
 - Bot Routing Improvements: Enhanced routing logic for bot commands
 - Documentation Updates: Comprehensive documentation refresh to match current direction
-- Tokenizer Fixes: Addressed critical token masking issues
+- Tokenizer Fixes: Addressing tokenizer interface issues
 
 ### Completed Items
 - [x] Basic Observability Integration & UI Dashboard
@@ -75,10 +77,11 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] GitHub PR Moderator (core functionality complete but needs final polish)
 - [x] Fix Task-Engine design (refactoring planned for next slice)
 - [x] Add variable composition enhancements
+- [x] Integrated githubworker for PR handling
 
-### Remaining Items
-- [ ] Package a Persona-Chat Application
-- [ ] Permission Model Improvements (partially implemented)
+### Not Completed Items
+- Package a Persona-Chat Application
+- Permission Model Improvements (partially implemented)
 
 ### Effort Estimate
 - 180-220 hours
@@ -118,6 +121,8 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Persisting Tasks
 - [x] Integration tests for dispatcher
 - [x] Worker authentication fixes
+- [x] Redesigned broker-worker architecture for improved async job handling
+- [x] Prepare modelprovider to become a reusable library
 
 ### Notes
 - Formal release processes are not part of the MVP; they will be implemented in the re-architecture phase.
@@ -153,6 +158,8 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Cleaning & Wiring: Ensured components were integrated and passing tests
 - [x] Python worker integration for document processing
 - [x] Resource type implementation for chunks
+- [x] First implementation of the task engine
+- [x] Job cleanup logic implementation to prevent resource leaks
 
 ### Effort Estimate
 - 150-180 hours
@@ -191,6 +198,7 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Testing & CI: Fixed failing tests and set up basic Continuous Integration
 - [x] Authentication layer implementation
 - [x] Activity tracking framework foundation
+- [x] Queue item leasing implementation for job reliability
 
 ### Effort Estimate
 - 120-160 hours
@@ -227,6 +235,7 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Basic Authentication System
 - [x] Initial File Storage System
 - [x] Pub/Sub implementation for event-driven communication
+- [x] Task engine skeleton implementation
 
 ### Effort Estimate
 - 140-180 hours
