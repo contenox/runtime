@@ -236,6 +236,9 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Initial File Storage System
 - [x] Pub/Sub implementation for event-driven communication
 - [x] Task engine skeleton implementation
+- [x] Health checks for backend services and initial infrastructure setup
+- [x] Developing the core for model syncing across distributed instances
+- [x] Implementing a Circuit breaker and go routine manager library
 
 ### Effort Estimate
 - 140-180 hours
