@@ -1,4 +1,4 @@
-import { Button, Form, FormField, Input, Select } from '@contenox/ui';
+import { Button, Form, FormField, Input, Section, Select } from '@contenox/ui';
 import { useTranslation } from 'react-i18next';
 import { Backend } from '../../../../lib/types';
 
@@ -30,51 +30,53 @@ export default function BackendForm({
 }: BackendFormProps) {
   const { t } = useTranslation();
   return (
-    <Form
-      title={editingBackend ? t('backends.form_title_edit') : t('backends.form_title_create')}
-      onSubmit={onSubmit}
-      error={
-        error
-          ? `Error ${editingBackend ? 'updating' : 'creating'} backend. Please try again.`
-          : undefined
-      }
-      onError={errorMsg => console.error('Form error:', errorMsg)}
-      actions={
-        <>
-          <Button type="submit" variant="primary" disabled={isPending}>
-            {editingBackend
-              ? isPending
-                ? t('common.updating')
-                : t('backends.form_update_action')
-              : isPending
-                ? t('common.creating')
-                : t('backends.form_create_action')}
-          </Button>
-          {editingBackend && (
-            <Button type="button" variant="secondary" onClick={onCancel}>
-              {t('common.cancel')}
+    <Section>
+      <Form
+        title={editingBackend ? t('backends.form_title_edit') : t('backends.form_title_create')}
+        onSubmit={onSubmit}
+        error={
+          error
+            ? `Error ${editingBackend ? 'updating' : 'creating'} backend. Please try again.`
+            : undefined
+        }
+        onError={errorMsg => console.error('Form error:', errorMsg)}
+        actions={
+          <>
+            <Button type="submit" variant="primary" disabled={isPending}>
+              {editingBackend
+                ? isPending
+                  ? t('common.updating')
+                  : t('backends.form_update_action')
+                : isPending
+                  ? t('common.creating')
+                  : t('backends.form_create_action')}
             </Button>
-          )}
-        </>
-      }>
-      <FormField label={t('common.name')} required>
-        <Input value={name} onChange={e => setName(e.target.value)} />
-      </FormField>
+            {editingBackend && (
+              <Button type="button" variant="secondary" onClick={onCancel}>
+                {t('common.cancel')}
+              </Button>
+            )}
+          </>
+        }>
+        <FormField label={t('common.name')} required>
+          <Input value={name} onChange={e => setName(e.target.value)} />
+        </FormField>
 
-      <FormField label={t('backends.form_url')} required>
-        <Input value={baseURL} onChange={e => setBaseURL(e.target.value)} />
-      </FormField>
+        <FormField label={t('backends.form_url')} required>
+          <Input value={baseURL} onChange={e => setBaseURL(e.target.value)} />
+        </FormField>
 
-      <FormField label={t('backends.form_type')} required>
-        <Select
-          value={configType}
-          onChange={e => setConfigType(e.target.value)}
-          options={[
-            { value: 'ollama', label: 'Ollama' },
-            { value: 'vllm', label: 'vLLM' },
-          ]}
-        />
-      </FormField>
-    </Form>
+        <FormField label={t('backends.form_type')} required>
+          <Select
+            value={configType}
+            onChange={e => setConfigType(e.target.value)}
+            options={[
+              { value: 'ollama', label: 'Ollama' },
+              { value: 'vllm', label: 'vLLM' },
+            ]}
+          />
+        </FormField>
+      </Form>
+    </Section>
   );
 }
