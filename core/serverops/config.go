@@ -49,6 +49,7 @@ type Config struct {
 	// RateLimit           string `json:"rate_limit"`
 	// RateWindow          string `json:"rate_window"`
 	DownstreamToken string `json:"downstream_token"`
+	GatewayURL      string `json:"gateway_url"`
 }
 
 type ConfigTokenizerService struct {

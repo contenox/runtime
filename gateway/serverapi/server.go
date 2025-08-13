@@ -302,6 +302,7 @@ func New(
 	if err != nil {
 		return nil, cleanup, err
 	}
+
 	systemapi.AddRoutes(mux, config, serverops.GetManagerInstance())
 
 	return handler, cleanup, nil

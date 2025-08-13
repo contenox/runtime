@@ -4,16 +4,20 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"time"
 
+	"github.com/contenox/activitytracker"
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
 	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
+	"github.com/contenox/runtime-mvp/core/hookrecipes"
+	"github.com/contenox/runtime-mvp/core/hooks"
 	"github.com/contenox/runtime-mvp/core/kv"
 	"github.com/contenox/runtime-mvp/core/serverops"
 	"github.com/contenox/runtime-mvp/core/serverops/store"
@@ -21,6 +25,7 @@ import (
 	"github.com/contenox/runtime-mvp/core/tasksrecipes"
 	"github.com/contenox/runtime-mvp/gateway/serverapi"
 	"github.com/contenox/runtime/runtimesdk"
+	"github.com/contenox/runtime/taskengine"
 )
 
 var (
@@ -150,8 +155,33 @@ func main() {
 	if err != nil {
 		log.Fatalf("initializing default tasks failed: %v", err)
 	}
+	tracker := taskengine.NewKVActivityTracker(kvManager)
+	stdOuttracker := activitytracker.NewLogActivityTracker(slog.Default())
+	serveropsChainedTracker := activitytracker.ChainedTracker{
+		tracker,
+		stdOuttracker,
+	}
+	hookDeps := hookrecipes.HookDependencies{
+		DBInstance:      dbInstance,
+		ChatManager:     chatManager,
+		Embedder:        client.EmbedService,
+		VectorStore:     vectorStore,
+		ActivityTracker: serveropsChainedTracker,
+	}
+	legacyHooks := hookrecipes.NewLegacyHooks(hookDeps)
 
+	bridge := hooks.NewBridgeService(
+		legacyHooks,
+		client,
+		config.GatewayURL,
+	)
+
+	err = bridge.Start(ctx)
+	if err != nil {
+		log.Fatalf("starting bridge service failed: %v", err)
+	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /hooks/legacy/{name}", bridge.HandleHook)
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
 	uiURL, err := url.Parse(config.UIBaseURL)
 	if err != nil {
