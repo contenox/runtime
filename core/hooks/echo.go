@@ -17,17 +17,17 @@ func NewEchoHook() taskengine.HookRepo {
 }
 
 // Exec handles execution by echoing the input arguments.
-func (e *EchoHook) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+func (e *EchoHook) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (any, taskengine.DataType, string, error) {
 	switch dataType {
 	case taskengine.DataTypeString:
 		if inputStr, ok := input.(string); ok {
-			return taskengine.StatusSuccess, inputStr, taskengine.DataTypeString, transition, nil
+			return inputStr, taskengine.DataTypeString, transition, nil
 		}
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid string input")
+		return nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid string input")
 	case taskengine.DataTypeChatHistory:
 		chatHist, ok := input.(taskengine.ChatHistory)
 		if !ok {
-			return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history input")
+			return nil, taskengine.DataTypeAny, transition, fmt.Errorf("invalid chat history input")
 		}
 
 		// Create assistant response echoing the last USER message
@@ -53,10 +53,10 @@ func (e *EchoHook) Exec(ctx context.Context, startTime time.Time, input any, dat
 		chatHist.Messages = append(chatHist.Messages, echoMsg)
 		chatHist.OutputTokens += 0 // Will be calculated later
 
-		return taskengine.StatusSuccess, chatHist, taskengine.DataTypeChatHistory, transition, nil
+		return chatHist, taskengine.DataTypeChatHistory, transition, nil
 
 	default:
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("unsupported data type: %v", dataType)
+		return nil, taskengine.DataTypeAny, transition, fmt.Errorf("unsupported data type: %v", dataType)
 	}
 }
 
@@ -66,7 +66,7 @@ func (e *EchoHook) Supports(ctx context.Context) ([]string, error) {
 }
 
 // Get returns the function corresponding to the hook name.
-func (e *EchoHook) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (int, any, taskengine.DataType, string, error), error) {
+func (e *EchoHook) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (any, taskengine.DataType, string, error), error) {
 	if name != "echo" {
 		return nil, fmt.Errorf("unsupported hook type: %s", name)
 	}

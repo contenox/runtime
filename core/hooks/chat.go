@@ -37,7 +37,7 @@ func NewChatHook(dbInstance libdb.DBManager, chatManager *chat.Manager) taskengi
 
 var _ taskengine.HookRepo = (*Chat)(nil)
 
-func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (int, any, taskengine.DataType, string, error), error) {
+func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengine.DataType, string, *taskengine.HookCall) (any, taskengine.DataType, string, error), error) {
 	switch name {
 	case "convert_openai_to_history":
 		return h.AppendOpenAIChatToChathistory, nil
@@ -49,26 +49,26 @@ func (h *Chat) Get(name string) (func(context.Context, time.Time, any, taskengin
 }
 
 // Exec resolves and runs the hook function based on the provided hook call.
-func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+func (h *Chat) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (any, taskengine.DataType, string, error) {
 	if hookCall.Args == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("invalid hook call: missing type")
+		return nil, taskengine.DataTypeAny, "", fmt.Errorf("invalid hook call: missing type")
 	}
 	hookFunc, err := h.Get(hookCall.Name)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, "", fmt.Errorf("failed to get hook function: %w", err)
+		return nil, taskengine.DataTypeAny, "", fmt.Errorf("failed to get hook function: %w", err)
 	}
 
 	return hookFunc(ctx, startTime, input, dataType, transition, hookCall)
 }
 
-func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeOpenAIChat {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected OpenAI chat input")
+		return nil, taskengine.DataTypeAny, transition, fmt.Errorf("expected OpenAI chat input")
 	}
 
 	openAIHistory, ok := input.(taskengine.OpenAIChatRequest)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got %s an invalid input type, expected OpenAIChatRequest", dataType.String())
+		return nil, taskengine.DataTypeAny, transition, fmt.Errorf("append to chat got %s an invalid input type, expected OpenAIChatRequest", dataType.String())
 	}
 	history := taskengine.ChatHistory{
 		Messages: []taskengine.Message{},
@@ -81,7 +81,7 @@ func (h *Chat) AppendOpenAIChatToChathistory(ctx context.Context, startTime time
 		})
 	}
 
-	return taskengine.StatusSuccess, history, taskengine.DataTypeChatHistory, "appended", nil
+	return history, taskengine.DataTypeChatHistory, "appended", nil
 }
 
 func (h *Chat) ConvertToOpenAIResponse(
@@ -91,15 +91,15 @@ func (h *Chat) ConvertToOpenAIResponse(
 	dataType taskengine.DataType,
 	transition string,
 	hookCall *taskengine.HookCall,
-) (int, any, taskengine.DataType, string, error) {
+) (any, taskengine.DataType, string, error) {
 	if dataType != taskengine.DataTypeChatHistory {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+		return nil, taskengine.DataTypeAny, transition,
 			fmt.Errorf("ConvertToOpenAIResponse expected chat history, got %s", dataType.String())
 	}
 
 	history, ok := input.(taskengine.ChatHistory)
 	if !ok {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+		return nil, taskengine.DataTypeAny, transition,
 			fmt.Errorf("invalid input type: expected ChatHistory")
 	}
 
@@ -113,7 +113,7 @@ func (h *Chat) ConvertToOpenAIResponse(
 	}
 
 	if lastAsstMessage == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition,
+		return nil, taskengine.DataTypeAny, transition,
 			fmt.Errorf("no assistant message found in history")
 	}
 
@@ -141,6 +141,6 @@ func (h *Chat) ConvertToOpenAIResponse(
 		SystemFingerprint: "fp_" + uuid.New().String()[:8],
 	}
 
-	return taskengine.StatusSuccess, resp, taskengine.DataTypeOpenAIChatResponse,
+	return resp, taskengine.DataTypeOpenAIChatResponse,
 		"converted history to OpenAI response", nil
 }

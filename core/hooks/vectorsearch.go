@@ -47,17 +47,17 @@ func (h *Search) Exec(
 	dataType taskengine.DataType,
 	transition string,
 	hook *taskengine.HookCall,
-) (int, any, taskengine.DataType, string, error) {
+) (any, taskengine.DataType, string, error) {
 	if input == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("input must be a string")
+		return nil, taskengine.DataTypeAny, transition, errors.New("input must be a string")
 	}
 	if hook == nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("SERVER BUG: hook must be provided")
+		return nil, taskengine.DataTypeAny, transition, errors.New("SERVER BUG: hook must be provided")
 	}
 	// Ensure input is a string
 	in, ok := input.(string)
 	if !ok && dataType != taskengine.DataTypeString {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("input must be a string")
+		return nil, taskengine.DataTypeAny, transition, errors.New("input must be a string")
 	}
 
 	topK := 1
@@ -68,10 +68,10 @@ func (h *Search) Exec(
 			if k, err := strconv.Atoi(kStr); err == nil && k > 0 {
 				topK = k
 			} else {
-				return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("top_k must be a positive integer")
+				return nil, taskengine.DataTypeAny, transition, errors.New("top_k must be a positive integer")
 			}
 			if topK <= 0 {
-				return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("top_k must be a positive integer")
+				return nil, taskengine.DataTypeAny, transition, errors.New("top_k must be a positive integer")
 			}
 		}
 		if eStr := hook.Args["epsilon"]; eStr != "" {
@@ -79,17 +79,17 @@ func (h *Search) Exec(
 				argsSet = true
 				epsilon = float32(e)
 			} else {
-				return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("epsilon must be a float")
+				return nil, taskengine.DataTypeAny, transition, errors.New("epsilon must be a float")
 			}
 		}
 		if rStr := hook.Args["radius"]; rStr != "" {
 			if r, err := strconv.ParseFloat(rStr, 32); err == nil {
 				if !argsSet {
-					return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("radius requires epsilon")
+					return nil, taskengine.DataTypeAny, transition, errors.New("radius requires epsilon")
 				}
 				radius = float32(r)
 			} else {
-				return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, errors.New("radius must be a float")
+				return nil, taskengine.DataTypeAny, transition, errors.New("radius must be a float")
 			}
 		}
 	}
@@ -111,7 +111,7 @@ func (h *Search) Exec(
 		searchArgs,
 	)
 	if err != nil {
-		return taskengine.StatusError, nil, taskengine.DataTypeAny, transition, fmt.Errorf("vector search failed: %w", err)
+		return nil, taskengine.DataTypeAny, transition, fmt.Errorf("vector search failed: %w", err)
 	}
 	convertedResults := make([]taskengine.SearchResult, len(results))
 	for i := range results {
@@ -122,5 +122,5 @@ func (h *Search) Exec(
 		}
 	}
 
-	return taskengine.StatusSuccess, convertedResults, taskengine.DataTypeSearchResults, fmt.Sprint(len(results)), nil
+	return convertedResults, taskengine.DataTypeSearchResults, fmt.Sprint(len(results)), nil
 }

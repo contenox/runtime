@@ -10,13 +10,13 @@ replace github.com/contenox/runtime-mvp/libs/libtestenv => ../libs/libtestenv
 replace github.com/contenox/runtime-mvp/core => ../core
 
 require (
-	github.com/contenox/activitytracker v0.0.2
+	github.com/contenox/activitytracker v0.0.3
 	github.com/contenox/authz v0.0.1
 	github.com/contenox/bus v0.0.2
 	github.com/contenox/dbexec v0.0.2
 	github.com/contenox/kvstore v0.0.1
 	github.com/contenox/routine v0.0.1
-	github.com/contenox/runtime v0.0.21
+	github.com/contenox/runtime v0.0.22
 	github.com/contenox/runtime-mvp/core v0.0.0-00010101000000-000000000000
 	github.com/google/go-github/v58 v58.0.0
 	github.com/google/uuid v1.6.0

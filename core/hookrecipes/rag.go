@@ -58,7 +58,7 @@ func (r *SearchThenResolveHook) Exec(
 	dataType taskengine.DataType,
 	transition string,
 	hook *taskengine.HookCall,
-) (int, any, taskengine.DataType, string, error) {
+) (any, taskengine.DataType, string, error) {
 	reportErr, _, end := r.tracker.Start(ctx, "exec", "search_then_resolve", "hook_type", "search_knowledge")
 	defer end()
 
@@ -68,7 +68,7 @@ func (r *SearchThenResolveHook) Exec(
 			topK = k
 		} else {
 			reportErr(errors.New("invalid top_k"))
-			return taskengine.StatusError, nil, dataType, transition, errors.New("top_k must be a positive integer")
+			return nil, dataType, transition, errors.New("top_k must be a positive integer")
 		}
 	}
 
@@ -78,7 +78,7 @@ func (r *SearchThenResolveHook) Exec(
 			epsilon = e
 		} else {
 			reportErr(errors.New("invalid epsilon"))
-			return taskengine.StatusError, nil, dataType, transition, errors.New("epsilon must be a non-negative number")
+			return nil, dataType, transition, errors.New("epsilon must be a non-negative number")
 		}
 	}
 
@@ -88,7 +88,7 @@ func (r *SearchThenResolveHook) Exec(
 			distance = d
 		} else {
 			reportErr(errors.New("invalid distance"))
-			return taskengine.StatusError, nil, dataType, transition, errors.New("distance must be a valid number")
+			return nil, dataType, transition, errors.New("distance must be a valid number")
 		}
 	}
 
@@ -98,7 +98,7 @@ func (r *SearchThenResolveHook) Exec(
 			position = p
 		} else {
 			reportErr(errors.New("invalid position"))
-			return taskengine.StatusError, nil, dataType, transition, errors.New("position must be a non-negative integer")
+			return nil, dataType, transition, errors.New("position must be a non-negative integer")
 		}
 	}
 
@@ -108,7 +108,7 @@ func (r *SearchThenResolveHook) Exec(
 			radius = r
 		} else {
 			reportErr(errors.New("invalid radius"))
-			return taskengine.StatusError, nil, dataType, transition, errors.New("radius must be a non-negative number")
+			return nil, dataType, transition, errors.New("radius must be a non-negative number")
 		}
 	}
 
@@ -138,13 +138,13 @@ func (r *SearchThenResolveHook) Exec(
 	inStr, err := getPrompt()
 	if err != nil {
 		reportErr(err)
-		return taskengine.StatusError, nil, dataType, transition, err
+		return nil, dataType, transition, err
 	}
 	var parsedArgs map[string]string
 	inStrParsed, args, err := ParsePrefixedArgs(inStr)
 	if err != nil {
 		reportErr(err)
-		return taskengine.StatusError, nil, dataType, transition, err
+		return nil, dataType, transition, err
 	}
 	input = inStrParsed
 	parsedArgs = args
@@ -177,7 +177,7 @@ func (r *SearchThenResolveHook) Exec(
 	}
 
 	// 🔍 Run SearchHook
-	status, out, outType, trans, err := r.SearchHook.Exec(
+	out, outType, trans, err := r.SearchHook.Exec(
 		ctx,
 		startTime,
 		input,
@@ -194,12 +194,12 @@ func (r *SearchThenResolveHook) Exec(
 		},
 	)
 
-	if status != taskengine.StatusSuccess || err != nil {
+	if err != nil {
 		reportErr(fmt.Errorf("search failed: %w", err))
-		return status, out, outType, trans, fmt.Errorf("search failed: %w", err)
+		return out, outType, trans, fmt.Errorf("search failed: %w", err)
 	}
 
-	status, out, outType, trans, err = r.ResolveHook.Exec(
+	out, outType, trans, err = r.ResolveHook.Exec(
 		ctx,
 		startTime,
 		out,
@@ -214,10 +214,10 @@ func (r *SearchThenResolveHook) Exec(
 		},
 	)
 
-	if status != taskengine.StatusSuccess || err != nil {
+	if err != nil {
 		reportErr(fmt.Errorf("resolve failed: %w", err))
-		return status, out, outType, trans, fmt.Errorf("resolve failed: %w", err)
+		return out, outType, trans, fmt.Errorf("resolve failed: %w", err)
 	}
 
-	return status, out, outType, name, nil
+	return out, outType, name, nil
 }

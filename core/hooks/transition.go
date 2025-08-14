@@ -24,12 +24,12 @@ func NewTransition(transition string, tracker activitytracker.ActivityTracker) *
 	}
 }
 
-func (h *Transition) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (int, any, taskengine.DataType, string, error) {
+func (h *Transition) Exec(ctx context.Context, startTime time.Time, input any, dataType taskengine.DataType, transition string, hookCall *taskengine.HookCall) (any, taskengine.DataType, string, error) {
 	_, _, end := h.tracker.Start(ctx, "exec", "transition_hook")
 	defer end()
 
 	// Return the input unchanged but with our predefined transition
-	return taskengine.StatusSuccess, input, dataType, h.transition, nil
+	return input, dataType, h.transition, nil
 }
 
 func (h *Transition) Supports(ctx context.Context) ([]string, error) {

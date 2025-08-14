@@ -70,7 +70,7 @@ func (b *BridgeService) HandleHook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute hook
-	status, output, outType, transition, err := hook.Exec(
+	output, outType, transition, err := hook.Exec(
 		r.Context(),
 		req.StartingTime,
 		req.Input,
@@ -79,20 +79,17 @@ func (b *BridgeService) HandleHook(w http.ResponseWriter, r *http.Request) {
 		req.Args,
 	)
 
-	if status != taskengine.StatusSuccess {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	// Prepare response
 	resp := struct {
 		Output     any    `json:"output"`
 		DataType   string `json:"dataType"`
 		Transition string `json:"transition"`
+		Error      string `json:"error,omitempty"`
 	}{
 		Output:     output,
 		DataType:   outType.String(),
 		Transition: transition,
+		Error:      err.Error(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -123,7 +120,7 @@ func (b *BridgeService) makeHandler(name string) http.HandlerFunc {
 		}
 
 		// Execute hook
-		status, output, outType, transition, err := hook.Exec(
+		output, outType, transition, err := hook.Exec(
 			r.Context(),
 			req.StartingTime,
 			req.Input,
@@ -131,11 +128,6 @@ func (b *BridgeService) makeHandler(name string) http.HandlerFunc {
 			req.Transition,
 			req.Args,
 		)
-
-		if status != taskengine.StatusSuccess {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
 
 		// Prepare response
 		resp := struct {
