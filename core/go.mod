@@ -15,7 +15,7 @@ require (
 	github.com/contenox/dbexec v0.0.2
 	github.com/contenox/kvstore v0.0.1
 	github.com/contenox/modelprovider v0.0.6
-	github.com/contenox/runtime v0.0.22
+	github.com/contenox/runtime v0.0.37
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0

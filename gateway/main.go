@@ -14,6 +14,7 @@ import (
 	libbus "github.com/contenox/bus"
 	libdb "github.com/contenox/dbexec"
 	libkv "github.com/contenox/kvstore"
+	"github.com/contenox/routine"
 	libroutine "github.com/contenox/routine"
 	"github.com/contenox/runtime-mvp/core/chat"
 	"github.com/contenox/runtime-mvp/core/hookrecipes"
@@ -136,11 +137,17 @@ func main() {
 		log.Fatalf("initializing kv manager 2 failed: %v", err)
 	}
 	cleanups = append(cleanups, cleanup)
-	client, err := runtimesdk.NewClient(runtimesdk.Config{
-		BaseURL: config.RuntimeBaseUrl,
-		Token:   config.DownstreamToken,
-	}, http.DefaultClient)
-	if err != nil {
+	var client *runtimesdk.Client
+	sdkCtx, sdkCancel := context.WithTimeout(ctx, time.Second*5)
+	defer sdkCancel()
+	routine.NewRoutine(2, time.Second*5).ExecuteWithRetry(sdkCtx, time.Second, 5, func(sdkCtx context.Context) error {
+		client, err = runtimesdk.NewClient(sdkCtx, runtimesdk.Config{
+			BaseURL: config.RuntimeBaseUrl,
+			Token:   config.DownstreamToken,
+		}, http.DefaultClient)
+		return err
+	})
+	if client == nil {
 		log.Fatalf("initializing runtime client failed: %v", err)
 	}
 

@@ -26,8 +26,8 @@ github.com/contenox/kvstore v0.0.1 h1:caWl8UoL7ZhT52QEnwc8q0II06hX2K08g0iD5aAIal
 github.com/contenox/kvstore v0.0.1/go.mod h1:vPAABNgqO8Xz+AotFyOAIW883uiiPrO+GYCnXK4S/dU=
 github.com/contenox/modelprovider v0.0.6 h1:vw48VAG9RtKc7MOAKEy3k7FidscXqEAlxTz88RQVyU4=
 github.com/contenox/modelprovider v0.0.6/go.mod h1:aoSoJAb92saScq4y4FQUhx0T6G/rJrs9fh0XHF1ZYkg=
-github.com/contenox/runtime v0.0.22 h1:fd92KqVWionVlG/54Su2AW1dWwWFRsnj9PAVmncjOT4=
-github.com/contenox/runtime v0.0.22/go.mod h1:cl3Gf5bcK368Da9mLII9hfh/nNbGk1DpuBl1IADf6rs=
+github.com/contenox/runtime v0.0.37 h1:97GijzxCcXOPze/tUZT1t1tWWRh59kguNUsyus/kc10=
+github.com/contenox/runtime v0.0.37/go.mod h1:cl3Gf5bcK368Da9mLII9hfh/nNbGk1DpuBl1IADf6rs=
 github.com/cpuguy83/dockercfg v0.3.2 h1:DlJTyZGBDlXqUZ2Dk2Q3xHs/FtnooJJVaad2S9GKorA=
 github.com/cpuguy83/dockercfg v0.3.2/go.mod h1:sugsbF4//dDlL/i+S+rtpIWp+5h0BHJHfjj5/jFyUJc=
 github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
