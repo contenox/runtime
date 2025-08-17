@@ -69,11 +69,17 @@ func (b *BridgeService) HandleHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	input, err := taskengine.ConvertToType(req.Input, dataType)
+	if err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
 	// Execute hook
 	output, outType, transition, err := hook.Exec(
 		r.Context(),
 		req.StartingTime,
-		req.Input,
+		input,
 		dataType,
 		req.Transition,
 		req.Args,
@@ -89,9 +95,10 @@ func (b *BridgeService) HandleHook(w http.ResponseWriter, r *http.Request) {
 		Output:     output,
 		DataType:   outType.String(),
 		Transition: transition,
-		Error:      err.Error(),
 	}
-
+	if err != nil {
+		resp.Error = err.Error()
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }

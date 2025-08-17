@@ -103,8 +103,8 @@ func (h *chatManagerHandler) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	reply, inputTokenCount, outputTokenCount, capturedStateUnits, err := h.service.Chat(ctx, reqConv)
 	if err != nil {
-		// _ = serverops.Error(w, r, err, serverops.CreateOperation)
-		reply = fmt.Sprintf("Error: %v", err)
+		_ = serverops.Error(w, r, err, serverops.CreateOperation)
+		// reply = fmt.Sprintf("Error: %v", err)
 	}
 
 	resp := map[string]any{

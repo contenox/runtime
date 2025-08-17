@@ -38,7 +38,7 @@ The approach proved effective for managing complexity, though some features (lik
 
 ### Key Deliverables
 
-- Hook-Based Integration System: Migration from dedicated workers to user-defined remote server connections
+- Hook-Based Integration System: Migration to user-defined remote server connections
 - GitHub Comment Synchronization: Fixing the critical "no way to compute a diff" issue
 - Production-Ready PR Reviewer: Deploying a working GitHub PR review solution
 - Task Engine Specification: Completing the documentation for chain definition and hook system
@@ -46,6 +46,18 @@ The approach proved effective for managing complexity, though some features (lik
 - Scope-Creep: Token billing
 - Scope-Creep: Prepwork for the DSL-UI-Builder
 - Scope-Creep: Bot & Frontend configuration instead of Forms
+
+### Completed Items:
+- [x] Implement and test the new hook registry system for extensible integrations
+- [x] Connection of existing hooks to the runtime via a bridge as a remote server connection
+- [x] Generation of OpenAPI specification for the runtime via ast analysis
+- [x] Automation of a initial CI and release process for the runtime
+- [x] Refactor monorepo into multiple, dedicated libraries and service repositories
+- [x] Add key API features: version endpoint, pagination, and simple authentication
+- [x] Add API endpoints for exposing text embeddings
+- [x] Create and integrate a new Go SDK for service-to-service communication
+- [x] Improve model management to remove the hardcoded capabilities
+- [x] Address breaking changes from Ollama-APIs and model behavior
 
 ---
 

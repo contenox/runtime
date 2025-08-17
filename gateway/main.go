@@ -176,7 +176,9 @@ func main() {
 		ActivityTracker: serveropsChainedTracker,
 	}
 	legacyHooks := hookrecipes.NewLegacyHooks(hookDeps)
-
+	if config.GatewayURL == "" {
+		log.Fatal("GatewayURL is required")
+	}
 	bridge := hooks.NewBridgeService(
 		legacyHooks,
 		client,
