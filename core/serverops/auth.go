@@ -225,7 +225,7 @@ func CheckPassword(password, encodedHash, salt, signingKey string) (bool, error)
 	return libcipher.CheckHash(signingKey, salt, password, hashBytes)
 }
 
-func initCredentials(ctx context.Context, config *Config, tx dbexec.Exec) error {
+func InitCredentials(ctx context.Context, config *Config, tx dbexec.Exec) error {
 	storeInstance := store.New(tx)
 	passwordHash, salt, err := NewPasswordHash(config.WorkerUserPassword, config.SigningKey)
 	if err != nil {

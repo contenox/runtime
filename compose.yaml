@@ -119,9 +119,9 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.worker
-    # depends_on:
-    #   gateway:
-    #     condition: service_healthy
+    depends_on:
+      gateway:
+        condition: service_healthy
     environment:
       API_BASE_URL: http://gateway:8080/api
       WORKER_TYPE: plaintext

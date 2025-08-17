@@ -189,6 +189,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("starting bridge service failed: %v", err)
 	}
+	err = serverops.InitCredentials(ctx, config, dbInstance.WithoutTransaction())
+	if err != nil {
+		log.Fatalf("initializing credentials failed: %v", err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /hooks/legacy/{name}", bridge.HandleHook)
 	mux.Handle("/api/", http.StripPrefix("/api", apiHandler))
