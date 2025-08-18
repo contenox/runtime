@@ -247,25 +247,27 @@ export type OperatorTerm =
 export type TriggerType = 'manual' | 'keyword' | 'embedding' | 'webhook';
 
 export interface HookCall {
-  type: string;
+  name: string;
   args: Record<string, string>;
 }
 
 export interface TransitionBranch {
   operator?: OperatorTerm;
+  alert_on_match?: boolean;
   when: string;
   goto: string;
 }
 
 export interface TaskTransition {
   on_failure: string;
+  alert_on_match?: boolean;
   branches: TransitionBranch[];
 }
 
 export interface ChainTask {
   id: string;
   description: string;
-  type: ChainTaskType;
+  handler: ChainTaskType;
   valid_conditions?: Record<string, boolean>;
   hook?: HookCall;
   print?: string;

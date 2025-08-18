@@ -230,7 +230,7 @@ __metadata:
 
 "@contenox/ui@file:../packages/ui::locator=frontend%40workspace%3Afrontend":
   version: 0.1.0
-  resolution: "@contenox/ui@file:../packages/ui#../packages/ui::hash=39df97&locator=frontend%40workspace%3Afrontend"
+  resolution: "@contenox/ui@file:../packages/ui#../packages/ui::hash=02fa0c&locator=frontend%40workspace%3Afrontend"
   dependencies:
     "@tailwindcss/postcss": "npm:^4.1.3"
     "@types/react": "npm:^19.0.10"
@@ -251,7 +251,7 @@ __metadata:
     react-dom: ^19.0.0
     tailwind-merge: ^3.0.2
     tailwindcss: ^4.0.0
-  checksum: 10c0/0e8ce29a408b64df318d9d94842005c8877cf8c8a4be7e6de152906a78a5e077f5a5b30fad5a8e0e0a7043356cabb6858938ea7173b704d3ffdb36913517fddb
+  checksum: 10c0/0a03023e3cb6a94cf16cc7575a5c9d4bd78aaa9ed905676899c13405ced6aef4bc0362805036d72ffd8c1bb23e8e8cb0e139ff34ede4456382dc8d58c156ea9d
   languageName: node
   linkType: hard
 
@@ -2399,6 +2399,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/dagre@npm:^0.7.53":
+  version: 0.7.53
+  resolution: "@types/dagre@npm:0.7.53"
+  checksum: 10c0/c2311e2c6f819e0c15531d265bde6359b131ca9788e323b4cf80feb03ecf4cdd442698a1dac35eed5bb43c5fffd575eb28fc2d3c5163936756dac5183ff3af43
+  languageName: node
+  linkType: hard
+
 "@types/estree@npm:1.0.7, @types/estree@npm:^1.0.0, @types/estree@npm:^1.0.6":
   version: 1.0.7
   resolution: "@types/estree@npm:1.0.7"
@@ -3828,6 +3835,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dagre@npm:^0.8.5":
+  version: 0.8.5
+  resolution: "dagre@npm:0.8.5"
+  dependencies:
+    graphlib: "npm:^2.1.8"
+    lodash: "npm:^4.17.15"
+  checksum: 10c0/1c021b66961aa9a700bb6ec51747bcc214720a661ad6cb1878eab7316ecb550a759664a6754081a315b37d0355e3c19ff162813b36f20cbeb2e37f7440364d62
+  languageName: node
+  linkType: hard
+
 "dargs@npm:^7.0.0":
   version: 7.0.0
   resolution: "dargs@npm:7.0.0"
@@ -5208,6 +5225,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"graphlib@npm:^2.1.8":
+  version: 2.1.8
+  resolution: "graphlib@npm:2.1.8"
+  dependencies:
+    lodash: "npm:^4.17.15"
+  checksum: 10c0/41c525e4d91a6d8b4e8da1883bf4e85689a547e908557ccc53f64db9141bdfb351b9162a79f13cae81c5b3a410027f59e4fc1edc1ea442234ec08e629859b188
+  languageName: node
+  linkType: hard
+
 "handlebars@npm:^4.7.7":
   version: 4.7.8
   resolution: "handlebars@npm:4.7.8"
@@ -6363,7 +6389,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lodash@npm:^4.17.21":
+"lodash@npm:^4.17.15, lodash@npm:^4.17.21":
   version: 4.17.21
   resolution: "lodash@npm:4.17.21"
   checksum: 10c0/d8cbea072bb08655bb4c989da418994b073a608dffa608b09ac04b43a791b12aeae7cd7ad919aa4c925f33b48490b5cfe6c1f71d827956071dae2e7bb3a6b74c
@@ -8547,10 +8573,12 @@ __metadata:
   dependencies:
     "@swc/helpers": "npm:^0.5.15"
     "@tailwindcss/postcss": "npm:^4.1.3"
+    "@types/dagre": "npm:^0.7.53"
     "@types/node": "npm:^22.13.10"
     "@types/react": "npm:^19.1.1"
     "@types/react-dom": "npm:^19.1.2"
     clsx: "npm:^2.1.1"
+    dagre: "npm:^0.8.5"
     esbuild: "npm:^0.25.1"
     i18next: "npm:^24.2.3"
     jsx-runtime: "npm:^1.2.0"
