@@ -13,19 +13,20 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({ direction, onChangeDire
   const { t } = useTranslation();
 
   return (
-    <div className="flex gap-1 rounded-md bg-gray-100 p-1">
+    // The container now has dark mode classes for background and border colors.
+    <div className="bg-surface-50 border-surface-200 dark:bg-dark-surface-200 dark:border-dark-surface-700 flex gap-1 rounded-md border p-1">
       <Button
-        size="sm"
+        size="icon"
         variant={direction === 'horizontal' ? 'primary' : 'ghost'}
         onClick={() => onChangeDirection('horizontal')}
-        title={t('workflow.horizontal_layout')}>
+        aria-label={t('workflow.horizontal_layout')}>
         <LayoutGrid className="h-4 w-4" />
       </Button>
       <Button
-        size="sm"
+        size="icon"
         variant={direction === 'vertical' ? 'primary' : 'ghost'}
         onClick={() => onChangeDirection('vertical')}
-        title={t('workflow.vertical_layout')}>
+        aria-label={t('workflow.vertical_layout')}>
         <LayoutList className="h-4 w-4" />
       </Button>
     </div>

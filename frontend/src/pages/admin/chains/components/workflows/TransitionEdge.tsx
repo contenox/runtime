@@ -1,64 +1,93 @@
 import React from 'react';
-import { getConnectorPoints, NodePosition } from './utils';
+import { getConnectorPath, getTaskType, LayoutDirection, NodePosition } from './utils';
 
 interface TransitionEdgeProps {
   source: NodePosition;
   target: NodePosition;
   label: string;
+  direction: LayoutDirection;
+  fromType: string;
   isError?: boolean;
   isHighlighted?: boolean;
 }
+
+const getEdgeStrokeClass = (
+  handler: string,
+  isHighlighted?: boolean,
+  isError?: boolean,
+): string => {
+  if (isError) {
+    return 'stroke-[var(--color-error)] dark:stroke-[var(--color-dark-error-500)]';
+  }
+  if (isHighlighted) {
+    return 'stroke-[var(--color-accent-600)] dark:stroke-[var(--color-dark-accent-400)]';
+  }
+
+  const type = getTaskType(handler);
+  switch (type) {
+    case 'primary':
+      return 'stroke-[var(--color-primary)/0.8] dark:stroke-[var(--color-dark-primary-500)/0.8]';
+    case 'secondary':
+      return 'stroke-[var(--color-secondary)/0.8] dark:stroke-[var(--color-dark-secondary-500)/0.8]';
+    case 'accent':
+      return 'stroke-[var(--color-accent)/0.8] dark:stroke-[var(--color-dark-accent-500)/0.8]';
+    default:
+      return 'stroke-[var(--color-surface-400)] dark:stroke-[var(--color-dark-surface-500)]';
+  }
+};
 
 const TransitionEdge: React.FC<TransitionEdgeProps> = ({
   source,
   target,
   label,
+  direction,
+  fromType,
   isError = false,
   isHighlighted = false,
 }) => {
   if (!source || !target) return null;
 
-  const { start, end, control } = getConnectorPoints(source, target);
+  const path = getConnectorPath(source, target, direction);
 
-  // Calculate quadratic bezier curve path
-  const path = `M ${start.x},${start.y} Q ${start.x},${control.y} ${end.x},${end.y}`;
+  const labelX = (source.x + source.width / 2 + target.x + target.width / 2) / 2;
+  const labelY = (source.y + source.height / 2 + target.y + target.height / 2) / 2;
 
-  // Calculate label position
-  const labelX = (start.x + end.x) / 2;
-  const labelY = (start.y + end.y) / 2 - 10;
-
-  const strokeColor = isError ? '#ef4444' : isHighlighted ? '#3b82f6' : '#6b7280';
-  const strokeWidth = isHighlighted ? 2 : 1;
-  const dashArray = isError ? '4,2' : 'none';
+  const strokeClass = getEdgeStrokeClass(fromType, isHighlighted, isError);
+  const strokeWidth = isHighlighted ? 2.5 : 1.5;
+  const dashArray = isError ? '5 3' : 'none';
 
   return (
     <g>
       <path
         d={path}
         fill="none"
-        stroke={strokeColor}
+        className={`transition-all duration-300 ${strokeClass}`}
         strokeWidth={strokeWidth}
         strokeDasharray={dashArray}
-        className="transition-all duration-200"
+        markerEnd="url(#arrowhead)"
       />
 
-      {/* Arrowhead */}
-      <polygon
-        points={`${end.x - 4},${end.y - 8} ${end.x},${end.y} ${end.x + 4},${end.y - 8}`}
-        fill={strokeColor}
-        className="transition-all duration-200"
-      />
-
-      {/* Label */}
-      <g transform={`translate(${labelX}, ${labelY})`}>
-        <rect x="-50" y="-12" width="100" height="20" rx="4" fill="white" className="shadow-sm" />
-        <text
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="fill-gray-700 text-xs font-medium">
-          {label}
-        </text>
-      </g>
+      {label && label !== 'next' && (
+        <g transform={`translate(${labelX}, ${labelY})`}>
+          <rect
+            x="-45"
+            y="-11"
+            width="90"
+            height="22"
+            rx="6"
+            strokeWidth="1"
+            // The fill is now a darker surface color in dark mode.
+            // The stroke is now aware of dark mode for better visibility.
+            className="fill-[var(--color-surface-100)] stroke-[rgba(0,0,0,0.05)] dark:fill-[var(--color-dark-surface-100)] dark:stroke-[rgba(255,255,255,0.05)]"
+          />
+          <text
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="fill-[var(--color-text-muted)] text-xs font-medium dark:fill-[var(--color-dark-text-muted)]">
+            {label}
+          </text>
+        </g>
+      )}
     </g>
   );
 };

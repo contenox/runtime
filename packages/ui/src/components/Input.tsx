@@ -1,6 +1,11 @@
-// components/Input.tsx
 import { forwardRef, useState } from "react";
-import { cn } from "../utils";
+import type { ClassValue } from "clsx";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   startIcon?: React.ReactNode;
@@ -20,14 +25,18 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           className={cn(
-            "bg-surface-50 text-text w-full rounded-lg border px-4 py-2.5",
-            "focus:ring-primary-500 focus:ring-2 focus:ring-offset-2",
-            "dark:border-dark-secondary-300 dark:bg-dark-surface-50 dark:text-dark-text dark:focus:ring-dark-primary-500",
+            // Base styles
+            "bg-surface-50 text-text w-full rounded-lg border px-4 py-2.5 transition-colors",
+            "focus:ring-primary-500 focus:ring-2 focus:ring-offset-2 focus:outline-none",
+            // Dark mode styles
+            "dark:bg-dark-surface-200 dark:text-dark-text dark:focus:ring-dark-primary-500 dark:focus:ring-offset-dark-surface-100",
+            // Icon padding
             startIcon && "pl-10",
             endIcon && "pr-10",
+            // Error and default border states
             error
-              ? "border-error-300 focus:ring-error-500 dark:border-dark-error-300 dark:focus:ring-dark-error-500"
-              : "border-secondary-300 dark:border-dark-secondary-300 focus:border-transparent",
+              ? "border-error-300 focus:border-error-500 focus:ring-error-500 dark:border-dark-error-400 dark:focus:border-dark-error-500 dark:focus:ring-dark-error-500"
+              : "border-surface-300 dark:border-dark-surface-600 focus:border-primary-500",
             className,
           )}
           {...props}
@@ -41,6 +50,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     );
   },
 );
+
 Input.displayName = "Input";
 
 export const PasswordInput = forwardRef<HTMLInputElement, InputProps>(

@@ -1,41 +1,33 @@
 import { forwardRef } from "react";
+import type { ClassValue } from "clsx";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 import { cn } from "../utils";
 
 type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  startIcon?: React.ReactNode;
-  endIcon?: React.ReactNode;
   error?: boolean;
 };
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, startIcon, endIcon, error = false, ...props }, ref) => {
+  ({ className, error = false, ...props }, ref) => {
     return (
       <div className="relative w-full">
-        {startIcon && (
-          <div className="absolute top-3 left-3 text-secondary-400 dark:text-dark-secondary-400">
-            {startIcon}
-          </div>
-        )}
         <textarea
           ref={ref}
           className={cn(
-            "bg-surface-50 text-text w-full rounded-lg border px-4 py-2.5 min-h-[120px] resize-y",
-            "focus:ring-primary-500 focus:ring-2 focus:ring-offset-2",
-            "dark:border-dark-secondary-300 dark:bg-dark-surface-50 dark:text-dark-text dark:focus:ring-dark-primary-500",
-            startIcon && "pl-10",
-            endIcon && "pr-10",
+            // Base styles
+            "bg-surface-50 text-text w-full rounded-lg border px-4 py-2.5 min-h-[120px] resize-y transition-colors",
+            "focus:ring-primary-500 focus:ring-2 focus:ring-offset-2 focus:outline-none",
+            // Dark mode styles
+            "dark:bg-dark-surface-200 dark:text-dark-text dark:focus:ring-dark-primary-500 dark:focus:ring-offset-dark-surface-100",
+            // Error and default border states
             error
-              ? "border-error-300 focus:ring-error-500 dark:border-dark-error-300 dark:focus:ring-dark-error-500"
-              : "border-secondary-300 dark:border-dark-secondary-300 focus:border-transparent",
+              ? "border-error-300 focus:border-error-500 focus:ring-error-500 dark:border-dark-error-400 dark:focus:border-dark-error-500 dark:focus:ring-dark-error-500"
+              : "border-surface-300 dark:border-dark-surface-600 focus:border-primary-500",
             className,
           )}
           {...props}
         />
-        {endIcon && (
-          <div className="absolute top-3 right-3 text-secondary-400 dark:text-dark-secondary-400">
-            {endIcon}
-          </div>
-        )}
       </div>
     );
   },
