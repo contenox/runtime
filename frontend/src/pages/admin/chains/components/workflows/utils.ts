@@ -5,11 +5,9 @@ export type LayoutDirection = 'horizontal' | 'vertical';
 export type NodePosition = { id: string; x: number; y: number; width: number; height: number };
 export type Edge = { from: string; to: string; label: string; isError?: boolean; fromType: string };
 
-// Constants for layout
-const NODE_WIDTH = 240;
-const NODE_HEIGHT = 90;
-// Increased spacing values for a better layout
-const HORIZONTAL_SPACING = 80;
+const NODE_WIDTH = 250;
+const NODE_HEIGHT = 200;
+const HORIZONTAL_SPACING = 85;
 const VERTICAL_SPACING = 100;
 
 export const calculateLayout = (
@@ -25,8 +23,8 @@ export const calculateLayout = (
     rankdir: direction === 'horizontal' ? 'LR' : 'TB',
     nodesep: HORIZONTAL_SPACING,
     ranksep: VERTICAL_SPACING,
-    marginx: 20,
-    marginy: 20,
+    marginx: 25,
+    marginy: 25,
   });
   graph.setDefaultEdgeLabel(() => ({}));
 
@@ -120,18 +118,17 @@ export const getTaskType = (handler: string): 'primary' | 'secondary' | 'accent'
   return 'default';
 };
 
-// Refined color mapping for nodes
 export const getTaskColor = (handler: string): string => {
   const type = getTaskType(handler);
   switch (type) {
     case 'primary':
-      return 'bg-primary-50 border-primary-300 text-primary-800 dark:bg-dark-primary-900/50 dark:border-dark-primary-700 dark:text-dark-primary-200';
+      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
     case 'secondary':
-      return 'bg-secondary-50 border-secondary-300 text-secondary-800 dark:bg-dark-secondary-900/50 dark:border-dark-secondary-700 dark:text-dark-secondary-200';
+      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
     case 'accent':
-      return 'bg-accent-50 border-accent-300 text-accent-800 dark:bg-dark-accent-900/50 dark:border-dark-accent-700 dark:text-dark-accent-200';
+      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
     default:
-      return 'bg-surface-100 border-surface-300 text-text-surface dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text-surface';
+      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
   }
 };
 

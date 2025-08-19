@@ -20,19 +20,19 @@ const getEdgeStrokeClass = (
     return 'stroke-[var(--color-error)] dark:stroke-[var(--color-dark-error-500)]';
   }
   if (isHighlighted) {
-    return 'stroke-[var(--color-accent-600)] dark:stroke-[var(--color-dark-accent-400)]';
+    return 'stroke-[var(--color-dark-accent-400)] dark:stroke-[var(--color-dark-accent-400)]';
   }
 
   const type = getTaskType(handler);
   switch (type) {
     case 'primary':
-      return 'stroke-[var(--color-primary)/0.8] dark:stroke-[var(--color-dark-primary-500)/0.8]';
+      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
     case 'secondary':
-      return 'stroke-[var(--color-secondary)/0.8] dark:stroke-[var(--color-dark-secondary-500)/0.8]';
+      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
     case 'accent':
-      return 'stroke-[var(--color-accent)/0.8] dark:stroke-[var(--color-dark-accent-500)/0.8]';
+      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
     default:
-      return 'stroke-[var(--color-surface-400)] dark:stroke-[var(--color-dark-surface-500)]';
+      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
   }
 };
 
@@ -76,14 +76,12 @@ const TransitionEdge: React.FC<TransitionEdgeProps> = ({
             height="22"
             rx="6"
             strokeWidth="1"
-            // The fill is now a darker surface color in dark mode.
-            // The stroke is now aware of dark mode for better visibility.
-            className="fill-[var(--color-surface-100)] stroke-[rgba(0,0,0,0.05)] dark:fill-[var(--color-dark-surface-100)] dark:stroke-[rgba(255,255,255,0.05)]"
+            className="fill-[var(--color-surface-100)] stroke-[var(--color-primary-100)] dark:fill-[var(--color-dark-surface-100)] dark:stroke-[var(--color-dark-surface-400)]"
           />
           <text
             textAnchor="middle"
             dominantBaseline="middle"
-            className="fill-[var(--color-text-muted)] text-xs font-medium dark:fill-[var(--color-dark-text-muted)]">
+            className="fill-[var(--color-text)] text-xs font-medium dark:fill-[var(--color-dark-text)]">
             {label}
           </text>
         </g>

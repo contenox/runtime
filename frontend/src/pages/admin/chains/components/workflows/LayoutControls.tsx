@@ -14,7 +14,7 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({ direction, onChangeDire
 
   return (
     // The container now has dark mode classes for background and border colors.
-    <div className="bg-surface-50 border-surface-200 dark:bg-dark-surface-200 dark:border-dark-surface-700 flex gap-1 rounded-md border p-1">
+    <div className="flex gap-1 rounded-md border p-1">
       <Button
         size="icon"
         variant={direction === 'horizontal' ? 'primary' : 'ghost'}

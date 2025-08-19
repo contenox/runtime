@@ -1,4 +1,4 @@
-import { Button, Card } from '@contenox/ui';
+import { Button, Section } from '@contenox/ui';
 import { ChevronRight, Maximize2, Workflow, ZoomIn, ZoomOut } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -103,17 +103,17 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
   const selectedTask = selectedTaskId ? chain.tasks.find(task => task.id === selectedTaskId) : null;
 
   return (
-    <Card
+    <Section
       className="relative m-0 flex h-full flex-col overflow-hidden border-0 p-0"
       variant="bordered">
-      <div className="bg-surface-50 dark:bg-dark-surface-100/50 z-10 flex items-center justify-between border-b p-2">
+      <div className="z-10 flex items-center justify-between border-b p-2">
         <h3 className="flex items-center gap-2 text-lg font-semibold">
           <Workflow className="h-5 w-5" />
           {t('workflow.visualization_title')}
         </h3>
         <div className="flex items-center gap-2">
           <LayoutControls direction={layoutDirection} onChangeDirection={setLayoutDirection} />
-          <div className="bg-surface-300 dark:bg-dark-surface-600 h-6 w-px"></div>
+          <div className="h-6 w-px"></div>
           <Button
             size="icon"
             variant="ghost"
@@ -142,7 +142,7 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
             aria-label={t('workflow.reset_view')}>
             <Maximize2 className="h-4 w-4" />
           </Button>
-          <div className="bg-surface-300 dark:bg-dark-surface-600 h-6 w-px"></div>
+          <div className="h-6 w-px"></div>
           <Button size="sm" variant="secondary" onClick={() => setShowDetails(!showDetails)}>
             {t('workflow.show_details')}
             <ChevronRight
@@ -206,7 +206,7 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
 
         {chain.tasks.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center text-center">
-            <div className="bg-surface-50/80 dark:bg-dark-surface-100/80 rounded-lg p-8 backdrop-blur-sm">
+            <div className="rounded-lg p-8 backdrop-blur-sm">
               <Workflow className="text-surface-300 dark:text-dark-surface-500 mx-auto mb-4 h-12 w-12" />
               <p className="text-text-muted dark:text-dark-text-muted mt-2">
                 {t('workflow.no_tasks')}
@@ -216,36 +216,10 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
         )}
       </div>
 
-      <div className="bg-surface-50 dark:bg-dark-surface-100/50 z-10 flex flex-wrap items-center gap-x-4 gap-y-1 border-t p-2 text-xs">
-        <span className="font-semibold">{t('workflow.legend')}:</span>
-        <div className="flex items-center gap-2">
-          <div className="border-primary-300 bg-primary-50 dark:border-dark-primary-700 dark:bg-dark-primary-900/50 h-3 w-3 rounded-sm border"></div>
-          <span>{t('workflow.node_condition')}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="border-secondary-300 bg-secondary-50 dark:border-dark-secondary-700 dark:bg-dark-secondary-900/50 h-3 w-3 rounded-sm border"></div>
-          <span>{t('workflow.node_model')}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="border-accent-300 bg-accent-50 dark:border-dark-accent-700 dark:bg-dark-accent-900/50 h-3 w-3 rounded-sm border"></div>
-          <span>{t('workflow.node_hook')}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            className="stroke-error dark:stroke-dark-error-500">
-            <line x1="0" y1="6" x2="12" y2="6" strokeWidth="1.5" strokeDasharray="2 2" />
-          </svg>
-          <span>{t('workflow.edge_error')}</span>
-        </div>
-      </div>
-
       {showDetails && selectedTask && (
         <TaskDetailsPanel task={selectedTask} onClose={() => setShowDetails(false)} />
       )}
-    </Card>
+    </Section>
   );
 };
 

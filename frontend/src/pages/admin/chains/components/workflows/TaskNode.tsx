@@ -1,3 +1,4 @@
+import { Panel } from '@contenox/ui';
 import { Edit, GitBranch } from 'lucide-react';
 import React from 'react';
 import { ChainTask } from '../../../../../lib/types';
@@ -28,15 +29,17 @@ const TaskNode: React.FC<TaskNodeProps> = ({ task, position, isSelected, onEdit 
         className={`${colorClass} ${selectedClass} transition-all duration-300 ease-in-out`}
       />
 
-      <foreignObject width={width} height={height} className="p-3 text-current">
-        <div className="flex h-full flex-col font-sans">
+      <foreignObject
+        width={width}
+        height={height}
+        className="bg-primary-100 border-surface-300 dark:bg-dark-primary-50 dark:border-dark-surface-600">
+        <Panel variant="body" className="flex h-full flex-col">
           <div className="flex items-start justify-between">
             <div className="flex-grow overflow-hidden">
-              <div className="truncate text-base font-bold" title={task.id}>
+              <div className="truncate" title={task.id}>
                 {task.id}
               </div>
-              {/* Using opacity for secondary text to maintain theme color */}
-              <div className="mb-1 text-xs text-current opacity-80">{task.handler}</div>
+              <div className="mb-1">{task.handler}</div>
             </div>
             {onEdit && (
               <button
@@ -44,8 +47,7 @@ const TaskNode: React.FC<TaskNodeProps> = ({ task, position, isSelected, onEdit 
                   e.stopPropagation();
                   onEdit();
                 }}
-                // Icon uses opacity and transitions for a cleaner effect
-                className="flex-shrink-0 p-1 text-current opacity-60 transition-opacity hover:opacity-100"
+                className="flex-shrink-0 p-1"
                 title="Edit task in JSON">
                 <Edit className="h-4 w-4" />
               </button>
@@ -53,21 +55,19 @@ const TaskNode: React.FC<TaskNodeProps> = ({ task, position, isSelected, onEdit 
           </div>
 
           {task.description && (
-            <p
-              className="mt-1 line-clamp-2 flex-grow text-xs text-current opacity-90"
-              title={task.description}>
+            <Panel className="mt-1 line-clamp-2 flex-grow" title={task.description} variant="body">
               {task.description}
-            </p>
+            </Panel>
           )}
 
-          <div className="mt-auto flex items-center justify-end text-xs text-current opacity-80">
+          <div className="mt-auto flex items-center justify-end">
             <GitBranch className="mr-1 h-3 w-3" />
             <span>
               {task.transition.branches.length} branch
               {task.transition.branches.length !== 1 && 'es'}
             </span>
           </div>
-        </div>
+        </Panel>
       </foreignObject>
     </g>
   );
