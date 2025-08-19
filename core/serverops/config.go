@@ -36,8 +36,6 @@ type Config struct {
 	ProxyOrigin         string `json:"proxy_origin"`
 	UIBaseURL           string `json:"ui_base_url"`
 	TokenizerServiceURL string `json:"tokenizer_service_url"`
-	EmbedModel          string `json:"embed_model"`
-	TasksModel          string `json:"tasks_model"`
 	VectorStoreURL      string `json:"vector_store_url"`
 	WorkerUserAccountID string `json:"worker_user_account_id"`
 	WorkerUserPassword  string `json:"worker_user_password"`
@@ -140,14 +138,6 @@ func ValidateConfig(cfg *Config) error {
 
 	if cfg.VectorStoreURL == "" {
 		return fmt.Errorf("missing required configuration: vector_store_url")
-	}
-
-	if cfg.TasksModel == "" {
-		return fmt.Errorf("missing required configuration: tasks_model")
-	}
-
-	if cfg.EmbedModel == "" {
-		return fmt.Errorf("missing required configuration: embed_model")
 	}
 
 	return nil
