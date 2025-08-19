@@ -1,21 +1,15 @@
 import React from 'react';
-import { getConnectorPath, getTaskType, LayoutDirection, NodePosition } from './utils';
+import { getConnectorPath, LayoutDirection, NodePosition } from './utils';
 
 interface TransitionEdgeProps {
   source: NodePosition;
   target: NodePosition;
   label: string;
   direction: LayoutDirection;
-  fromType: string;
-  isError?: boolean;
   isHighlighted?: boolean;
 }
 
-const getEdgeStrokeClass = (
-  handler: string,
-  isHighlighted?: boolean,
-  isError?: boolean,
-): string => {
+const getEdgeStrokeClass = (isHighlighted?: boolean, isError?: boolean): string => {
   if (isError) {
     return 'stroke-[var(--color-error)] dark:stroke-[var(--color-dark-error-500)]';
   }
@@ -23,17 +17,7 @@ const getEdgeStrokeClass = (
     return 'stroke-[var(--color-dark-accent-400)] dark:stroke-[var(--color-dark-accent-400)]';
   }
 
-  const type = getTaskType(handler);
-  switch (type) {
-    case 'primary':
-      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
-    case 'secondary':
-      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
-    case 'accent':
-      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
-    default:
-      return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
-  }
+  return 'stroke-[var(--color-dark-primary-500)] dark:stroke-[var(--color-dark-primary-500)]';
 };
 
 const TransitionEdge: React.FC<TransitionEdgeProps> = ({
@@ -41,8 +25,6 @@ const TransitionEdge: React.FC<TransitionEdgeProps> = ({
   target,
   label,
   direction,
-  fromType,
-  isError = false,
   isHighlighted = false,
 }) => {
   if (!source || !target) return null;
@@ -52,9 +34,8 @@ const TransitionEdge: React.FC<TransitionEdgeProps> = ({
   const labelX = (source.x + source.width / 2 + target.x + target.width / 2) / 2;
   const labelY = (source.y + source.height / 2 + target.y + target.height / 2) / 2;
 
-  const strokeClass = getEdgeStrokeClass(fromType, isHighlighted, isError);
+  const strokeClass = getEdgeStrokeClass(isHighlighted);
   const strokeWidth = isHighlighted ? 2.5 : 1.5;
-  const dashArray = isError ? '5 3' : 'none';
 
   return (
     <g>
@@ -63,7 +44,7 @@ const TransitionEdge: React.FC<TransitionEdgeProps> = ({
         fill="none"
         className={`transition-all duration-300 ${strokeClass}`}
         strokeWidth={strokeWidth}
-        strokeDasharray={dashArray}
+        strokeDasharray={'none'}
         markerEnd="url(#arrowhead)"
       />
 

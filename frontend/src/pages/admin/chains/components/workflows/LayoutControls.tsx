@@ -13,7 +13,6 @@ const LayoutControls: React.FC<LayoutControlsProps> = ({ direction, onChangeDire
   const { t } = useTranslation();
 
   return (
-    // The container now has dark mode classes for background and border colors.
     <div className="flex gap-1 rounded-md border p-1">
       <Button
         size="icon"

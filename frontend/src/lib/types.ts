@@ -248,7 +248,7 @@ export type TriggerType = 'manual' | 'keyword' | 'embedding' | 'webhook';
 
 export interface HookCall {
   name: string;
-  args: Record<string, string>;
+  args?: Record<string, string>;
 }
 
 export interface TransitionBranch {

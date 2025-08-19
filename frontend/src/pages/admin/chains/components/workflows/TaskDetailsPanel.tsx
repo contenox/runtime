@@ -22,13 +22,11 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
       </Button>
 
       <div className="space-y-4 p-4">
-        {/* Basic Information */}
         <Panel variant="surface">
           <Label>{t('workflow.task_type')}</Label>
           <Badge>{task.handler}</Badge>
         </Panel>
 
-        {/* Description */}
         {task.description && (
           <Panel variant="surface">
             <Label>{t('workflow.description')}</Label>
@@ -36,7 +34,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </Panel>
         )}
 
-        {/* Timeout */}
         {task.timeout && (
           <Panel variant="surface">
             <div className="flex items-center gap-1">
@@ -47,7 +44,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </Panel>
         )}
 
-        {/* Retry Settings */}
         {task.retry_on_failure && (
           <Panel variant="surface">
             <div className="flex items-center gap-1">
@@ -60,7 +56,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </Panel>
         )}
 
-        {/* Prompt Template */}
         {task.prompt_template && (
           <Panel variant="surface">
             <Label>{t('workflow.prompt_template')}</Label>
@@ -68,7 +63,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </Panel>
         )}
 
-        {/* Transition Settings */}
         <Panel variant="surface">
           <div className="flex items-center gap-1">
             <GitBranch className="h-4 w-4" />
@@ -76,7 +70,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </div>
 
           <div className="mt-2 space-y-3">
-            {/* On Failure Transition */}
             {task.transition.on_failure && (
               <Panel variant="flat">
                 <Small className="text-error-700 dark:text-dark-error-300 font-medium">
@@ -90,7 +83,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
               </Panel>
             )}
 
-            {/* Branches */}
             {task.transition.branches.length > 0 && (
               <div>
                 <Label>
@@ -120,17 +112,22 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </div>
         </Panel>
 
-        {/* Hook Information */}
         {task.hook && (
           <Panel variant="surface">
             <Label>{t('workflow.hook')}</Label>
             <Panel variant="flat">
               <Small className="font-mono">{task.hook.name}</Small>
-              {Object.keys(task.hook.args).length > 0 && (
+              {task.hook.args && Object.keys(task.hook.args).length > 0 && (
                 <div className="mt-2">
                   <Label>Arguments:</Label>
                   <Panel variant="flat">
-                    <pre className="text-xs">{JSON.stringify(task.hook.args, null, 2)}</pre>
+                    <Small>
+                      {Object.entries(task.hook.args).map(([key, value], index) => (
+                        <div key={index}>
+                          <span className="font-medium">{key}:</span> {String(value)}
+                        </div>
+                      ))}
+                    </Small>
                   </Panel>
                 </div>
               )}
@@ -138,17 +135,21 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({ task, onClose }) =>
           </Panel>
         )}
 
-        {/* Valid Conditions */}
-        {task.valid_conditions && Object.keys(task.valid_conditions).length > 0 && (
+        {task.valid_conditions && Object.keys(task.valid_conditions)?.length > 0 && (
           <Panel variant="surface">
             <Label>{t('workflow.valid_conditions')}</Label>
             <Panel variant="flat">
-              <pre className="text-xs">{JSON.stringify(task.valid_conditions, null, 2)}</pre>
+              <Small>
+                {Object.entries(task.valid_conditions).map(([key, value], index) => (
+                  <div key={index}>
+                    <span className="font-medium">{key}:</span> {String(value)}
+                  </div>
+                ))}
+              </Small>
             </Panel>
           </Panel>
         )}
 
-        {/* Print Configuration */}
         {task.print && (
           <Panel variant="surface">
             <Label>{t('workflow.print_configuration')}</Label>

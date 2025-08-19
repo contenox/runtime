@@ -20,7 +20,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
   chain,
   selectedTaskId,
   onTaskSelect,
-  onTaskEdit,
 }) => {
   const { t } = useTranslation();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -31,12 +30,10 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   const [showDetails, setShowDetails] = useState(false);
 
-  // Memoize layout calculation to prevent unnecessary recalculations
   const { nodePositions, edges } = React.useMemo(() => {
     return calculateLayout(chain.tasks, layoutDirection);
   }, [chain.tasks, layoutDirection]);
 
-  // Calculate viewBox based on layout without causing re-renders
   const calculateViewBox = useCallback(() => {
     if (Object.keys(nodePositions).length === 0) {
       return { x: -500, y: -500, width: 1000, height: 1000 };
@@ -60,11 +57,9 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
     };
   }, [nodePositions]);
 
-  // Only reset view when layout actually changes
   useEffect(() => {
     const newViewBox = calculateViewBox();
 
-    // Prevent unnecessary state updates
     if (
       viewBox.x !== newViewBox.x ||
       viewBox.y !== newViewBox.y ||
@@ -76,7 +71,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
     }
   }, [calculateViewBox, viewBox]);
 
-  // Panning handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0 || e.target !== svgRef.current) return;
     setIsPanning(true);
@@ -85,7 +79,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isPanning) return;
-    // Adjust panning speed based on the current zoom level and SVG client size
     const clientWidth = svgRef.current?.clientWidth ?? viewBox.width;
     const zoomFactor = clientWidth / (viewBox.width / zoom);
     const dx = (e.clientX - startPoint.x) / zoomFactor;
@@ -97,7 +90,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
 
   const handleMouseUp = () => setIsPanning(false);
 
-  // Zoom handlers
   const handleZoom = (factor: number) => setZoom(prev => Math.max(0.2, Math.min(prev * factor, 3)));
 
   const selectedTask = selectedTaskId ? chain.tasks.find(task => task.id === selectedTaskId) : null;
@@ -183,8 +175,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
                 target={nodePositions[edge.to]}
                 label={edge.label}
                 direction={layoutDirection}
-                fromType={edge.fromType}
-                isError={edge.isError}
                 isHighlighted={selectedTaskId === edge.from || selectedTaskId === edge.to}
               />
             ))}
@@ -196,7 +186,6 @@ const ChainVisualizer: React.FC<ChainVisualizerProps> = ({
                       task={task}
                       position={nodePositions[task.id]}
                       isSelected={selectedTaskId === task.id}
-                      onEdit={onTaskEdit ? () => onTaskEdit(task.id) : undefined}
                     />
                   </g>
                 ),

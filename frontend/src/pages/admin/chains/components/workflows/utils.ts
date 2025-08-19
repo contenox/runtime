@@ -81,57 +81,6 @@ export const calculateLayout = (
   return { nodePositions, edges };
 };
 
-// Helper to classify task handlers
-export const getTaskType = (handler: string): 'primary' | 'secondary' | 'accent' | 'default' => {
-  if (
-    [
-      'moderate',
-      'mux_input',
-      'condition_key',
-      'parse_number',
-      'parse_score',
-      'parse_range',
-    ].includes(handler)
-  ) {
-    return 'primary';
-  }
-  if (
-    ['execute_model_on_messages', 'search_knowledge', 'append_search_results'].includes(handler)
-  ) {
-    return 'secondary';
-  }
-  if (
-    [
-      'echo_message',
-      'print_help_message',
-      'do_we_need_context',
-      'swap_to_input',
-      'request_failed',
-      'reject_request',
-      'raise_error',
-      'noop',
-      'hook',
-    ].includes(handler)
-  ) {
-    return 'accent';
-  }
-  return 'default';
-};
-
-export const getTaskColor = (handler: string): string => {
-  const type = getTaskType(handler);
-  switch (type) {
-    case 'primary':
-      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
-    case 'secondary':
-      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
-    case 'accent':
-      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
-    default:
-      return 'bg-surface-300 border-surface-300 text-text dark:bg-dark-surface-700 dark:border-dark-surface-600 dark:text-dark-text';
-  }
-};
-
 // Generate a smooth cubic Bezier curve path string
 export const getConnectorPath = (
   source: NodePosition,
