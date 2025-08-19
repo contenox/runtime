@@ -3,7 +3,7 @@ version: "3.8"
 services:
   # Core kernel runtime
   runtime:
-    image: ghcr.io/contenox/runtime-api:v0.0.50
+    image: ghcr.io/contenox/runtime-api:v0.0.51
     container_name: contenox-runtime
     #env_file: .env
     environment:
