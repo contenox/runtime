@@ -14,6 +14,8 @@ This project followed an iterative slice-based development approach where each m
 
 The approach proved effective for managing complexity, though some features (like the task engine design) required more iteration than initially anticipated. Future slices will focus on stabilizing the architecture while adding new capabilities.
 
+"Original Goals", "Targeted Deliverables", and "Scope Changes During Slice" declare the planned work while the "Actual Deliverables" are a list of ongoing or completed tasks. Completed tasks don't have to map to the declared deliverables and goals. If there is a mismatch between planned and actual deliverables, it is intentional to allow iterative planning and reflection.
+
 ## For Future Slices (Planned)
 
   - Production Capabilities
@@ -23,12 +25,13 @@ The approach proved effective for managing complexity, though some features (lik
   - Model fine-tuning management
   - MCP compatibility implementation
   - Fix the openai model-provider implementation
+  - Implement a custom model gateway to allow elastic scaling
 
 ---
 
 ## August 2025 – Task Engine Refinement & Live Deployment
 
-### Original Goals
+### Original Goals (Planned at Start)
 
 - Refactor the engine to establish service boundaries
 - Rewire existing frontends and bots
@@ -36,18 +39,16 @@ The approach proved effective for managing complexity, though some features (lik
 - Documentation of the task engine spec
 - Improve the modelprovider
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
 
 - Hook-Based Integration System: Migration to user-defined remote server connections
-- GitHub Comment Synchronization: Fixing the critical "no way to compute a diff" issue
+- GitHub Comment Synchronization: Fixing the "no way to compute a diff" issue
 - Production-Ready PR Reviewer: Deploying a working GitHub PR review solution
 - Task Engine Specification: Completing the documentation for chain definition and hook system
 - Model Provider: Refactoring into a standalone reusable library
-- Scope-Creep: Token billing
-- Scope-Creep: Prepwork for the DSL-UI-Builder
-- Scope-Creep: Bot & Frontend configuration instead of Forms
 
-### Completed Items:
+### Actual Deliverables (Completed Work)
+
 - [x] Implement and test the new hook registry system for extensible integrations
 - [x] Connection of existing hooks to the runtime via a bridge as a remote server connection
 - [x] Generation of OpenAPI specification for the runtime via ast analysis
@@ -58,12 +59,29 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Create and integrate a new Go SDK for service-to-service communication
 - [x] Improve model management to remove the hardcoded capabilities
 - [x] Address breaking changes from Ollama-APIs and model behavior
+- [x] Improving the llmrepo and model provider management
+- [x] Improving the llmresolver and fixing the engine to use the correct model
+- [x] Implementing a new Request Response system via pubsub
+- [x] Developing scripts for release automation and proper versioning
+- [x] Fixing runtimestate hitting ratelimits of managed models
+
+### Scope Changes During Slice
+
+- **Added**: Token billing
+- **Added**: Prepwork for the DSL-UI-Builder
+- **Added**: Bot & Frontend configuration instead of Forms
+- **Added**: Human-in-the-loop for the PR-reviewer
+
+### Dependencies for Next Slice
+- Task engine refactoring must be completed before major new features can be added
+- Permission model improvements needed for multi-user collaboration features
 
 ---
 
 ## July 2025 – Building a demo application
 
-### Original Goals
+### Original Goals (Planned at Start)
+
 - Package a persona-chat application
 - Implement basic observability and UI dashboard
 - Add API rate limiting middleware
@@ -73,7 +91,8 @@ The approach proved effective for managing complexity, though some features (lik
 - Improve permission model
 - Support multiple Telegram frontends via UI
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
+
 - Task Engine Enhancements: Improved system instruction handling and variable composition
 - Activity Logging: Delivery of tracking and visualization of system activity
 - GitHub Integration: Delivery of PR tracking functionality and initial frontend
@@ -81,7 +100,8 @@ The approach proved effective for managing complexity, though some features (lik
 - Documentation Updates: Comprehensive documentation refresh to match current direction
 - Tokenizer Fixes: Addressing tokenizer interface issues
 
-### Completed Items
+### Actual Deliverables (Completed Work)
+
 - [x] Basic Observability Integration & UI Dashboard
 - [x] API Rate Limiting Middleware
 - [x] Implement Chat Moderation
@@ -95,8 +115,14 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Integrated githubworker for PR handling
 - [x] Fix the ollama model-provider implementation
 
+### Scope Changes During Slice
 
-### Not Completed Items
+- **Added**: Activity tracking view improvements
+- **Added**: Token count bug fixes
+- **Added**: Keyword extraction feature
+- **Added**: Add variable composition enhancements
+
+### Unmet Original Goals
 - Package a Persona-Chat Application
 - Permission Model Improvements (partially implemented)
 
@@ -112,12 +138,14 @@ The approach proved effective for managing complexity, though some features (lik
 
 ## June 2025 – Taskengine & core
 
-### Original Goals
+### Original Goals (Planned at Start)
+
 - Package a chat application with persona support
 - Add user registration and task execution commands
 - Begin observability and release infrastructure
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
+
 - RAG Implementation: Completed document retrieval and integration with LLM responses
 - OpenAI-Compatible API: Added endpoints compatible with OpenAI's API format
 - Telegram Integration: Initial Telegram bot implementation with job queue system
@@ -125,7 +153,8 @@ The approach proved effective for managing complexity, though some features (lik
 - vLLM Integration: Added support for vLLM inference server
 - Testing Infrastructure: Comprehensive test suite for core components
 
-### Completed Items
+### Actual Deliverables (Completed Work)
+
 - [x] RAG-Enhanced Chat Interface
 - [x] Chat with Task Command Execution Support
 - [x] Registration Route for Persona Chat Users
@@ -141,10 +170,13 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Redesigned broker-worker architecture for improved async job handling
 - [x] Prepare modelprovider to become a reusable library
 
-### Notes
-- Formal release processes are not part of the MVP; they will be implemented in the re-architecture phase.
-- Packaging the platform as an application for persona-based chat was moved to the next cycle.
-- Task engine foundation established but required significant refactoring in July.
+### Scope Changes During Slice
+
+- **Added**: None
+- **Removed**: Formal release processes (deferred to re-architecture phase)
+
+### Unmet Original Goals
+- Packaging the platform as an application for persona-based chat (moved to next cycle)
 
 ### Effort Estimate
 - 180-220 hours
@@ -154,11 +186,13 @@ The approach proved effective for managing complexity, though some features (lik
 
 ## May 2025 – Documents QA
 
-### Original Goals
+### Original Goals (Planned at Start)
+
 - Build a UI page for natural language document Q&A
 - Prepare infrastructure for reusable prompt chains
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
+
 - Job System: Implemented job queue system for processing background tasks
 - Files UI: Basic document management interface
 - Worker Infrastructure: Docker-compose integration for worker services
@@ -166,7 +200,8 @@ The approach proved effective for managing complexity, though some features (lik
 - Task Engine Foundation: Initial implementation of the task execution framework
 - Testing Improvements: Enhanced test coverage for document processing
 
-### Completed Items
+### Actual Deliverables (Completed Work)
+
 - [x] Documents QA UI Page: Allows users to ask questions and get answers based on relevant documents
 - [x] Prompt Execution Service: Executes prompts used by workers to chunk text
 - [x] Prompt Chain Service: Runs sequences of prompts for QA and automation workflows
@@ -178,6 +213,15 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] First implementation of the task engine
 - [x] Job cleanup logic implementation to prevent resource leaks
 
+### Scope Changes During Slice
+
+- **Added**: None
+- **Removed**: None
+
+### Unmet Original Goals
+
+- None
+
 ### Effort Estimate
 - 150-180 hours
 - Focused on document processing pipeline and foundational task execution
@@ -186,13 +230,15 @@ The approach proved effective for managing complexity, though some features (lik
 
 ## April 2025 – Semantic Search
 
-### Original Goals
+### Original Goals (Planned at Start)
+
 - Enable semantic search over embedded documents
 - Improve backend pooling and model routing logic
 - Migrate tokenizer into a standalone service
 - Replace OpenSearch with Vald for vector search
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
+
 - Core Project Foundation: Initial project setup with MVP backend and admin-ui
 - CI Pipeline: Implemented Go core tests and basic continuous integration
 - Authentication System: JWT-based authentication with access control lists
@@ -200,7 +246,8 @@ The approach proved effective for managing complexity, though some features (lik
 - Document Processing Pipeline: Initial document ingestion and indexing system
 - Testing Infrastructure: Basic test framework for core components
 
-### Completed Items
+### Actual Deliverables (Completed Work)
+
 - [x] UI-Search Page: Developed to demo semantic search functionality
 - [x] Backend Pooling: Finalized implementation of backend pools/fleets
 - [x] Tokenizer Service Migration: Tokenizer logic moved to its own microservice
@@ -217,6 +264,13 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Activity tracking framework foundation
 - [x] Queue item leasing implementation for job reliability
 
+### Scope Changes During Slice
+
+- **Added**: None
+- **Removed**: None
+
+### Unmet Original Goals
+
 ### Effort Estimate
 - 120-160 hours
 - Focused on vector search implementation and core infrastructure
@@ -225,19 +279,22 @@ The approach proved effective for managing complexity, though some features (lik
 
 ## February-March 2025 – Project Initialization
 
-### Original Goals
+### Original Goals (Planned at Start)
+
 - Establish foundational project structure
 - Set up development environment for multi-language codebase
 - Begin dependency management for cross-service communication
 
-### Key Deliverables
+### Targeted Deliverables (Planned Outcomes)
+
 - Project Scaffold: Initial directory structure and dependency management
 - Core Tech Stack Setup: Go module initialization, Dockerfile templates
 - Basic CI/CD Configuration: Minimal GitHub Actions workflow for testing
 - Core Backend Implementation: Initial Go-based server architecture
 - Database Integration: PostgreSQL setup and basic schema
 
-### Completed Items
+### Actual Deliverables (Completed Work)
+
 - [x] Multi-language Project Template (Go/Python/JS)
 - [x] Dockerfile Base Templates
 - [x] Initial GitHub Actions Workflow
@@ -256,6 +313,15 @@ The approach proved effective for managing complexity, though some features (lik
 - [x] Health checks for backend services and initial infrastructure setup
 - [x] Developing the core for model syncing across distributed instances
 - [x] Implementing a Circuit breaker and go routine manager library
+
+### Scope Changes During Slice
+
+- **Added**: None
+- **Removed**: None
+
+### Unmet Original Goals
+
+- None
 
 ### Effort Estimate
 - 140-180 hours
