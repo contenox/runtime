@@ -311,7 +311,7 @@ func BuildCodeReviewChain() *taskengine.ChainDefinition {
 				SystemInstruction: "You are an expert code reviewer. Analyze the provided code changes and provide structured feedback with actionable suggestions.",
 				Handler:           taskengine.HandleModelExecution,
 				ExecuteConfig: &taskengine.LLMExecutionConfig{
-					Models:    []string{"gemini-2.5-flash"},
+					Models:    []string{"gemini-2.5-pro"},
 					Providers: []string{"gemini"},
 				},
 				Transition: taskengine.TaskTransition{

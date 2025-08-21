@@ -12,11 +12,11 @@ replace github.com/contenox/runtime-mvp/core => ../core
 require (
 	github.com/contenox/activitytracker v0.0.3
 	github.com/contenox/authz v0.0.1
-	github.com/contenox/bus v0.0.2
+	github.com/contenox/bus v0.0.3
 	github.com/contenox/dbexec v0.0.2
 	github.com/contenox/kvstore v0.0.1
 	github.com/contenox/routine v0.0.1
-	github.com/contenox/runtime v0.0.51
+	github.com/contenox/runtime v0.0.55
 	github.com/contenox/runtime-mvp/core v0.0.0-00010101000000-000000000000
 	github.com/google/go-github/v58 v58.0.0
 	github.com/google/uuid v1.6.0
@@ -32,7 +32,7 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
-	github.com/contenox/modelprovider v0.0.9 // indirect
+	github.com/contenox/modelprovider v0.0.11 // indirect
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cpuguy83/dockercfg v0.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

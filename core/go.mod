@@ -14,8 +14,8 @@ require (
 	github.com/contenox/authz v0.0.1
 	github.com/contenox/dbexec v0.0.2
 	github.com/contenox/kvstore v0.0.1
-	github.com/contenox/modelprovider v0.0.9
-	github.com/contenox/runtime v0.0.51
+	github.com/contenox/modelprovider v0.0.11
+	github.com/contenox/runtime v0.0.55
 	github.com/contenox/runtime-mvp/libs/libcipher v0.0.0-00010101000000-000000000000
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
@@ -30,7 +30,7 @@ require (
 require (
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
-	github.com/contenox/bus v0.0.2 // indirect
+	github.com/contenox/bus v0.0.3 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/moby/go-archive v0.1.0 // indirect
