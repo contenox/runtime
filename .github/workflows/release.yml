@@ -1,0 +1,292 @@
+name: Release
+
+on:
+  repository_dispatch:
+    types: [contenox-release]
+
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.event.client_payload.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      prerelease: ${{ steps.vars.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.client_payload.sha }}
+          fetch-depth: 0
+
+      - name: Verify release event
+        id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
+          PAYLOAD_SHA: ${{ github.event.client_payload.sha }}
+          PAYLOAD_REF: ${{ github.event.client_payload.ref }}
+          CI_RUN_ID: ${{ github.event.client_payload.ci_run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$PAYLOAD_REF" != "main" ]; then
+            echo "release event must come from main, got $PAYLOAD_REF"
+            exit 1
+          fi
+          if ! [[ "$PAYLOAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "invalid sha: $PAYLOAD_SHA"
+            exit 1
+          fi
+          if [ "$(git rev-parse HEAD)" != "$PAYLOAD_SHA" ]; then
+            echo "checked out commit does not match payload sha"
+            exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$PAYLOAD_SHA" origin/main; then
+            echo "$PAYLOAD_SHA is not on main"
+            exit 1
+          fi
+          if ! [[ "$CI_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "invalid CI run id: $CI_RUN_ID"
+            exit 1
+          fi
+          RUN_JSON=""
+          for _ in $(seq 1 60); do
+            if RUN_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}" 2>/dev/null); then
+              STATUS=$(printf '%s' "$RUN_JSON" | jq -r '.status // ""')
+              if [ "$STATUS" = "completed" ]; then
+                break
+              fi
+            fi
+            sleep 10
+          done
+          if [ -z "$RUN_JSON" ]; then
+            echo "could not read CI run $CI_RUN_ID"
+            exit 1
+          fi
+          if ! printf '%s' "$RUN_JSON" | jq -e \
+            --arg sha "$PAYLOAD_SHA" \
+            '.name == "CI" and .event == "push" and .head_branch == "main" and .head_sha == $sha and .status == "completed" and .conclusion == "success"' \
+            >/dev/null; then
+            echo "CI run $CI_RUN_ID did not complete successfully on main for $PAYLOAD_SHA"
+            printf '%s' "$RUN_JSON" | jq '{name,event,head_branch,head_sha,status,conclusion}'
+            exit 1
+          fi
+          VERSION=$(tr -d '\r\n' < runtime/version/version.txt)
+          if [ "$VERSION" != "$PAYLOAD_VERSION" ]; then
+            echo "version.txt is $VERSION, payload is $PAYLOAD_VERSION"
+            exit 1
+          fi
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid version in runtime/version/version.txt: $VERSION"
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            TAG_SHA=$(git rev-list -n1 "$VERSION")
+            if [ "$TAG_SHA" != "$PAYLOAD_SHA" ]; then
+              echo "tag $VERSION already exists at $TAG_SHA, expected $PAYLOAD_SHA"
+              exit 1
+            fi
+            TAG_VERSION=$(git show "${VERSION}:runtime/version/version.txt" | tr -d '\r\n')
+            if [ "$TAG_VERSION" != "$VERSION" ]; then
+              echo "drift: tag $VERSION contains version.txt $TAG_VERSION"
+              exit 1
+            fi
+          else
+            LATEST=$(git tag -l 'v*' | sort -V | tail -1 || true)
+            if [ -n "$LATEST" ]; then
+              HIGHEST=$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -1)
+              if [ "$HIGHEST" != "$VERSION" ]; then
+                echo "version $VERSION is not newer than latest tag $LATEST"
+                exit 1
+              fi
+            fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.client_payload.sha }}
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then
+            EXT=".exe"
+          fi
+          go build -o "dist/contenox-runtime-${GOOS}-${GOARCH}${EXT}" ./cmd/contenox
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: contenox-runtime-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/contenox-runtime-*
+
+  assemble:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.client_payload.sha }}
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: contenox-runtime-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Assemble checksums and manifest
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ github.event.client_payload.sha }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum $(find . -maxdepth 1 -type f -name 'contenox-runtime-*' -printf '%f\n' | LC_ALL=C sort) > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          python3 ../scripts/release-manifest.py \
+            --dir . \
+            --version "$VERSION" \
+            --tag "$VERSION" \
+            --commit "$COMMIT" \
+            --output runtime-manifest.json
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-bundle
+          path: release-assets/*
+
+  release:
+    needs: [verify, assemble]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.client_payload.sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-bundle
+          path: release-assets
+
+      - name: Create tag
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags --force
+          if ! git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            git tag -a "$VERSION" -m "Release $VERSION"
+            git push origin "$VERSION"
+          fi
+          TAG_SHA=$(git rev-list -n1 "$VERSION")
+          if [ "$TAG_SHA" != "$SHA" ]; then
+            echo "tag $VERSION points at $TAG_SHA, expected $SHA"
+            exit 1
+          fi
+          TAG_VERSION=$(git show "${VERSION}:runtime/version/version.txt" | tr -d '\r\n')
+          if [ "$TAG_VERSION" != "$VERSION" ]; then
+            echo "drift: tag $VERSION contains version.txt $TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f
+        with:
+          subject-path: "release-assets/*"
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          PRERELEASE_FLAG=""
+          if [ "$PRERELEASE" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            DRAFT=$(gh release view "$VERSION" --json isDraft -q .isDraft)
+            if [ "$DRAFT" != "true" ]; then
+              echo "release $VERSION is already published"
+              exit 1
+            fi
+            gh release upload "$VERSION" release-assets/* --clobber
+          else
+            gh release create "$VERSION" release-assets/* \
+              --draft \
+              --verify-tag \
+              --title "$VERSION" \
+              --generate-notes \
+              $PRERELEASE_FLAG
+          fi
+
+      - name: Verify uploaded assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p verify
+          gh release download "$VERSION" --dir verify --clobber
+          cd verify
+          sha256sum -c SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$VERSION" --draft=false
+          else
+            gh release edit "$VERSION" --draft=false --latest
+          fi

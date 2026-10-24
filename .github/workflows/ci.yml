@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -15,6 +18,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version.txt
+        id: version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          VERSION=$(tr -d '\r\n' < runtime/version/version.txt)
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid version in runtime/version/version.txt: $VERSION"
+            exit 1
+          fi
+          LATEST=$(git tag -l 'v*' | sort -V | tail -1 || true)
+          if [ -n "$LATEST" ]; then
+            HIGHEST=$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -1)
+            if [ "$HIGHEST" != "$VERSION" ]; then
+              echo "version $VERSION is not newer than latest tag $LATEST"
+              exit 1
+            fi
+          fi
+          CHANGED=false
+          if [ -z "$LATEST" ]; then
+            CHANGED=true
+          elif ! git diff --quiet "$LATEST" -- runtime/version/version.txt; then
+            CHANGED=true
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@v5
         with:
@@ -33,3 +66,17 @@ jobs:
 
       - name: Unit tests
         run: make test-unit
+
+      - name: Dispatch release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" \
+            -f event_type=contenox-release \
+            -f "client_payload[version]=${VERSION}" \
+            -f "client_payload[sha]=${GITHUB_SHA}" \
+            -f "client_payload[ref]=main" \
+            -f "client_payload[ci_run_id]=${GITHUB_RUN_ID}"
