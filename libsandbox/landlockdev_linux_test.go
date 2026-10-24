@@ -1,0 +1,54 @@
+//go:build linux
+
+package libsandbox_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/contenox/runtime/libsandbox"
+	"github.com/stretchr/testify/require"
+)
+
+func TestIntegration_DeviceFloor(t *testing.T) {
+	if !landlockSupported() {
+		t.Skip("landlock filesystem ABI unavailable on this kernel")
+	}
+	if !usernsNetnsSupported() {
+		t.Skip("unprivileged user+network namespaces unavailable on this host")
+	}
+
+	ws := t.TempDir()
+	home := t.TempDir()
+
+	newSpec := func(action, path string) libsandbox.Spec {
+		return libsandbox.Spec{
+			WorkspaceRoot: ws,
+			Home:          home,
+			EnvSet: map[string]string{
+				probeEnv:     action,
+				probePathEnv: path,
+			},
+		}
+	}
+
+	cases := []struct {
+		name   string
+		action string
+		path   string
+		want   int
+	}{
+		{"write to /dev/null is allowed", "write", "/dev/null", exitAllowed},
+		{"read /dev/zero is allowed", "read", "/dev/zero", exitAllowed},
+		{"read /dev/urandom is allowed", "read", "/dev/urandom", exitAllowed},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd, err := libsandbox.Command(context.Background(), newSpec(tc.action, tc.path), "/proc/self/exe")
+			require.NoError(t, err)
+			require.Equal(t, tc.want, exitCode(cmd.Run()),
+				"device probe %q on %q: unexpected outcome", tc.action, tc.path)
+		})
+	}
+}

@@ -1,0 +1,81 @@
+package taskengine
+
+import (
+	"encoding/json"
+	"testing"
+
+	libmodelprovider "github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/stretchr/testify/require"
+)
+
+func TestUnit_ProviderMessagesFromEngine_Continuation(t *testing.T) {
+	continuation := &libmodelprovider.Continuation{Provider: "openai-codex", Model: "test", Items: json.RawMessage(`[{"type":"reasoning","encrypted_content":"opaque"}]`)}
+	got := providerMessagesFromEngine(nil, []Message{{Role: "assistant", Content: "hello", Continuation: continuation}})
+	require.Equal(t, continuation, got[0].Continuation)
+	stripped := stripToolProtocolMessages(got)
+	require.Nil(t, stripped[0].Continuation)
+}
+
+func TestUnit_ProviderMessagesFromEngine_ThreadsImages(t *testing.T) {
+	t.Parallel()
+
+	prelude := []Message{
+		{Role: "system", Content: "you are helpful"},
+	}
+	png := []byte{0x89, 0x50, 0x4e, 0x47}
+	messages := []Message{
+		{
+			Role:    "user",
+			Content: "what is in this screenshot?",
+			Images: []ImagePart{
+				{Data: png, MimeType: "image/png"},
+			},
+		},
+		{
+			Role: "assistant",
+			CallTools: []ToolCall{
+				{
+					ID:           "call_1",
+					Type:         "function",
+					Function:     FunctionCall{Name: "read_file", Arguments: `{"path":"a.go"}`},
+					ProviderMeta: map[string]string{"thought_signature": "sig"},
+				},
+			},
+		},
+		{Role: "tool", Content: "file contents", ToolCallID: "call_1"},
+	}
+
+	got := providerMessagesFromEngine(prelude, messages)
+	require.Len(t, got, 4)
+
+	require.Equal(t, "system", got[0].Role)
+	require.Empty(t, got[0].Images)
+
+	require.Equal(t, "user", got[1].Role)
+	require.Equal(t, "what is in this screenshot?", got[1].Content)
+	require.Len(t, got[1].Images, 1)
+	require.Equal(t, png, got[1].Images[0].Data)
+	require.Equal(t, "image/png", got[1].Images[0].MimeType)
+
+	require.Equal(t, "assistant", got[2].Role)
+	require.Len(t, got[2].ToolCalls, 1)
+	require.Equal(t, "call_1", got[2].ToolCalls[0].ID)
+	require.Equal(t, "read_file", got[2].ToolCalls[0].Function.Name)
+	require.Equal(t, map[string]string{"thought_signature": "sig"}, got[2].ToolCalls[0].ProviderMeta)
+
+	require.Equal(t, "tool", got[3].Role)
+	require.Equal(t, "call_1", got[3].ToolCallID)
+
+	require.True(t, libmodelprovider.MessagesHaveImages(got))
+}
+
+func TestUnit_ProviderMessagesFromEngine_TextOnlyStaysImageFree(t *testing.T) {
+	t.Parallel()
+
+	got := providerMessagesFromEngine(nil, []Message{
+		{Role: "user", Content: "plain text"},
+	})
+	require.Len(t, got, 1)
+	require.Nil(t, got[0].Images)
+	require.False(t, libmodelprovider.MessagesHaveImages(got))
+}

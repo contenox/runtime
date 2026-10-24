@@ -1,0 +1,8 @@
+**/*_test.go
+**/test_*.py
+**/__pycache__
+compose.local.yaml
+pyrightconfig.json
+bin
+tmp
+target

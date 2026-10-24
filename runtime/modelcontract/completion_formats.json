@@ -1,0 +1,87 @@
+{
+  "fim": [
+    {
+      "id": "qwen2.5-coder",
+      "operation": "fim",
+      "version": 1,
+      "kind": "tokens",
+      "prefix": "<|fim_prefix|>",
+      "suffix": "<|fim_suffix|>",
+      "middle": "<|fim_middle|>",
+      "stops": [
+        "<|endoftext|>",
+        "<|fim_prefix|>",
+        "<|fim_suffix|>",
+        "<|fim_middle|>",
+        "<|fim_pad|>",
+        "<|repo_name|>",
+        "<|file_sep|>",
+        "<|im_end|>"
+      ]
+    },
+    {
+      "id": "starcoder",
+      "operation": "fim",
+      "version": 1,
+      "kind": "tokens",
+      "prefix": "<fim_prefix>",
+      "suffix": "<fim_suffix>",
+      "middle": "<fim_middle>",
+      "stops": [
+        "<|endoftext|>",
+        "<fim_prefix>",
+        "<fim_suffix>",
+        "<fim_middle>",
+        "<fim_pad>"
+      ]
+    },
+    {
+      "id": "mistral-fim",
+      "operation": "fim",
+      "version": 1,
+      "kind": "endpoint"
+    },
+    {
+      "id": "deepseek-fim",
+      "operation": "fim",
+      "version": 1,
+      "kind": "endpoint"
+    },
+    {
+      "id": "ollama-insert",
+      "operation": "fim",
+      "version": 1,
+      "kind": "endpoint"
+    }
+  ],
+  "nextEdit": [
+    {
+      "id": "sweep-v1",
+      "operation": "next-edit",
+      "version": 2,
+      "contextTokens": 8192,
+      "maxTokens": 512,
+      "stops": ["<|file_sep|>", "<|endoftext|>"],
+      "textStops": ["</s>"],
+      "controls": ["<|file_sep|>", "<|endoftext|>"]
+    },
+    {
+      "id": "sweep-v2",
+      "operation": "next-edit",
+      "version": 2,
+      "contextTokens": 32768,
+      "maxTokens": 1024,
+      "stops": ["<|file_sep|>", "<|endoftext|>"],
+      "controls": ["<|file_sep|>", "<|endoftext|>"]
+    },
+    {
+      "id": "zeta-2.1",
+      "operation": "next-edit",
+      "version": 2,
+      "contextTokens": 32768,
+      "maxTokens": 1024,
+      "stops": ["<[end▁of▁sentence]>"],
+      "controls": ["<[fim-suffix]>", "<[fim-prefix]>", "<[fim-middle]>", "<[end▁of▁sentence]>"]
+    }
+  ]
+}
