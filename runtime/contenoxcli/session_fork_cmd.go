@@ -55,7 +55,7 @@ func runSessionFork(cmd *cobra.Command, args []string) error {
 
 	activeID, err := svc.GetActiveID(ctx)
 	if err != nil || activeID == "" {
-		return fmt.Errorf("no active session; run 'contenox session new' to create one")
+		return fmt.Errorf("no active session; run 'contenox-runtime session new' to create one")
 	}
 
 	contenoxDir, _ := ResolveContenoxDir(cmd)
@@ -118,7 +118,7 @@ func summarizeForFork(ctx context.Context, cmd *cobra.Command, db libdb.DBManage
 		return nil, err
 	}
 	if model == "" {
-		return nil, fmt.Errorf("no default model configured; run 'contenox config set default-model <model>'")
+		return nil, fmt.Errorf("no default model configured; run 'contenox-runtime config set default-model <model>'")
 	}
 
 	rootFlags := cmd.Root().PersistentFlags()
@@ -202,7 +202,7 @@ func lookupSystemFile(contenoxDir, name string) (string, error) {
 	if _, err := os.Stat(homePath); err == nil {
 		return homePath, nil
 	}
-	return "", fmt.Errorf("file %q not found in workspace %q or ~/.contenox-harness; run 'contenox init' to populate it", name, contenoxDir)
+	return "", fmt.Errorf("file %q not found in workspace %q or ~/.contenox-harness; run 'contenox-runtime init' to populate it", name, contenoxDir)
 }
 
 func resolveDefaultModelProvider(cmd *cobra.Command, db libdb.DBManager) (model, provider, altModel, altProvider, maxTokens string, err error) {

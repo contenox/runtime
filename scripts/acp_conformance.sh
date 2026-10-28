@@ -16,7 +16,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${CONTENOX_BIN:-"$ROOT_DIR/bin/contenox"}"
+BIN="${CONTENOX_BIN:-"$ROOT_DIR/bin/contenox-runtime"}"
 VALIDATOR="${ACP_VALIDATOR_BIN:-}"
 
 fail() {

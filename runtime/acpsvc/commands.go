@@ -35,6 +35,7 @@ func allACPCommands() []libacp.AvailableCommand {
 		{Name: "capability", Description: "Show or set persistent provider/model capability overrides.", Input: &libacp.AvailableCommandInput{Hint: "set|show|unset <provider> <model> [--think true|false]"}},
 		{Name: "policy", Description: "Show the active HITL policy, or switch it: /policy <name>.", Input: &libacp.AvailableCommandInput{Hint: "[policy-name]"}},
 		{Name: "mission", Description: "Fire a mission from this session: /mission [agent-name] <intent>.", Input: &libacp.AvailableCommandInput{Hint: "[agent-name] <intent>"}},
+		{Name: planCommandName, Description: "Plan a piece of work, then run each step as a subagent.", Input: &libacp.AvailableCommandInput{Hint: "<what you want done>"}},
 	}
 }
 
@@ -43,9 +44,9 @@ func (t *Transport) acpCommands() []libacp.AvailableCommand {
 	if t.hasMissionCapability() {
 		return all
 	}
-	out := make([]libacp.AvailableCommand, 0, len(all)-1)
+	out := make([]libacp.AvailableCommand, 0, len(all)-2)
 	for _, c := range all {
-		if c.Name == "mission" {
+		if c.Name == "mission" || c.Name == planCommandName {
 			continue
 		}
 		out = append(out, c)

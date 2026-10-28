@@ -29,7 +29,7 @@ var stateListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List request IDs with captured execution state.",
 	Long: `List every request ID for which the engine's inspector persisted execution
-state to KV. Use a listed ID with 'contenox state show' to inspect its steps.
+state to KV. Use a listed ID with 'contenox-runtime state show' to inspect its steps.
 Prints "(no captured state)" when nothing has been recorded.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,7 +63,7 @@ var stateShowCmd = &cobra.Command{
 	Short: "Print captured execution steps for a request.",
 	Long: `Print the captured step records for one request as a table showing each task,
 its handler, retry index, duration, transition, and status. Pass --raw to dump
-the captured units as JSON instead. Use 'contenox state list' to find request
+the captured units as JSON instead. Use 'contenox-runtime state list' to find request
 IDs.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

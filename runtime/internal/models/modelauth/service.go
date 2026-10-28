@@ -27,7 +27,7 @@ const BaseURL = "https://chatgpt.com/backend-api/codex"
 const clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 const authURL = "https://auth.openai.com"
 
-var ErrLoginRequired = errors.New("ChatGPT login required; run contenox-cli backend login <name>")
+var ErrLoginRequired = errors.New("ChatGPT login required; run contenox-runtime backend login <name>")
 
 type DeviceCode struct {
 	URL       string

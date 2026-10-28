@@ -418,17 +418,6 @@ func TestUnit_ControlPlane_SurvivesSetRoots(t *testing.T) {
 	require.ErrorIs(t, err, vfs.ErrControlPlane)
 }
 
-func TestUnit_ControlPlane_DeniedRootStillRefused(t *testing.T) {
-	controlPlane := t.TempDir()
-	setControlPlane(t, controlPlane)
-	f, err := vfs.NewFactory(controlPlane)
-	require.NoError(t, err)
-
-	_, err = f.Resolve(controlPlane)
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, vfs.ErrControlPlane), "a control-plane dir is refused even when it is itself a configured root")
-}
-
 func TestUnit_ControlPlane_ResolveSessionCwd(t *testing.T) {
 	root := t.TempDir()
 	controlPlane := filepath.Join(root, ".contenox")
@@ -499,4 +488,65 @@ func TestUnit_ControlPlane_UnregisteredIsNoOp(t *testing.T) {
 
 	_, err = vfs.Contain(root, ".contenox")
 	require.NoError(t, err, "containment is unaffected when nothing is registered")
+}
+
+func TestUnit_Contain_RejectsDanglingSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "does-not-exist.txt")
+	link := filepath.Join(root, "dangling")
+	require.NoError(t, os.Symlink(outside, link))
+
+	_, err := vfs.Contain(root, "dangling")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, vfs.ErrEscape), "a dangling symlink must be refused, got %v", err)
+
+	v, err := vfs.OpenView(root)
+	require.NoError(t, err)
+	_, err = v.Resolve("dangling")
+	require.ErrorIs(t, err, vfs.ErrEscape)
+	_, statErr := os.Lstat(outside)
+	assert.True(t, os.IsNotExist(statErr), "nothing may be created outside the root")
+}
+
+func TestUnit_ControlPlane_DeniedRootRefusedAtConstruction(t *testing.T) {
+	controlPlane := t.TempDir()
+	other := t.TempDir()
+	setControlPlane(t, controlPlane)
+
+	_, err := vfs.NewFactory(controlPlane)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, vfs.ErrControlPlane), "a control-plane dir is refused as a configured root, got %v", err)
+
+	sub := filepath.Join(controlPlane, "policies")
+	require.NoError(t, os.MkdirAll(sub, 0o750))
+	_, err = vfs.NewFactory(other, sub)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, vfs.ErrControlPlane), "a subpath of the control plane is refused too, got %v", err)
+
+	f, err := vfs.NewFactory(other)
+	require.NoError(t, err)
+	require.ErrorIs(t, f.SetRoots([]string{other, controlPlane}), vfs.ErrControlPlane,
+		"a hot-reload must not be able to smuggle one in either")
+	ro, err := vfs.ResolveRoot(other)
+	require.NoError(t, err)
+	assert.Equal(t, []string{ro}, f.Roots(), "a refused SetRoots leaves the previous allowlist intact")
+}
+
+func TestUnit_ControlPlane_DefaultRootRefusedWhenRegisteredLate(t *testing.T) {
+	controlPlane := t.TempDir()
+
+	f, err := vfs.NewFactory(controlPlane)
+	require.NoError(t, err)
+
+	setControlPlane(t, controlPlane)
+
+	for _, sentinel := range []string{"", "/"} {
+		_, err := f.Resolve(sentinel)
+		require.Errorf(t, err, "sentinel %q must not return the control-plane default", sentinel)
+		assert.True(t, errors.Is(err, vfs.ErrControlPlane), "got %v", err)
+	}
+
+	_, err = vfs.ResolveSessionCwd(f, "", "")
+	require.ErrorIs(t, err, vfs.ErrCwdNotPermitted)
+	assert.Contains(t, err.Error(), "control plane")
 }

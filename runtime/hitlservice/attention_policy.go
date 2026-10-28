@@ -7,11 +7,15 @@ import (
 )
 
 type AttentionBounds struct {
-	AllowAgentAnswers bool `json:"allowAgentAnswers,omitempty"`
-	MaxAgentAnswers   int  `json:"maxAgentAnswers,omitempty"`
+	AllowAgentAnswers   bool `json:"allowAgentAnswers,omitempty"`
+	MaxAgentAnswers     int  `json:"maxAgentAnswers,omitempty"`
+	AllowAgentApprovals bool `json:"allowAgentApprovals,omitempty"`
+	MaxAgentApprovals   int  `json:"maxAgentApprovals,omitempty"`
 }
 
 const DefaultMaxAgentAnswers = 3
+
+const DefaultMaxAgentApprovals = 10
 
 const maxAgentAnswersCeiling = 1_000
 
@@ -20,6 +24,13 @@ func (b AttentionBounds) EffectiveMaxAgentAnswers() int {
 		return DefaultMaxAgentAnswers
 	}
 	return b.MaxAgentAnswers
+}
+
+func (b AttentionBounds) EffectiveMaxAgentApprovals() int {
+	if b.MaxAgentApprovals <= 0 {
+		return DefaultMaxAgentApprovals
+	}
+	return b.MaxAgentApprovals
 }
 
 func (s *service) AttentionBoundsFor(ctx context.Context, policyName string) (AttentionBounds, error) {
@@ -49,6 +60,12 @@ func validateAttentionBounds(b *AttentionBounds) error {
 	}
 	if b.MaxAgentAnswers > maxAgentAnswersCeiling {
 		return fmt.Errorf("attention.maxAgentAnswers %d exceeds the sanity ceiling %d", b.MaxAgentAnswers, maxAgentAnswersCeiling)
+	}
+	if b.MaxAgentApprovals < 0 {
+		return fmt.Errorf("attention.maxAgentApprovals must not be negative")
+	}
+	if b.MaxAgentApprovals > maxAgentAnswersCeiling {
+		return fmt.Errorf("attention.maxAgentApprovals %d exceeds the sanity ceiling %d", b.MaxAgentApprovals, maxAgentAnswersCeiling)
 	}
 	return nil
 }

@@ -192,7 +192,11 @@ func (m *Manager) StartWorker(ctx context.Context, srv *runtimetypes.MCPServer) 
 		delete(m.workers, srv.Name)
 	}
 
-	workerCtx, workerCancel := context.WithCancel(ctx)
+	root := m.rootCtx
+	if root == nil {
+		root = context.Background()
+	}
+	workerCtx, workerCancel := context.WithCancel(root)
 	w := &worker{
 		serverName: srv.Name,
 		cfg:        mcpServerToConfig(srv, m.db),

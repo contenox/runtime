@@ -84,6 +84,27 @@ func (s *store) scanHITLApproval(ctx context.Context, query string, arg any) (*H
 	return &a, nil
 }
 
+type AgentAnswerBound struct {
+	MissionID      string
+	ResolutionLike string
+	Max            int
+}
+
+func (s *store) ResolveHITLApprovalWithinBound(ctx context.Context, id string, bound AgentAnswerBound, state HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error {
+	result, err := s.Exec.ExecContext(ctx, `
+		UPDATE hitl_approvals
+		SET state = $2, resolution = $3, resolved_at = $4
+		WHERE id = $1 AND state = 'pending'
+		  AND (SELECT COUNT(*) FROM hitl_approvals
+		       WHERE mission_id = $5 AND state <> 'pending' AND resolution LIKE $6) < $7`,
+		id, string(state), nullableJSON(resolution), resolvedAt, bound.MissionID, bound.ResolutionLike, bound.Max,
+	)
+	if err != nil {
+		return err
+	}
+	return checkRowsAffected(result)
+}
+
 func (s *store) ResolveHITLApproval(ctx context.Context, id string, state HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error {
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE hitl_approvals

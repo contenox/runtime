@@ -21,7 +21,7 @@ PTY) or the interactive terminal is allowed to inherit, so credentials in serve'
 environment do not leak into a shell an agent can drive.
 
 Configure it with the SANDBOX_SHELL_SCRUB / SANDBOX_TERMINAL_SCRUB modes and the
-SANDBOX_ENV_ALLOW / SANDBOX_ENV_DENY lists (see 'contenox serve --help').`,
+SANDBOX_ENV_ALLOW / SANDBOX_ENV_DENY lists (see 'contenox-runtime serve --help').`,
 }
 
 var sandboxEnvCmd = &cobra.Command{

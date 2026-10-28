@@ -39,6 +39,22 @@ func SecretEnvDeny() []string {
 		"*_PASSWORD",
 		"*_PASSWD",
 		"*_CREDENTIALS",
+		"AWS_ACCESS_KEY_ID",
+		"AWS_SESSION_TOKEN",
+		"PGPASSWORD",
+		"MYSQL_PWD",
+		"*_PWD",
+		"DATABASE_URL",
+		"*_DATABASE_URL",
+		"REDIS_URL",
+		"MONGODB_URI",
+		"*_DSN",
+		"SSH_AUTH_SOCK",
+		"KUBECONFIG",
+		"*_AUTH",
+		"*_PAT",
+		"NETRC",
+		"*_API_KEY_ID",
 	}
 }
 
@@ -97,7 +113,7 @@ func (p EnvPolicy) Apply(parentEnv []string) []string {
 }
 
 func (p EnvPolicy) passes(name string) bool {
-	return !matchesAny(p.Deny, name) && matchesAny(p.Allow, name)
+	return !matchesAnyFold(p.Deny, name) && matchesAny(p.Allow, name)
 }
 
 func ParseEnvList(s string) []string {
@@ -108,6 +124,16 @@ func ParseEnvList(s string) []string {
 		return nil
 	}
 	return fields
+}
+
+func matchesAnyFold(patterns []string, name string) bool {
+	lowered := strings.ToLower(name)
+	for _, pat := range patterns {
+		if envNameMatches(strings.ToLower(pat), lowered) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchesAny(patterns []string, name string) bool {

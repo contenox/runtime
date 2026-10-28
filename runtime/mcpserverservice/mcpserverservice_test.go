@@ -50,3 +50,18 @@ func TestUnit_MCPServerService_ValidateTransportRequirements(t *testing.T) {
 		})
 	}
 }
+
+func TestUnit_ValidateRejectsACPManagedNamePrefix(t *testing.T) {
+	srv := &runtimetypes.MCPServer{
+		Name:      runtimetypes.ACPMCPServerNamePrefix + "forged",
+		Transport: "stdio",
+		Command:   "server",
+	}
+	err := validate(srv)
+	if err == nil {
+		t.Fatal("expected the reserved ACP prefix to be refused")
+	}
+	if !strings.Contains(err.Error(), "reserved ACP session prefix") {
+		t.Fatalf("error %q does not name the reserved prefix", err)
+	}
+}

@@ -239,7 +239,7 @@ func TestUnit_ServeClient_DoUnreachableServerReportsConnectError(t *testing.T) {
 	client := &serveClient{baseURL: "http://127.0.0.1:1", http: &http.Client{Timeout: 2 * time.Second}}
 	err := client.get(context.Background(), "/x", nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "contenox serve")
+	require.Contains(t, err.Error(), "contenox-runtime serve")
 }
 
 func TestUnit_ApprovalsList_EmptyInboxPrintsHint(t *testing.T) {

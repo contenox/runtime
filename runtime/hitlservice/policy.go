@@ -411,11 +411,11 @@ func isCommandBlacklisted(args map[string]any, blacklist string) bool {
 	if cmd == "" {
 		return false
 	}
-	base := path.Base(cmd)
-	base = strings.Fields(base)[0]
-	if base == "" {
+	fields := strings.Fields(path.Base(cmd))
+	if len(fields) == 0 {
 		return false
 	}
+	base := fields[0]
 	for _, denied := range strings.Split(blacklist, ",") {
 		denied = strings.TrimSpace(denied)
 		if denied == "" {
@@ -436,11 +436,11 @@ func isCommandInAskAlwaysList(args map[string]any, commandList string) bool {
 	if cmd == "" {
 		return false
 	}
-	base := path.Base(cmd)
-	base = strings.Fields(base)[0]
-	if base == "" {
+	fields := strings.Fields(path.Base(cmd))
+	if len(fields) == 0 {
 		return false
 	}
+	base := fields[0]
 	for _, cmdName := range strings.Split(commandList, ",") {
 		cmdName = strings.TrimSpace(cmdName)
 		if cmdName == "" {

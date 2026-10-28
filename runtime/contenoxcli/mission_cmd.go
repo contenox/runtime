@@ -31,12 +31,12 @@ prompt an agent turn by turn and you are the one approving each gated action. In
 mission mode you fire a one-line intent at a declared agent under an ENVELOPE (a
 HITL policy that bounds what it may do unattended) and detach; the unit acts
 inside the envelope and only crossing it costs your attention, in the approvals
-inbox ('contenox approvals').
+inbox ('contenox-runtime approvals').
 
 A mission is a subagent of whatever process fires it: /mission in an editor
-session ('contenox acp') dispatches in-process and its reports arrive live back
+session ('contenox-runtime acp') dispatches in-process and its reports arrive live back
 in that session. THESE verbs are the operator's remote lever — they fire onto,
-and read from, a running 'contenox serve' over its REST API (default
+and read from, a running 'contenox-runtime serve' over its REST API (default
 http://127.0.0.1:32123; override with --server/--token or
 CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN).
 
@@ -44,6 +44,7 @@ CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN).
   contenox mission fire --intent "summarise today's commits"   # --agent/--policy from config defaults
   contenox mission list                     # what is running, for whom, and why
   contenox mission show <mission-id>        # the mission plus its reports, newest first
+  contenox mission plan <mission-id>        # the living plan: entries, status and revision history
 
 Set the defaults 'mission fire' falls back to with:
   contenox config set default-mission-agent  <agent-name>
@@ -71,7 +72,7 @@ workspace root serve allows. Omitted, it defaults to serve's project root.
 
 By default firing returns as soon as the unit's session is open (the first turn
 runs detached), printing the mission/instance/session ids to follow it with
-'contenox mission show' and 'contenox fleet show'. The mission id is
+'contenox-runtime mission show' and 'contenox-runtime fleet show'. The mission id is
 machine-readable on stdout — bare with -q, or inside the --json object — so a
 script can capture and correlate it.
 
@@ -113,7 +114,7 @@ the inbox) but the same coarse shell verdict, "ended without success".`,
 var missionListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List missions, newest first.",
-	Long: `Print the missions a running 'contenox serve' holds, newest first: each
+	Long: `Print the missions a running 'contenox-runtime serve' holds, newest first: each
 mission's id, status, agent, envelope, when it last changed, and the intent it
 was fired with. --json emits the raw records (including the session/instance ids
 and the parent-session supervision edge).`,
@@ -134,6 +135,18 @@ emits {mission, reports} as one object.`,
 	RunE: runMissionShow,
 }
 
+var missionPlanCmd = &cobra.Command{
+	Use:   "plan <mission-id>",
+	Short: "Print a mission's living plan in full: every entry, its status and priority, and the revision history.",
+	Long: `The mission record carries only a one-line plan summary (revision number and
+per-status counts). This prints the plan itself: every entry in order with its
+status (pending|in_progress|completed) and priority, plus the durable
+"+added/-removed — why" history of past revisions. A mission with no plan
+(revision 0 — no resident planner has run for it) says so plainly.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runMissionPlan,
+}
+
 func init() {
 	addServeClientFlags(missionCmd)
 
@@ -143,7 +156,7 @@ func init() {
 	missionFireCmd.Flags().String("cwd", "", "Absolute working directory for the unit's session (default: serve's project root)")
 	missionFireCmd.Flags().Bool("json", false, "Print the dispatch result (ids) as JSON")
 	missionFireCmd.Flags().BoolP("quiet", "q", false, "Print only the mission id to stdout (for capture in scripts)")
-	missionFireCmd.Flags().Bool("wait", false, "Block until the fired unit reaches an observable terminal condition; exit code reflects the outcome (see 'contenox mission fire --help')")
+	missionFireCmd.Flags().Bool("wait", false, "Block until the fired unit reaches an observable terminal condition; exit code reflects the outcome (see 'contenox-runtime mission fire --help')")
 	missionFireCmd.Flags().Duration("wait-timeout", 5*time.Minute, "With --wait, the ceiling before giving up (exit 3)")
 	missionFireCmd.Flags().Duration("wait-interval", 2*time.Second, "With --wait, how often to poll for a terminal condition")
 
@@ -156,6 +169,7 @@ func init() {
 	missionCmd.AddCommand(missionFireCmd)
 	missionCmd.AddCommand(missionListCmd)
 	missionCmd.AddCommand(missionShowCmd)
+	missionCmd.AddCommand(missionPlanCmd)
 }
 
 func (c *serveClient) dispatchMission(ctx context.Context, req fleetservice.DispatchRequest) (fleetservice.DispatchResult, error) {
@@ -311,7 +325,7 @@ func waitForMissionOutcome(
 				latest := reports[0]
 				switch latest.Kind {
 				case missionservice.ReportKindBlocker:
-					return missionWaitBlocked, fmt.Sprintf("mission %s is BLOCKED: %s — needs attention (see 'contenox mission show %s').",
+					return missionWaitBlocked, fmt.Sprintf("mission %s is BLOCKED: %s — needs attention (see 'contenox-runtime mission show %s').",
 						result.MissionID, latest.Summary, result.MissionID)
 				case missionservice.ReportKindResult:
 					return missionWaitReported, fmt.Sprintf("mission %s produced a result: %s", result.MissionID, latest.Summary)
@@ -359,7 +373,7 @@ func verdictFromStatus(m *missionservice.Mission) (int, string, bool) {
 	case missionservice.StatusDerailed:
 		return missionWaitStopped, fmt.Sprintf("mission %s DERAILED%s", m.ID, reason), true
 	case missionservice.StatusStuck:
-		return missionWaitStopped, fmt.Sprintf("mission %s is STUCK%s — needs attention (see 'contenox mission show %s').", m.ID, reason, m.ID), true
+		return missionWaitStopped, fmt.Sprintf("mission %s is STUCK%s — needs attention (see 'contenox-runtime mission show %s').", m.ID, reason, m.ID), true
 	case missionservice.StatusAbandoned:
 		return missionWaitStopped, fmt.Sprintf("mission %s was ABANDONED%s", m.ID, reason), true
 	default:
@@ -496,4 +510,49 @@ func runMissionShow(cmd *cobra.Command, args []string) error {
 		)
 	}
 	return rw.Flush()
+}
+
+func runMissionPlan(cmd *cobra.Command, args []string) error {
+	ctx := libtracker.WithNewRequestID(context.Background())
+
+	client, err := newServeClient(cmd)
+	if err != nil {
+		return err
+	}
+	mission, err := client.getMission(ctx, args[0])
+	if err != nil {
+		return fmt.Errorf("plan mission %q: %w", args[0], err)
+	}
+	renderMissionPlan(cmd.OutOrStdout(), mission)
+	return nil
+}
+
+func renderMissionPlan(w io.Writer, m *missionservice.Mission) {
+	if m.Plan.Revision == 0 {
+		fmt.Fprintf(w, "Mission %s has no plan yet (revision 0) - no resident planner has run for this mission.\n", m.ID)
+		return
+	}
+	fmt.Fprintf(w, "Mission %s - plan revision %d\n", m.ID, m.Plan.Revision)
+	if explanation := strings.TrimSpace(m.Plan.Explanation); explanation != "" {
+		fmt.Fprintf(w, "Rationale: %s\n", explanation)
+	}
+	fmt.Fprintln(w)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "STATUS\tPRIORITY\tENTRY")
+	for _, entry := range m.Plan.Entries {
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", entry.Status, entry.Priority, entry.Content)
+	}
+	tw.Flush()
+
+	if len(m.PlanRevisions) > 0 {
+		fmt.Fprintln(w, "\nRevision history (oldest first):")
+		for _, revision := range m.PlanRevisions {
+			line := fmt.Sprintf("  rev %d: +%d/-%d (%d pending, %d in progress, %d completed)",
+				revision.Revision, revision.Added, revision.Removed, revision.Pending, revision.InProgress, revision.Completed)
+			if explanation := strings.TrimSpace(revision.Explanation); explanation != "" {
+				line += " - " + explanation
+			}
+			fmt.Fprintln(w, line)
+		}
+	}
 }

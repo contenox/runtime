@@ -1,7 +1,7 @@
 # Contenox API Smoke Tests
 
 These tests are recovered from the old OSS API test shape, but trimmed for the
-current local `contenox serve` contract.
+current local `contenox-runtime serve` contract.
 
 Run the suite with:
 
@@ -9,8 +9,8 @@ Run the suite with:
 make test-api
 ```
 
-The runner builds `bin/contenox`, creates a temporary HOME/workspace, runs
-`contenox init --force`, starts `contenox serve` on `127.0.0.1:32124`, then runs
+The runner builds `bin/contenox-runtime`, creates a temporary HOME/workspace, runs
+`contenox-runtime init --force`, starts `contenox-runtime serve` on `127.0.0.1:32124`, then runs
 pytest against `http://127.0.0.1:32124/api`.
 
 Useful overrides:

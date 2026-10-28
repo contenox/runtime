@@ -8,11 +8,14 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libkvstore"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
@@ -28,6 +31,8 @@ const (
 	ProviderTypeGemini       = "gemini"
 	ProviderTypeVLLM         = "vllm"
 	ProviderTypeVertexGoogle = "vertex-google"
+	ProviderTypeDeepSeek     = "deepseek"
+	ProviderTypeOpenAICodex  = "openai-codex"
 )
 
 var ErrInvalidProvider = errors.New("invalid provider")
@@ -55,6 +60,8 @@ type ProviderStatus struct {
 	DefaultProvider      string    `json:"defaultProvider,omitempty"`
 	DefaultModel         string    `json:"defaultModel,omitempty"`
 	UpdatedAt            time.Time `json:"updatedAt,omitempty"`
+	AuthState            string    `json:"authState,omitempty"`
+	LoginRequired        bool      `json:"loginRequired,omitempty"`
 }
 
 type ProviderCapability struct {
@@ -62,6 +69,7 @@ type ProviderCapability struct {
 	DefaultBaseURL       string `json:"defaultBaseUrl,omitempty"`
 	RequiresBaseURL      bool   `json:"requiresBaseUrl"`
 	RequiresSecretConfig bool   `json:"requiresSecretConfig"`
+	RequiresLogin        bool   `json:"requiresLogin,omitempty"`
 	RecommendedAPIKeyEnv string `json:"recommendedApiKeyEnv,omitempty"`
 }
 
@@ -71,6 +79,26 @@ type Service interface {
 	DeleteProviderConfig(ctx context.Context, providerType string) error
 	ListProviderConfigs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*ProviderStatus, error)
 	ListSupportedProviders(ctx context.Context) ([]ProviderCapability, error)
+	StartLogin(ctx context.Context, providerType string) (*LoginStart, error)
+	LoginStatus(ctx context.Context, providerType string) (*LoginStatus, error)
+	Logout(ctx context.Context, providerType string) error
+}
+
+type LoginStart struct {
+	Provider  string    `json:"provider"`
+	State     string    `json:"state"`
+	URL       string    `json:"url,omitempty"`
+	Code      string    `json:"code,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt,omitempty"`
+}
+
+type LoginStatus struct {
+	Provider  string    `json:"provider"`
+	State     string    `json:"state"`
+	URL       string    `json:"url,omitempty"`
+	Code      string    `json:"code,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt,omitempty"`
+	Error     string    `json:"error,omitempty"`
 }
 
 type service struct {
@@ -83,6 +111,7 @@ type providerDefaults struct {
 	DefaultBaseURL       string
 	RequiresBaseURL      bool
 	RequiresSecretConfig bool
+	RequiresLogin        bool
 	RecommendedAPIKeyEnv string
 }
 
@@ -96,6 +125,8 @@ var providerDefaultsByType = map[string]providerDefaults{
 	ProviderTypeGemini:       {Type: ProviderTypeGemini, DefaultBaseURL: "https://generativelanguage.googleapis.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "GEMINI_API_KEY"},
 	ProviderTypeVLLM:         {Type: ProviderTypeVLLM, RequiresBaseURL: true},
 	ProviderTypeVertexGoogle: {Type: ProviderTypeVertexGoogle, RequiresBaseURL: true, RecommendedAPIKeyEnv: "GOOGLE_APPLICATION_CREDENTIALS"},
+	ProviderTypeDeepSeek:     {Type: ProviderTypeDeepSeek, DefaultBaseURL: "https://api.deepseek.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DEEPSEEK_API_KEY"},
+	ProviderTypeOpenAICodex:  {Type: ProviderTypeOpenAICodex, DefaultBaseURL: modelauth.BaseURL, RequiresLogin: true},
 }
 
 func supportedProviders() []ProviderCapability {
@@ -106,6 +137,7 @@ func supportedProviders() []ProviderCapability {
 			DefaultBaseURL:       defaults.DefaultBaseURL,
 			RequiresBaseURL:      defaults.RequiresBaseURL,
 			RequiresSecretConfig: defaults.RequiresSecretConfig,
+			RequiresLogin:        defaults.RequiresLogin,
 			RecommendedAPIKeyEnv: defaults.RecommendedAPIKeyEnv,
 		})
 	}
@@ -143,6 +175,12 @@ func (s *service) Configure(ctx context.Context, providerType string, req Config
 	}
 	if defaults.RequiresBaseURL && baseURL == "" {
 		return nil, fmt.Errorf("%w: baseUrl is required for %s", ErrInvalidProvider, providerType)
+	}
+	if defaults.RequiresLogin {
+		if req.APIKey != "" || req.APIKeyEnv != "" {
+			return nil, fmt.Errorf("%w: %s signs in with a device code; an API key does not apply", ErrInvalidProvider, providerType)
+		}
+		baseURL = defaults.DefaultBaseURL
 	}
 
 	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
@@ -215,6 +253,12 @@ func (s *service) Configure(ctx context.Context, providerType string, req Config
 			if err := clikv.WriteConfig(ctx, store, s.workspaceID, "default-model", req.DefaultModel); err != nil {
 				return nil, fmt.Errorf("set default-model: %w", err)
 			}
+		}
+		if strings.TrimSpace(clikv.Read(ctx, store, "default-oracle-chain")) == "" {
+			_ = clikv.WriteConfig(ctx, store, s.workspaceID, "default-oracle-chain", "chain-oracle-default.json")
+		}
+		if strings.TrimSpace(clikv.Read(ctx, store, "default-oracle-policy")) == "" {
+			_ = clikv.WriteConfig(ctx, store, s.workspaceID, "default-oracle-policy", "hitl-policy-oracle.json")
 		}
 	}
 
@@ -387,6 +431,12 @@ func (s *service) statusFrom(ctx context.Context, store runtimetypes.Store, defa
 	}
 	hasBackend := backend != nil
 	status.Configured = hasBackend && (!defaults.RequiresSecretConfig || status.SecretConfigured)
+	if defaults.RequiresLogin && backend != nil {
+		if authState, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID); err == nil {
+			status.AuthState = authState.State
+			status.LoginRequired = authState.State == "login_required" || authState.State == "refresh_required"
+		}
+	}
 	return status
 }
 
@@ -409,4 +459,177 @@ func normalizeProvider(providerType string) (string, providerDefaults, error) {
 		return "", providerDefaults{}, fmt.Errorf("%w: %s", ErrInvalidProvider, providerType)
 	}
 	return providerType, defaults, nil
+}
+
+type loginAttempt struct {
+	provider string
+	device   modelauth.DeviceCode
+	done     bool
+	err      error
+	codeCh   chan modelauth.DeviceCode
+	doneCh   chan struct{}
+	cancel   context.CancelFunc
+}
+
+var (
+	loginMu       sync.Mutex
+	loginAttempts = map[string]*loginAttempt{}
+)
+
+func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginStart, error) {
+	providerType, defaults, err := normalizeProvider(providerType)
+	if err != nil {
+		return nil, err
+	}
+	if !defaults.RequiresLogin {
+		return nil, fmt.Errorf("%w: %s does not use a subscription sign-in", ErrInvalidProvider, providerType)
+	}
+
+	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
+	backend, err := store.GetBackendByName(ctx, providerType)
+	if errors.Is(err, libdb.ErrNotFound) {
+		if _, err := s.Configure(ctx, providerType, ConfigureProviderRequest{Upsert: true, SetDefault: false}); err != nil {
+			return nil, err
+		}
+		backend, err = store.GetBackendByName(ctx, providerType)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
+	}
+
+	auth := modelauth.New(s.dbInstance)
+	if state, err := auth.Status(ctx, backend.ID); err == nil && state.State == "authenticated" {
+		return &LoginStart{Provider: providerType, State: state.State, ExpiresAt: state.ExpiresAt}, nil
+	}
+
+	loginMu.Lock()
+	if attempt := loginAttempts[backend.ID]; attempt != nil && !attempt.done {
+		device := attempt.device
+		loginMu.Unlock()
+		if device.Code != "" {
+			return &LoginStart{Provider: providerType, State: "login_pending", URL: device.URL, Code: device.Code, ExpiresAt: device.ExpiresAt}, nil
+		}
+		return waitLoginStart(ctx, providerType, attempt)
+	}
+	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	attempt := &loginAttempt{
+		provider: providerType,
+		codeCh:   make(chan modelauth.DeviceCode, 1),
+		doneCh:   make(chan struct{}),
+		cancel:   cancel,
+	}
+	loginAttempts[backend.ID] = attempt
+	loginMu.Unlock()
+
+	go func() {
+		err := auth.Login(loginCtx, backend.ID, func(code modelauth.DeviceCode) error {
+			loginMu.Lock()
+			attempt.device = code
+			loginMu.Unlock()
+			select {
+			case attempt.codeCh <- code:
+			default:
+			}
+			return nil
+		})
+		loginMu.Lock()
+		attempt.err = err
+		attempt.done = true
+		loginMu.Unlock()
+		close(attempt.doneCh)
+		if err == nil {
+			s.invalidateBackendCache(backend.ID)
+		}
+	}()
+
+	return waitLoginStart(ctx, providerType, attempt)
+}
+
+func waitLoginStart(ctx context.Context, providerType string, attempt *loginAttempt) (*LoginStart, error) {
+	select {
+	case code := <-attempt.codeCh:
+		return &LoginStart{Provider: providerType, State: "login_pending", URL: code.URL, Code: code.Code, ExpiresAt: code.ExpiresAt}, nil
+	case <-attempt.doneCh:
+		loginMu.Lock()
+		err := attempt.err
+		loginMu.Unlock()
+		if err != nil {
+			return nil, fmt.Errorf("start sign-in: %w", err)
+		}
+		return &LoginStart{Provider: providerType, State: "authenticated"}, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(30 * time.Second):
+		return nil, fmt.Errorf("%w: timed out waiting for the device code", ErrInvalidProvider)
+	}
+}
+
+func (s *service) LoginStatus(ctx context.Context, providerType string) (*LoginStatus, error) {
+	providerType, defaults, err := normalizeProvider(providerType)
+	if err != nil {
+		return nil, err
+	}
+	if !defaults.RequiresLogin {
+		return nil, fmt.Errorf("%w: %s does not use a subscription sign-in", ErrInvalidProvider, providerType)
+	}
+	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
+	backend, err := store.GetBackendByName(ctx, providerType)
+	if errors.Is(err, libdb.ErrNotFound) {
+		return &LoginStatus{Provider: providerType, State: "not_configured"}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
+	}
+	state, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := &LoginStatus{Provider: providerType, State: state.State, ExpiresAt: state.ExpiresAt}
+
+	loginMu.Lock()
+	if attempt := loginAttempts[backend.ID]; attempt != nil {
+		if !attempt.done && attempt.device.Code != "" && out.State != "authenticated" {
+			out.State = "login_pending"
+			out.URL = attempt.device.URL
+			out.Code = attempt.device.Code
+			out.ExpiresAt = attempt.device.ExpiresAt
+		}
+		if attempt.done && attempt.err != nil {
+			out.Error = attempt.err.Error()
+		}
+	}
+	loginMu.Unlock()
+	return out, nil
+}
+
+func (s *service) Logout(ctx context.Context, providerType string) error {
+	providerType, defaults, err := normalizeProvider(providerType)
+	if err != nil {
+		return err
+	}
+	if !defaults.RequiresLogin {
+		return fmt.Errorf("%w: %s does not use a subscription sign-in", ErrInvalidProvider, providerType)
+	}
+	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
+	backend, err := store.GetBackendByName(ctx, providerType)
+	if err != nil {
+		return fmt.Errorf("read backend %q: %w", providerType, err)
+	}
+
+	loginMu.Lock()
+	if attempt := loginAttempts[backend.ID]; attempt != nil {
+		attempt.cancel()
+		delete(loginAttempts, backend.ID)
+	}
+	loginMu.Unlock()
+
+	if err := modelauth.New(s.dbInstance).Logout(ctx, backend.ID); err != nil {
+		return err
+	}
+	s.invalidateBackendCache(backend.ID)
+	return nil
+}
+
+func (s *service) invalidateBackendCache(backendID string) {
+	_ = runtimestate.InvalidateModelCache(context.Background(), libkvstore.NewSQLiteManager(s.dbInstance), backendID)
 }

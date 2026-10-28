@@ -15,6 +15,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -50,6 +51,8 @@ type setupProvider struct {
 var setupProviders = []setupProvider{
 	{key: "ollama", label: "Ollama (local daemon)", defaultModel: "qwen2.5:7b", needsAPIKey: false},
 	{key: "openai", label: "OpenAI", defaultModel: "gpt-5-mini", envKey: "OPENAI_API_KEY", needsAPIKey: true},
+	{key: "openai-codex", label: "ChatGPT subscription (Codex — device login, no API key)"},
+	{key: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat", envKey: "DEEPSEEK_API_KEY", needsAPIKey: true},
 	{key: "openrouter", label: "OpenRouter (300+ models, one API key — deepseek, qwen, llama, gemini, gpt and more)", defaultModel: "deepseek/deepseek-chat-v3-5", envKey: "OPENROUTER_API_KEY", needsAPIKey: true},
 	{key: "gemini", label: "Google Gemini", defaultModel: "gemini-flash-latest", envKey: "GEMINI_API_KEY", needsAPIKey: true},
 	{key: "vertex-google", label: "Google Vertex AI (Gemini via gcloud ADC)", defaultModel: "gemini-flash-latest", needsAPIKey: false, needsBaseURL: true, baseURLHint: "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT/locations/us-central1"},
@@ -114,9 +117,9 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 	chosen := promptChoiceOrQuit(out, scanner, "  Provider", len(setupProviders), alreadyConfigured)
 	if chosen == promptEOF {
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "  No input received — `contenox setup` is interactive and made no changes.")
-		fmt.Fprintln(out, "  Run it in a terminal, or configure non-interactively with `contenox config set`")
-		fmt.Fprintln(out, "  (e.g. `contenox config set default-provider ollama`).")
+		fmt.Fprintln(out, "  No input received — `contenox-runtime setup` is interactive and made no changes.")
+		fmt.Fprintln(out, "  Run it in a terminal, or configure non-interactively with `contenox-runtime config set`")
+		fmt.Fprintln(out, "  (e.g. `contenox-runtime config set default-provider ollama`).")
 		fmt.Fprintln(out, "")
 		return errSetupNoInput
 	}
@@ -126,6 +129,9 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 		return nil
 	}
 	sp := setupProviders[chosen]
+	if sp.key == modelauth.ProviderType {
+		return runCodexSetup(cmd, out, scanner)
+	}
 
 	var apiKey string
 	if sp.needsAPIKey {
@@ -203,6 +209,8 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 	if model != "" {
 		_ = clikv.WriteConfig(ctx, store, "global", "default-model", model)
 	}
+	ensureConfigDefault(ctx, store, "default-oracle-chain", "chain-oracle-default.json")
+	ensureConfigDefault(ctx, store, "default-oracle-policy", "hitl-policy-oracle.json")
 
 	fmt.Fprintln(out, "")
 	fmt.Fprintf(out, "  ✓ Provider: %s\n", sp.key)
@@ -219,7 +227,7 @@ func reportSetupReadiness(ctx context.Context, cmd *cobra.Command, db libdb.DBMa
 	opts, err := buildRunOpts(cmd, db, contenoxDir)
 	if err != nil {
 		fmt.Fprintf(out, "  ⚠  Could not verify setup: %v\n", err)
-		fmt.Fprintln(out, "     Config is saved. Run `contenox doctor` to check connectivity.")
+		fmt.Fprintln(out, "     Config is saved. Run `contenox-runtime doctor` to check connectivity.")
 		fmt.Fprintln(out, "")
 		return
 	}
@@ -233,7 +241,7 @@ func reportSetupReadiness(ctx context.Context, cmd *cobra.Command, db libdb.DBMa
 	res, err := ComputeReadiness(ctx, db, opts)
 	if err != nil {
 		fmt.Fprintf(out, "  ⚠  Could not verify setup: %v\n", err)
-		fmt.Fprintln(out, "     Config is saved. Run `contenox doctor` to check connectivity.")
+		fmt.Fprintln(out, "     Config is saved. Run `contenox-runtime doctor` to check connectivity.")
 		fmt.Fprintln(out, "")
 		return
 	}
@@ -248,7 +256,7 @@ func reportSetupReadiness(ctx context.Context, cmd *cobra.Command, db libdb.DBMa
 	fmt.Fprintln(out, "  Config saved, but the agent is not ready yet:")
 	PrintSetupIssues(out, res)
 	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "  Fix the above (or run `contenox doctor`), then you're set.")
+	fmt.Fprintln(out, "  Fix the above (or run `contenox-runtime doctor`), then you're set.")
 	fmt.Fprintln(out, "")
 }
 
@@ -270,6 +278,10 @@ func registerSetupBackend(ctx context.Context, db libdb.DBManager, providerType,
 			backendURL = "https://openrouter.ai/api/v1"
 		case "gemini":
 			backendURL = "https://generativelanguage.googleapis.com"
+		case "deepseek":
+			backendURL = "https://api.deepseek.com"
+		case "openai-codex":
+			backendURL = modelauth.BaseURL
 		}
 	}
 
@@ -372,4 +384,11 @@ func promptSecret(out io.Writer, scanner *bufio.Scanner, label string) string {
 		return strings.TrimSpace(string(bytes))
 	}
 	return promptLine(out, scanner, label, "")
+}
+
+func ensureConfigDefault(ctx context.Context, store runtimetypes.Store, key, value string) {
+	if strings.TrimSpace(clikv.Read(ctx, store, key)) != "" {
+		return
+	}
+	_ = clikv.WriteConfig(ctx, store, "global", key, value)
 }

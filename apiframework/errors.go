@@ -2,6 +2,7 @@ package apiframework
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -31,14 +32,16 @@ func (e *APIError) Code() string {
 }
 
 func IsAPIError(err error) (message, errorCode, errorType, param string, ok bool) {
-	if e, ok := err.(*APIError); ok {
+	var e *APIError
+	if errors.As(err, &e) {
 		return e.message, e.errorCode, e.errorType, e.param, true
 	}
 	return "", "", "", "", false
 }
 
 func GetErrorParam(err error) string {
-	if paramErr, ok := err.(interface{ Param() string }); ok {
+	var paramErr interface{ Param() string }
+	if errors.As(err, &paramErr) {
 		return paramErr.Param()
 	}
 	return ""

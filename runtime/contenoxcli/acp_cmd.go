@@ -21,6 +21,7 @@ import (
 	"github.com/contenox/runtime/runtime/acpsvc"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
+	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
@@ -30,11 +31,13 @@ import (
 	"github.com/contenox/runtime/runtime/missiontools"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/operatorinbox"
+	"github.com/contenox/runtime/runtime/oracletools"
 	"github.com/contenox/runtime/runtime/presence"
 	"github.com/contenox/runtime/runtime/reasoning"
 	"github.com/contenox/runtime/runtime/reportrouter"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +51,7 @@ The chain executed for each session/prompt is loaded from ~/.contenox-harness/de
 contenox chain.
 
 The default model is read from the global 'default-model' / 'default-provider' configuration
-(set via 'contenox config set default-model …'). Logging goes to stderr; stdin/stdout are
+(set via 'contenox-runtime config set default-model …'). Logging goes to stderr; stdin/stdout are
 reserved for the JSON-RPC stream.
 
 HITL is on by default — gated tool calls route through the ACP session/request_permission
@@ -56,7 +59,7 @@ flow so the editor's UI controls approval. Pass --auto to disable (unattended/te
 
 The /mission slash command dispatches a mission in-process: the fired unit is a child
 subprocess of this editor session and its reports arrive live back in the firing session.
-No 'contenox serve' is needed. Setting CONTENOX_SERVER_URL opts into forwarding the
+No 'contenox-runtime serve' is needed. Setting CONTENOX_SERVER_URL opts into forwarding the
 dispatch to that serve instead (reports then land in its operator inbox).`,
 	RunE: runACP,
 }
@@ -79,6 +82,7 @@ profiles never share state.`,
 
 func init() {
 	for _, c := range []*cobra.Command{acpCmd, acpxCmd} {
+		registerOracleFlags(c)
 		c.Flags().Bool("auto", false, "Non-interactive mode: disable HITL permission prompts (gated tools run unattended)")
 		c.Flags().Bool("setup", false, "Run interactive setup wizard to configure provider and model, then exit.")
 		c.Flags().String("workspace-id", "", "Workspace ID for new ACP sessions (default: the stable workspace from ~/.contenox-harness/workspace.id, same as the CLI). Existing sessions are always located by their session ID regardless of workspace.")
@@ -165,6 +169,10 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		return fmt.Errorf("resolve contenox dir: %w", err)
 	}
 	reportChange("phase", "resolve_contenox_dir")
+	if err := vfs.SetControlPlaneDenied(controlPlaneDirs(contenoxDir)...); err != nil {
+		reportErr(err)
+		return fmt.Errorf("register control-plane isolation: %w", err)
+	}
 	workspaceID := workspaceFlag
 	if workspaceID == "" {
 		workspaceID = ResolveWorkspaceID(contenoxDir)
@@ -195,9 +203,9 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	if acpsvc.ReadConfigValue(ctx, db, "default-model") == "" &&
 		(os.Getenv(envDefaultProvider) != "" || os.Getenv(envDefaultModel) != "") {
 		if err := completeEnvSetup(ctx, db); err != nil {
-			fmt.Fprintf(os.Stderr, "contenox acp: environment-based setup incomplete: %v\n", err)
+			fmt.Fprintf(os.Stderr, "contenox-runtime acp: environment-based setup incomplete: %v\n", err)
 		} else {
-			fmt.Fprintln(os.Stderr, "contenox acp: configured provider/model from environment.")
+			fmt.Fprintln(os.Stderr, "contenox-runtime acp: configured provider/model from environment.")
 		}
 	}
 
@@ -231,6 +239,13 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 
 	acpHITL := hitlservice.NewWithDefaultPolicy(acpPolicySource(), runtimetypes.LocalTenantID, runtimetypes.New(db.WithoutTransaction()), tracker, profile.hitlPolicy)
 
+	oracleStore := runtimetypes.New(db.WithoutTransaction())
+	oracleCfg := resolveOracleConfig(ctx, oracleStore, cmd)
+	if strings.TrimSpace(os.Getenv(profile.chainEnv)) != "" {
+		oracleCfg.chain = ""
+	}
+
+	fleetRef := &fleetHolder{}
 	tools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
@@ -252,7 +267,12 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		}, missiontools.WithSupervision(
 			missionSupervision{missions: missions, hitl: acpHITL},
 			missionSupervision{missions: missions, hitl: acpHITL},
-		)),
+		), missiontools.WithSpawner(fleetSpawner{fleet: fleetRef.get}, missions, subagentDefaults(db))),
+	}
+	if oracleCfg.enabled() {
+		tools[oracletools.ToolsProviderName] = oracletools.New(oracleResolver{
+			hitl: acpHITL, missions: missions, store: oracleStore, out: cmd.ErrOrStderr(), approves: oracleCfg.approves,
+		})
 	}
 
 	var askApproval localtools.AskApproval
@@ -270,7 +290,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		return fmt.Errorf("cleanup stale ACP MCP servers: %w", err)
 	}
 	if defaultModel == "" {
-		fmt.Fprintln(os.Stderr, "contenox acp: no default-model configured; serving setup-only. Run the \"Setup Contenox\" auth method or `contenox acp --setup` to configure a provider and model.")
+		fmt.Fprintln(os.Stderr, "contenox-runtime acp: no default-model configured; serving setup-only. Run the \"Setup Contenox\" auth method or `contenox-runtime acp --setup` to configure a provider and model.")
 	} else {
 		cfg := enginesvc.Config{
 			DefaultModel:       defaultModel,
@@ -294,6 +314,40 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			return fmt.Errorf("build engine: %w", err)
 		}
 		defer engine.Stop()
+	}
+
+	if engine != nil && oracleCfg.enabled() {
+		oracleChain, oracleChainRef, oracleErr := loadOracleChain(ctx, contenoxDir, oracleCfg)
+		if oracleErr != nil {
+			return oracleErr
+		}
+		contextLength, _ := cmd.Flags().GetInt("context")
+		templateVars := map[string]string{
+			"model":    defaultModel,
+			"provider": defaultProvider,
+			"think":    string(defaultThink),
+		}
+		if defaultAltModel != "" {
+			templateVars["alt_model"] = defaultAltModel
+		}
+		if defaultAltProvider != "" {
+			templateVars["alt_provider"] = defaultAltProvider
+		}
+		if defaultMaxTokens != "" {
+			templateVars["max_tokens"] = defaultMaxTokens
+		}
+		hitlservice.SetAdjudicator(acpHITL, &oracleDriver{
+			agent:         agentservice.New(agentservice.Deps{Engine: engine, DB: db, WorkspaceID: workspaceID}),
+			chain:         oracleChain,
+			chainRef:      oracleChainRef,
+			policy:        oracleCfg.policy,
+			templateVars:  templateVars,
+			contextLength: contextLength,
+			approves:      oracleCfg.approves,
+			missions:      missions,
+			out:           cmd.ErrOrStderr(),
+		})
+		fmt.Fprintln(cmd.ErrOrStderr(), oracleMountedLine(oracleCfg))
 	}
 
 	updateBanner := acpUpdateBanner(dbCtx, db, contenoxDir)
@@ -327,6 +381,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		}
 		missionFleet, missionAgents, stopFleetTeardown = fleet, agents, stop
 	}
+	fleetRef.set(missionFleet)
 	if stopFleetTeardown != nil {
 		defer stopFleetTeardown()
 	}
@@ -559,7 +614,7 @@ func acpUpdateBanner(ctx context.Context, db libdb.DBManager, contenoxDir string
 		if !r.available {
 			return ""
 		}
-		return fmt.Sprintf("contenox %s is available (current: %s) — run `contenox update` to upgrade.", r.tag, CLIVersion())
+		return fmt.Sprintf("contenox-runtime %s is available (current: %s) — run `contenox-runtime update` to upgrade.", r.tag, CLIVersion())
 	case <-time.After(500 * time.Millisecond):
 		return ""
 	}

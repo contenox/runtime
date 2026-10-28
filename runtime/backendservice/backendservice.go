@@ -9,6 +9,7 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -93,8 +94,26 @@ func (s *service) Update(ctx context.Context, backend *runtimetypes.Backend) err
 }
 
 func (s *service) Delete(ctx context.Context, id string) error {
-	tx := s.dbInstance.WithoutTransaction()
-	return runtimetypes.New(tx).DeleteBackend(ctx, id)
+	tx, commit, release, err := s.dbInstance.WithTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	store := runtimetypes.New(tx)
+	if err := store.LockBackend(ctx, id); err != nil {
+		return err
+	}
+	backend, err := store.GetBackend(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := store.DeleteKV(ctx, runtimestate.BackendCredentialKey(backend.Type, backend.ID)); err != nil && !errors.Is(err, libdb.ErrNotFound) {
+		return err
+	}
+	if err := store.DeleteBackend(ctx, id); err != nil {
+		return err
+	}
+	return commit(ctx)
 }
 
 func (s *service) List(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*runtimetypes.Backend, error) {
@@ -110,9 +129,9 @@ func validate(backend *runtimetypes.Backend) error {
 		return fmt.Errorf("%w: baseURL is required", ErrInvalidBackend)
 	}
 	switch modelrepo.CanonicalBackendType(backend.Type) {
-	case "ollama", "vllm", "openai", "openrouter", "anthropic", "mistral", "bedrock", "gemini", "vertex-google", "scripted-test":
+	case "ollama", "vllm", "openai", "openrouter", "openai-codex", "anthropic", "mistral", "deepseek", "bedrock", "gemini", "vertex-google", "scripted-test":
 	default:
-		return fmt.Errorf("%w: Type must be ollama, vllm, openrouter, openai, anthropic, mistral, bedrock, gemini, vertex-google, or scripted-test (test only)", ErrInvalidBackend)
+		return fmt.Errorf("%w: Type must be ollama, vllm, openrouter, openai, openai-codex, anthropic, mistral, deepseek, bedrock, gemini, vertex-google, or scripted-test (test only)", ErrInvalidBackend)
 	}
 
 	return nil

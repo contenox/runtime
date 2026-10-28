@@ -307,3 +307,27 @@ func TestUnit_HITLApprovals_UnattributedRowIsEmptyNotNull(t *testing.T) {
 	require.Empty(t, got.AgentName)
 	require.Nil(t, got.MissionID, "no mission must read back as NULL, not as an empty string")
 }
+
+func TestUnit_ResolveHITLApprovalWithinBoundStopsAtCap(t *testing.T) {
+	ctx, store := setupHITLApprovalsStore(t)
+	missionID := "m-1"
+	first := newPendingApproval()
+	first.MissionID = &missionID
+	second := newPendingApproval()
+	second.MissionID = &missionID
+	require.NoError(t, store.CreateHITLApproval(ctx, first))
+	require.NoError(t, store.CreateHITLApproval(ctx, second))
+
+	bound := runtimetypes.AgentAnswerBound{MissionID: missionID, ResolutionLike: `%"answeredBy":%`, Max: 1}
+	resolution := json.RawMessage(`{"answer":"one","answeredBy":"agent"}`)
+	bounded := store.(interface {
+		ResolveHITLApprovalWithinBound(context.Context, string, runtimetypes.AgentAnswerBound, runtimetypes.HITLApprovalState, json.RawMessage, time.Time) error
+	})
+	require.NoError(t, bounded.ResolveHITLApprovalWithinBound(ctx, first.ID, bound, runtimetypes.HITLApprovalApproved, resolution, time.Now().UTC()))
+
+	err := bounded.ResolveHITLApprovalWithinBound(ctx, second.ID, bound, runtimetypes.HITLApprovalApproved, resolution, time.Now().UTC())
+	require.ErrorIs(t, err, libdb.ErrNotFound, "the second answer must lose to the cap")
+	row, err := store.GetHITLApproval(ctx, second.ID)
+	require.NoError(t, err)
+	require.Equal(t, runtimetypes.HITLApprovalPending, row.State)
+}

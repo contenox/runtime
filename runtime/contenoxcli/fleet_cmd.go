@@ -15,19 +15,19 @@ import (
 var fleetCmd = &cobra.Command{
 	Use:   "fleet",
 	Short: "Operate the fleet board: list units, inspect one, stop or cancel it.",
-	Long: `Operate the fleet — the supervised agent units a running 'contenox serve'
+	Long: `Operate the fleet — the supervised agent units a running 'contenox-runtime serve'
 is hosting — from the shell. These verbs act on UNITS (the running processes);
 the WORK a unit was sent to do, and the reports it files back, live under
-'contenox mission'.
+'contenox-runtime mission'.
 
 The fleet is not in the database: it is a set of live subprocesses owned by the
-serve process's in-memory Manager, so — unlike 'contenox state'/'session' —
+serve process's in-memory Manager, so — unlike 'contenox-runtime state'/'session' —
 these verbs reach serve over its REST API instead of opening the database. By
 default that is http://127.0.0.1:32123; override with --server/--token or the
 CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN environment variables. (Units an
 editor session fired in-process via /mission belong to that editor process, not
 to serve, so they do not appear on this board — follow their durable record with
-'contenox mission show' instead.)
+'contenox-runtime mission show' instead.)
 
   contenox fleet list                       # the board: every declared agent + its live units
   contenox fleet list --json                # the raw /fleet records (declared agents + instances)
@@ -36,14 +36,14 @@ to serve, so they do not appear on this board — follow their durable record wi
   contenox fleet cancel <instance-id>       # cancel every in-flight turn on the unit
   contenox fleet cancel <instance-id> --session <session-id>   # cancel just that session
 
-To FIRE a new unit at an intent, use 'contenox mission fire' — firing is a
+To FIRE a new unit at an intent, use 'contenox-runtime mission fire' — firing is a
 mission, not a bare dispatch.`,
 }
 
 var fleetListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List the fleet board: every declared agent and its live units.",
-	Long: `Print the fleet board — the config+runtime join a running 'contenox serve'
+	Long: `Print the fleet board — the config+runtime join a running 'contenox-runtime serve'
 holds: every DECLARED agent (so a declared-but-idle agent is visible, not only
 running ones) annotated with each live instance's kind, state, open-session and
 viewer counts, and — the board's primary fact in mission mode — what the unit
@@ -53,7 +53,7 @@ The INTENT column is joined in from the mission bound to each unit; it is "-"
 for a unit with no mission behind it (an editor's ACP chat session, say) and for
 a declared agent that is idle. --json emits the raw /fleet records (the machine
 contract, without the mission join); read a unit's work as structured data with
-'contenox mission list --json' instead.`,
+'contenox-runtime mission list --json' instead.`,
 	Args: cobra.NoArgs,
 	RunE: runFleetList,
 }
@@ -84,7 +84,7 @@ var fleetCancelCmd = &cobra.Command{
 	Use:   "cancel <instance-id>",
 	Short: "Cancel a unit's in-flight prompt turn(s).",
 	Long: `Cancel an in-flight prompt turn on an instance WITHOUT tearing the instance
-down (for that, use 'contenox fleet stop'). With no --session, it fans out over
+down (for that, use 'contenox-runtime fleet stop'). With no --session, it fans out over
 every session currently open on the unit and cancels each — "stop everything
 running on this unit". With --session it cancels exactly that session, which is
 safe even with no turn in flight. An unknown instance id fails with a non-zero

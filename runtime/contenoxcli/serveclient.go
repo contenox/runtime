@@ -30,7 +30,7 @@ type serveClient struct {
 
 func addServeClientFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().String("server", "",
-		fmt.Sprintf("Base URL of a running 'contenox serve' (default http://%s:%s; also settable via %s)",
+		fmt.Sprintf("Base URL of a running 'contenox-runtime serve' (default http://%s:%s; also settable via %s)",
 			defaultServeAddr, defaultServePort, envServeURL))
 	cmd.PersistentFlags().String("token", "",
 		fmt.Sprintf("Bearer token for the serve API, when serve was started with one configured (also settable via %s)",
@@ -121,7 +121,7 @@ func (c *serveClient) do(ctx context.Context, method, path string, body, out any
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("connect to %s: %w (is 'contenox serve' running?)", c.baseURL, err)
+		return fmt.Errorf("connect to %s: %w (is 'contenox-runtime serve' running?)", c.baseURL, err)
 	}
 	defer resp.Body.Close()
 

@@ -49,7 +49,7 @@ func (r *workspaceRootReloader) mutators(bus libbus.Messenger) *localfileapi.Roo
 				return err
 			}
 			if _, err := project.Register(path, name); err != nil {
-				slog.Warn("contenox serve: workspace root granted but project marker could not be written",
+				slog.Warn("contenox-runtime serve: workspace root granted but project marker could not be written",
 					"path", path, "error", err)
 			}
 			return r.applyAndRing(ctx, bus)
@@ -71,10 +71,10 @@ func (r *workspaceRootReloader) applyAndRing(ctx context.Context, bus libbus.Mes
 		return err
 	}
 	roots := r.factory.Roots()
-	slog.Info("contenox serve: workspace roots changed (authenticated grant verb)",
+	slog.Info("contenox-runtime serve: workspace roots changed (authenticated grant verb)",
 		"count", len(roots), "roots", roots)
 	if err := workspacegrants.PublishChanged(ctx, bus, r.effectiveRoots(ctx)); err != nil {
-		slog.Warn("contenox serve: workspace-root grant applied but reload doorbell publish failed",
+		slog.Warn("contenox-runtime serve: workspace-root grant applied but reload doorbell publish failed",
 			"error", err)
 	}
 	return nil
@@ -100,11 +100,11 @@ func startWorkspaceRootReloader(ctx context.Context, bus libbus.Messenger, reloa
 					return
 				}
 				if err := reloader.apply(runCtx); err != nil {
-					slog.Warn("contenox serve: workspace-root reload failed; keeping current roots", "error", err)
+					slog.Warn("contenox-runtime serve: workspace-root reload failed; keeping current roots", "error", err)
 					continue
 				}
 				roots := reloader.factory.Roots()
-				slog.Info("contenox serve: workspace roots reloaded from doorbell",
+				slog.Info("contenox-runtime serve: workspace roots reloaded from doorbell",
 					"count", len(roots), "roots", roots)
 			}
 		}

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${CONTENOX_BIN:-"$ROOT_DIR/bin/contenox"}"
+BIN="${CONTENOX_BIN:-"$ROOT_DIR/bin/contenox-runtime"}"
 HOST="${CONTENOX_APITEST_HOST:-127.0.0.1}"
 PORT="${CONTENOX_APITEST_PORT:-32124}"
 TMP_ROOT="${CONTENOX_APITEST_TMPDIR:-}"

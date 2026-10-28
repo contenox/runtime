@@ -968,7 +968,7 @@ func (t *Transport) ListSessions(ctx context.Context, req libacp.ListSessionsReq
 	}
 	defer rows.Close()
 
-	var all []sessionListRow
+	var scanned []sessionListRow
 	for rows.Next() {
 		var row sessionListRow
 		var updatedAt any
@@ -976,10 +976,20 @@ func (t *Transport) ListSessions(ctx context.Context, req libacp.ListSessionsReq
 			return libacp.ListSessionsResponse{}, fmt.Errorf("acpsvc: scan session: %w", err)
 		}
 		row.updatedAt, row.hasTime = parseDBTime(updatedAt)
-		all = append(all, row)
+		scanned = append(scanned, row)
 	}
 	if err := rows.Err(); err != nil {
 		return libacp.ListSessionsResponse{}, fmt.Errorf("acpsvc: rows: %w", err)
+	}
+	rows.Close()
+
+	store := runtimetypes.New(exec)
+	var all []sessionListRow
+	for _, row := range scanned {
+		if !sessionUnderRequestedCwd(t.sessionCwd(ctx, store, libacp.SessionID(row.name)), req.Cwd) {
+			continue
+		}
+		all = append(all, row)
 	}
 	sort.Slice(all, func(i, j int) bool { return sessionListRowLess(all[i], all[j]) })
 
@@ -989,7 +999,6 @@ func (t *Transport) ListSessions(ctx context.Context, req libacp.ListSessionsReq
 	}
 	end := min(start+listSessionsPageSize, len(all))
 
-	store := runtimetypes.New(exec)
 	chatMgr := chatservice.NewManager(t.workspaceID())
 	var sessions []libacp.SessionInfo
 	for _, row := range all[start:end] {
@@ -1005,9 +1014,6 @@ func (t *Transport) ListSessions(ctx context.Context, req libacp.ListSessionsReq
 		if row.hasTime {
 			info.UpdatedAt = row.updatedAt.UTC().Format(time.RFC3339)
 		}
-		if req.Cwd != "" && info.Cwd != "" && info.Cwd != req.Cwd {
-			continue
-		}
 		sessions = append(sessions, info)
 	}
 
@@ -1016,6 +1022,18 @@ func (t *Transport) ListSessions(ctx context.Context, req libacp.ListSessionsReq
 		resp.NextCursor = listSessionsCursor(all[end-1])
 	}
 	return resp, nil
+}
+
+func sessionUnderRequestedCwd(storedRoot, requested string) bool {
+	requested = strings.TrimSpace(requested)
+	if requested == "" || requested == "/" {
+		return true
+	}
+	if storedRoot == "" {
+		return false
+	}
+	resolved, err := vfs.Contain(requested, storedRoot)
+	return err == nil && resolved != ""
 }
 
 func (t *Transport) sessionListTitle(ctx context.Context, mgr *chatservice.Manager, exec libdb.Exec, internalSessionID, fallback string) string {

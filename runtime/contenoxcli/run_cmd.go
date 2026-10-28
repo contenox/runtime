@@ -27,7 +27,7 @@ var runCmd = &cobra.Command{
 	Short: "Run any task chain with explicit input type control (stateless).",
 	Long: `Run a task chain with explicit control over input type and content.
 
-Unlike 'contenox chat', run is stateless — no chat history is loaded or saved.
+Unlike 'contenox-runtime chat', run is stateless — no chat history is loaded or saved.
 It accepts any task chain regardless of the first handler's expected input type.
 
 Input sources (in priority order):
@@ -76,7 +76,7 @@ Examples:
 		}
 		if chainPath == "" {
 			fmt.Fprintln(os.Stderr, "No default-run-chain.json found in .contenox/ (workspace) or ~/.contenox-harness/.")
-			fmt.Fprintln(os.Stderr, "Run 'contenox init' to scaffold it, or pass --chain explicitly.")
+			fmt.Fprintln(os.Stderr, "Run 'contenox-runtime init' to scaffold it, or pass --chain explicitly.")
 			return errChainRequired
 		}
 

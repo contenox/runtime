@@ -9,10 +9,12 @@ import (
 	"github.com/google/uuid"
 )
 
+const MaxRequestIDLength = 128
+
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := r.Header.Get("X-Request-ID")
-		if requestID == "" {
+		if !validRequestID(requestID) {
 			requestID = uuid.New().String()
 		}
 
@@ -20,6 +22,18 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), libtracker.ContextKeyRequestID, requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func validRequestID(id string) bool {
+	if id == "" || len(id) > MaxRequestIDLength {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		if id[i] < 0x21 || id[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 func TracingMiddleware(next http.Handler) http.Handler {

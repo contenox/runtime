@@ -1,0 +1,28 @@
+{
+  "$schema": "https://contenox.com/schema/hitl-policy-v1.schema.json",
+  "default_action": "deny",
+  "rules": [
+    {
+      "tools": "@client-mcp",
+      "tool": "*",
+      "action": "deny"
+    },
+    {
+      "tools": "oracle",
+      "tool": "submit_verdict",
+      "action": "allow"
+    },
+    {
+      "tools": "oracle",
+      "tool": "verdict_state",
+      "action": "allow"
+    }
+  ],
+  "compute": {
+    "onExhausted": "finish_stuck"
+  },
+  "attention": {
+    "allowAgentAnswers": false,
+    "allowAgentApprovals": false
+  }
+}

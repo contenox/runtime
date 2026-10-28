@@ -17,7 +17,7 @@ var cacheCmd = &cobra.Command{
 
 The chat/run engine caches each backend's model list for up to an hour to avoid
 re-querying the provider on every invocation. That cache is keyed per backend, so
-` + "`contenox model list`" + ` (which always fetches live) can show models the chat
+` + "`contenox-runtime model list`" + ` (which always fetches live) can show models the chat
 path hasn't picked up yet — e.g. right after upgrading contenox or editing a
 backend. Clear the cache to force a fresh fetch.`,
 }
@@ -26,7 +26,7 @@ var cacheClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear cached backend model lists so the next chat/run refetches.",
 	Long: `Delete the cached per-backend model lists (the prov:* keys the chat/run
-engine reads). Use this when ` + "`contenox model list`" + ` shows a model the chat
+engine reads). Use this when ` + "`contenox-runtime model list`" + ` shows a model the chat
 path reports as "no model matched", e.g. after upgrading contenox or editing a
 backend. Adding or removing a backend already clears its own entry; this clears
 all of them at once.`,

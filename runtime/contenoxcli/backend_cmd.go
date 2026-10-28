@@ -15,6 +15,7 @@ import (
 	"github.com/contenox/runtime/libkvstore"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/backendservice"
+	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
@@ -35,10 +36,16 @@ var backendCmd = &cobra.Command{
 A backend points at an LLM provider. Supported types:
   ollama                        Local Ollama daemon (requires: ollama serve) or hosted Ollama Cloud.
   openai                        api.openai.com (requires --api-key-env).
+  openai-codex                  ChatGPT subscription (Codex). Fixed endpoint; no API key — use
+                                'backend login <name>' to sign in with a device code.
   openrouter                    openrouter.ai — routes 300+ models from many providers through one
                                 OpenAI-compatible endpoint (requires --api-key-env OPENROUTER_API_KEY).
+  deepseek                      api.deepseek.com (requires --api-key-env DEEPSEEK_API_KEY).
+  anthropic                     api.anthropic.com (requires --api-key-env).
+  mistral                       api.mistral.ai (requires --api-key-env).
   gemini                        Google Gemini (requires --api-key-env).
   vllm                          Self-hosted OpenAI-compatible endpoint (requires --url).
+  bedrock                       AWS Bedrock (requires --url with the region; ambient AWS credentials).
   vertex-google                 Google Cloud Vertex AI / Gemini (requires gcloud auth application-default
                                 login and GOOGLE_CLOUD_PROJECT).
 
@@ -54,6 +61,13 @@ Examples:
 
   # Register OpenRouter (access 300+ models via one API key):
   contenox backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
+
+  # Register a ChatGPT subscription (then sign in with a device code):
+  contenox-runtime backend add chatgpt --type openai-codex
+  contenox-runtime backend login chatgpt
+
+  # Register DeepSeek:
+  contenox-runtime backend add deepseek --type deepseek --api-key-env DEEPSEEK_API_KEY
 
   # Register Google Gemini:
   contenox backend add gemini --type gemini --api-key-env GEMINI_API_KEY
@@ -87,6 +101,10 @@ func defaultBaseURLForType(typ string) (string, error) {
 		return "https://generativelanguage.googleapis.com", nil
 	case "vertex-google":
 		return "", fmt.Errorf("--url is required for %s backends\n  Include project and location, e.g.:\n  --url \"https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1\"", typ)
+	case "deepseek":
+		return "https://api.deepseek.com", nil
+	case "openai-codex":
+		return modelauth.BaseURL, nil
 	case "bedrock":
 		return "", fmt.Errorf("--url is required for bedrock backends (it carries the region)\n  e.g.: --url \"https://bedrock-runtime.us-east-1.amazonaws.com\"\n  Credentials come from the ambient AWS chain (env / profile / IAM role); no --api-key needed unless storing static keys.")
 	default:
@@ -102,20 +120,31 @@ var backendAddCmd = &cobra.Command{
 The --type flag determines which provider protocol is used.
   ollama                        Local daemon (requires 'ollama serve') or hosted Ollama Cloud (use
                                 --url https://ollama.com/api and --api-key-env OLLAMA_API_KEY).
+  openai                        api.openai.com (requires --api-key-env).
+  openai-codex                  ChatGPT subscription (Codex). Fixed endpoint; no API key — sign in
+                                with 'backend login <name>' after adding it.
+  openrouter                    openrouter.ai — 300+ models through one OpenAI-compatible endpoint.
+  deepseek                      api.deepseek.com (requires --api-key-env DEEPSEEK_API_KEY).
+  anthropic                     api.anthropic.com (requires --api-key-env).
+  mistral                       api.mistral.ai (requires --api-key-env).
+  gemini                        Google Gemini (requires --api-key-env).
   vllm                          Self-hosted OpenAI-compatible endpoint (requires --url).
+  bedrock                       AWS Bedrock (requires --url with the region; ambient AWS credentials).
   vertex-google                 Google Cloud Vertex AI / Gemini (requires gcloud auth application-default login).
 
 API keys should be passed via --api-key-env (reads from environment) rather than
 --api-key (inline literal) to avoid leaking secrets into shell history.
 
 Examples:
-  contenox backend add ollama     --type ollama
-  contenox backend add ollama-cloud --type ollama    --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
-  contenox backend add openai     --type openai      --api-key-env OPENAI_API_KEY
-  contenox backend add openrouter --type openrouter  --api-key-env OPENROUTER_API_KEY
-  contenox backend add gemini     --type gemini      --api-key-env GEMINI_API_KEY
-  contenox backend add myvllm    --type vllm         --url http://gpu-host:8000
-  contenox backend add myvllm     --type vllm        --url http://gpu-host:8000`,
+  contenox-runtime backend add ollama    --type ollama
+  contenox-runtime backend add openai    --type openai    --api-key-env OPENAI_API_KEY
+  contenox-runtime backend add deepseek  --type deepseek  --api-key-env DEEPSEEK_API_KEY
+  contenox-runtime backend add chatgpt   --type openai-codex
+  contenox-runtime backend login chatgpt
+  contenox-runtime backend add gemini    --type gemini    --api-key-env GEMINI_API_KEY
+  contenox-runtime backend add myvllm    --type vllm      --url http://gpu-host:8000
+
+`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := libtracker.WithNewRequestID(context.Background())
@@ -130,6 +159,12 @@ Examples:
 		typ = strings.ToLower(strings.TrimSpace(typ))
 		if typ == "" {
 			typ = "ollama"
+		}
+		if typ == modelauth.ProviderType {
+			if strings.TrimSpace(baseURL) != "" || strings.TrimSpace(apiKeyEnv) != "" || strings.TrimSpace(apiKeyLit) != "" {
+				return fmt.Errorf("openai-codex uses ChatGPT device login and a fixed endpoint; omit --api-key, --api-key-env, and --url")
+			}
+			baseURL = modelauth.BaseURL
 		}
 		if baseURL == "" {
 			inferred, err := defaultBaseURLForType(typ)
@@ -183,6 +218,9 @@ Examples:
 		invalidateBackendModelCache(ctx, cmd.ErrOrStderr(), db, backend.ID)
 
 		fmt.Fprintf(cmd.OutOrStdout(), "Backend %q added (%s → %s).\n", name, typ, baseURL)
+		if typ == modelauth.ProviderType {
+			fmt.Fprintf(cmd.OutOrStdout(), "ChatGPT subscription. Sign in: contenox-runtime backend login %s\n", name)
+		}
 		return nil
 	},
 }
@@ -192,7 +230,7 @@ var backendListCmd = &cobra.Command{
 	Short: "List all registered backends.",
 	Long: `List every registered backend as a table of name, type, and URL.
 
-If no backends are registered, prints a hint to run 'contenox backend add'.`,
+If no backends are registered, prints a hint to run 'contenox-runtime backend add'.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := libtracker.WithNewRequestID(context.Background())

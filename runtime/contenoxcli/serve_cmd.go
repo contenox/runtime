@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -39,6 +40,7 @@ import (
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/operatorinbox"
+	"github.com/contenox/runtime/runtime/oracletools"
 	"github.com/contenox/runtime/runtime/presence"
 	"github.com/contenox/runtime/runtime/reportrouter"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -76,7 +78,7 @@ The product API is served under /api (state, models, model-registry, backends,
 setup-status, providers, tools, mcp-servers, task-chains, hitl-policies, task
 execution, task events, terminal sessions). Chat, its HITL approvals, and
 execution-state/event replay run over the /acp WebSocket instead (see
-'contenox acp').
+'contenox-runtime acp').
 
 OpenAI- and Ollama-compatible endpoints are served for external clients:
 point an OpenAI client's base URL at the server root (POST /v1/chat/completions,
@@ -98,13 +100,14 @@ token is resolved as: TOKEN env, else ~/.contenox-harness/serve-token.txt, else 
 (contenox approvals/mission/fleet) discover the same file automatically. Serving
 is plain HTTP — put a TLS-terminating reverse proxy in front for untrusted
 networks. A configured model is required — run
-` + "`contenox setup`" + ` first if you have not configured one.`,
+` + "`contenox-runtime setup`" + ` first if you have not configured one.`,
 	RunE: runServe,
 }
 
 func init() {
 	serveCmd.Flags().StringArray("workspace-root", nil,
-		"Directory a browser client may choose as a session workspace (repeatable). The serve directory is always the default; these extend the allowlist. Also settable via WORKSPACE_ROOTS (OS path-list separated) or as `contenox serve [dir]...` positional arguments.")
+		"Directory a browser client may choose as a session workspace (repeatable). The serve directory is always the default; these extend the allowlist. Also settable via WORKSPACE_ROOTS (OS path-list separated) or as `contenox-runtime serve [dir]...` positional arguments.")
+	registerOracleFlags(serveCmd)
 	serveCmd.Flags().Bool("remote", false,
 		"Serve on all network interfaces (0.0.0.0) so other machines on your LAN can reach the API. Auto-provisions a TOKEN (env, else ~/.contenox-harness/serve-token.txt, else generated and saved there) since a token is mandatory off loopback. A shorthand for ADDR=0.0.0.0; an explicit ADDR still wins. Plain HTTP — front with a TLS reverse proxy for untrusted networks.")
 }
@@ -290,6 +293,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	hitlSvc := hitlservice.NewWithDefaultPolicy(hitlSource, runtimetypes.LocalTenantID, store, tracker, "")
 	missions := missionservice.New(db, missionservice.WithEventPublisher(bus))
 
+	fleetRef := &fleetHolder{}
+	oracleStore := runtimetypes.New(db.WithoutTransaction())
+	oracleCfg := resolveOracleConfig(ctx, oracleStore, cmd)
 	localTools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
@@ -301,7 +307,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		missiontools.ToolsProviderName: missiontools.New(missions, nil, missiontools.WithSupervision(
 			missionSupervision{missions: missions, hitl: hitlSvc},
 			missionSupervision{missions: missions, hitl: hitlSvc},
-		)),
+		), missiontools.WithSpawner(fleetSpawner{fleet: fleetRef.get}, missions, subagentDefaults(db))),
+	}
+	if oracleCfg.enabled() {
+		localTools[oracletools.ToolsProviderName] = oracletools.New(oracleResolver{
+			hitl: hitlSvc, missions: missions, store: oracleStore, out: os.Stderr, approves: oracleCfg.approves,
+		})
 	}
 	if opts.EffectiveEnableLocalExec {
 		execOpts := []localtools.LocalExecOption{}
@@ -365,12 +376,31 @@ func runServe(cmd *cobra.Command, args []string) error {
 		HITLPolicySource: hitlSource,
 	})
 	if err != nil {
-		return fmt.Errorf("build engine (run `contenox setup` to configure a model): %w", err)
+		return fmt.Errorf("build engine (run `contenox-runtime setup` to configure a model): %w", err)
 	}
 	if engine.State == nil {
 		return fmt.Errorf("build engine: runtime state is not configured")
 	}
 	defer engine.Stop()
+
+	if oracleCfg.enabled() {
+		oracleChain, oracleChainRef, oracleErr := loadOracleChain(ctx, contenoxDir, oracleCfg)
+		if oracleErr != nil {
+			return oracleErr
+		}
+		hitlservice.SetAdjudicator(hitlSvc, &oracleDriver{
+			agent:         agentservice.New(agentservice.Deps{Engine: engine, DB: db, WorkspaceID: workspaceID}),
+			chain:         oracleChain,
+			chainRef:      oracleChainRef,
+			policy:        oracleCfg.policy,
+			templateVars:  buildTemplateVars(opts),
+			contextLength: opts.EffectiveContext,
+			approves:      oracleCfg.approves,
+			missions:      missions,
+			out:           os.Stderr,
+		})
+		fmt.Fprintln(os.Stderr, oracleMountedLine(oracleCfg))
+	}
 
 	chainFiles, err := localfileservice.NewPrivileged(contenoxDir)
 	if err != nil {
@@ -427,6 +457,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	fleet := fleetservice.New(instances, agentRegistry, missions, workspaceFactory, workspaceRoot, tracker,
 		fleetservice.WithPolicyValidator(hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")))
+	fleetRef.set(fleet)
 
 	operatorInbox := operatorinbox.New(db)
 	reportRouter, err := reportrouter.New(reportrouter.Deps{
@@ -455,7 +486,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	var acpAgentFactory libacp.AgentFactory
 	if acpChains, err := acpsvc.LoadChainRegistry(); err != nil {
-		slog.Warn("contenox serve: /acp transport disabled: ACP chain registry unavailable", "error", err)
+		slog.Warn("contenox-runtime serve: /acp transport disabled: ACP chain registry unavailable", "error", err)
 	} else {
 		acpAgentFactory = acpsvc.New(acpsvc.Deps{
 			Engine:                engine,
@@ -556,7 +587,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		fmt.Fprintf(cmd.OutOrStdout(), "contenox serve %s ready: http://%s\n", version.Get(), srv.Addr)
+		fmt.Fprintf(cmd.OutOrStdout(), "contenox-runtime serve %s ready: http://%s\n", version.Get(), srv.Addr)
 		if !serverapi.IsLoopbackAddress(config.Addr) {
 			for _, u := range lanURLs(config.Port) {
 				fmt.Fprintf(cmd.OutOrStdout(), "  reachable on LAN: %s\n", u)
@@ -721,12 +752,12 @@ func discoverChainAgents(ctx context.Context, agents agentregistryservice.Servic
 	}
 	res, err := chainagents.Discover(ctx, agents, roots...)
 	if err != nil {
-		slog.Warn("contenox serve: chain-agent discovery failed; the fleet keeps the agents already declared",
+		slog.Warn("contenox-runtime serve: chain-agent discovery failed; the fleet keeps the agents already declared",
 			"error", err, "roots", roots)
 		return
 	}
 	if len(res.Created) > 0 || len(res.Updated) > 0 || len(res.Disabled) > 0 || len(res.Skipped) > 0 {
-		slog.Info("contenox serve: chain agents discovered",
+		slog.Info("contenox-runtime serve: chain agents discovered",
 			"created", res.Created, "updated", res.Updated,
 			"disabled", res.Disabled, "skipped_name_taken", res.Skipped,
 			"unchanged", len(res.Unchanged))

@@ -149,7 +149,7 @@ func Evaluate(in Input) Result {
 			Category:   CategoryHealth,
 			Message:    "Backends are registered but runtime state has no synced entries yet. Ensure providers are reachable, then run again (do not use --skip-backend-cycle unless you know state is current).",
 			FixPath:    "/backends?tab=backends",
-			CLICommand: "contenox backend list   # confirm URLs; start Ollama or fix API keys, then retry",
+			CLICommand: "contenox-runtime backend list   # confirm URLs; start Ollama or fix API keys, then retry",
 		})
 	} else if r.ReachableBackendCount == 0 {
 		addIssue(&r, Issue{
@@ -593,6 +593,8 @@ func backendHint(backend runtimetypes.Backend, kind backendErrorKind) string {
 		switch modelrepo.CanonicalBackendType(backend.Type) {
 		case "openai", "anthropic", "mistral", "gemini":
 			return fmt.Sprintf("Save credentials on Cloud providers, or re-add backend %q after exporting the provider API key.", backend.Name)
+		case "openai-codex":
+			return fmt.Sprintf("Backend %q uses a ChatGPT subscription sign-in. Sign in again on Cloud providers.", backend.Name)
 		case "vertex-google":
 			return fmt.Sprintf("Backend %q uses ADC (Application Default Credentials). Run: gcloud auth application-default login", backend.Name)
 		case "bedrock":
@@ -609,6 +611,8 @@ func backendHint(backend runtimetypes.Backend, kind backendErrorKind) string {
 		switch modelrepo.CanonicalBackendType(backend.Type) {
 		case "openai", "anthropic", "mistral", "gemini":
 			return fmt.Sprintf("The stored API key for backend %q was rejected. Update the key on Cloud providers.", backend.Name)
+		case "openai-codex":
+			return fmt.Sprintf("The ChatGPT sign-in for backend %q expired or was revoked. Sign in again on Cloud providers.", backend.Name)
 		case "vertex-google":
 			return fmt.Sprintf("ADC credentials for backend %q were rejected. Refresh with: gcloud auth application-default login", backend.Name)
 		case "bedrock":
@@ -721,7 +725,7 @@ func modelNamePresent(available []string, wanted string) bool {
 
 func providerFixPath(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "openrouter", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openrouter", "openai-codex", "deepseek", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	default:
 		return "/backends?tab=backends"
@@ -730,7 +734,7 @@ func providerFixPath(provider string) string {
 
 func providerFixPathForChecks(provider string, checks []BackendCheck) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openai-codex", "deepseek", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	case "ollama":
 		if anyHostedOllamaCheck(checks) {
@@ -743,23 +747,27 @@ func providerFixPathForChecks(provider string, checks []BackendCheck) string {
 func providerAddCommand(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
 	case "openai":
-		return "contenox backend add openai --type openai --api-key-env OPENAI_API_KEY"
+		return "contenox-runtime backend add openai --type openai --api-key-env OPENAI_API_KEY"
 	case "anthropic":
-		return "contenox backend add anthropic --type anthropic --api-key-env ANTHROPIC_API_KEY"
+		return "contenox-runtime backend add anthropic --type anthropic --api-key-env ANTHROPIC_API_KEY"
 	case "mistral":
-		return "contenox backend add mistral --type mistral --api-key-env MISTRAL_API_KEY"
+		return "contenox-runtime backend add mistral --type mistral --api-key-env MISTRAL_API_KEY"
 	case "gemini":
-		return "contenox backend add gemini --type gemini --api-key-env GEMINI_API_KEY"
+		return "contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY"
+	case "deepseek":
+		return "contenox-runtime backend add deepseek --type deepseek --api-key-env DEEPSEEK_API_KEY"
+	case "openai-codex":
+		return "contenox-runtime backend add chatgpt --type openai-codex && contenox-runtime backend login chatgpt"
 	case "llama":
-		return "contenox backend add llama --type llama --url ~/.contenox-harness/models/llama"
+		return "contenox-runtime backend add llama --type llama --url ~/.contenox-harness/models/llama"
 	case "openvino":
-		return "contenox backend add openvino --type openvino --url ~/.contenox-harness/models/openvino"
+		return "contenox-runtime backend add openvino --type openvino --url ~/.contenox-harness/models/openvino"
 	case "vertex-google":
-		return fmt.Sprintf("gcloud auth application-default login && contenox backend add %s --type %s --url \"https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1\"", provider, provider)
+		return fmt.Sprintf("gcloud auth application-default login && contenox-runtime backend add %s --type %s --url \"https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1\"", provider, provider)
 	case "bedrock":
-		return "contenox backend add bedrock --type bedrock --url \"https://bedrock-runtime.us-east-1.amazonaws.com\"   # uses the ambient AWS credential chain"
+		return "contenox-runtime backend add bedrock --type bedrock --url \"https://bedrock-runtime.us-east-1.amazonaws.com\"   # uses the ambient AWS credential chain"
 	default:
-		return "contenox backend add local --type ollama  # or: contenox backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY"
+		return "contenox-runtime backend add local --type ollama  # or: contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY"
 	}
 }
 
@@ -789,7 +797,7 @@ func primaryDiagnosticCommand(provider string) string {
 	case "openvino":
 		return "contenox model local   # confirm installed OpenVINO IR artifacts; start modeld in openvino mode, then run 'contenox model list'"
 	default:
-		return "contenox backend list   # verify URL, then inspect runtime errors on the backend"
+		return "contenox-runtime backend list   # verify URL, then inspect runtime errors on the backend"
 	}
 }
 
@@ -802,21 +810,21 @@ func repairBackendCommand(check *BackendCheck) string {
 	switch backendType {
 	case "ollama":
 		if isHostedOllamaCheck(*check) {
-			return fmt.Sprintf("export OLLAMA_API_KEY=... && contenox backend remove %q && contenox backend add %q --type ollama --url %q --api-key-env OLLAMA_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://ollama.com/api"))
+			return fmt.Sprintf("export OLLAMA_API_KEY=... && contenox-runtime backend remove %q && contenox-runtime backend add %q --type ollama --url %q --api-key-env OLLAMA_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://ollama.com/api"))
 		}
 		return ""
 	case "openai":
-		return fmt.Sprintf("export OPENAI_API_KEY=... && contenox backend remove %q && contenox backend add %q --type openai --url %q --api-key-env OPENAI_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.openai.com/v1"))
+		return fmt.Sprintf("export OPENAI_API_KEY=... && contenox-runtime backend remove %q && contenox-runtime backend add %q --type openai --url %q --api-key-env OPENAI_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.openai.com/v1"))
 	case "anthropic":
-		return fmt.Sprintf("export ANTHROPIC_API_KEY=... && contenox backend remove %q && contenox backend add %q --type anthropic --url %q --api-key-env ANTHROPIC_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.anthropic.com"))
+		return fmt.Sprintf("export ANTHROPIC_API_KEY=... && contenox-runtime backend remove %q && contenox-runtime backend add %q --type anthropic --url %q --api-key-env ANTHROPIC_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.anthropic.com"))
 	case "mistral":
-		return fmt.Sprintf("export MISTRAL_API_KEY=... && contenox backend remove %q && contenox backend add %q --type mistral --url %q --api-key-env MISTRAL_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.mistral.ai/v1"))
+		return fmt.Sprintf("export MISTRAL_API_KEY=... && contenox-runtime backend remove %q && contenox-runtime backend add %q --type mistral --url %q --api-key-env MISTRAL_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://api.mistral.ai/v1"))
 	case "gemini":
-		return fmt.Sprintf("export GEMINI_API_KEY=... && contenox backend remove %q && contenox backend add %q --type gemini --url %q --api-key-env GEMINI_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://generativelanguage.googleapis.com"))
+		return fmt.Sprintf("export GEMINI_API_KEY=... && contenox-runtime backend remove %q && contenox-runtime backend add %q --type gemini --url %q --api-key-env GEMINI_API_KEY", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://generativelanguage.googleapis.com"))
 	case "vertex-google":
-		return fmt.Sprintf("gcloud auth application-default login && contenox backend remove %q && contenox backend add %q --type %s --url %q", check.Name, check.Name, backendType, check.BaseURL)
+		return fmt.Sprintf("gcloud auth application-default login && contenox-runtime backend remove %q && contenox-runtime backend add %q --type %s --url %q", check.Name, check.Name, backendType, check.BaseURL)
 	case "bedrock":
-		return fmt.Sprintf("# ensure AWS creds resolve (aws sts get-caller-identity), then:\ncontenox backend remove %q && contenox backend add %q --type bedrock --url %q", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://bedrock-runtime.us-east-1.amazonaws.com"))
+		return fmt.Sprintf("# ensure AWS creds resolve (aws sts get-caller-identity), then:\ncontenox-runtime backend remove %q && contenox-runtime backend add %q --type bedrock --url %q", check.Name, check.Name, chooseBaseURL(check.BaseURL, "https://bedrock-runtime.us-east-1.amazonaws.com"))
 	default:
 		return ""
 	}

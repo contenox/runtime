@@ -95,6 +95,10 @@ func resolveLeaf(absPath string) (string, error) {
 		return "", err
 	}
 
+	if fi, lerr := os.Lstat(absPath); lerr == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("%w: %s is a symlink whose target cannot be resolved", ErrEscape, absPath)
+	}
+
 	probe := absPath
 	var missing []string
 

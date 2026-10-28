@@ -22,7 +22,7 @@ directory. Granting a root grants everything UNDER it; a directory outside every
 granted root is refused.
 
 Grants are durable config in the shared database, so these verbs work whether or
-not 'contenox serve' is running. When serve IS running, a grant applies LIVE —
+not 'contenox-runtime serve' is running. When serve IS running, a grant applies LIVE —
 these verbs ring a reload signal serve picks up without a restart.
 
   contenox workspace add /home/me/src        # grant a root (and everything under it)
@@ -31,7 +31,7 @@ these verbs ring a reload signal serve picks up without a restart.
   contenox workspace remove /home/me/scratch  # revoke a grant
 
 serve always also allows its own launched default root (its served directory, or
-home for a bare 'contenox serve'); that is not a grant and is not listed here —
+home for a bare 'contenox-runtime serve'); that is not a grant and is not listed here —
 it appears in the API and the Beam folder picker (GET /workspace/roots).`,
 }
 
@@ -40,7 +40,7 @@ var workspaceAddCmd = &cobra.Command{
 	Short: "Grant a directory as a project workspace root.",
 	Long: `Grant <path> as a workspace root. The path must be an existing directory;
 granting it grants everything under it. The grant is durable and, if a
-'contenox serve' is running, applies live (no restart). Granting a path already
+'contenox-runtime serve' is running, applies live (no restart). Granting a path already
 granted is a no-op.
 
 The granted directory is also registered as a project: its

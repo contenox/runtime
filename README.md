@@ -10,13 +10,13 @@ The desktop and web clients live in separate repositories.
 make build
 ```
 
-The binary is `bin/contenox`.
+The binary is `bin/contenox-runtime`.
 
 ## Run
 
 ```bash
-bin/contenox serve
-bin/contenox acp
+bin/contenox-runtime serve
+bin/contenox-runtime acp
 ```
 
 `serve` exposes the HTTP API and ACP WebSocket. `acp` speaks ACP over stdio.

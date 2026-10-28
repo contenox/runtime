@@ -1,7 +1,287 @@
 {
-  "//compute": "OPTIONAL and OMITTED here by design, so this preset stays unbounded (unchanged behavior). The envelope is a unit's TOTAL boundary: to bound a mission's COMPUTE as well as its actions, add a top-level \"compute\" block, e.g. \"compute\": {\"maxTurns\": 40, \"maxToolCalls\": 300, \"maxTokens\": 2000000, \"onExhausted\": \"finish_stuck\"}. Bounds only RESTRICT (an absent field is unbounded); a mission that crosses one is finished at status \"stuck\" with a reason naming the bound. maxTurns and maxToolCalls are enforced host-side; maxTokens is best-effort (enforced only from reported usage); modelAllowlist/backendAllowlist are declared but not yet enforced. See docs/development/blueprints/acp/envelope-compute-bounds.md.",
+  "compute": {
+    "maxToolCalls": 300,
+    "maxTokens": 2000000,
+    "onExhausted": "finish_stuck"
+  },
   "default_action": "approve",
   "rules": [
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.ssh,.gnupg,.aws,.azure,.kube,.config/gcloud,.config/doctl,.oci}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.password-store,.local/share/keyrings,Library/Keychains,.config/1Password,.config/Bitwarden,.config/keepassxc}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.electrum,.bitcoin,.ethereum/keystore}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{wallet.dat,*.kdbx}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.mozilla,.config/google-chrome,.config/chromium,.config/BraveSoftware}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/Library/Application Support/{Google/Chrome,Firefox,BraveSoftware}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.bash_history,.zsh_history,.python_history,.netrc,.git-credentials,.npmrc,.pypirc}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/.docker/config.json"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "*",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{id_rsa,id_dsa,id_ecdsa,id_ed25519}*"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.ssh,.gnupg}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.ssh,.gnupg}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.config/autostart,.config/systemd/user,Library/LaunchAgents,Library/LaunchDaemons}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.config/autostart,.config/systemd/user,Library/LaunchAgents,Library/LaunchDaemons}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.bashrc,.zshrc,.profile,.bash_profile,.zprofile,.bash_login,.zshenv,.kshrc,crontab,.crontab}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/{.bashrc,.zshrc,.profile,.bash_profile,.zprofile,.bash_login,.zshenv,.kshrc,crontab,.crontab}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/.config/fish/config.fish"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/.config/fish/config.fish"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "/{etc,usr,bin,sbin,boot,lib,lib64,opt,System}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "/{etc,usr,bin,sbin,boot,lib,lib64,opt,System}/**"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/hitl-policy*.json"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "**/hitl-policy*.json"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "{**/.git/**,.git/**}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "{**/.git/**,.git/**}"
+        }
+      ]
+    },
     {
       "tools": "local_fs",
       "tool": "read_file",
@@ -130,5 +410,6 @@
   "attention": {
     "allowAgentAnswers": true,
     "maxAgentAnswers": 2
-  }
+  },
+  "//compute": "OPTIONAL and OMITTED here by design, so this preset stays unbounded (unchanged behavior). The envelope is a unit's TOTAL boundary: to bound a mission's COMPUTE as well as its actions, add a top-level \"compute\" block, e.g. \"compute\": {\"maxTurns\": 40, \"maxToolCalls\": 300, \"maxTokens\": 2000000, \"onExhausted\": \"finish_stuck\"}. Bounds only RESTRICT (an absent field is unbounded); a mission that crosses one is finished at status \"stuck\" with a reason naming the bound. maxTurns and maxToolCalls are enforced host-side; maxTokens is best-effort (enforced only from reported usage); modelAllowlist/backendAllowlist are declared but not yet enforced. See docs/development/blueprints/acp/envelope-compute-bounds.md."
 }

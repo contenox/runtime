@@ -9,6 +9,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
@@ -205,4 +206,31 @@ func TestUnit_DefaultBaseURLForType_VertexGoogleAndBedrockRequireURL(t *testing.
 		_, err := defaultBaseURLForType(typ)
 		require.Error(t, err, "type=%s", typ)
 	}
+}
+
+func TestUnit_BackendDefaultsIncludeChatGPTSubscriptionAndDeepSeek(t *testing.T) {
+	deepseek, err := defaultBaseURLForType("deepseek")
+	require.NoError(t, err)
+	require.Equal(t, "https://api.deepseek.com", deepseek)
+
+	codex, err := defaultBaseURLForType("openai-codex")
+	require.NoError(t, err)
+	require.Equal(t, modelauth.BaseURL, codex)
+}
+
+func TestUnit_SetupOffersCodexAndDeepSeek(t *testing.T) {
+	byKey := map[string]setupProvider{}
+	for _, provider := range setupProviders {
+		byKey[provider.key] = provider
+	}
+
+	codex, ok := byKey["openai-codex"]
+	require.True(t, ok, "setup must offer the ChatGPT subscription")
+	require.False(t, codex.needsAPIKey)
+	require.False(t, codex.needsBaseURL)
+
+	deepseek, ok := byKey["deepseek"]
+	require.True(t, ok, "setup must offer DeepSeek")
+	require.Equal(t, "DEEPSEEK_API_KEY", deepseek.envKey)
+	require.Equal(t, "deepseek-chat", deepseek.defaultModel)
 }

@@ -10,9 +10,9 @@ import (
 
 const (
 	effortAutoInChat  = "`/default inference.reasoning.effort auto`"
-	effortAutoOnCLI   = "`contenox-cli config set inference.reasoning.effort auto`"
+	effortAutoOnCLI   = "`contenox-runtime config set inference.reasoning.effort auto`"
 	effortLevelInChat = "`/default inference.reasoning.effort <level>`"
-	effortLevelOnCLI  = "`contenox-cli config set inference.reasoning.effort <level>`"
+	effortLevelOnCLI  = "`contenox-runtime config set inference.reasoning.effort <level>`"
 	novaMicro         = "eu.amazon.nova-micro-v1:0"
 )
 

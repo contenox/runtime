@@ -189,3 +189,34 @@ func TestUnit_EnvPolicy_StrictCanRepermitOneCredential(t *testing.T) {
 
 	require.Equal(t, []string{"NPM_TOKEN=npm_trusted", "PATH=/usr/bin"}, got)
 }
+
+func TestUnit_EnvPolicy_DenyMatchingIsCaseInsensitive(t *testing.T) {
+	require.True(t, matchesAnyFold(SecretEnvDeny(), "github_token"))
+	require.True(t, matchesAnyFold(SecretEnvDeny(), "GitHub_Token"))
+	require.False(t, matchesAnyFold(SecretEnvDeny(), "PATH"))
+
+	parent := []string{"github_token=x", "GITHUB_TOKEN=y", "PATH=/bin"}
+	require.Equal(t, []string{"PATH"}, DefaultEnvPolicy().Resolve(parent))
+}
+
+func TestUnit_EnvPolicy_SecretDenyCoversDatabaseAndAmbientCloudNames(t *testing.T) {
+	for _, name := range []string{
+		"AWS_ACCESS_KEY_ID",
+		"AWS_SESSION_TOKEN",
+		"PGPASSWORD",
+		"MYSQL_PWD",
+		"SOME_PWD",
+		"DATABASE_URL",
+		"OTHER_DATABASE_URL",
+		"REDIS_URL",
+		"MONGODB_URI",
+		"SERVICE_DSN",
+		"SSH_AUTH_SOCK",
+		"KUBECONFIG",
+		"GITHUB_PAT",
+		"NETRC",
+		"OPENAI_API_KEY_ID",
+	} {
+		require.Truef(t, matchesAnyFold(SecretEnvDeny(), name), "%s must be scrubbed", name)
+	}
+}

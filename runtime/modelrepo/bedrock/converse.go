@@ -400,7 +400,7 @@ func reasoningEffortRemedy(declared bool) string {
 	if declared {
 		lead, level = "choose a reasoning effort the model declares, or auto, which sends no thinking control", "<level>"
 	}
-	return fmt.Sprintf("%s: `/default %s %s` in the chat or `contenox-cli config set %s %s`, then start a new Contenox invocation", lead, "inference.reasoning.effort", level, "inference.reasoning.effort", level)
+	return fmt.Sprintf("%s: `/default %s %s` in the chat or `contenox-runtime config set %s %s`, then start a new Contenox invocation", lead, "inference.reasoning.effort", level, "inference.reasoning.effort", level)
 }
 
 func thinkDeclarationRefusal() string {

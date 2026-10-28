@@ -17,7 +17,7 @@ For command-line issues, include the command, output, Contenox version, operatin
 
 For chain or tool behavior, include the smallest chain snippet, tool policy, or setup detail that shows the problem.
 
-For ACP/editor behavior, include the client name and version if you know it, plus whether you are using `contenox acp` or `contenox acpx`.
+For ACP/editor behavior, include the client name and version if you know it, plus whether you are using `contenox-runtime acp` or `contenox-runtime acpx`.
 
 For docs feedback, point to the page, section, command help, or missing topic.
 

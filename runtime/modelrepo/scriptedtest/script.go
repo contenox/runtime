@@ -83,7 +83,7 @@ func ResolvePath(baseURL string) (string, error) {
 	raw := strings.TrimSpace(baseURL)
 	raw = strings.TrimPrefix(raw, "file://")
 	if raw == "" {
-		return "", fmt.Errorf("scripted-test backend has no script path: register it with 'contenox-cli backend add <name> --type scripted-test --script ./dialog.json'")
+		return "", fmt.Errorf("scripted-test backend has no script path: register it with 'contenox-runtime backend add <name> --type scripted-test --script ./dialog.json'")
 	}
 	abs, err := filepath.Abs(raw)
 	if err != nil {

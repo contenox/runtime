@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -160,7 +161,7 @@ func (p *PersistentRepo) execMCPTools(
 		return nil, taskengine.DataTypeAny, fmt.Errorf("mcp tools %q: encode request: %w", srv.Name, err)
 	}
 
-	replyData, err := p.messenger.Request(ctx, mcpworker.SubjectExecute(srv.Name), reqPayload)
+	replyData, err := requestMCP(ctx, p.messenger, mcpworker.SubjectExecute(srv.Name), reqPayload)
 	if err != nil {
 		return nil, taskengine.DataTypeAny, fmt.Errorf("mcp tools %q: nats request: %w", srv.Name, err)
 	}
@@ -309,7 +310,7 @@ func (p *PersistentRepo) GetToolsForToolsByName(ctx context.Context, name string
 			}
 		}
 		reqPayload, _ := json.Marshal(mcpworker.MCPToolRequest{SessionID: sessionID})
-		replyData, err := p.messenger.Request(ctx, mcpworker.SubjectListTools(mcpSrv.Name), reqPayload)
+		replyData, err := requestMCP(ctx, p.messenger, mcpworker.SubjectListTools(mcpSrv.Name), reqPayload)
 		if err != nil {
 			return nil, taskengine.ToolsToolsUnavailable(name, fmt.Errorf("mcp list-tools request: %w", err))
 		}
@@ -477,4 +478,22 @@ func safeJSONString(v any) (string, error) {
 		return "", fmt.Errorf("failed to serialize arguments to JSON: %w", err)
 	}
 	return string(b), nil
+}
+
+func requestMCP(ctx context.Context, messenger libbus.Messenger, subject string, payload []byte) ([]byte, error) {
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		reply, err := messenger.Request(ctx, subject, payload)
+		if err == nil {
+			return reply, nil
+		}
+		if !errors.Is(err, libbus.ErrNoResponders) || time.Now().After(deadline) {
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
 }

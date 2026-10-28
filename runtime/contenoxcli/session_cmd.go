@@ -59,7 +59,7 @@ var sessionSwitchCmd = &cobra.Command{
 	Use:   "switch <name>",
 	Short: "Switch the active session by name.",
 	Long: `Make the named session the active one, so subsequent chat and run commands
-use its conversation history. Run 'contenox session list' to see the names
+use its conversation history. Run 'contenox-runtime session list' to see the names
 available to switch to.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runSessionSwitch,
@@ -82,7 +82,7 @@ var sessionShowCmd = &cobra.Command{
 
 Defaults to the active session. Pass a session name (active scope) or a
 session id, which is resolved across any workspace/identity. Use
-'contenox session list --all' or 'contenox session workspaces' to find ids.
+'contenox-runtime session list --all' or 'contenox-runtime session workspaces' to find ids.
 
 Flags:
   --tail N    Show only the last N messages
@@ -191,7 +191,7 @@ func runSessionSwitch(cmd *cobra.Command, args []string) error {
 
 	name := args[0]
 	if err := svc.Switch(ctx, localIdentity, name); err != nil {
-		return fmt.Errorf("%w; run 'contenox session list' to see available sessions", err)
+		return fmt.Errorf("%w; run 'contenox-runtime session list' to see available sessions", err)
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Switched to session %q.\n", name)
 	return nil
@@ -210,7 +210,7 @@ func runSessionDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if wasActive {
-		fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q (was active; run 'contenox session new' or 'contenox session switch' to set a new active session).\n", name)
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q (was active; run 'contenox-runtime session new' or 'contenox-runtime session switch' to set a new active session).\n", name)
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q.\n", name)
 	}
@@ -248,13 +248,13 @@ func runSessionShow(cmd *cobra.Command, args []string) error {
 				}
 			}
 			if sessionID == "" {
-				return fmt.Errorf("session %q not found; run 'contenox session list' or 'contenox session workspaces'", args[0])
+				return fmt.Errorf("session %q not found; run 'contenox-runtime session list' or 'contenox-runtime session workspaces'", args[0])
 			}
 		}
 	} else {
 		activeID, err := svc.GetActiveID(ctx)
 		if err != nil || activeID == "" {
-			return fmt.Errorf("no active session; run 'contenox session new' to create one")
+			return fmt.Errorf("no active session; run 'contenox-runtime session new' to create one")
 		}
 		sessionID = activeID
 		sessionName = sessionID[:8] + "…"

@@ -161,7 +161,9 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 	backendSvc := backendservice.New(deps.DB)
 	stateSvc := stateservice.New(deps.State, deps.DB, deps.WorkspaceID)
 
-	agentregistryapi.AddAgentRegistryRoutes(mux, agentregistryservice.New(deps.DB))
+	agentSvc := agentregistryservice.New(deps.DB)
+	agentregistryapi.AddAgentRegistryRoutes(mux, agentSvc)
+	agentregistryapi.AddAgentPresetRoutes(mux, agentSvc, deps.ContenoxDir)
 
 	backendapi.AddStateRoutes(mux, stateSvc)
 	backendapi.AddModelRoutes(mux, stateSvc, deps.Defaults)

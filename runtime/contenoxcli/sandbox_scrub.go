@@ -51,7 +51,7 @@ func newLiveGlobalShellEnv(svc shellenvservice.Service, ttl time.Duration) func(
 		}
 		vars, err := svc.Get(context.Background())
 		if err != nil {
-			slog.Warn("contenox serve: could not read global shell-env; keeping last known", "error", err)
+			slog.Warn("contenox-runtime serve: could not read global shell-env; keeping last known", "error", err)
 			return val
 		}
 		val, at, loaded = vars, time.Now(), true
@@ -65,7 +65,7 @@ func resolveScrubMode(raw, def string) string {
 		return def
 	}
 	if !libsandbox.ScrubModeValid(raw) {
-		slog.Warn("contenox serve: unrecognized sandbox scrub mode; using default",
+		slog.Warn("contenox-runtime serve: unrecognized sandbox scrub mode; using default",
 			"value", raw, "default", def)
 		return def
 	}

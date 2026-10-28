@@ -144,7 +144,7 @@ func firstNonFlagIsReserved(args []string) bool {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "contenox",
+	Use:   "contenox-runtime",
 	Short: "AI harness runtime: run versioned chains with your tools and models.",
 	Long: `Contenox is a local runtime for packaged, auditable AI workflows.
 Chains define the prompts, model routing, tools, retries, branch conditions,
@@ -152,50 +152,50 @@ and human approval gates. State is stored in SQLite. Cloud providers and Ollama
 work directly from the CLI; local inference is reached through an Ollama server.
 
   Quickstart:
-    contenox setup                         # interactive wizard — pick provider, model, API key
-    contenox init                          # scaffold .contenox/ with default chains
-    contenox "list files in my home dir"   # session-backed chat using your configured policy
+    contenox-runtime setup                         # interactive wizard — pick provider, model, API key
+    contenox-runtime init                          # scaffold .contenox/ with default chains
+    contenox-runtime "list files in my home dir"   # session-backed chat using your configured policy
 
   Inspect models:
-    contenox model list                    # models exposed by registered live backends
+    contenox-runtime model list                    # models exposed by registered live backends
 
   Or register an LLM backend manually:
     # Local Ollama daemon
     ollama serve && ollama pull qwen2.5:7b
-    contenox backend add ollama --type ollama
-    contenox config set default-provider ollama
-    contenox config set default-model qwen2.5:7b
+    contenox-runtime backend add ollama --type ollama
+    contenox-runtime config set default-provider ollama
+    contenox-runtime config set default-model qwen2.5:7b
 
     # Hosted Ollama Cloud
-    contenox backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
-    contenox config set default-provider ollama
+    contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
+    contenox-runtime config set default-provider ollama
 
     # Google Gemini (no GPU required)
-    contenox backend add gemini --type gemini --api-key-env GEMINI_API_KEY
-    contenox config set default-model  gemini-flash-latest
-    contenox config set default-provider gemini
+    contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY
+    contenox-runtime config set default-model  gemini-flash-latest
+    contenox-runtime config set default-provider gemini
 
     # OpenAI
-    contenox backend add openai --type openai --api-key-env OPENAI_API_KEY
-    contenox config set default-model    gpt-4o-mini
-    contenox config set default-provider openai
+    contenox-runtime backend add openai --type openai --api-key-env OPENAI_API_KEY
+    contenox-runtime config set default-model    gpt-4o-mini
+    contenox-runtime config set default-provider openai
 
     # OpenRouter
-    contenox backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
-    contenox config set default-model    deepseek/deepseek-chat-v3-5
-    contenox config set default-provider openrouter
+    contenox-runtime backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
+    contenox-runtime config set default-model    deepseek/deepseek-chat-v3-5
+    contenox-runtime config set default-provider openrouter
 
   VS Code autocomplete can use a separate model from chat:
     # Example: chat on OpenAI, ghost text on a local Ollama model.
-    contenox config set default-provider openai
-    contenox config set default-model    gpt-5-mini
-    contenox config set default-autocomplete-provider llama
-    contenox config set default-autocomplete-model    qwen3-coder-30b-a3b
+    contenox-runtime config set default-provider openai
+    contenox-runtime config set default-model    gpt-5-mini
+    contenox-runtime config set default-autocomplete-provider llama
+    contenox-runtime config set default-autocomplete-model    qwen3-coder-30b-a3b
 
   Scope note:
     Backends and config are GLOBAL (stored in ~/.contenox-harness/local.db).
     Chain files (.contenox/) are LOCAL to each project directory — like .git/.
-    Run 'contenox init' once per project to create the local chain files.`,
+    Run 'contenox-runtime init' once per project to create the local chain files.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -232,7 +232,7 @@ Giving the model tools (file system and shell access):
 Human-in-the-loop is on by default. The workflow pauses for terminal approval before
 write_file, sed, and local_shell calls. The active policy is defined in
 ~/.contenox-harness/hitl-policy-default.json (override per workspace via
-.contenox/hitl-policy-*.json or via 'contenox config set hitl-policy-name').
+.contenox/hitl-policy-*.json or via 'contenox-runtime config set hitl-policy-name').
 
   --auto                             non-interactive mode: skip approval prompts
                                      entirely. Use only in trusted environments
@@ -310,8 +310,8 @@ var versionCmd = &cobra.Command{
 	Short: "Print the contenox CLI version",
 	Long: `Print the contenox CLI version string.
 
-This is the subcommand form of 'contenox --version' and exists so that typing
-'contenox version' is not mistaken for chat input by the default run command.`,
+This is the subcommand form of 'contenox-runtime --version' and exists so that typing
+'contenox-runtime version' is not mistaken for chat input by the default run command.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("%s version %s\n", cmd.Root().Name(), cmd.Root().Version)
 	},
@@ -328,7 +328,7 @@ func init() {
 	f.String("data-dir", "", "Override the .contenox data directory path")
 	f.String("ollama", defaultOllama, "Ollama base URL")
 	f.String("model", defaultModel, "Model name (task/chat/embed)")
-	f.String("provider", "", "Provider type override. See 'contenox backend add --help' for supported backend types.")
+	f.String("provider", "", "Provider type override. See 'contenox-runtime backend add --help' for supported backend types.")
 	f.String("alt-model", "", "Alt model name (chains referencing {{var:alt_model}}). Overrides config default-alt-model.")
 	f.String("alt-provider", "", "Alt provider type (chains referencing {{var:alt_provider}}). Overrides config default-alt-provider.")
 	f.Int("max-tokens", 0, "Response token cap for chains referencing {{var:max_tokens}}. Overrides config default-max-tokens when set.")
@@ -595,7 +595,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 	}
 	if effectiveChain == "" {
 		fmt.Fprintln(os.Stderr, "No default chain found in .contenox/ (workspace) or ~/.contenox-harness/.")
-		fmt.Fprintln(os.Stderr, "Run 'contenox init' to scaffold one, or pass --chain explicitly.")
+		fmt.Fprintln(os.Stderr, "Run 'contenox-runtime init' to scaffold one, or pass --chain explicitly.")
 		return errChainRequired
 	}
 

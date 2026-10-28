@@ -16,7 +16,7 @@ func OpenDBAt(ctx context.Context, dbPath string) (libdb.DBManager, error) {
 		return nil, fmt.Errorf("cannot create database directory: %w", err)
 	}
 	schema := runtimetypes.SchemaSQLite + "\n" + libkvstore.SQLiteSchema
-	db, err := libdb.NewSQLiteDBManager(ctx, dbPath, schema)
+	db, err := libdb.NewSQLiteDBManagerWithOptions(ctx, dbPath, schema, libdb.SQLiteOptions{Synchronous: libdb.SQLiteSynchronousNormal})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database %q: %w", dbPath, err)
 	}

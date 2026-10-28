@@ -28,6 +28,9 @@ func buildRootSet(roots ...string) (*rootSet, error) {
 		if err != nil {
 			return nil, fmt.Errorf("vfs: workspace root %q: %w", r, err)
 		}
+		if denied, bad := deniedResolved(resolved); bad {
+			return nil, controlPlaneError(r, denied)
+		}
 		if _, dup := seen[resolved]; dup {
 			continue
 		}
@@ -98,7 +101,11 @@ func (f *Factory) DescribeRoots() string {
 func (f *Factory) Resolve(root string) (string, error) {
 	rs := f.load()
 	if root == "" || root == "/" {
-		return rs.defaultRoot(), nil
+		def := rs.defaultRoot()
+		if denied, bad := deniedResolved(def); bad {
+			return "", controlPlaneError(def, denied)
+		}
+		return def, nil
 	}
 	resolved, err := ResolveRoot(root)
 	if err != nil {

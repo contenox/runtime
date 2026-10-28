@@ -18,14 +18,14 @@ import (
 var approvalsCmd = &cobra.Command{
 	Use:   "approvals",
 	Short: "Read and answer pending human-in-the-loop approvals.",
-	Long: `List and answer the human-in-the-loop approvals a running 'contenox serve'
+	Long: `List and answer the human-in-the-loop approvals a running 'contenox-runtime serve'
 is holding pending — the inbox for asks raised by an agent working with no
 attached session (dispatched fleet work, a headless API caller). A permission
 request that would otherwise hang until its policy-rule timeout, or the
 serve-level ceiling, is answerable here as soon as it lands.
 
-Unlike 'contenox state'/'session', which open the local database directly,
-a pending approval is a goroutine parked inside a running 'contenox serve'
+Unlike 'contenox-runtime state'/'session', which open the local database directly,
+a pending approval is a goroutine parked inside a running 'contenox-runtime serve'
 process — answering it has to reach that process, not just its database. So
 this command talks to serve's REST API over HTTP instead: by default
 http://127.0.0.1:32123, overridable with --server/--token or the
@@ -41,7 +41,7 @@ Examples:
 var approvalsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List pending approvals, newest first.",
-	Long: `Fetch the pending human-in-the-loop approvals from a running 'contenox serve'
+	Long: `Fetch the pending human-in-the-loop approvals from a running 'contenox-runtime serve'
 and print them as a table of id, tool, args summary, policy, matched rule,
 diff presence, the agent/mission/instance/session the ask came from, and the
 created/expires timestamps — everything an operator needs to decide, and to
@@ -56,7 +56,7 @@ that is not on a mission.`,
 var approvalsAnswerCmd = &cobra.Command{
 	Use:   "answer <id> --approve|--deny|--reply <text>",
 	Short: "Approve or deny a pending approval, or reply to a unit's question.",
-	Long: `Answer one pending ask by id (see 'contenox approvals list').
+	Long: `Answer one pending ask by id (see 'contenox-runtime approvals list').
 
 Two kinds of ask arrive in this queue, and they are answered differently:
 

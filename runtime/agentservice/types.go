@@ -81,5 +81,17 @@ func InferStopReason(err error, steps []taskengine.CapturedStateUnit) StopReason
 		return StopMaxTurnRequests
 	}
 
+	for i := len(steps) - 1; i >= 0; i-- {
+		fr := steps[i].FinishReason
+		if fr == "" {
+			continue
+		}
+		switch strings.ToLower(fr) {
+		case "length", "max_tokens", "max_output_tokens", "model_length":
+			return StopMaxTokens
+		}
+		break
+	}
+
 	return StopEndTurn
 }

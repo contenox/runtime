@@ -21,7 +21,7 @@ func (t *Transport) Initialize(ctx context.Context, req libacp.InitializeRequest
 		authMethods = append(authMethods, libacp.AuthMethod{
 			ID:          terminalAuthMethodID,
 			Name:        "Setup Contenox",
-			Description: "Opens an interactive terminal to configure your LLM provider and model.",
+			Description: "Opens an interactive terminal to configure your LLM provider and model, including a ChatGPT subscription sign-in.",
 			Type:        libacp.AuthMethodTypeTerminal,
 			Args:        []string{"acp", "--setup"},
 			Meta: mustJSON(map[string]any{

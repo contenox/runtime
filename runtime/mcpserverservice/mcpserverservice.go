@@ -97,6 +97,9 @@ func validate(srv *runtimetypes.MCPServer) error {
 	if srv.Name == "" {
 		return fmt.Errorf("name is required")
 	}
+	if runtimetypes.IsACPManagedMCPServerName(srv.Name) {
+		return fmt.Errorf("name %q uses the reserved ACP session prefix %q", srv.Name, runtimetypes.ACPMCPServerNamePrefix)
+	}
 	switch srv.Transport {
 	case "stdio":
 		if srv.Command == "" {

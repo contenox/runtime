@@ -2,6 +2,7 @@ package contenoxcli
 
 import (
 	"context"
+	"fmt"
 	"github.com/contenox/runtime/runtime/homedir"
 	"log/slog"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/vfs"
 )
 
 func ComputeReadiness(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (setupcheck.Result, error) {
@@ -34,6 +36,12 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 
 	reportErr, reportChange, end := tracker.Start(ctx, "build", "engine")
 	defer end()
+
+	if err := vfs.SetControlPlaneDenied(controlPlaneDirs(opts.ContenoxDir)...); err != nil {
+		err = fmt.Errorf("register control-plane isolation: %w", err)
+		reportErr(err)
+		return nil, err
+	}
 
 	tools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),

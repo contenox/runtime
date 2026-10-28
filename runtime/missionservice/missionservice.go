@@ -80,6 +80,10 @@ const (
 	StatusStuck Status = "stuck"
 )
 
+func IsTerminalStatus(status Status) bool {
+	return isTerminalStatus(status)
+}
+
 func isTerminalStatus(status Status) bool {
 	switch status {
 	case StatusLanded, StatusDerailed, StatusStuck, StatusAbandoned:

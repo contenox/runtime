@@ -32,7 +32,7 @@ func pinnedModelRefusal(ctx context.Context, task *TaskDefinition, taskErr error
 	if model == "" || task.ExecuteConfig.Model != model {
 		return nil
 	}
-	return fmt.Errorf("task %s: model %q was requested explicitly and no backend serves it; run 'contenox-cli model list' to see the served models: %w", task.ID, model, taskErr)
+	return fmt.Errorf("task %s: model %q was requested explicitly and no backend serves it; run 'contenox-runtime model list' to see the served models: %w", task.ID, model, taskErr)
 }
 
 type DataType int

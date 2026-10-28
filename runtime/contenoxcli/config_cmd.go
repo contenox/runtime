@@ -29,8 +29,8 @@ var validConfigKeys = map[string]string{
 	"hitl-policy-name":              "Active HITL policy file name (e.g. hitl-policy-strict.json). Empty = use hitl-policy-default.json.",
 	"telemetry-enabled":             "Enable writing telemetry logs to <data-dir>/telemetry.log (true/false)",
 	"update-check":                  "Enable automatic update availability checks (true/false). Set false for zero-trust/air-gapped environments.",
-	"default-mission-agent":         "Default declared agent fired by '/mission <intent>' and 'contenox mission fire' with no --agent.",
-	"default-mission-policy":        "Default mission envelope (HITL policy) used when '/mission' or 'contenox mission fire' names none.",
+	"default-mission-agent":         "Default declared agent fired by '/mission <intent>' and 'contenox-runtime mission fire' with no --agent.",
+	"default-mission-policy":        "Default mission envelope (HITL policy) used when '/mission' or 'contenox-runtime mission fire' names none.",
 }
 
 var configCmd = &cobra.Command{

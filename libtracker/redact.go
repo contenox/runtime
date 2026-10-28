@@ -9,7 +9,23 @@ const redactedPlaceholder = "[REDACTED]"
 
 const maxRedactDepth = 64
 
-var defaultRedactedFields = []string{
+var defaultPrivatePayloadFields = []string{
+	"args",
+	"arguments",
+	"argv",
+	"content",
+	"input",
+	"message",
+	"messages",
+	"output",
+	"prompt",
+	"provider_meta",
+	"system_instruction",
+	"thinking",
+	"thought_signature",
+}
+
+var defaultRedactedFields = append([]string{
 	"password",
 	"passwd",
 	"passphrase",
@@ -33,7 +49,7 @@ var defaultRedactedFields = []string{
 	"id_token",
 	"bearer",
 	"token",
-}
+}, defaultPrivatePayloadFields...)
 
 var tokenAccountingFields = []string{
 	"tokens",
@@ -78,6 +94,12 @@ func (r *fieldRedactor) sensitive(name string) bool {
 		return false
 	}
 	for _, f := range r.fields {
+		if privatePayloadField(f) {
+			if n == f {
+				return true
+			}
+			continue
+		}
 		if !strings.Contains(n, f) {
 			continue
 		}
@@ -85,6 +107,15 @@ func (r *fieldRedactor) sensitive(name string) bool {
 			continue
 		}
 		return true
+	}
+	return false
+}
+
+func privatePayloadField(name string) bool {
+	for _, field := range defaultPrivatePayloadFields {
+		if name == field {
+			return true
+		}
 	}
 	return false
 }

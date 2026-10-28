@@ -58,7 +58,7 @@ defaults to "http" when a URL is provided this way.
 
 For authentication, use:
   --auth-type bearer  with --auth-token <token>  or  --auth-env <ENV_VAR>
-  --auth-type oauth   for OAuth 2.1 + PKCE (run 'contenox mcp auth <name>' next)
+  --auth-type oauth   for OAuth 2.1 + PKCE (run 'contenox-runtime mcp auth <name>' next)
                       For servers that support dynamic client registration
                       (RFC 7591) the client is created automatically.
                       For servers without DCR (e.g. HubSpot, Salesforce),
@@ -184,7 +184,7 @@ var mcpListCmd = &cobra.Command{
 	Short: "List all registered MCP servers.",
 	Long: `List every registered MCP server as a table of name, transport, and target.
 The target column shows the command for stdio servers and the URL for sse/http
-servers. If none are registered, prints a hint to run 'contenox mcp add'.`,
+servers. If none are registered, prints a hint to run 'contenox-runtime mcp add'.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := libtracker.WithNewRequestID(context.Background())

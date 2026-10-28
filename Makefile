@@ -7,8 +7,8 @@ RUNTIME_S3_URI ?=
 .PHONY: help build build-windows test test-unit test-contenox-help test-api acp-conformance rust-e2e lint release-assets release-check release clean
 
 help:
-	@echo "build              build bin/contenox"
-	@echo "build-windows      cross-build bin/contenox-windows-amd64.exe"
+	@echo "build              build bin/contenox-runtime"
+	@echo "build-windows      cross-build bin/contenox-runtime-windows-amd64.exe"
 	@echo "test               go test ./..."
 	@echo "test-unit          go test -short -run '^TestUnit_' ./..."
 	@echo "test-contenox-help CLI help smoke"
@@ -23,10 +23,10 @@ help:
 	@echo "clean              remove bin/ and dist/"
 
 build:
-	CGO_ENABLED=0 go build -o $(PROJECT_ROOT)bin/contenox $(PROJECT_ROOT)cmd/contenox
+	CGO_ENABLED=0 go build -o $(PROJECT_ROOT)bin/contenox-runtime $(PROJECT_ROOT)cmd/contenox
 
 build-windows:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o $(PROJECT_ROOT)bin/contenox-windows-amd64.exe $(PROJECT_ROOT)cmd/contenox
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o $(PROJECT_ROOT)bin/contenox-runtime-windows-amd64.exe $(PROJECT_ROOT)cmd/contenox
 
 test:
 	go test -C $(PROJECT_ROOT) ./...
@@ -36,7 +36,7 @@ test-unit:
 
 test-contenox-help: build
 	@chmod +x $(PROJECT_ROOT)scripts/verify_cli_help.sh
-	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox $(PROJECT_ROOT)scripts/verify_cli_help.sh
+	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox-runtime $(PROJECT_ROOT)scripts/verify_cli_help.sh
 
 test-api: build
 	@bash $(PROJECT_ROOT)scripts/run_apitests.sh
@@ -45,7 +45,7 @@ ACP_VALIDATOR_BIN ?= $(wildcard $(PROJECT_ROOT)tools/acp-validator/target/debug/
 
 acp-conformance: build
 	@test -n "$(ACP_VALIDATOR_BIN)" || { echo "set ACP_VALIDATOR_BIN=/path/to/acp-validator"; exit 1; }
-	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox ACP_VALIDATOR_BIN=$(ACP_VALIDATOR_BIN) bash $(PROJECT_ROOT)scripts/acp_conformance.sh
+	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox-runtime ACP_VALIDATOR_BIN=$(ACP_VALIDATOR_BIN) bash $(PROJECT_ROOT)scripts/acp_conformance.sh
 
 rust-e2e: build
 	@tmp=$$(mktemp -d /tmp/contenox-e2e.XXXXXX); trap 'rm -rf "$$tmp"' EXIT; \

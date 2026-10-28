@@ -92,6 +92,7 @@ func (s *service) RequestAttention(ctx context.Context, req AttentionRequest, si
 	s.mu.Lock()
 	s.pending[askID] = ch
 	s.mu.Unlock()
+	s.offerAdjudication(ctx, adjudicationFromAttentionRequest(askID, req))
 	defer func() {
 		s.mu.Lock()
 		delete(s.pending, askID)
@@ -141,10 +142,10 @@ func (s *service) RequestAttention(ctx context.Context, req AttentionRequest, si
 const attentionPollInterval = time.Second
 
 func (s *service) Answer(ctx context.Context, askID, text string) error {
-	return s.answerAttention(ctx, askID, text, "")
+	return s.answerAttention(ctx, askID, text, "", nil)
 }
 
-func (s *service) answerAttention(ctx context.Context, askID, text, by string) error {
+func (s *service) answerAttention(ctx context.Context, askID, text, by string, max *int) error {
 	if s.approvals == nil {
 		return fmt.Errorf("hitlservice: durable approval store not configured; pass a runtimetypes.Store-backed store to New/NewWithDefaultPolicy")
 	}
@@ -164,13 +165,29 @@ func (s *service) answerAttention(ctx context.Context, askID, text, by string) e
 	}
 
 	now := time.Now().UTC()
-	if err := s.approvals.ResolveHITLApproval(ctx, askID, runtimetypes.HITLApprovalApproved, marshalAttentionResolution(text, by), now); err != nil {
-		if !errors.Is(err, libdb.ErrNotFound) {
-			return fmt.Errorf("hitlservice: resolve ask %s: %w", askID, err)
+	var resolveErr error
+	if max != nil {
+		if row.MissionID == nil || strings.TrimSpace(*row.MissionID) == "" {
+			return fmt.Errorf("hitlservice: ask %s belongs to no mission, so no agent-answer bound can be applied to it", askID)
+		}
+		resolveErr = s.approvals.ResolveHITLApprovalWithinBound(ctx, askID, runtimetypes.AgentAnswerBound{
+			MissionID:      *row.MissionID,
+			ResolutionLike: agentResolutionLike,
+			Max:            *max,
+		}, runtimetypes.HITLApprovalApproved, marshalAttentionResolution(text, by), now)
+	} else {
+		resolveErr = s.approvals.ResolveHITLApproval(ctx, askID, runtimetypes.HITLApprovalApproved, marshalAttentionResolution(text, by), now)
+	}
+	if resolveErr != nil {
+		if !errors.Is(resolveErr, libdb.ErrNotFound) {
+			return fmt.Errorf("hitlservice: resolve ask %s: %w", askID, resolveErr)
 		}
 		current, getErr := s.approvals.GetHITLApproval(ctx, askID)
 		if getErr != nil {
 			return fmt.Errorf("hitlservice: look up ask %s: %w", askID, getErr)
+		}
+		if current.State == runtimetypes.HITLApprovalPending {
+			return ErrAgentAnswerBoundSpent
 		}
 		if current.State == runtimetypes.HITLApprovalExpired {
 			return ErrApprovalExpired
@@ -192,8 +209,24 @@ func (s *service) answerAttention(ctx context.Context, askID, text, by string) e
 
 const answeredByAgent = "agent"
 
+const agentResolutionLike = `%"answeredBy":%`
+
+var ErrAgentAnswerBoundSpent = errors.New("hitlservice: mission agent-answer bound spent")
+
+func agentActor(agentName string) string {
+	name := strings.TrimSpace(agentName)
+	if name == "" {
+		return answeredByAgent
+	}
+	return name
+}
+
 func (s *service) AnswerAsAgent(ctx context.Context, askID, text string) error {
-	return s.answerAttention(ctx, askID, text, answeredByAgent)
+	return s.answerAttention(ctx, askID, text, answeredByAgent, nil)
+}
+
+func (s *service) AnswerAsAgentBounded(ctx context.Context, askID, agentName, text string, max int) error {
+	return s.answerAttention(ctx, askID, text, agentActor(agentName), &max)
 }
 
 func (s *service) PendingAttentionAsks(ctx context.Context, missionID string) ([]*runtimetypes.HITLApproval, error) {
@@ -230,7 +263,7 @@ func (s *service) AgentAnswerCount(ctx context.Context, missionID string) (int, 
 		if json.Unmarshal(row.Resolution, &res) != nil {
 			continue
 		}
-		if res.AnsweredBy != nil && *res.AnsweredBy == answeredByAgent {
+		if res.AnsweredBy != nil && strings.TrimSpace(*res.AnsweredBy) != "" {
 			count++
 		}
 	}

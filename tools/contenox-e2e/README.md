@@ -10,7 +10,7 @@ only the cases that hold against this checkout's surface were kept.
 An end-to-end test written in the language of the thing it tests can reach
 internals, swap a fake in, and still call itself end-to-end. From here there is
 no `internal/` to import and no in-process runtime to stand up: the suite spawns
-`bin/contenox`, seeds a scratch `HOME`, and asserts on what a user or an
+`bin/contenox-runtime`, seeds a scratch `HOME`, and asserts on what a user or an
 integrator can observe.
 
 ## What it covers
@@ -23,7 +23,7 @@ integrator can observe.
 
 ## Fixtures
 
-`Instance` seeds a scratch `HOME` and workspace, runs `contenox init`, disables
+`Instance` seeds a scratch `HOME` and workspace, runs `contenox-runtime init`, disables
 the update check, and registers a scripted dialog as the backend the chain uses.
 
 This checkout registers the dialog by pointing the backend URL at the script
@@ -40,7 +40,7 @@ state with the real installation.
 
 Deleted entirely: `envelopes.rs` (asserts the declared-envelope compiler and its
 `vet`, which this tree does not ship) and `durable_ask.rs` (asserts an approvals
-queue this CLI exposes only through a running `contenox serve`).
+queue this CLI exposes only through a running `contenox-runtime serve`).
 
 Dropped from the kept files (also present in the enterprise source): the
 chain-router leaf and preseed cases (`.generated/chain-agent-acp.json`), the

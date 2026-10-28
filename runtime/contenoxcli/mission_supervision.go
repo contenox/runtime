@@ -2,11 +2,19 @@ package contenoxcli
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync"
 	"time"
 
+	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/acpsvc"
+	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/missiontools"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
 type missionSupervision struct {
@@ -69,4 +77,50 @@ func (s missionSupervision) PendingAsks(ctx context.Context, missionID string) (
 
 func (s missionSupervision) AnswerAsAgent(ctx context.Context, askID, text string) error {
 	return s.hitl.AnswerAsAgent(ctx, askID, text)
+}
+
+type fleetHolder struct {
+	mu         sync.Mutex
+	dispatcher acpsvc.MissionDispatcher
+}
+
+func (h *fleetHolder) set(dispatcher acpsvc.MissionDispatcher) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.dispatcher = dispatcher
+}
+
+func (h *fleetHolder) get() acpsvc.MissionDispatcher {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.dispatcher
+}
+
+type fleetSpawner struct {
+	fleet func() acpsvc.MissionDispatcher
+}
+
+func (f fleetSpawner) Spawn(ctx context.Context, spec missiontools.SubagentSpec) (missiontools.SubagentHandle, error) {
+	if f.fleet == nil {
+		return missiontools.SubagentHandle{}, fmt.Errorf("the fleet is not running in this process")
+	}
+	fleet := f.fleet()
+	if fleet == nil {
+		return missiontools.SubagentHandle{}, fmt.Errorf("the fleet is not running in this process")
+	}
+	res, err := fleet.Dispatch(ctx, fleetservice.DispatchRequest{
+		AgentName: spec.AgentName, Intent: spec.Intent, HITLPolicyName: spec.HITLPolicyName, ParentSessionID: spec.ParentSessionID,
+	})
+	if err != nil {
+		return missiontools.SubagentHandle{}, err
+	}
+	return missiontools.SubagentHandle{MissionID: res.MissionID}, nil
+}
+
+func subagentDefaults(db libdb.DBManager) missiontools.SubagentDefaults {
+	return func(ctx context.Context) (string, string) {
+		store := runtimetypes.New(db.WithoutTransaction())
+		return strings.TrimSpace(clikv.Read(ctx, store, "default-mission-agent")),
+			strings.TrimSpace(clikv.Read(ctx, store, "default-mission-policy"))
+	}
 }

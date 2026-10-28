@@ -3,12 +3,12 @@
 # top-level subcommands and exits cleanly. Invoked by `make test-contenox-help`.
 #
 # Usage:
-#   CONTENOX_BIN=./bin/contenox ./scripts/verify_cli_help.sh
+#   CONTENOX_BIN=./bin/contenox-runtime ./scripts/verify_cli_help.sh
 #
 # The Makefile sets CONTENOX_BIN before calling this script.
 set -euo pipefail
 
-BIN="${CONTENOX_BIN:-./bin/contenox}"
+BIN="${CONTENOX_BIN:-./bin/contenox-runtime}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "ERROR: binary not found or not executable: $BIN" >&2

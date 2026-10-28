@@ -3,10 +3,9 @@ package statetype
 import (
 	"strings"
 
+	ollama "github.com/contenox/runtime/runtime/modelrepo/ollama"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
-	"github.com/ollama/ollama/api"
-	ollamamodel "github.com/ollama/ollama/types/model"
 )
 
 type BackendRuntimeState = runtimestate.BackendRuntimeState
@@ -15,16 +14,16 @@ type ModelPullStatus = runtimestate.ModelPullStatus
 
 type ModelDetails = runtimestate.ModelDetails
 
-func EnrichFromOllamaShow(m *ModelPullStatus, r *api.ShowResponse) {
+func EnrichFromOllamaShow(m *ModelPullStatus, r *ollama.ShowResponse) {
 	for _, cap := range r.Capabilities {
 		switch cap {
-		case ollamamodel.CapabilityCompletion:
+		case ollama.CapabilityCompletion:
 			m.CanChat = true
 			m.CanPrompt = true
 			m.CanStream = true
-		case ollamamodel.CapabilityEmbedding:
+		case ollama.CapabilityEmbedding:
 			m.CanEmbed = true
-		case ollamamodel.CapabilityTools:
+		case ollama.CapabilityTools:
 			m.CanChat = true
 		}
 	}
@@ -40,7 +39,7 @@ func EnrichFromOllamaShow(m *ModelPullStatus, r *api.ShowResponse) {
 	}
 }
 
-func ConvertOllamaModelResponse(model *api.ListModelResponse) *ModelPullStatus {
+func ConvertOllamaModelResponse(model *ollama.ListModelResponse) *ModelPullStatus {
 	list := &ModelPullStatus{
 		Name:       model.Name,
 		Model:      model.Model,

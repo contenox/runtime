@@ -50,6 +50,8 @@ func TestUnit_ProviderService_ConfiguresOpenAIWithEnvReference(t *testing.T) {
 	require.Equal(t, "https://api.openai.com/v1", backend.BaseURL)
 	require.Equal(t, "openai", clikv.Read(context.Background(), store, "default-provider"))
 	require.Equal(t, "gpt-5-mini", clikv.Read(context.Background(), store, "default-model"))
+	require.Equal(t, "chain-oracle-default.json", clikv.Read(context.Background(), store, "default-oracle-chain"))
+	require.Equal(t, "hitl-policy-oracle.json", clikv.Read(context.Background(), store, "default-oracle-policy"))
 }
 
 func TestUnit_ProviderService_RequiresSecretForOpenAI(t *testing.T) {
@@ -115,4 +117,78 @@ func TestUnit_ProviderService_ConfigureWritesTheConnectionCredential(t *testing.
 		runtimestate.BackendCredentialKey("openai", status.BackendID), &record))
 	require.Equal(t, runtimestate.CredentialStored, record.CredentialSource)
 	require.Equal(t, "sk-test", record.APIKey)
+}
+
+func TestUnit_ProviderService_SupportedProvidersIncludeDeepSeekAndCodex(t *testing.T) {
+	db := testSQLiteDB(t)
+	svc := providerservice.New(db, "workspace")
+
+	caps, err := svc.ListSupportedProviders(context.Background())
+	require.NoError(t, err)
+	byType := map[string]providerservice.ProviderCapability{}
+	for _, capability := range caps {
+		byType[capability.Provider] = capability
+	}
+
+	deepseek, ok := byType["deepseek"]
+	require.True(t, ok, "deepseek must be offered")
+	require.Equal(t, "https://api.deepseek.com", deepseek.DefaultBaseURL)
+	require.True(t, deepseek.RequiresSecretConfig)
+	require.Equal(t, "DEEPSEEK_API_KEY", deepseek.RecommendedAPIKeyEnv)
+
+	codex, ok := byType["openai-codex"]
+	require.True(t, ok, "the ChatGPT subscription must be offered")
+	require.True(t, codex.RequiresLogin)
+	require.False(t, codex.RequiresSecretConfig)
+	require.Equal(t, "https://chatgpt.com/backend-api/codex", codex.DefaultBaseURL)
+}
+
+func TestUnit_ProviderService_ConfiguresCodexWithFixedEndpointAndLoginState(t *testing.T) {
+	db := testSQLiteDB(t)
+	svc := providerservice.New(db, "workspace")
+
+	status, err := svc.Configure(context.Background(), "openai-codex", providerservice.ConfigureProviderRequest{
+		Upsert:     true,
+		SetDefault: false,
+	})
+	require.NoError(t, err)
+	require.True(t, status.Configured)
+	require.Equal(t, "https://chatgpt.com/backend-api/codex", status.BaseURL)
+	require.Equal(t, "login_required", status.AuthState)
+	require.True(t, status.LoginRequired)
+	require.False(t, status.SecretConfigured)
+
+	backend, err := runtimetypes.New(db.WithoutTransaction()).GetBackendByName(context.Background(), "openai-codex")
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/backend-api/codex", backend.BaseURL)
+}
+
+func TestUnit_ProviderService_CodexRefusesAPIKey(t *testing.T) {
+	db := testSQLiteDB(t)
+	svc := providerservice.New(db, "workspace")
+
+	_, err := svc.Configure(context.Background(), "openai-codex", providerservice.ConfigureProviderRequest{
+		APIKey: "sk-not-used",
+		Upsert: true,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "device code")
+}
+
+func TestUnit_ProviderService_LoginStatusReportsNotConfigured(t *testing.T) {
+	db := testSQLiteDB(t)
+	svc := providerservice.New(db, "workspace")
+
+	status, err := svc.LoginStatus(context.Background(), "openai-codex")
+	require.NoError(t, err)
+	require.Equal(t, "not_configured", status.State)
+}
+
+func TestUnit_ProviderService_StartLoginRefusesAPIKeyProviders(t *testing.T) {
+	db := testSQLiteDB(t)
+	svc := providerservice.New(db, "workspace")
+
+	_, err := svc.StartLogin(context.Background(), "openai")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "does not use a subscription sign-in")
 }

@@ -26,7 +26,7 @@ without restarting serve. Do not store secrets here.
   contenox shell-env list
   contenox shell-env unset HTTP_PROXY
 
-To see what the scrub itself keeps or strips, use 'contenox sandbox env'.`,
+To see what the scrub itself keeps or strips, use 'contenox-runtime sandbox env'.`,
 }
 
 var shellEnvSetCmd = &cobra.Command{

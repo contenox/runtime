@@ -1,6 +1,35 @@
 {
+  "compute": {
+    "maxToolCalls": 300,
+    "maxTokens": 2000000,
+    "onExhausted": "finish_stuck"
+  },
   "default_action": "approve",
   "rules": [
+    {
+      "tools": "local_fs",
+      "tool": "write_file",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "{**/.git/**,.git/**}"
+        }
+      ]
+    },
+    {
+      "tools": "local_fs",
+      "tool": "sed",
+      "action": "deny",
+      "when": [
+        {
+          "key": "path",
+          "op": "glob",
+          "value": "{**/.git/**,.git/**}"
+        }
+      ]
+    },
     {
       "tools": "local_fs",
       "tool": "*",

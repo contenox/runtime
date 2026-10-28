@@ -110,7 +110,7 @@ var toolsListCmd = &cobra.Command{
 	Short: "List all registered remote tool providers.",
 	Long: `List every registered remote tool provider as a table of name, endpoint URL,
 and request timeout. If none are registered, prints a hint to run
-'contenox tools add'.`,
+'contenox-runtime tools add'.`,
 	Args: cobra.NoArgs,
 	RunE: runToolsList,
 }
@@ -321,7 +321,7 @@ func runToolsAdd(cmd *cobra.Command, args []string) error {
 	defer db.Close()
 
 	if _, err := svc.GetByName(ctx, name); err == nil {
-		return fmt.Errorf("tools %q already exists; use 'contenox tools update' to modify it", name)
+		return fmt.Errorf("tools %q already exists; use 'contenox-runtime tools update' to modify it", name)
 	}
 
 	toolCount := probeTools(url, resolvedSpec)

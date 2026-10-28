@@ -47,10 +47,14 @@ type AttentionAsker interface {
 }
 
 type provider struct {
-	missions   MissionStore
-	asker      AttentionAsker
-	supervisor SupervisorStore
-	resolver   AttentionResolver
+	missions         MissionStore
+	asker            AttentionAsker
+	supervisor       SupervisorStore
+	resolver         AttentionResolver
+	spawner          Spawner
+	watcher          SubagentWatcher
+	subagentDefaults SubagentDefaults
+	subagentTimeout  time.Duration
 }
 
 type Option func(*provider)
@@ -93,8 +97,15 @@ func (p *provider) GetToolsForToolsByName(ctx context.Context, name string) ([]t
 			finishToolSchema(),
 		}, nil
 	}
-	if p.supervisor != nil && p.resolver != nil && ParentSessionIDFromContext(ctx) != "" {
-		return supervisorTools(), nil
+	if ParentSessionIDFromContext(ctx) != "" {
+		tools := []taskengine.Tool{}
+		if p.supervisor != nil && p.resolver != nil {
+			tools = append(tools, supervisorTools()...)
+		}
+		if p.canSpawn() {
+			tools = append(tools, startMissionToolSchema())
+		}
+		return tools, nil
 	}
 	return []taskengine.Tool{}, nil
 }
@@ -113,6 +124,12 @@ func (p *provider) Exec(ctx context.Context, _ time.Time, input any, _ bool, cal
 			return p.execListMissions(ctx, parentSessionID)
 		}
 		return p.execAnswer(ctx, parentSessionID, input, call)
+	case ToolNameStartMission:
+		parentSessionID := ParentSessionIDFromContext(ctx)
+		if parentSessionID == "" {
+			return nil, taskengine.DataTypeAny, fmt.Errorf("missiontools: %s is only available to a session that fired missions", call.ToolName)
+		}
+		return p.execStartMission(ctx, parentSessionID, input, call)
 	}
 	missionID := MissionIDFromContext(ctx)
 	if missionID == "" {

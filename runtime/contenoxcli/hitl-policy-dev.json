@@ -1,4 +1,9 @@
 {
+  "compute": {
+    "maxToolCalls": 500,
+    "maxTokens": 4000000,
+    "onExhausted": "finish_stuck"
+  },
   "default_action": "allow",
   "rules": [
     {

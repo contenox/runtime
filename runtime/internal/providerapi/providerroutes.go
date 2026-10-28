@@ -18,6 +18,9 @@ func AddProviderRoutes(mux *http.ServeMux, providerService providerservice.Servi
 	mux.HandleFunc("GET /providers/{providerType}/config", p.get)
 	mux.HandleFunc("GET /providers/configs", p.listConfigs)
 	mux.HandleFunc("GET /providers/supported", p.supported)
+	mux.HandleFunc("POST /providers/{providerType}/login", p.startLogin)
+	mux.HandleFunc("GET /providers/{providerType}/login", p.loginStatus)
+	mux.HandleFunc("DELETE /providers/{providerType}/login", p.logout)
 }
 
 type providerManager struct {
@@ -139,4 +142,45 @@ func (p *providerManager) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = apiframework.Encode(w, r, http.StatusOK, config)
+}
+
+func (p *providerManager) startLogin(w http.ResponseWriter, r *http.Request) {
+	providerType := apiframework.GetPathParam(r, "providerType", "Provider type to sign in to.")
+	if providerType == "" {
+		_ = apiframework.Error(w, r, errors.New("providerType is required in path"), apiframework.CreateOperation)
+		return
+	}
+	start, err := p.providerService.StartLogin(r.Context(), providerType)
+	if err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
+		return
+	}
+	_ = apiframework.Encode(w, r, http.StatusOK, start)
+}
+
+func (p *providerManager) loginStatus(w http.ResponseWriter, r *http.Request) {
+	providerType := apiframework.GetPathParam(r, "providerType", "Provider type to inspect.")
+	if providerType == "" {
+		_ = apiframework.Error(w, r, errors.New("providerType is required in path"), apiframework.GetOperation)
+		return
+	}
+	status, err := p.providerService.LoginStatus(r.Context(), providerType)
+	if err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
+		return
+	}
+	_ = apiframework.Encode(w, r, http.StatusOK, status)
+}
+
+func (p *providerManager) logout(w http.ResponseWriter, r *http.Request) {
+	providerType := apiframework.GetPathParam(r, "providerType", "Provider type to sign out of.")
+	if providerType == "" {
+		_ = apiframework.Error(w, r, errors.New("providerType is required in path"), apiframework.DeleteOperation)
+		return
+	}
+	if err := p.providerService.Logout(r.Context(), providerType); err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.DeleteOperation)
+		return
+	}
+	_ = apiframework.Encode(w, r, http.StatusOK, "signed out")
 }

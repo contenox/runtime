@@ -73,6 +73,21 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		return libacp.PromptResponse{}, err
 	}
 
+	if goal, ok := parsePlanCommand(input); ok {
+		if !t.hasMissionCapability() {
+			err := planPreambleForMissingFleet()
+			reportErr(err)
+			return libacp.PromptResponse{}, err
+		}
+		if goal == "" {
+			reportChange(string(req.SessionID), map[string]any{"stop_reason": string(libacp.StopReasonEndTurn), "command": planCommandName})
+			t.sendUpdate(ctx, libacp.SessionNotification{SessionID: req.SessionID, Update: libacp.NewAgentMessageChunk(planUsageLine)})
+			t.persistCommandTurn(ctx, sess, planCommandName, "", planUsageLine)
+			return libacp.PromptResponse{StopReason: libacp.StopReasonEndTurn}, nil
+		}
+		input = planPreamble(goal)
+	}
+
 	if name, args, ok := parseCommand(input); ok {
 		cmdCtx := libtracker.WithNewRequestID(ctx)
 		return t.dispatchCommand(cmdCtx, req.SessionID, sess, name, args)

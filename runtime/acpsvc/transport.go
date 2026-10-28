@@ -201,6 +201,8 @@ func New(deps Deps) libacp.AgentFactory {
 		go func() {
 			<-conn.Closed()
 			connCancel()
+			t.releaseSessionRouting()
+			t.unsubscribeAllTerminals()
 		}()
 		return t
 	}
@@ -400,6 +402,20 @@ func (t *Transport) bindContenoxSession(contenoxSessionID string, sid libacp.Ses
 func (t *Transport) unbindContenoxSession(contenoxSessionID string) {
 	delete(t.contenoxToACPID, contenoxSessionID)
 	t.deps.SessionRouter.unbind(contenoxSessionID, t)
+}
+
+func (t *Transport) releaseSessionRouting() {
+	if t.deps.SessionRouter == nil {
+		return
+	}
+	t.sessionMu.Lock()
+	defer t.sessionMu.Unlock()
+	for _, e := range t.sessions {
+		t.deps.SessionRouter.unbind(e.InternalSessionID, t)
+	}
+	for contenoxSessionID := range t.contenoxToACPID {
+		t.deps.SessionRouter.unbind(contenoxSessionID, t)
+	}
 }
 
 func (t *Transport) registerPromptCancel(sid libacp.SessionID, cancel context.CancelFunc) *inflightPrompt {

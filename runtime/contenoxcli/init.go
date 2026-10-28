@@ -42,9 +42,14 @@ var initFIMChain string
 //go:embed agent-planner.json
 var initPlannerChain string
 
+//go:embed chain-oracle-default.json
+var initOracleChain string
+
 var blessedChainHashes = map[string][]string{}
 
 const headlessACPChainFilename = "headless-acp-chain.json"
+
+const chainOracleDefaultFilename = "chain-oracle-default.json"
 
 func seedHeadlessACPChainIfMissing(contenoxDir string) error {
 	dst := filepath.Join(contenoxDir, headlessACPChainFilename)
@@ -217,6 +222,9 @@ func RunGlobalInit(out io.Writer) error {
 	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
 		return err
 	}
+	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
+		return err
+	}
 	if err := writeEmbeddedHITLPolicies(homeDir, false); err != nil {
 		return err
 	}
@@ -323,6 +331,9 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		return err
 	}
 	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
+		return err
+	}
+	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
 		return err
 	}
 	if err := writeEmbeddedHITLPolicies(homeDir, force); err != nil {
@@ -532,6 +543,6 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	fmt.Fprintln(out, "  To enable shell and filesystem tools pass --shell to any command, e.g.:")
 	fmt.Fprintln(out, "       contenox --shell \"run the tests\"")
 	fmt.Fprintln(out, "")
-	fmt.Fprintln(out, "  Run 'contenox --help' for full usage.")
+	fmt.Fprintln(out, "  Run 'contenox-runtime --help' for full usage.")
 	return nil
 }

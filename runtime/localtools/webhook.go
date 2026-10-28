@@ -33,7 +33,7 @@ func NewWebCaller(tracker libtracker.ActivityTracker, options ...WebtoolsOption)
 		tracker = libtracker.NoopTracker{}
 	}
 	wh := &WebCaller{
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: newContainedWebClient(30 * time.Second),
 		defaultHeaders: map[string]string{
 			"Content-Type": "application/json",
 			"Accept":       "application/json",
@@ -118,6 +118,10 @@ func (h *WebCaller) validateURL(args map[string]string, raw string) (*url.URL, s
 	host := u.Hostname()
 	if host == "" {
 		return nil, "webtools: URL must include a host", true, nil
+	}
+
+	if ip := net.ParseIP(host); ip != nil && isBlockedEgressIP(ip) {
+		return nil, fmt.Sprintf("webtools: host %q is a link-local / cloud-metadata address, which is never reachable", host), true, nil
 	}
 	denied := h.policyCSV(args, "_denied_hosts", "")
 	if hostMatches(host, denied) {
@@ -313,10 +317,20 @@ func (h *WebCaller) doRequest(ctx context.Context, method, toolName string, inpu
 
 	client := *h.client
 	client.Timeout = time.Duration(timeoutSec) * time.Second
-	if disallowRedirects {
-		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if disallowRedirects {
 			return http.ErrUseLastResponse
 		}
+		if len(via) >= 10 {
+			return fmt.Errorf("%w: stopped after 10 redirects", errRedirectBlocked)
+		}
+		if _, denial, denied, verr := h.validateURL(policy, req.URL.String()); verr != nil {
+			return fmt.Errorf("%w: %v", errRedirectBlocked, verr)
+		} else if denied {
+			return fmt.Errorf("%w: %s", errRedirectBlocked, denial)
+		}
+		return nil
 	}
 
 	var (
@@ -351,6 +365,11 @@ func (h *WebCaller) doRequest(ctx context.Context, method, toolName string, inpu
 
 		resp, doErr := client.Do(req)
 		if doErr != nil {
+
+			if errors.Is(doErr, errRedirectBlocked) || errors.Is(doErr, errEgressBlocked) {
+				reportErr(doErr)
+				return nil, taskengine.DataTypeAny, doErr
+			}
 			if attempt < maxAttempts {
 				time.Sleep(jitter(backoff))
 				backoff = nextBackoff(backoff, maxBackoff)

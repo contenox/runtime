@@ -2,6 +2,7 @@ package contenoxcli
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -82,4 +83,41 @@ func TestUnit_WorkspaceREST_AddControlPlaneRefused(t *testing.T) {
 	assert.Contains(t, strings.ToLower(err.Error()), "control plane")
 
 	assert.Empty(t, workspacegrants.ReadGrants(ctx, store), "a refused grant must not be persisted")
+}
+
+func TestUnit_BuildEngine_RegistersControlPlaneDenylist(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	_ = vfs.SetControlPlaneDenied()
+	t.Cleanup(func() { _ = vfs.SetControlPlaneDenied() })
+
+	workspace := t.TempDir()
+	contenoxDir := filepath.Join(workspace, ".contenox")
+	require.NoError(t, os.MkdirAll(contenoxDir, 0o700))
+	policy := filepath.Join(contenoxDir, "hitl-policy-default.json")
+	require.NoError(t, os.WriteFile(policy, []byte("{}"), 0o600))
+
+	_, err := vfs.Contain(workspace, policy)
+	require.NoError(t, err, "precondition: nothing is denied before the engine is built")
+
+	ctx := context.Background()
+	db, err := OpenDBAt(ctx, filepath.Join(t.TempDir(), "engine.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	engine, err := BuildEngine(ctx, db, chatOpts{
+		ContenoxDir:                  contenoxDir,
+		EffectiveDefaultModel:        "test-model",
+		EffectiveDefaultProvider:     "ollama",
+		EffectiveLocalExecAllowedDir: workspace,
+		EffectiveSkipBackendCycle:    true,
+	})
+	require.NoError(t, err)
+	t.Cleanup(engine.Stop)
+
+	_, err = vfs.Contain(workspace, policy)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, vfs.ErrControlPlane), "the non-serve engine path must arm the control-plane denylist, got %v", err)
+
+	_, err = vfs.Contain(workspace, "src/main.go")
+	require.NoError(t, err, "the rest of the workspace stays reachable")
 }

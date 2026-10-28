@@ -269,15 +269,18 @@ func TestUnit_AcpCommands_WithoutMissionCapability_ExcludesMission(t *testing.T)
 	if containsCommand(cmds, "mission") {
 		t.Fatalf("mission advertised without capability: %v", commandNames(cmds))
 	}
+	if containsCommand(cmds, planCommandName) {
+		t.Fatalf("/plan advertised without capability: %v", commandNames(cmds))
+	}
 	for _, c := range allACPCommands() {
-		if c.Name == "mission" {
+		if c.Name == "mission" || c.Name == planCommandName {
 			continue
 		}
 		if !containsCommand(cmds, c.Name) {
 			t.Fatalf("advertised commands missing %q: %v", c.Name, commandNames(cmds))
 		}
 	}
-	if want := len(allACPCommands()) - 1; len(cmds) != want {
+	if want := len(allACPCommands()) - 2; len(cmds) != want {
 		t.Fatalf("advertised %d commands, want %d (full set minus mission): %v", len(cmds), want, commandNames(cmds))
 	}
 }

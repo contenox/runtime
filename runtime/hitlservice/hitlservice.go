@@ -61,6 +61,7 @@ type approvalStore interface {
 	CreateHITLApproval(ctx context.Context, a *runtimetypes.HITLApproval) error
 	GetHITLApproval(ctx context.Context, id string) (*runtimetypes.HITLApproval, error)
 	ResolveHITLApproval(ctx context.Context, id string, state runtimetypes.HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error
+	ResolveHITLApprovalWithinBound(ctx context.Context, id string, bound runtimetypes.AgentAnswerBound, state runtimetypes.HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error
 	ListExpiredHITLApprovals(ctx context.Context, asOf time.Time, limit int) ([]*runtimetypes.HITLApproval, error)
 	ListHITLApprovals(ctx context.Context, state runtimetypes.HITLApprovalState, createdAtCursor *time.Time, limit int) ([]*runtimetypes.HITLApproval, error)
 	ListHITLApprovalsForMission(ctx context.Context, missionID string, limit int) ([]*runtimetypes.HITLApproval, error)
@@ -110,6 +111,7 @@ type service struct {
 
 	mu              sync.Mutex
 	pending         map[string]chan answer
+	adjudicator     Adjudicator
 	approvalCeiling time.Duration
 }
 
@@ -277,6 +279,7 @@ func (s *service) RequestApproval(ctx context.Context, req ApprovalRequest, sink
 	s.mu.Lock()
 	s.pending[approvalID] = ch
 	s.mu.Unlock()
+	s.offerAdjudication(ctx, adjudicationFromApprovalRequest(approvalID, req))
 	defer func() {
 		s.mu.Lock()
 		delete(s.pending, approvalID)
@@ -407,6 +410,8 @@ type approvalResolution struct {
 	Approved   *bool   `json:"approved,omitempty"`
 	Answer     *string `json:"answer,omitempty"`
 	AnsweredBy *string `json:"answeredBy,omitempty"`
+	DecidedBy  *string `json:"decidedBy,omitempty"`
+	Guidance   *string `json:"guidance,omitempty"`
 }
 
 type answer struct {

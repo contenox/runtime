@@ -106,6 +106,9 @@ func (t *Transport) resolveMissionAgentAndIntent(ctx context.Context, store runt
 }
 
 func (t *Transport) DeliverToContenoxSession(ctx context.Context, contenoxSessionID string, n libacp.SessionNotification) error {
+	if err := validateMissionReport(n); err != nil {
+		return err
+	}
 	sid, ok := t.acpSessionForContenoxID(contenoxSessionID)
 	if !ok {
 		return ErrSessionNotLive
@@ -116,8 +119,18 @@ func (t *Transport) DeliverToContenoxSession(ctx context.Context, contenoxSessio
 	return nil
 }
 
+func validateMissionReport(n libacp.SessionNotification) error {
+	if n.Update.SessionUpdate != libacp.SessionUpdateAgentMessageChunk || n.Update.Content == nil || n.Update.Content.Type != string(libacp.ContentKindText) {
+		return errors.New("acpsvc: mission report must contain a text agent message")
+	}
+	if strings.TrimSpace(n.Update.Content.Text) == "" {
+		return errors.New("acpsvc: mission report text is empty")
+	}
+	return nil
+}
+
 func (t *Transport) persistDeliveredReport(ctx context.Context, contenoxSessionID string, n libacp.SessionNotification) {
-	if t.deps.DB == nil || contenoxSessionID == "" {
+	if t.deps.DB == nil || contenoxSessionID == "" || n.Update.Content == nil {
 		return
 	}
 	text := strings.TrimSpace(n.Update.Content.Text)
