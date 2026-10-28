@@ -3,6 +3,7 @@ package acpsvc
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime/libacp"
@@ -66,8 +67,34 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		return libacp.PromptResponse{}, err
 	}
 
-	input, droppedContentKinds := libacp.FlattenContent(req.Prompt)
-	if input == "" {
+	// Extracted before FlattenContent, whose text projection would drop them.
+	images, nonImageBlocks := extractImageParts(req.Prompt)
+	audio, textBlocks := extractAudioParts(nonImageBlocks)
+	input, droppedContentKinds := libacp.FlattenContent(textBlocks)
+
+	droppedWhy := droppedReasons{}
+	if len(images) > 0 {
+		if reason := t.sessionImageRefusal(ctx, sess); reason != "" {
+			droppedWhy[string(libacp.ContentKindImage)] = reason
+			images = nil
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindImage))
+		}
+	}
+	if len(audio) > 0 {
+		if reason := t.sessionAudioRefusal(ctx, sess); reason != "" {
+			droppedWhy[string(libacp.ContentKindAudio)] = reason
+			audio = nil
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindAudio))
+		}
+	}
+
+	if input == "" && len(images) == 0 && len(audio) == 0 {
+		if len(droppedWhy) > 0 {
+			announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
+			err := libacp.NewError(libacp.ErrInvalidParams, strings.TrimSpace(droppedWhy[string(libacp.ContentKindImage)]+" "+droppedWhy[string(libacp.ContentKindAudio)]))
+			reportErr(err)
+			return libacp.PromptResponse{}, err
+		}
 		err := libacp.NewError(libacp.ErrInvalidParams, "empty prompt")
 		reportErr(err)
 		return libacp.PromptResponse{}, err
@@ -89,13 +116,27 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 	}
 
 	if name, args, ok := parseCommand(input); ok {
+		// A command handler returns text and cannot take attachments.
+		if len(images) > 0 {
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindImage))
+		}
+		if len(audio) > 0 {
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindAudio))
+		}
 		cmdCtx := libtracker.WithNewRequestID(ctx)
-		return t.dispatchCommand(cmdCtx, req.SessionID, sess, name, args)
+		announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
+		resp, err := t.dispatchCommand(cmdCtx, req.SessionID, sess, name, args)
+		if err != nil {
+			return resp, err
+		}
+		return withDroppedContentMeta(resp, droppedContentKinds, droppedWhy), nil
 	}
 
 	if t.deps.NativeTurns != nil {
-		return d.promptViaRegistry(ctx, req, sess, input, droppedContentKinds)
+		return d.promptViaRegistry(ctx, req, sess, input, images, audio, droppedWhy, droppedContentKinds)
 	}
+
+	announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
 
 	promptCtx := libtracker.WithNewRequestID(ctx)
 	reqID, _ := promptCtx.Value(libtracker.ContextKeyRequestID).(string)
@@ -184,6 +225,8 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 	resp, err := d.agent.Prompt(promptCtx, agentservice.PromptRequest{
 		SessionID:      sess.InternalSessionID,
 		Input:          input,
+		Images:         images,
+		Audio:          audio,
 		Chain:          t.deps.ChainRegistry.Default(),
 		TemplateVars:   templateVars,
 		ToolsAllowlist: toolsAllowlist,
@@ -229,7 +272,7 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		"request_id":            reqID,
 		"dropped_content_kinds": droppedContentKinds,
 	})
-	return libacp.PromptResponse{StopReason: stopReason}, nil
+	return withDroppedContentMeta(libacp.PromptResponse{StopReason: stopReason}, droppedContentKinds, droppedWhy), nil
 }
 
 func mapStopReason(r agentservice.StopReason) libacp.StopReason {

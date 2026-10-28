@@ -343,4 +343,6 @@ func ExampleSessionConfigOptionValue() {
 	_ = json.Unmarshal([]byte(`{"sessionId":"s","configId":"c","type":"boolean","value":true}`), &req)
 	fmt.Println(req.Value.AsString(), req.Value.IsBool)
 	// Output:
+	// model-x false
+	// true true
 }

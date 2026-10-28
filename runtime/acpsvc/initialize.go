@@ -52,11 +52,7 @@ func (t *Transport) Initialize(ctx context.Context, req libacp.InitializeRequest
 		},
 		AgentCapabilities: libacp.AgentCapabilities{
 			LoadSession: true,
-			PromptCapabilities: libacp.PromptCapabilities{
-				Image:           false,
-				Audio:           false,
-				EmbeddedContext: true,
-			},
+			PromptCapabilities: t.catalogPromptCapabilities(ctx),
 			McpCapabilities: libacp.McpCapabilities{
 				HTTP: true,
 				SSE:  false,

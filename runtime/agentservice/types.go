@@ -9,8 +9,11 @@ import (
 )
 
 type PromptRequest struct {
-	SessionID      string
-	Input          string
+	SessionID string
+	Input     string
+	// Images and Audio are attachments riding this turn's user message.
+	Images         []taskengine.ImagePart
+	Audio          []taskengine.AudioPart
 	InputType      taskengine.DataType
 	InputValue     any
 	Chain          *taskengine.TaskChainDefinition

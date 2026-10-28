@@ -120,13 +120,13 @@ func (tr *nativeEventTranslator) publish(ctx context.Context, sid libacp.Session
 	}
 }
 
-func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, droppedContentKinds []string) (libacp.PromptResponse, error) {
+func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, images []taskengine.ImagePart, audio []taskengine.AudioPart, droppedWhy droppedReasons, droppedContentKinds []string) (libacp.PromptResponse, error) {
 	t := d.t
 	_ = ctx
 
 	viewer := newNativeTurnViewer(t, req.SessionID)
 	turnFn := func(turnCtx context.Context, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
-		return d.runNativeTurn(turnCtx, req, sess, input, droppedContentKinds, emit)
+		return d.runNativeTurn(turnCtx, req, sess, input, images, audio, droppedWhy, droppedContentKinds, emit)
 	}
 
 	turn, _, err := t.deps.NativeTurns.Start(req.SessionID, turnFn, viewer)
@@ -137,7 +137,8 @@ func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptR
 	select {
 	case <-turn.Done():
 		turn.Detach(viewer.ID())
-		return nativeResultToResponse(turn.Result())
+		resp, err := nativeResultToResponse(turn.Result())
+		return withDroppedContentMeta(resp, droppedContentKinds, droppedWhy), err
 	case <-t.connCtx.Done():
 		turn.Detach(viewer.ID())
 		return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil
@@ -151,7 +152,7 @@ func nativeResultToResponse(res nativeturn.Result) (libacp.PromptResponse, error
 	return libacp.PromptResponse{StopReason: res.StopReason}, nil
 }
 
-func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, droppedContentKinds []string, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
+func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, images []taskengine.ImagePart, audio []taskengine.AudioPart, droppedWhy droppedReasons, droppedContentKinds []string, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
 	t := d.t
 
 	turnCtx = libtracker.WithNewRequestID(turnCtx)
@@ -160,6 +161,9 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	reportErr, reportChange, end := t.tracker().Start(turnCtx, "prompt", "acp_session",
 		"session_id", string(req.SessionID), "prompt_blocks", len(req.Prompt))
 	defer end()
+
+	// Journaled ahead of anything the turn produces.
+	announceDroppedContent(turnCtx, req.SessionID, droppedContentKinds, droppedWhy, emit)
 
 	if policyName := t.resolveSessionHITLPolicy(sess); policyName != "" {
 		turnCtx = hitlservice.WithPolicyName(turnCtx, policyName)
@@ -244,6 +248,8 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	resp, err := d.agent.Prompt(turnCtx, agentservice.PromptRequest{
 		SessionID:      sess.InternalSessionID,
 		Input:          input,
+		Images:         images,
+		Audio:          audio,
 		Chain:          t.deps.ChainRegistry.Default(),
 		TemplateVars:   templateVars,
 		ToolsAllowlist: toolsAllowlist,
