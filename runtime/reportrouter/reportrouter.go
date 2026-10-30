@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/contenox/runtime/libacp"
 	libbus "github.com/contenox/runtime/libbus"
@@ -22,6 +23,13 @@ type InboxWriter interface {
 	Add(ctx context.Context, item *operatorinbox.Item) error
 }
 
+type DeliveryMarker interface {
+	MarkDelivered(ctx context.Context, missionID, reportID string) error
+	WasDelivered(ctx context.Context, missionID, reportID string) (bool, error)
+}
+
+const DefaultParentGoneGrace = 3 * time.Second
+
 type Subscriber interface {
 	Stream(ctx context.Context, subject string, ch chan<- []byte) (libbus.Subscription, error)
 }
@@ -32,6 +40,9 @@ type Deps struct {
 	Inbox           InboxWriter
 	Tracker         libtracker.ActivityTracker
 	AgentSupervisor AgentSupervisor
+	Marker          DeliveryMarker
+	// ParentGoneGrace: 0 means DefaultParentGoneGrace; negative means no wait.
+	ParentGoneGrace time.Duration
 }
 
 type AgentSupervisor interface {
@@ -40,6 +51,7 @@ type AgentSupervisor interface {
 
 type Router struct {
 	deps Deps
+	bg   sync.WaitGroup
 }
 
 func New(deps Deps) (*Router, error) {
@@ -54,6 +66,14 @@ func New(deps Deps) (*Router, error) {
 	}
 	if deps.Tracker == nil {
 		deps.Tracker = libtracker.NoopTracker{}
+	}
+	if deps.Marker == nil {
+		if m, ok := deps.Inbox.(DeliveryMarker); ok {
+			deps.Marker = m
+		}
+	}
+	if deps.ParentGoneGrace == 0 {
+		deps.ParentGoneGrace = DefaultParentGoneGrace
 	}
 	return &Router{deps: deps}, nil
 }
@@ -88,6 +108,7 @@ func (r *Router) Start(ctx context.Context) (func(), error) {
 		_ = sub.Unsubscribe()
 		_ = askSub.Unsubscribe()
 		wg.Wait()
+		r.bg.Wait()
 	}, nil
 }
 
@@ -222,12 +243,15 @@ func (r *Router) route(ctx context.Context, ev missionservice.ReportAddedEvent) 
 		n := buildReportNotification(ev)
 		if err := r.deps.Sessions.DeliverToSession(ctx, libacp.SessionID(ev.ParentSessionID), n); err == nil {
 			reportChange("routed", "session")
+			r.markDelivered(ctx, ev, reportErr)
 			return
 		}
-		reportChange("routed", "inbox_parent_gone")
-		if err := r.toInbox(ctx, ev, operatorinbox.ReasonParentGone); err != nil {
-			reportErr(err)
-		}
+		reportChange("routed", "inbox_parent_gone_pending")
+		r.bg.Add(1)
+		go func() {
+			defer r.bg.Done()
+			r.parentGone(ctx, ev)
+		}()
 		return
 	}
 
@@ -237,8 +261,46 @@ func (r *Router) route(ctx context.Context, ev missionservice.ReportAddedEvent) 
 	}
 }
 
+func (r *Router) markDelivered(ctx context.Context, ev missionservice.ReportAddedEvent, reportErr func(error)) {
+	if r.deps.Marker == nil || ev.Report.ID == "" {
+		return
+	}
+	if err := r.deps.Marker.MarkDelivered(ctx, ev.MissionID, ev.Report.ID); err != nil {
+		reportErr(fmt.Errorf("reportrouter: mark report delivered: %w", err))
+	}
+}
+
+func (r *Router) parentGone(ctx context.Context, ev missionservice.ReportAddedEvent) {
+	reportErr, reportChange, end := r.deps.Tracker.Start(ctx, "fleet", "route_report_parent_gone",
+		"mission_id", ev.MissionID, "report_id", ev.Report.ID)
+	defer end()
+	if r.deps.Marker != nil && ev.Report.ID != "" {
+		if g := r.deps.ParentGoneGrace; g > 0 {
+			t := time.NewTimer(g)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return
+			case <-t.C:
+			}
+		}
+		delivered, err := r.deps.Marker.WasDelivered(ctx, ev.MissionID, ev.Report.ID)
+		if err != nil {
+			reportErr(err)
+		} else if delivered {
+			reportChange("routed", "session_other_process")
+			return
+		}
+	}
+	reportChange("routed", "inbox_parent_gone")
+	if err := r.toInbox(ctx, ev, operatorinbox.ReasonParentGone); err != nil {
+		reportErr(err)
+	}
+}
+
 func (r *Router) toInbox(ctx context.Context, ev missionservice.ReportAddedEvent, reason operatorinbox.Reason) error {
 	item := &operatorinbox.Item{
+		ID:              stableItemID(ev),
 		MissionID:       ev.MissionID,
 		AgentName:       ev.AgentName,
 		Intent:          ev.Intent,
@@ -250,6 +312,13 @@ func (r *Router) toInbox(ctx context.Context, ev missionservice.ReportAddedEvent
 		return fmt.Errorf("reportrouter: write inbox item for mission %q: %w", ev.MissionID, err)
 	}
 	return nil
+}
+
+func stableItemID(ev missionservice.ReportAddedEvent) string {
+	if ev.Report.ID == "" {
+		return ""
+	}
+	return operatorinbox.ItemIDForReport(ev.MissionID, ev.Report.ID)
 }
 
 type reportUpdateMeta struct {

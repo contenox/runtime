@@ -11,6 +11,7 @@ import (
 	"github.com/contenox/runtime/runtime/acpsvc"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/reasoning"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -29,6 +30,47 @@ func configValueWithEnv(ctx context.Context, db libdb.DBManager, key, envKey str
 		return v
 	}
 	return acpsvc.ReadConfigValue(ctx, db, key)
+}
+
+// liveDefaultsResolver builds the acpsvc.Deps.LiveDefaults callback: it re-reads
+// the persisted default-* config on demand (the DB is shared by every runtime
+// process, so edits made via the HTTP API or another process are seen).
+// withEnv lets CONTENOX_DEFAULT_* env vars win (acp); pinned holds non-empty
+// values that must never be overridden (explicit CLI flags).
+func liveDefaultsResolver(db libdb.DBManager, withEnv bool, pinned acpsvc.LiveDefaults) func(context.Context) acpsvc.LiveDefaults {
+	return func(ctx context.Context) acpsvc.LiveDefaults {
+		get := func(key, envKey string) string {
+			if withEnv {
+				return configValueWithEnv(ctx, db, key, envKey)
+			}
+			return acpsvc.ReadConfigValue(ctx, db, key)
+		}
+		first := func(a, b string) string {
+			if a != "" {
+				return a
+			}
+			return b
+		}
+		d := acpsvc.LiveDefaults{
+			Model:       first(pinned.Model, get("default-model", envDefaultModel)),
+			Provider:    first(pinned.Provider, get("default-provider", envDefaultProvider)),
+			AltModel:    first(pinned.AltModel, get("default-alt-model", envDefaultAltModel)),
+			AltProvider: first(pinned.AltProvider, get("default-alt-provider", envDefaultAltProvider)),
+		}
+		if pinned.MaxTokens != "" {
+			d.MaxTokens = pinned.MaxTokens
+		} else if n, err := normalizeMaxTokensConfig(get("default-max-tokens", envDefaultMaxTokens)); err == nil {
+			d.MaxTokens = n
+		}
+		if pinned.Think != "" {
+			d.Think = pinned.Think
+		} else if v := get("default-think", envDefaultThink); v != "" {
+			if level, err := reasoning.Normalize(v); err == nil {
+				d.Think = level
+			}
+		}
+		return d
+	}
 }
 
 func acpEnvSetupVars() []libacp.AuthEnvVar {

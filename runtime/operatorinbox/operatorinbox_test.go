@@ -82,3 +82,22 @@ func TestUnit_Inbox_AddValidates(t *testing.T) {
 	require.Error(t, svc.Add(ctx, &Item{MissionID: "m1", Reason: "bogus"}), "reason must be a known value")
 	require.Error(t, svc.Add(ctx, nil))
 }
+
+func TestUnit_Inbox_AddWithSameIDIsIdempotentAndKeepsFirstWrite(t *testing.T) {
+	ctx, db := setupInboxDB(t)
+	svc := New(db)
+	id := ItemIDForReport("m1", "r1")
+
+	first := &Item{ID: id, MissionID: "m1", Reason: ReasonOperatorFired,
+		Report: missionservice.Report{ID: "r1", Summary: "done"}}
+	require.NoError(t, svc.Add(ctx, first))
+	second := &Item{ID: id, MissionID: "m1", Reason: ReasonParentGone,
+		Report: missionservice.Report{ID: "r1", Summary: "done"}}
+	require.NoError(t, svc.Add(ctx, second))
+
+	items, err := svc.List(ctx, 100)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, ReasonOperatorFired, items[0].Reason, "first write wins")
+	require.True(t, first.CreatedAt.Equal(items[0].CreatedAt), "CreatedAt not clobbered")
+}

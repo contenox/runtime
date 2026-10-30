@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	libacp "github.com/contenox/runtime/libacp"
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -29,8 +30,14 @@ type Deps struct {
 	DefaultAltProvider string
 	DefaultMaxTokens   string
 	DefaultThink       string
-	WorkspaceID        string
-	ContenoxDir        string
+
+	// LiveDefaults, when set, is consulted (TTL-cached) so defaults saved by
+	// another process or the HTTP API take effect without a restart. Non-empty
+	// fields override the static Default* values above, which remain the fallback.
+	LiveDefaults func(ctx context.Context) LiveDefaults
+
+	WorkspaceID string
+	ContenoxDir string
 
 	WorkspaceRoots *vfs.Factory
 
@@ -55,6 +62,20 @@ type Deps struct {
 
 	MissionForwarded *MissionForwardConfig
 }
+
+// LiveDefaults is a snapshot of the persisted default-* configuration.
+// Empty fields mean "not configured" and fall back to the startup values.
+type LiveDefaults struct {
+	Model       string
+	Provider    string
+	AltModel    string
+	AltProvider string
+	MaxTokens   string
+	Think       string
+}
+
+// defaultsTTL bounds how often the live defaults hit the DB.
+const defaultsTTL = 2 * time.Second
 
 type MissionForwardConfig struct {
 	Reachable func() bool
@@ -117,6 +138,7 @@ type Transport struct {
 	defaultAltProvider string
 	defaultMaxTokens   string
 	defaultThink       string
+	defaultsAt         time.Time
 
 	permMu      sync.Mutex
 	permPending map[string]struct{}
@@ -216,31 +238,83 @@ func (t *Transport) takeBanner() string {
 	return b
 }
 
+// refreshDefaults reloads the effective defaults from Deps.LiveDefaults at most
+// once per defaultsTTL. The DB config is the source of truth: /model and
+// /provider persist before updating memory, so a reload never loses them.
+func (t *Transport) refreshDefaults() {
+	if t.deps.LiveDefaults == nil {
+		return
+	}
+	t.cfgMu.Lock()
+	fresh := !t.defaultsAt.IsZero() && time.Since(t.defaultsAt) < defaultsTTL
+	if !fresh {
+		// Claim the refresh so concurrent callers don't stampede the DB.
+		t.defaultsAt = time.Now()
+	}
+	t.cfgMu.Unlock()
+	if fresh {
+		return
+	}
+	parent := t.connCtx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+	d := t.deps.LiveDefaults(ctx)
+	pick := func(live, static string) string {
+		if live != "" {
+			return live
+		}
+		return static
+	}
+	t.cfgMu.Lock()
+	defer t.cfgMu.Unlock()
+	t.defaultModel = pick(d.Model, t.deps.DefaultModel)
+	t.defaultProvider = pick(d.Provider, t.deps.DefaultProvider)
+	t.defaultAltModel = pick(d.AltModel, t.deps.DefaultAltModel)
+	t.defaultAltProvider = pick(d.AltProvider, t.deps.DefaultAltProvider)
+	t.defaultMaxTokens = pick(d.MaxTokens, t.deps.DefaultMaxTokens)
+	t.defaultThink = pick(d.Think, t.deps.DefaultThink)
+}
+
+// invalidateDefaults forces the next read to reload live defaults.
+func (t *Transport) invalidateDefaults() {
+	t.cfgMu.Lock()
+	t.defaultsAt = time.Time{}
+	t.cfgMu.Unlock()
+}
+
 func (t *Transport) model() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	return t.defaultModel
 }
 
 func (t *Transport) provider() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	return t.defaultProvider
 }
 
 func (t *Transport) altModel() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	return t.defaultAltModel
 }
 
 func (t *Transport) altProvider() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	return t.defaultAltProvider
 }
 
 func (t *Transport) maxTokens() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	return t.defaultMaxTokens
@@ -272,22 +346,26 @@ func (t *Transport) chainTemplateVars(sess *sessionEntry) map[string]string {
 func (t *Transport) setModel(v string) {
 	t.cfgMu.Lock()
 	t.defaultModel = v
+	t.defaultsAt = time.Time{}
 	t.cfgMu.Unlock()
 }
 
 func (t *Transport) setProvider(v string) {
 	t.cfgMu.Lock()
 	t.defaultProvider = v
+	t.defaultsAt = time.Time{}
 	t.cfgMu.Unlock()
 }
 
 func (t *Transport) setMaxTokens(v string) {
 	t.cfgMu.Lock()
 	t.defaultMaxTokens = v
+	t.defaultsAt = time.Time{}
 	t.cfgMu.Unlock()
 }
 
 func (t *Transport) thinkDefault() string {
+	t.refreshDefaults()
 	t.cfgMu.Lock()
 	defer t.cfgMu.Unlock()
 	if t.defaultThink == "" {

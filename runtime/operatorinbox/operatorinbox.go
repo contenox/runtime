@@ -3,6 +3,7 @@ package operatorinbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,7 +33,16 @@ type Item struct {
 	CreatedAt       time.Time             `json:"createdAt"`
 }
 
+func ItemIDForReport(missionID, reportID string) string {
+	return "report:" + missionID + ":" + reportID
+}
+
+const deliveredKVPrefix = "report-delivered:"
+
 type Service interface {
+	MarkDelivered(ctx context.Context, missionID, reportID string) error
+	WasDelivered(ctx context.Context, missionID, reportID string) (bool, error)
+
 	Add(ctx context.Context, item *Item) error
 
 	List(ctx context.Context, limit int) ([]*Item, error)
@@ -60,8 +70,19 @@ func (s *service) Add(ctx context.Context, item *Item) error {
 	if err := validateReason(item.Reason); err != nil {
 		return err
 	}
-	if item.ID == "" {
+	callerID := item.ID != ""
+	if !callerID {
 		item.ID = uuid.NewString()
+	}
+	if callerID {
+		var existing json.RawMessage
+		err := s.store().GetKV(ctx, inboxKVPrefix+item.ID, &existing)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, libdb.ErrNotFound) {
+			return fmt.Errorf("check inbox item %q: %w", item.ID, err)
+		}
 	}
 	if item.CreatedAt.IsZero() {
 		item.CreatedAt = time.Now().UTC()
@@ -99,4 +120,24 @@ func validateReason(r Reason) error {
 	default:
 		return fmt.Errorf("invalid inbox reason %q: must be one of operator_fired|parent_gone", r)
 	}
+}
+
+func (s *service) MarkDelivered(ctx context.Context, missionID, reportID string) error {
+	raw, err := json.Marshal(time.Now().UTC())
+	if err != nil {
+		return err
+	}
+	return s.store().SetKV(ctx, deliveredKVPrefix+missionID+":"+reportID, raw)
+}
+
+func (s *service) WasDelivered(ctx context.Context, missionID, reportID string) (bool, error) {
+	var v json.RawMessage
+	err := s.store().GetKV(ctx, deliveredKVPrefix+missionID+":"+reportID, &v)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, libdb.ErrNotFound) {
+		return false, nil
+	}
+	return false, err
 }

@@ -396,6 +396,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		DefaultAltProvider:    defaultAltProvider,
 		DefaultMaxTokens:      defaultMaxTokens,
 		DefaultThink:          defaultThink,
+		LiveDefaults:          liveDefaultsResolver(db, true, acpsvc.LiveDefaults{}),
 		WorkspaceID:           workspaceID,
 		ContenoxDir:           contenoxDir,
 		KnownPolicies:         embeddedPolicyNames(),

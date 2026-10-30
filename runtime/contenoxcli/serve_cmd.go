@@ -498,6 +498,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			DefaultAltProvider:    opts.EffectiveAltDefaultProvider,
 			DefaultMaxTokens:      opts.EffectiveMaxTokens,
 			DefaultThink:          opts.EffectiveThink,
+			LiveDefaults:          liveDefaultsResolver(db, false, servePinnedDefaults(cmd, opts)),
 			WorkspaceID:           workspaceID,
 			ContenoxDir:           contenoxDir,
 			WorkspaceRoots:        workspaceFactory,
@@ -762,4 +763,30 @@ func discoverChainAgents(ctx context.Context, agents agentregistryservice.Servic
 			"disabled", res.Disabled, "skipped_name_taken", res.Skipped,
 			"unchanged", len(res.Unchanged))
 	}
+}
+
+// servePinnedDefaults returns the defaults explicitly set via CLI flags; those
+// stay fixed for the process lifetime while everything else tracks the DB.
+func servePinnedDefaults(cmd *cobra.Command, opts chatOpts) acpsvc.LiveDefaults {
+	var p acpsvc.LiveDefaults
+	changed := cmd.Flags().Changed
+	if changed("model") {
+		p.Model = opts.EffectiveDefaultModel
+	}
+	if changed("provider") {
+		p.Provider = opts.EffectiveDefaultProvider
+	}
+	if changed("alt-model") {
+		p.AltModel = opts.EffectiveAltDefaultModel
+	}
+	if changed("alt-provider") {
+		p.AltProvider = opts.EffectiveAltDefaultProvider
+	}
+	if changed("max-tokens") {
+		p.MaxTokens = opts.EffectiveMaxTokens
+	}
+	if changed("think") {
+		p.Think = opts.EffectiveThink
+	}
+	return p
 }

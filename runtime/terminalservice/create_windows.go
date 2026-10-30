@@ -135,7 +135,8 @@ func startWindowsPseudoConsole(shell, cwd string, cols, rows int) (windowsConPTY
 	defer attributes.Delete()
 	if err := attributes.Update(
 		windows.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-		unsafe.Pointer(&pseudoConsole),
+		// The attribute value is the HPCON itself, not a pointer to it.
+		*(*unsafe.Pointer)(unsafe.Pointer(&pseudoConsole)),
 		unsafe.Sizeof(pseudoConsole),
 	); err != nil {
 		return windowsConPTY{}, nil, nil, fmt.Errorf("terminalservice: conpty attribute update: %w", err)
@@ -143,7 +144,8 @@ func startWindowsPseudoConsole(shell, cwd string, cols, rows int) (windowsConPTY
 
 	startupInfo := windows.StartupInfoEx{
 		StartupInfo: windows.StartupInfo{
-			Cb: uint32(unsafe.Sizeof(windows.StartupInfoEx{})),
+			Cb:    uint32(unsafe.Sizeof(windows.StartupInfoEx{})),
+			Flags: windows.STARTF_USESTDHANDLES, // nil std handles: bind to the pseudoconsole, not our stdio
 		},
 		ProcThreadAttributeList: attributes.List(),
 	}

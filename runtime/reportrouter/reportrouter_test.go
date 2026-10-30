@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/operatorinbox"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,6 +87,7 @@ func TestUnit_Route_ParentSessionDelivered(t *testing.T) {
 	r := newTestRouter(t, del, inbox)
 
 	r.route(context.Background(), resultEvent("parent-42"))
+	r.bg.Wait()
 
 	require.Equal(t, 1, del.count(), "the report is delivered to the parent session")
 	require.Equal(t, libacp.SessionID("parent-42"), del.sessions[0])
@@ -111,6 +114,7 @@ func TestUnit_Route_ParentGoneFallsBackToInbox(t *testing.T) {
 	r := newTestRouter(t, del, inbox)
 
 	r.route(context.Background(), resultEvent("parent-42"))
+	r.bg.Wait()
 
 	require.Equal(t, 1, del.count(), "delivery was attempted")
 	items := inbox.list()
@@ -252,4 +256,97 @@ func TestUnit_DeliveredReportsCarryTheirOwnMessageID(t *testing.T) {
 
 	require.NotEmpty(t, first.Update.MessageID)
 	require.NotEqual(t, first.Update.MessageID, second.Update.MessageID)
+}
+
+func TestUnit_Route_TwoRoutersSharingOneInboxWriteOneItem(t *testing.T) {
+	ctx := context.Background()
+	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "inbox.db"), runtimetypes.SchemaSQLite)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	inbox := operatorinbox.New(db)
+
+	mk := func() *Router {
+		r, err := New(Deps{Bus: libbus.NewInMem(), Sessions: &fakeDeliverer{}, Inbox: inbox})
+		require.NoError(t, err)
+		return r
+	}
+	a, b := mk(), mk()
+	ev := resultEvent("")
+	a.route(ctx, ev)
+	b.route(ctx, ev)
+	a.route(ctx, ev)
+
+	items, err := inbox.List(ctx, 100)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, operatorinbox.ItemIDForReport("m1", "r1"), items[0].ID)
+
+	other := resultEvent("")
+	other.Report.ID = "r2"
+	b.route(ctx, other)
+	items, err = inbox.List(ctx, 100)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+}
+
+func sharedInbox(t *testing.T) (context.Context, operatorinbox.Service) {
+	t.Helper()
+	ctx := context.Background()
+	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "inbox.db"), runtimetypes.SchemaSQLite)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	return ctx, operatorinbox.New(db)
+}
+
+func graceRouter(t *testing.T, del *fakeDeliverer, inbox operatorinbox.Service, grace time.Duration) *Router {
+	t.Helper()
+	r, err := New(Deps{Bus: libbus.NewInMem(), Sessions: del, Inbox: inbox, ParentGoneGrace: grace})
+	require.NoError(t, err)
+	return r
+}
+
+func TestUnit_Route_NonOwnerWritesNoParentGoneWhenOwnerDelivered(t *testing.T) {
+	ctx, inbox := sharedInbox(t)
+	owner := graceRouter(t, &fakeDeliverer{}, inbox, -1)
+	nonOwnerDel := &fakeDeliverer{err: fmt.Errorf("not live")}
+	nonOwner := graceRouter(t, nonOwnerDel, inbox, 200*time.Millisecond)
+	ev := resultEvent("parent-42")
+
+	nonOwner.route(ctx, ev)
+	owner.route(ctx, ev)
+	nonOwner.bg.Wait()
+	owner.bg.Wait()
+
+	items, err := inbox.List(ctx, 100)
+	require.NoError(t, err)
+	require.Empty(t, items)
+	require.Equal(t, 1, nonOwnerDel.count())
+}
+
+func TestUnit_Route_NoOwnerYieldsExactlyOneParentGoneItem(t *testing.T) {
+	ctx, inbox := sharedInbox(t)
+	a := graceRouter(t, &fakeDeliverer{err: fmt.Errorf("not live")}, inbox, -1)
+	b := graceRouter(t, &fakeDeliverer{err: fmt.Errorf("not live")}, inbox, -1)
+	ev := resultEvent("parent-42")
+	a.route(ctx, ev)
+	b.route(ctx, ev)
+	a.bg.Wait()
+	b.bg.Wait()
+
+	items, err := inbox.List(ctx, 100)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, operatorinbox.ReasonParentGone, items[0].Reason)
+}
+
+func TestUnit_ParentGoneWaitStopsOnContextCancel(t *testing.T) {
+	_, inbox := sharedInbox(t)
+	r := graceRouter(t, &fakeDeliverer{err: fmt.Errorf("not live")}, inbox, time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
+	r.route(ctx, resultEvent("parent-42"))
+	cancel()
+	r.bg.Wait()
+	items, err := inbox.List(context.Background(), 100)
+	require.NoError(t, err)
+	require.Empty(t, items)
 }
