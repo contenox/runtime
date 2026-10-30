@@ -1,42 +1,68 @@
 PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-VERSION := $(shell tr -d '\r\n' < $(PROJECT_ROOT)runtime/version/version.txt)
-COMMIT ?= $(shell git rev-parse --verify --quiet HEAD 2>/dev/null || echo unknown)
+# Read with make itself (no tr / shell redirects) so these work from PowerShell and cmd too.
+VERSION := $(strip $(file < $(PROJECT_ROOT)runtime/version/version.txt))
+COMMIT ?= $(or $(shell git -C $(PROJECT_ROOT) rev-parse --verify --quiet HEAD),unknown)
 DIST := $(PROJECT_ROOT)dist/$(VERSION)
 RUNTIME_S3_URI ?=
 
-.PHONY: help build build-windows test test-unit test-contenox-help test-api acp-conformance rust-e2e lint release-assets release-check release clean
+# Native binaries need .exe on Windows hosts.
+ifeq ($(OS),Windows_NT)
+EXE := .exe
+endif
+BIN := $(PROJECT_ROOT)bin/contenox-runtime$(EXE)
+
+# Developer targets (help, build, build-windows, test, test-unit, lint, clean, dev-install,
+# dev-uninstall) avoid inline VAR=value prefixes and shell builtins, so they run under cmd.exe
+# (make from PowerShell) as well as sh. The integration and release targets are bash scripts:
+# run them from a Unix shell (Git Bash, WSL, Linux, macOS).
+
+.PHONY: help build build-windows test test-unit test-contenox-help test-api acp-conformance rust-e2e lint release-assets release-check release clean dev-install dev-uninstall
+
+# $(info) prints the same in every shell (no echo quoting); the recipe is a silent no-op in both.
+ifeq ($(or $(MAKECMDGOALS),help),help)
+$(info Developer targets (PowerShell, cmd and Unix shells):)
+$(info   build              build bin/contenox-runtime (.exe on Windows))
+$(info   build-windows      cross-build bin/contenox-runtime-windows-amd64.exe)
+$(info   test               go test ./...)
+$(info   test-unit          go test -short -run "^TestUnit_" ./...)
+$(info   lint               go vet ./...)
+$(info   clean              remove bin/ and dist/)
+$(info   dev-install        build and install contenox-runtime to the per-user bin dir (~/.local/bin, DEV_BIN_DIR overrides))
+$(info   dev-uninstall      remove the dev-installed contenox-runtime)
+$(info )
+$(info Unix shell only (Git Bash, WSL, Linux, macOS):)
+$(info   test-contenox-help CLI help smoke)
+$(info   test-api           Python API tests)
+$(info   acp-conformance    ACP conformance suite)
+$(info   rust-e2e           Rust black-box end-to-end suite)
+$(info   release-assets     build 4 raw binaries + SHA256SUMS + manifest)
+$(info   release-check      run checks, then release-assets)
+$(info   release            release-check + immutable S3 upload; requires RUNTIME_S3_URI=s3://bucket/prefix)
+endif
 
 help:
-	@echo "build              build bin/contenox-runtime"
-	@echo "build-windows      cross-build bin/contenox-runtime-windows-amd64.exe"
-	@echo "test               go test ./..."
-	@echo "test-unit          go test -short -run '^TestUnit_' ./..."
-	@echo "test-contenox-help CLI help smoke"
-	@echo "test-api           Python API tests"
-	@echo "acp-conformance    ACP conformance suite"
-	@echo "rust-e2e           Rust black-box end-to-end suite"
-	@echo "lint               go vet ./..."
-	@echo "release-assets     build 4 raw binaries + SHA256SUMS + manifest"
-	@echo "release-check      run checks, then release-assets"
-	@echo "release            release-check + immutable S3 upload"
-	@echo "                   requires RUNTIME_S3_URI=s3://bucket/prefix"
-	@echo "clean              remove bin/ and dist/"
+	@cd .
 
+build: export CGO_ENABLED = 0
 build:
-	CGO_ENABLED=0 go build -o $(PROJECT_ROOT)bin/contenox-runtime $(PROJECT_ROOT)cmd/contenox
+	go build -o $(BIN) $(PROJECT_ROOT)cmd/contenox
 
+build-windows: export CGO_ENABLED = 0
+build-windows: export GOOS = windows
+build-windows: export GOARCH = amd64
 build-windows:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o $(PROJECT_ROOT)bin/contenox-runtime-windows-amd64.exe $(PROJECT_ROOT)cmd/contenox
+	go build -o $(PROJECT_ROOT)bin/contenox-runtime-windows-amd64.exe $(PROJECT_ROOT)cmd/contenox
 
 test:
 	go test -C $(PROJECT_ROOT) ./...
 
+test-unit: export GOMAXPROCS = 4
 test-unit:
-	GOMAXPROCS=4 go test -C $(PROJECT_ROOT) -short -timeout 15m -run '^TestUnit_' ./...
+	go test -C $(PROJECT_ROOT) -short -timeout 15m -run "^TestUnit_" ./...
 
 test-contenox-help: build
 	@chmod +x $(PROJECT_ROOT)scripts/verify_cli_help.sh
-	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox-runtime $(PROJECT_ROOT)scripts/verify_cli_help.sh
+	@CONTENOX_BIN=$(BIN) $(PROJECT_ROOT)scripts/verify_cli_help.sh
 
 test-api: build
 	@bash $(PROJECT_ROOT)scripts/run_apitests.sh
@@ -45,14 +71,14 @@ ACP_VALIDATOR_BIN ?= $(wildcard $(PROJECT_ROOT)tools/acp-validator/target/debug/
 
 acp-conformance: build
 	@test -n "$(ACP_VALIDATOR_BIN)" || { echo "set ACP_VALIDATOR_BIN=/path/to/acp-validator"; exit 1; }
-	@CONTENOX_BIN=$(PROJECT_ROOT)bin/contenox-runtime ACP_VALIDATOR_BIN=$(ACP_VALIDATOR_BIN) bash $(PROJECT_ROOT)scripts/acp_conformance.sh
+	@CONTENOX_BIN=$(BIN) ACP_VALIDATOR_BIN=$(ACP_VALIDATOR_BIN) bash $(PROJECT_ROOT)scripts/acp_conformance.sh
 
 rust-e2e: build
 	@tmp=$$(mktemp -d /tmp/contenox-e2e.XXXXXX); trap 'rm -rf "$$tmp"' EXIT; \
 		cd $(PROJECT_ROOT)tools/contenox-e2e && TMPDIR=$$tmp cargo test -- --test-threads=1
 
 lint:
-	cd $(PROJECT_ROOT) && go vet ./...
+	go vet -C $(PROJECT_ROOT) ./...
 
 release-assets:
 	@rm -rf $(DIST)
@@ -85,5 +111,15 @@ release:
 		cd "$$tmp" && sha256sum -c SHA256SUMS; \
 		echo "released $(VERSION) to $(RUNTIME_S3_URI)/$(VERSION)/"
 
+# The helper removes paths portably (rm -rf does not exist in cmd.exe).
 clean:
-	rm -rf $(PROJECT_ROOT)bin $(PROJECT_ROOT)dist
+	go run -C $(PROJECT_ROOT) ./tools/devtool clean $(PROJECT_ROOT)bin $(PROJECT_ROOT)dist
+
+# Install a development build where local tools (e.g. the desktop harness) look for
+# contenox-runtime: the per-user bin directory on PATH. Portable via a small Go helper, so it
+# works the same from PowerShell, cmd and Unix shells.
+dev-install:
+	go run -C $(PROJECT_ROOT) ./tools/devtool install
+
+dev-uninstall:
+	go run -C $(PROJECT_ROOT) ./tools/devtool uninstall

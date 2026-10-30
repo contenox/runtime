@@ -13,6 +13,9 @@ func ConnectionSelector(id string) string {
 
 func MatchesBackend(selector string, backend runtimetypes.Backend) bool {
 	selector = strings.TrimSpace(selector)
+	if IsAnyProvider(selector) {
+		return true
+	}
 	if strings.HasPrefix(selector, "connection:") {
 		return strings.TrimPrefix(selector, "connection:") == backend.ID
 	}

@@ -98,8 +98,7 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 
 func readinessDefaults(opts chatOpts) (model, provider string) {
 	if opts.EffectiveDefaultModel != opts.EffectiveConfiguredModel &&
-		opts.EffectiveDefaultModel != "" &&
-		opts.EffectiveDefaultModel != defaultModel {
+		opts.EffectiveDefaultModel != "" {
 		model = opts.EffectiveDefaultModel
 	}
 	if opts.EffectiveDefaultProvider != opts.EffectiveConfiguredProvider &&

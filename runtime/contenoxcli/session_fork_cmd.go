@@ -211,7 +211,7 @@ func resolveDefaultModelProvider(cmd *cobra.Command, db libdb.DBManager) (model,
 	ctx := libtracker.WithNewRequestID(context.Background())
 
 	model, _ = flags.GetString("model")
-	if !flags.Changed("model") || model == defaultModel {
+	if !flags.Changed("model") {
 		if kv, _ := getConfigKV(ctx, store, "default-model"); kv != "" {
 			model = kv
 		}

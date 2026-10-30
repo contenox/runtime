@@ -9,6 +9,10 @@ import (
 	"github.com/contenox/runtime/runtime/version"
 )
 
+// AvailableCommandsMetaKey carries the static slash-command list in the
+// initialize response, so clients can offer commands before any session exists.
+const AvailableCommandsMetaKey = "contenox.availableCommands"
+
 func (t *Transport) Initialize(ctx context.Context, req libacp.InitializeRequest) (libacp.InitializeResponse, error) {
 	t.initMu.Lock()
 	t.clientInfo = req.ClientInfo
@@ -67,13 +71,15 @@ func (t *Transport) Initialize(ctx context.Context, req libacp.InitializeRequest
 		AuthMethods: authMethods,
 	}
 
+	meta := map[string]any{
+		AvailableCommandsMetaKey: t.acpCommands(),
+	}
 	if t.deps.Engine != nil {
 		if opts := t.workspaceConfigOptions(ctx); len(opts) > 0 {
-			resp.Meta = mustJSON(map[string]any{
-				WorkspaceConfigOptionsMetaKey: opts,
-			})
+			meta[WorkspaceConfigOptionsMetaKey] = opts
 		}
 	}
+	resp.Meta = mustJSON(meta)
 
 	return resp, nil
 }

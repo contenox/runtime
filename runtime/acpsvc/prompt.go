@@ -100,6 +100,8 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		return libacp.PromptResponse{}, err
 	}
 
+	t.setProvisionalTitle(ctx, req.SessionID, sess, input)
+
 	if goal, ok := parsePlanCommand(input); ok {
 		if !t.hasMissionCapability() {
 			err := planPreambleForMissingFleet()
@@ -183,6 +185,10 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 
 	templateVars := t.chainTemplateVars(sess)
 	templateVars["think"] = sess.think()
+	if err := requireDefaultModel(templateVars); err != nil {
+		reportErr(err)
+		return libacp.PromptResponse{}, libacp.InternalError(err.Error())
+	}
 	var toolsAllowlist []string
 	if t.deps.DB != nil {
 		var err error

@@ -52,6 +52,9 @@ func LocalProviderAdapter(ctx context.Context, tracker libtracker.ActivityTracke
 	return func(ctx context.Context, backendTypes ...string) ([]modelrepo.Provider, error) {
 		hasNonEmpty := false
 		for _, bt := range backendTypes {
+			if IsAnyProvider(bt) {
+				return all, nil
+			}
 			if bt != "" {
 				hasNonEmpty = true
 				break

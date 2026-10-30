@@ -9,6 +9,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/statetype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,6 +36,7 @@ func TestUnit_SessionConfigOptionsExposeModelPolicyAndThink(t *testing.T) {
 		defaultModel:       "gpt-5-mini",
 		defaultAltProvider: "anthropic",
 		defaultAltModel:    "claude-sonnet-4",
+		statesFn:           twoConnectionStates,
 	}
 	sess := &sessionEntry{Think: "medium", HITLPolicy: "dev", driver: &nativeDriver{t: tr}}
 
@@ -43,14 +45,15 @@ func TestUnit_SessionConfigOptionsExposeModelPolicyAndThink(t *testing.T) {
 
 	model := optionByID(t, options, configIDModel)
 	require.Equal(t, configCategoryModel, model.Category)
-	require.Equal(t, "openai/gpt-5-mini", model.CurrentValue)
-	require.Len(t, model.Options.Groups, 2)
-	require.Equal(t, "openai", model.Options.Groups[0].Group)
-	require.Equal(t, "gpt-5-mini", model.Options.Groups[0].Options[0].Name)
-	require.Equal(t, "anthropic", model.Options.Groups[1].Group)
+	require.Equal(t, "connection:o1/gpt-5-mini", model.CurrentValue)
+	require.Len(t, model.Options.Groups, 3)
+	require.Equal(t, "any", model.Options.Groups[0].Group)
+	require.Equal(t, "a1", model.Options.Groups[1].Group)
+	require.Equal(t, "o1", model.Options.Groups[2].Group)
+	require.Equal(t, "gpt-5-mini", model.Options.Groups[2].Options[0].Name)
 	require.Equal(t, "claude-sonnet-4", model.Options.Groups[1].Options[0].Name)
-	require.True(t, configOptionHasValue(model, "openai/gpt-5-mini"))
-	require.True(t, configOptionHasValue(model, "anthropic/claude-sonnet-4"))
+	require.True(t, configOptionHasValue(model, "connection:o1/gpt-5-mini"))
+	require.True(t, configOptionHasValue(model, "any/claude-sonnet-4"))
 
 	policy := optionByID(t, options, configIDHITLPolicy)
 	require.Equal(t, configCategoryHITLPolicy, policy.Category)
@@ -100,6 +103,7 @@ func TestUnit_SetSessionConfigOptionUpdatesSessionAndPolicyConfig(t *testing.T) 
 		defaultModel:       "gpt-5-mini",
 		defaultAltProvider: "anthropic",
 		defaultAltModel:    "claude-sonnet-4",
+		statesFn:           twoConnectionStates,
 	}
 	sess.driver = &nativeDriver{t: tr}
 
@@ -113,9 +117,9 @@ func TestUnit_SetSessionConfigOptionUpdatesSessionAndPolicyConfig(t *testing.T) 
 	require.Equal(t, "gpt-5-mini", tr.model(), "ACP selector changes the session, not the persistent default model")
 	require.Empty(t, ReadConfigValue(ctx, db, "default-provider"))
 	require.Empty(t, ReadConfigValue(ctx, db, "default-model"))
-	require.Equal(t, "anthropic", sess.providerOrDefault(""))
+	require.Equal(t, "connection:a1", sess.providerOrDefault(""))
 	require.Equal(t, "claude-sonnet-4", sess.modelOrDefault(""))
-	require.Equal(t, "anthropic/claude-sonnet-4", optionByID(t, resp.ConfigOptions, configIDModel).CurrentValue)
+	require.Equal(t, "connection:a1/claude-sonnet-4", optionByID(t, resp.ConfigOptions, configIDModel).CurrentValue)
 
 	resp, err = tr.SetSessionConfigOption(ctx, libacp.SetSessionConfigOptionRequest{
 		SessionID: sid,
@@ -205,6 +209,7 @@ func TestUnit_SetSessionConfigOptionRejectsUnknownValue(t *testing.T) {
 		defaultModel:       "gpt-5-mini",
 		defaultAltProvider: "anthropic",
 		defaultAltModel:    "claude-sonnet-4",
+		statesFn:           twoConnectionStates,
 	}
 	sess.driver = &nativeDriver{t: tr}
 
@@ -234,6 +239,7 @@ func TestUnit_WorkspaceConfigOptionsMirrorFreshSession(t *testing.T) {
 		defaultModel:       "gpt-5-mini",
 		defaultAltProvider: "anthropic",
 		defaultAltModel:    "claude-sonnet-4",
+		statesFn:           twoConnectionStates,
 		defaultThink:       "medium",
 	}
 
@@ -241,9 +247,9 @@ func TestUnit_WorkspaceConfigOptionsMirrorFreshSession(t *testing.T) {
 	require.Len(t, options, 4)
 
 	model := optionByID(t, options, configIDModel)
-	require.Equal(t, "openai/gpt-5-mini", model.CurrentValue)
-	require.True(t, configOptionHasValue(model, "openai/gpt-5-mini"))
-	require.True(t, configOptionHasValue(model, "anthropic/claude-sonnet-4"))
+	require.Equal(t, "connection:o1/gpt-5-mini", model.CurrentValue)
+	require.True(t, configOptionHasValue(model, "connection:o1/gpt-5-mini"))
+	require.True(t, configOptionHasValue(model, "connection:a1/claude-sonnet-4"))
 
 	think := optionByID(t, options, configIDThink)
 	require.Equal(t, "medium", think.CurrentValue, "workspace think must reflect thinkDefault(), not the bare accessor fallback")
@@ -267,4 +273,11 @@ func optionByID(t *testing.T, options []libacp.SessionConfigOption, id string) l
 	}
 	t.Fatalf("option %q not found in %#v", id, options)
 	return libacp.SessionConfigOption{}
+}
+
+func twoConnectionStates() []statetype.BackendRuntimeState {
+	return []statetype.BackendRuntimeState{
+		{Backend: runtimetypes.Backend{ID: "o1", Name: "openai", Type: "openai"}, PulledModels: []statetype.ModelPullStatus{{Model: "gpt-5-mini", CanChat: true}}},
+		{Backend: runtimetypes.Backend{ID: "a1", Name: "anthropic", Type: "anthropic"}, PulledModels: []statetype.ModelPullStatus{{Model: "claude-sonnet-4", CanChat: true}}},
+	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -110,6 +111,9 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if err := store.DeleteKV(ctx, runtimestate.BackendCredentialKey(backend.Type, backend.ID)); err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return err
 	}
+	if err := modelauth.DeleteCredentials(ctx, tx, id); err != nil {
+		return err
+	}
 	if err := store.DeleteBackend(ctx, id); err != nil {
 		return err
 	}
@@ -162,4 +166,12 @@ func sanitizeBackendStoreError(backend *runtimetypes.Backend, err error) error {
 		}
 	}
 	return err
+}
+
+// Validate applies the field rules Create and Update enforce, without the
+// one-backend-per-type-and-URL rule. Callers that deliberately allow several
+// connections to one endpoint (each with its own credential) use it before
+// writing through the store.
+func Validate(backend *runtimetypes.Backend) error {
+	return validate(backend)
 }

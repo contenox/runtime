@@ -40,7 +40,6 @@ const DefaultWorkspaceID = "00000000-0000-0000-0000-000000000002"
 
 const (
 	defaultOllama  = "http://127.0.0.1:11434"
-	defaultModel   = "qwen2.5:7b"
 	defaultContext = 0
 	defaultTimeout = 5 * time.Minute
 )
@@ -327,7 +326,7 @@ func init() {
 	f.String("db", "", "SQLite database path (default: ~/.contenox-harness/local.db)")
 	f.String("data-dir", "", "Override the .contenox data directory path")
 	f.String("ollama", defaultOllama, "Ollama base URL")
-	f.String("model", defaultModel, "Model name (task/chat/embed)")
+	f.String("model", "", "Model name (task/chat/embed). Overrides config default-model; no built-in default.")
 	f.String("provider", "", "Provider type override. See 'contenox-runtime backend add --help' for supported backend types.")
 	f.String("alt-model", "", "Alt model name (chains referencing {{var:alt_model}}). Overrides config default-alt-model.")
 	f.String("alt-provider", "", "Alt provider type (chains referencing {{var:alt_provider}}). Overrides config default-alt-provider.")
@@ -540,7 +539,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 	}
 
 	effectiveModel, _ := flags.GetString("model")
-	if !changed("model") || effectiveModel == defaultModel {
+	if !changed("model") {
 		if configuredDefaultModel != "" {
 			effectiveModel = configuredDefaultModel
 		}

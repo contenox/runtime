@@ -17,6 +17,7 @@ import (
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/messagestore"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/statetype"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/stretchr/testify/assert"
@@ -343,6 +344,12 @@ func TestUnit_Initialize_AdvertisesWorkspaceConfigOptions(t *testing.T) {
 		defaultProvider: "openai",
 		defaultModel:    "gpt-5-mini",
 		defaultThink:    "medium",
+		statesFn: func() []statetype.BackendRuntimeState {
+			return []statetype.BackendRuntimeState{{
+				Backend:      runtimetypes.Backend{ID: "o1", Name: "openai", Type: "openai"},
+				PulledModels: []statetype.ModelPullStatus{{Model: "gpt-5-mini", CanChat: true}},
+			}}
+		},
 	}
 	resp, err := tr.Initialize(context.Background(), libacp.InitializeRequest{ProtocolVersion: libacp.ProtocolVersion})
 	require.NoError(t, err)
@@ -356,7 +363,7 @@ func TestUnit_Initialize_AdvertisesWorkspaceConfigOptions(t *testing.T) {
 	var options []libacp.SessionConfigOption
 	require.NoError(t, json.Unmarshal(raw, &options))
 	require.Len(t, options, 4)
-	require.Equal(t, "openai/gpt-5-mini", optionByID(t, options, configIDModel).CurrentValue)
+	require.Equal(t, "connection:o1/gpt-5-mini", optionByID(t, options, configIDModel).CurrentValue)
 	require.Equal(t, "medium", optionByID(t, options, configIDThink).CurrentValue)
 }
 

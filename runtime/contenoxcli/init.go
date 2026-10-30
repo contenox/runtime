@@ -82,7 +82,7 @@ type providerConfig struct {
 var providerConfigs = map[string]providerConfig{
 	"ollama": {
 		name:         "Ollama (local)",
-		defaultModel: defaultModel,
+		defaultModel: "qwen2.5:7b", // suggestion printed by init only; never a runtime default
 		envKey:       "",
 	},
 	"gemini": {

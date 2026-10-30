@@ -175,7 +175,7 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 
 	setupapi.AddSetupRoutes(mux, stateSvc, deps.Auth)
 	shellenvapi.AddShellEnvRoutes(mux, shellenvservice.New(deps.DB), deps.Auth)
-	providerSvc := providerservice.New(deps.DB, deps.WorkspaceID)
+	providerSvc := providerservice.New(deps.DB, deps.WorkspaceID, providerservice.WithRuntimeState(deps.State))
 	providerapi.AddProviderRoutes(mux, providerSvc)
 
 	if deps.WorkspaceRoots != nil {

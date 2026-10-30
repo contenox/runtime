@@ -203,6 +203,13 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 
 	templateVars := t.chainTemplateVars(sess)
 	templateVars["think"] = sess.think()
+	if err := requireDefaultModel(templateVars); err != nil {
+		if drainEvents != nil {
+			drainEvents()
+		}
+		reportErr(err)
+		return nativeturn.Result{Err: err}
+	}
 	var toolsAllowlist []string
 	if t.deps.DB != nil {
 		var err error

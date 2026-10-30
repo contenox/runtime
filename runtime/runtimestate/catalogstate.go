@@ -395,7 +395,7 @@ func storeBackendError(state *State, backend *runtimetypes.Backend, apiKey strin
 		Backend:      *backend,
 	}
 	if err != nil {
-		runtimeState.Error = err.Error()
+		runtimeState.setError(err)
 	}
 	runtimeState.SetAPIKey(apiKey)
 	state.state.Store(backend.ID, runtimeState)

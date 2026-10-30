@@ -311,12 +311,8 @@ func buildRunOpts(cmd *cobra.Command, db libdbexec.DBManager, contenoxDir string
 	}
 
 	effectiveModel, _ := flags.GetString("model")
-	if !flags.Changed("model") && (effectiveModel == "" || effectiveModel == defaultModel) {
-		if kvModel != "" {
-			effectiveModel = kvModel
-		} else {
-			effectiveModel = defaultModel
-		}
+	if !flags.Changed("model") && effectiveModel == "" {
+		effectiveModel = kvModel
 	}
 
 	effectiveDefaultProvider := kvProvider

@@ -16,6 +16,7 @@ import (
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/shellsession"
+	"github.com/contenox/runtime/runtime/statetype"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/contenox/runtime/runtime/vfs"
 )
@@ -127,7 +128,9 @@ type Transport struct {
 	clientInfo *libacp.Implementation
 	clientCaps libacp.ClientCapabilities
 
-	sessionMu       sync.Mutex
+	sessionMu sync.Mutex
+	// statesFn overrides the engine backend state source (tests).
+	statesFn        func() []statetype.BackendRuntimeState
 	sessions        map[libacp.SessionID]*sessionEntry
 	contenoxToACPID map[string]libacp.SessionID
 
@@ -220,8 +223,10 @@ func New(deps Deps) libacp.AgentFactory {
 			promptCancels:      make(map[libacp.SessionID]*inflightPrompt),
 		}
 		conn.SetExtRequestHandler(t.handleExtRequest)
+		stopWatch := t.watchBackendState()
 		go func() {
 			<-conn.Closed()
+			stopWatch()
 			connCancel()
 			t.releaseSessionRouting()
 			t.unsubscribeAllTerminals()

@@ -372,11 +372,12 @@ func (s *State) processBackend(ctx context.Context, backend *runtimetypes.Backen
 			return
 		}
 		brokenService := &BackendRuntimeState{
-			ID:      backend.ID,
-			Name:    backend.Name,
-			Models:  []string{},
-			Backend: *backend,
-			Error:   "Unsupported backend type: " + backend.Type,
+			ID:        backend.ID,
+			Name:      backend.Name,
+			Models:    []string{},
+			Backend:   *backend,
+			Error:     "Unsupported backend type: " + backend.Type,
+			ErrorCode: ErrorCodeMisconfigured,
 		}
 		s.state.Store(backend.ID, brokenService)
 	}
@@ -482,7 +483,7 @@ func (s *State) processVLLMBackend(ctx context.Context, backend *runtimetypes.Ba
 		return
 	}
 	if len(observedModels) == 0 {
-		storeBackendError(s, backend, apiKey, fmt.Errorf("No models found in response"), nil)
+		storeBackendError(s, backend, apiKey, errNoModels, nil)
 		return
 	}
 
@@ -506,6 +507,7 @@ func (s *State) processVLLMBackend(ctx context.Context, backend *runtimetypes.Ba
 
 	if len(declaredModelMap) > 0 && len(pulledModels) == 0 && !s.autoDiscoverModels {
 		res.Error = declaredModelsUnavailableError("vLLM", declaredModelMap, res.Models).Error()
+		res.ErrorCode = ErrorCodeModelUnavailable
 	}
 	res.PulledModels = pulledModels
 	s.state.Store(backend.ID, res)
@@ -522,7 +524,7 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *runtimetypes.
 	stateInstance.SetAPIKey("")
 	apiKey, err := s.loadProviderAPIKey(ctx, backend)
 	if err != nil {
-		stateInstance.Error = apiKeyFailure(err)
+		stateInstance.setKeyError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -541,13 +543,13 @@ func (s *State) processGeminiBackend(ctx context.Context, backend *runtimetypes.
 
 	catalog, err := s.newCatalogProvider(backend, apiKey)
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
 	observedModels, err := catalog.ListModels(ctx)
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -582,7 +584,7 @@ func (s *State) processOptionalCredCloudBackend(ctx context.Context, backend *ru
 
 	credJSON, err := s.loadProviderAPIKey(ctx, backend)
 	if err != nil && !errors.Is(err, libdb.ErrNotFound) {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -603,13 +605,13 @@ func (s *State) processOptionalCredCloudBackend(ctx context.Context, backend *ru
 
 	catalog, err := s.newCatalogProvider(backend, credJSON)
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
 	observedModels, err := catalog.ListModels(ctx)
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -646,13 +648,13 @@ func (s *State) processScriptedTestBackend(ctx context.Context, backend *runtime
 
 	catalog, err := s.newCatalogProvider(backend, "")
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
 	observedModels, err := catalog.ListModels(ctx)
 	if err != nil {
-		stateInstance.Error = err.Error()
+		stateInstance.setError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -675,7 +677,7 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *runtimetypes.
 
 	apiKey, err := s.loadProviderAPIKey(ctx, backend)
 	if err != nil {
-		stateInstance.Error = apiKeyFailure(err)
+		stateInstance.setKeyError(err)
 		s.state.Store(backend.ID, stateInstance)
 		return
 	}
@@ -691,13 +693,13 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *runtimetypes.
 	if !ok {
 		catalog, err := s.newCatalogProvider(backend, apiKey)
 		if err != nil {
-			stateInstance.Error = err.Error()
+			stateInstance.setError(err)
 			s.state.Store(backend.ID, stateInstance)
 			return
 		}
 		observedModels, err = catalog.ListModels(ctx)
 		if err != nil {
-			stateInstance.Error = err.Error()
+			stateInstance.setError(err)
 			s.state.Store(backend.ID, stateInstance)
 			return
 		}
@@ -717,6 +719,7 @@ func (s *State) processOpenAIBackend(ctx context.Context, backend *runtimetypes.
 	stateInstance.PulledModels = pulledModels
 	if len(declaredModels) > 0 && len(pulledModels) == 0 && !s.autoDiscoverModels {
 		stateInstance.Error = declaredModelsUnavailableError("OpenAI", declaredModels, stateInstance.Models).Error()
+		stateInstance.ErrorCode = ErrorCodeModelUnavailable
 	}
 
 	s.state.Store(backend.ID, stateInstance)

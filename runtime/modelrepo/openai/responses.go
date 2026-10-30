@@ -58,16 +58,16 @@ type openAIResponsesTool struct {
 
 type openAIResponseInput struct {
 	raw              json.RawMessage
-	ID               string                   `json:"id,omitempty"`
-	EncryptedContent string                   `json:"encrypted_content,omitempty"`
-	Summary          *[]openAIResponseContent `json:"summary,omitempty"`
-	Type             string                   `json:"type"`
-	Role             string                   `json:"role,omitempty"`
-	Content          any                      `json:"content,omitempty"`
-	CallID           string                   `json:"call_id,omitempty"`
-	Name             string                   `json:"name,omitempty"`
-	Arguments        string                   `json:"arguments,omitempty"`
-	Output           *string                  `json:"output,omitempty"`
+	ID               string                    `json:"id,omitempty"`
+	EncryptedContent string                    `json:"encrypted_content,omitempty"`
+	Summary          *[]openAIResponseTextPart `json:"summary,omitempty"`
+	Type             string                    `json:"type"`
+	Role             string                    `json:"role,omitempty"`
+	Content          any                       `json:"content,omitempty"`
+	CallID           string                    `json:"call_id,omitempty"`
+	Name             string                    `json:"name,omitempty"`
+	Arguments        string                    `json:"arguments,omitempty"`
+	Output           *string                   `json:"output,omitempty"`
 }
 
 func (item openAIResponseInput) MarshalJSON() ([]byte, error) {
@@ -152,6 +152,14 @@ type openAIResponseContent struct {
 	Type    string `json:"type"`
 	Text    string `json:"text"`
 	Refusal string `json:"refusal"`
+}
+
+// openAIResponseTextPart is the request-side text content part
+// (input_text / output_text / summary_text). It must never carry output-only
+// fields such as refusal, which the API rejects as unknown parameters.
+type openAIResponseTextPart struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 type openAIResponseInputContent struct {
@@ -375,7 +383,7 @@ func (c *openAIClient) buildResponsesRequest(messages []modelrepo.Message, args 
 				if item.Role == "assistant" {
 					typ = "output_text"
 				}
-				item.Content = []openAIResponseContent{{Type: typ, Text: text}}
+				item.Content = []openAIResponseTextPart{{Type: typ, Text: text}}
 			}
 		}
 	}

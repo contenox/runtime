@@ -1040,6 +1040,9 @@ func (t *Transport) sessionListTitle(ctx context.Context, mgr *chatservice.Manag
 	if title := firstUserMessageTitle(ctx, mgr, exec, internalSessionID); title != "" {
 		return title
 	}
+	if title := readProvisionalTitle(ctx, exec, internalSessionID); title != "" {
+		return truncateSessionListTitle(title)
+	}
 	return fallback
 }
 
@@ -1061,7 +1064,11 @@ func (t *Transport) sessionInfoTitle(ctx context.Context, internalSessionID stri
 		return ""
 	}
 	mgr := chatservice.NewManager(t.workspaceID())
-	return firstUserMessageTitle(ctx, mgr, t.deps.DB.WithoutTransaction(), internalSessionID)
+	exec := t.deps.DB.WithoutTransaction()
+	if title := firstUserMessageTitle(ctx, mgr, exec, internalSessionID); title != "" {
+		return title
+	}
+	return readProvisionalTitle(ctx, exec, internalSessionID)
 }
 
 const acpSessionCwdKVPrefix = "acp:session_cwd:"

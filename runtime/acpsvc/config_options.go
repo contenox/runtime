@@ -86,20 +86,6 @@ func workspaceRootDisplayName(root string) string {
 	return project.DisplayName(root)
 }
 
-func (t *Transport) modelConfigOption(ctx context.Context, sess *sessionEntry) libacp.SessionConfigOption {
-	currentProvider := sess.providerOrDefault(t.provider())
-	currentModel := sess.modelOrDefault(t.model())
-	current := modelConfigValue(currentProvider, currentModel)
-	return libacp.SessionConfigOption{
-		ID:           configIDModel,
-		Name:         "Model",
-		Category:     configCategoryModel,
-		Type:         configTypeSelect,
-		CurrentValue: current,
-		Options:      t.modelConfigValues(ctx, currentProvider, currentModel),
-	}
-}
-
 func (t *Transport) hitlPolicyConfigOption(sess *sessionEntry) libacp.SessionConfigOption {
 	return libacp.SessionConfigOption{
 		ID:           configIDHITLPolicy,
@@ -134,14 +120,23 @@ func (t *Transport) thinkConfigOption(sess *sessionEntry) libacp.SessionConfigOp
 
 func (t *Transport) tokenLimitConfigOption(ctx context.Context, sess *sessionEntry) libacp.SessionConfigOption {
 	limit := sess.effectiveTokenLimit()
+	cap := t.modelContextCap(ctx, sess)
 	current := "0"
+	if cap > 0 {
+		// Default is the model maximum; a custom limit above a newly selected
+		// smaller model's window falls back to that model's maximum.
+		if limit <= 0 || limit > cap {
+			limit = cap
+		}
+	}
 	if limit > 0 {
 		current = strconv.Itoa(limit)
 	}
-	cap := t.modelContextCap(ctx, sess)
-	desc := "Session context budget (token limit for history). Controls shifting and usage indicator size. 0 = chain default / unlimited."
+	desc := "Session context budget (token limit for history). Controls shifting and usage indicator size."
 	if cap > 0 {
-		desc += fmt.Sprintf(" Capped to model max %d if larger.", cap)
+		desc += fmt.Sprintf(" Defaults to the model's maximum context window (%s).", formatTokenCountShort(cap))
+	} else {
+		desc += " 0 = chain default / unlimited (the model's context window is not reported)."
 	}
 	return libacp.SessionConfigOption{
 		ID:           configIDTokenLimit,
@@ -154,9 +149,24 @@ func (t *Transport) tokenLimitConfigOption(ctx context.Context, sess *sessionEnt
 	}
 }
 
+// tokenLimitLadder holds the selectable budgets for agentic work. Entries at
+// or above the model's reported maximum are dropped.
+var tokenLimitLadder = []int{65536, 131072, 262144, 524288, 1048576}
+
+// tokenLimitConfigValues lists the selectable limits. Values are plain
+// integer strings; "0" is the chain default. With a reported model maximum
+// (cap > 0) the maximum comes first (it is the default) and the ladder is
+// capped below it.
 func tokenLimitConfigValues(cap, current int) libacp.SessionConfigValues {
-	values := []libacp.SessionConfigValue{{Value: "0", Name: "Chain default", Description: "Use the chain's token limit (or unlimited)"}}
+	var values []libacp.SessionConfigValue
+	if cap > 0 {
+		values = append(values, libacp.SessionConfigValue{Value: strconv.Itoa(cap), Name: "Model maximum (" + formatTokenCountShort(cap) + ")", Description: "The model's reported context window"})
+	}
+	values = append(values, libacp.SessionConfigValue{Value: "0", Name: "Chain default", Description: "Use the chain's token limit (or unlimited)"})
 	seen := map[int]struct{}{0: {}}
+	if cap > 0 {
+		seen[cap] = struct{}{}
+	}
 	add := func(n int, name, desc string) {
 		if n <= 0 {
 			return
@@ -167,22 +177,27 @@ func tokenLimitConfigValues(cap, current int) libacp.SessionConfigValues {
 		seen[n] = struct{}{}
 		values = append(values, libacp.SessionConfigValue{Value: strconv.Itoa(n), Name: name, Description: desc})
 	}
-	for _, n := range []int{4096, 8192, 16384, 32768, 65536, 131072, 262144} {
+	for _, n := range tokenLimitLadder {
 		if cap > 0 && n >= cap {
 			break
 		}
-		add(n, formatTokenCount(n), "")
+		add(n, formatTokenCountShort(n), "")
 	}
-	if cap > 0 {
-		add(cap, formatTokenCount(cap)+" (model max)", "The model's reported context length")
-	}
-	add(current, formatTokenCount(current)+" (current)", "Session's current custom budget")
+	add(current, formatTokenCountShort(current)+" (current)", "Session's current custom budget")
 	return libacp.NewSessionConfigValues(values)
 }
 
-func formatTokenCount(n int) string {
-	if n >= 1024 && n%1024 == 0 {
+// formatTokenCountShort renders 400000 as "400k tokens", 1048576 as "1M tokens".
+func formatTokenCountShort(n int) string {
+	switch {
+	case n >= 1<<20 && n%(1<<20) == 0:
+		return strconv.Itoa(n>>20) + "M tokens"
+	case n >= 1_000_000 && n%1_000_000 == 0:
+		return strconv.Itoa(n/1_000_000) + "M tokens"
+	case n >= 1024 && n%1024 == 0:
 		return strconv.Itoa(n/1024) + "k tokens"
+	case n >= 1000 && n%1000 == 0:
+		return strconv.Itoa(n/1000) + "k tokens"
 	}
 	return strconv.Itoa(n) + " tokens"
 }
@@ -191,142 +206,33 @@ func (t *Transport) modelContextCap(ctx context.Context, sess *sessionEntry) int
 	if sess == nil {
 		return 0
 	}
-	prov := sess.providerOrDefault(t.provider())
-	mod := sess.modelOrDefault(t.model())
-	for _, st := range t.runtimeStates(ctx) {
-		for _, pm := range st.PulledModels {
-			if (pm.Model == mod || pm.Name == mod) && (prov == "" || strings.Contains(strings.ToLower(st.Backend.Type), strings.ToLower(prov)) || prov == "") {
-				if pm.ContextLength > 0 {
-					return pm.ContextLength
-				}
-			}
-		}
-	}
-	for _, st := range t.runtimeStates(ctx) {
-		for _, pm := range st.PulledModels {
-			if pm.Model == mod || pm.Name == mod {
-				if pm.ContextLength > 0 {
-					return pm.ContextLength
-				}
-			}
-		}
-	}
-	return 0
+	return contextCapFor(t.runtimeStates(ctx), sess.providerOrDefault(t.provider()), sess.modelOrDefault(t.model()))
 }
 
-func (t *Transport) modelConfigValues(ctx context.Context, currentProvider, currentModel string) libacp.SessionConfigValues {
-	type modelValue struct {
-		provider    string
-		value       string
-		name        string
-		description string
-		current     bool
+// contextCapFor returns the context window reported for the model (catalog /
+// provider metadata, e.g. the ChatGPT models list's context_window), or 0.
+func contextCapFor(states []statetype.BackendRuntimeState, prov, mod string) int {
+	mod = strings.TrimSpace(mod)
+	if mod == "" {
+		return 0
 	}
-
-	seen := map[string]modelValue{}
-	add := func(provider, model, description string, current bool) {
-		value := modelConfigValue(provider, model)
-		if strings.TrimSpace(value) == "" {
-			return
-		}
-		name := modelConfigDisplayName(model)
-		if existing, ok := seen[value]; ok {
-			existing.current = existing.current || current
-			if existing.description == "" {
-				existing.description = description
+	min := func(matches []statetype.BackendRuntimeState) int {
+		best := 0
+		for _, st := range matches {
+			for _, pm := range st.PulledModels {
+				if sameModelName(servedModelName(pm), mod) && pm.ContextLength > 0 && (best == 0 || pm.ContextLength < best) {
+					best = pm.ContextLength
+				}
 			}
-			seen[value] = existing
-			return
 		}
-		seen[value] = modelValue{
-			provider:    strings.TrimSpace(provider),
-			value:       value,
-			name:        name,
-			description: description,
-			current:     current,
-		}
+		return best
 	}
-
-	add(currentProvider, currentModel, "Current default model", true)
-	if altModel := t.altModel(); altModel != "" {
-		altProvider := t.altProvider()
-		if altProvider == "" {
-			altProvider = currentProvider
-		}
-		add(altProvider, altModel, "Configured alternate model", false)
+	// any/"" and connection:ID selectors; the minimum is the safe budget when
+	// several connections serve the model.
+	if n := min(serving(states, prov, mod)); n > 0 {
+		return n
 	}
-
-	for _, state := range t.runtimeStates(ctx) {
-		if strings.TrimSpace(state.Error) != "" {
-			continue
-		}
-		provider := strings.TrimSpace(state.Backend.Type)
-		if provider == "" {
-			continue
-		}
-		for _, pulled := range state.PulledModels {
-			if !pulled.CanChat && !pulled.CanPrompt {
-				continue
-			}
-			model := strings.TrimSpace(pulled.Model)
-			if model == "" {
-				model = strings.TrimSpace(pulled.Name)
-			}
-			add(provider, model, describePulledModel(pulled), false)
-		}
-	}
-
-	groupsByProvider := map[string][]modelValue{}
-	groupNames := map[string]string{}
-	for _, value := range seen {
-		groupID := value.provider
-		if groupID == "" {
-			groupID = "default"
-		}
-		groupsByProvider[groupID] = append(groupsByProvider[groupID], value)
-		groupNames[groupID] = groupID
-	}
-	if len(groupsByProvider) == 0 {
-		return libacp.NewSessionConfigValues(nil)
-	}
-
-	groupIDs := make([]string, 0, len(groupsByProvider))
-	for groupID := range groupsByProvider {
-		groupIDs = append(groupIDs, groupID)
-	}
-	sort.SliceStable(groupIDs, func(i, j int) bool {
-		leftCurrent := groupIDs[i] == currentProvider
-		rightCurrent := groupIDs[j] == currentProvider
-		if leftCurrent != rightCurrent {
-			return leftCurrent
-		}
-		return strings.ToLower(groupIDs[i]) < strings.ToLower(groupIDs[j])
-	})
-
-	groups := make([]libacp.SessionConfigGroup, 0, len(groupIDs))
-	for _, groupID := range groupIDs {
-		values := groupsByProvider[groupID]
-		sort.SliceStable(values, func(i, j int) bool {
-			if values[i].current != values[j].current {
-				return values[i].current
-			}
-			return strings.ToLower(values[i].name) < strings.ToLower(values[j].name)
-		})
-		options := make([]libacp.SessionConfigValue, 0, len(values))
-		for _, value := range values {
-			options = append(options, libacp.SessionConfigValue{
-				Value:       value.value,
-				Name:        value.name,
-				Description: value.description,
-			})
-		}
-		groups = append(groups, libacp.SessionConfigGroup{
-			Group:   groupID,
-			Name:    groupNames[groupID],
-			Options: options,
-		})
-	}
-	return libacp.NewGroupedSessionConfigValues(groups)
+	return min(serving(states, "", mod))
 }
 
 func (t *Transport) hitlPolicyConfigValues(sess *sessionEntry) libacp.SessionConfigValues {
@@ -369,6 +275,9 @@ func (t *Transport) resolveSessionHITLPolicy(sess *sessionEntry) string {
 }
 
 func (t *Transport) runtimeStates(ctx context.Context) []statetype.BackendRuntimeState {
+	if t.statesFn != nil {
+		return t.statesFn()
+	}
 	if t.deps.Engine == nil || t.deps.Engine.State == nil {
 		return nil
 	}
@@ -411,12 +320,9 @@ func (t *Transport) SetSessionConfigOption(ctx context.Context, req libacp.SetSe
 func (t *Transport) setSessionConfigOption(ctx context.Context, sess *sessionEntry, configID, value string) error {
 	switch configID {
 	case configIDModel:
-		if !configOptionHasValue(t.modelConfigOption(ctx, sess), value) {
-			return libacp.NewErrorf(libacp.ErrInvalidParams, "unknown model option %q", value)
-		}
-		provider, model := splitModelConfigValue(value)
-		if strings.TrimSpace(model) == "" {
-			return libacp.NewErrorf(libacp.ErrInvalidParams, "model option %q has empty model", value)
+		provider, model, ok := resolveModelValue(t.runtimeStates(ctx), value)
+		if !ok {
+			return libacp.NewErrorf(libacp.ErrInvalidParams, "unknown model option %q (expected any/<model> or connection:<id>/<model>)", value)
 		}
 		sess.setModelSelection(provider, model)
 		return nil
@@ -450,7 +356,7 @@ func (t *Transport) setSessionConfigOption(ctx context.Context, sess *sessionEnt
 		}
 		cap := t.modelContextCap(ctx, sess)
 		eff := requested
-		if cap > 0 && (eff == 0 || eff > cap) {
+		if cap > 0 && eff > cap {
 			eff = cap
 		}
 		sess.setEffectiveTokenLimit(eff)
@@ -536,4 +442,13 @@ func describePulledModel(model statetype.ModelPullStatus) string {
 		parts = append(parts, "thinking")
 	}
 	return strings.Join(parts, ", ")
+}
+
+// requireDefaultModel fails a turn up front when no model is configured, with
+// the same code/wording the setup check reports (missing_default_model).
+func requireDefaultModel(vars map[string]string) error {
+	if strings.TrimSpace(vars["model"]) != "" {
+		return nil
+	}
+	return fmt.Errorf("missing_default_model: No default model is set. Internal chat and chains using {{var:model}} need it. Fix: contenox config set default-model <name>")
 }

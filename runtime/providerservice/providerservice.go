@@ -13,7 +13,6 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libkvstore"
-	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
@@ -82,28 +81,55 @@ type Service interface {
 	StartLogin(ctx context.Context, providerType string) (*LoginStart, error)
 	LoginStatus(ctx context.Context, providerType string) (*LoginStatus, error)
 	Logout(ctx context.Context, providerType string) error
+	CancelLogin(ctx context.Context, providerType string) (*LoginStatus, error)
+
+	ListConnections(ctx context.Context) ([]*Connection, error)
+	GetConnection(ctx context.Context, id string) (*Connection, error)
+	CreateConnection(ctx context.Context, providerType string, req CreateConnectionRequest) (*Connection, error)
+	UpdateConnection(ctx context.Context, id string, req UpdateConnectionRequest) (*Connection, error)
+	DeleteConnection(ctx context.Context, id string) error
+	CheckConnection(ctx context.Context, id string) (*Connection, error)
+	StartConnectionLogin(ctx context.Context, id string) (*LoginStart, error)
+	ConnectionLoginStatus(ctx context.Context, id string) (*LoginStatus, error)
+	CancelConnectionLogin(ctx context.Context, id string) (*LoginStatus, error)
+	LogoutConnection(ctx context.Context, id string) error
 }
 
 type LoginStart struct {
-	Provider  string    `json:"provider"`
-	State     string    `json:"state"`
-	URL       string    `json:"url,omitempty"`
-	Code      string    `json:"code,omitempty"`
-	ExpiresAt time.Time `json:"expiresAt,omitempty"`
+	Provider     string    `json:"provider"`
+	ConnectionID string    `json:"connectionId,omitempty"`
+	State        string    `json:"state"`
+	URL          string    `json:"url,omitempty"`
+	Code         string    `json:"code,omitempty"`
+	ExpiresAt    time.Time `json:"expiresAt,omitempty"`
 }
 
 type LoginStatus struct {
-	Provider  string    `json:"provider"`
-	State     string    `json:"state"`
-	URL       string    `json:"url,omitempty"`
-	Code      string    `json:"code,omitempty"`
-	ExpiresAt time.Time `json:"expiresAt,omitempty"`
-	Error     string    `json:"error,omitempty"`
+	Provider     string    `json:"provider"`
+	ConnectionID string    `json:"connectionId,omitempty"`
+	State        string    `json:"state"`
+	URL          string    `json:"url,omitempty"`
+	Code         string    `json:"code,omitempty"`
+	ExpiresAt    time.Time `json:"expiresAt,omitempty"`
+	Error        string    `json:"error,omitempty"`
 }
 
 type service struct {
 	dbInstance  libdb.DBManager
 	workspaceID string
+	state       *runtimestate.State
+
+	checkMu  sync.Mutex
+	checking map[string]int
+}
+
+// Option configures optional collaborators of the provider service.
+type Option func(*service)
+
+// WithRuntimeState lets connections report live health and model counts and
+// lets a connection be re-checked on demand. Without it, health is "unknown".
+func WithRuntimeState(state *runtimestate.State) Option {
+	return func(s *service) { s.state = state }
 }
 
 type providerDefaults struct {
@@ -147,8 +173,12 @@ func supportedProviders() []ProviderCapability {
 	return out
 }
 
-func New(dbInstance libdb.DBManager, workspaceID string) Service {
-	return &service{dbInstance: dbInstance, workspaceID: workspaceID}
+func New(dbInstance libdb.DBManager, workspaceID string, opts ...Option) Service {
+	s := &service{dbInstance: dbInstance, workspaceID: workspaceID, checking: map[string]int{}}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func (s *service) ListSupportedProviders(context.Context) ([]ProviderCapability, error) {
@@ -165,22 +195,9 @@ func (s *service) Configure(ctx context.Context, providerType string, req Config
 	req.BaseURL = strings.TrimSpace(req.BaseURL)
 	req.DefaultModel = strings.TrimSpace(req.DefaultModel)
 
-	if req.APIKey != "" && req.APIKeyEnv != "" {
-		return nil, fmt.Errorf("%w: provide apiKey or apiKeyEnv, not both", ErrInvalidProvider)
-	}
-
-	baseURL := req.BaseURL
-	if baseURL == "" {
-		baseURL = defaults.DefaultBaseURL
-	}
-	if defaults.RequiresBaseURL && baseURL == "" {
-		return nil, fmt.Errorf("%w: baseUrl is required for %s", ErrInvalidProvider, providerType)
-	}
-	if defaults.RequiresLogin {
-		if req.APIKey != "" || req.APIKeyEnv != "" {
-			return nil, fmt.Errorf("%w: %s signs in with a device code; an API key does not apply", ErrInvalidProvider, providerType)
-		}
-		baseURL = defaults.DefaultBaseURL
+	baseURL, err := validateConnectionInput(providerType, defaults, req.APIKey, req.APIKeyEnv, req.BaseURL)
+	if err != nil {
+		return nil, err
 	}
 
 	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
@@ -227,14 +244,13 @@ func (s *service) Configure(ctx context.Context, providerType string, req Config
 		Type:    providerType,
 		BaseURL: baseURL,
 	}
-	backendSvc := backendservice.New(s.dbInstance)
 	if existingBackend != nil {
 		backend.ID = existingBackend.ID
-		if err := backendSvc.Update(ctx, backend); err != nil {
+		if err := s.saveBackend(ctx, store, backend, false); err != nil {
 			return nil, fmt.Errorf("update backend: %w", err)
 		}
 	} else {
-		if err := backendSvc.Create(ctx, backend); err != nil {
+		if err := s.saveBackend(ctx, store, backend, true); err != nil {
 			return nil, fmt.Errorf("create backend: %w", err)
 		}
 	}
@@ -497,9 +513,13 @@ func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginSt
 		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
 	}
 
+	return s.startLogin(ctx, providerType, backend)
+}
+
+func (s *service) startLogin(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStart, error) {
 	auth := modelauth.New(s.dbInstance)
 	if state, err := auth.Status(ctx, backend.ID); err == nil && state.State == "authenticated" {
-		return &LoginStart{Provider: providerType, State: state.State, ExpiresAt: state.ExpiresAt}, nil
+		return &LoginStart{Provider: providerType, ConnectionID: backend.ID, State: state.State, ExpiresAt: state.ExpiresAt}, nil
 	}
 
 	loginMu.Lock()
@@ -507,9 +527,9 @@ func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginSt
 		device := attempt.device
 		loginMu.Unlock()
 		if device.Code != "" {
-			return &LoginStart{Provider: providerType, State: "login_pending", URL: device.URL, Code: device.Code, ExpiresAt: device.ExpiresAt}, nil
+			return &LoginStart{Provider: providerType, ConnectionID: backend.ID, State: "login_pending", URL: device.URL, Code: device.Code, ExpiresAt: device.ExpiresAt}, nil
 		}
-		return waitLoginStart(ctx, providerType, attempt)
+		return waitLoginStart(ctx, providerType, backend.ID, attempt)
 	}
 	loginCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	attempt := &loginAttempt{
@@ -542,13 +562,13 @@ func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginSt
 		}
 	}()
 
-	return waitLoginStart(ctx, providerType, attempt)
+	return waitLoginStart(ctx, providerType, backend.ID, attempt)
 }
 
-func waitLoginStart(ctx context.Context, providerType string, attempt *loginAttempt) (*LoginStart, error) {
+func waitLoginStart(ctx context.Context, providerType, backendID string, attempt *loginAttempt) (*LoginStart, error) {
 	select {
 	case code := <-attempt.codeCh:
-		return &LoginStart{Provider: providerType, State: "login_pending", URL: code.URL, Code: code.Code, ExpiresAt: code.ExpiresAt}, nil
+		return &LoginStart{Provider: providerType, ConnectionID: backendID, State: "login_pending", URL: code.URL, Code: code.Code, ExpiresAt: code.ExpiresAt}, nil
 	case <-attempt.doneCh:
 		loginMu.Lock()
 		err := attempt.err
@@ -556,7 +576,7 @@ func waitLoginStart(ctx context.Context, providerType string, attempt *loginAtte
 		if err != nil {
 			return nil, fmt.Errorf("start sign-in: %w", err)
 		}
-		return &LoginStart{Provider: providerType, State: "authenticated"}, nil
+		return &LoginStart{Provider: providerType, ConnectionID: backendID, State: "authenticated"}, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(30 * time.Second):
@@ -580,11 +600,15 @@ func (s *service) LoginStatus(ctx context.Context, providerType string) (*LoginS
 	if err != nil {
 		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
 	}
+	return s.loginStatus(ctx, providerType, backend)
+}
+
+func (s *service) loginStatus(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStatus, error) {
 	state, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID)
 	if err != nil {
 		return nil, err
 	}
-	out := &LoginStatus{Provider: providerType, State: state.State, ExpiresAt: state.ExpiresAt}
+	out := &LoginStatus{Provider: providerType, ConnectionID: backend.ID, State: state.State, ExpiresAt: state.ExpiresAt}
 
 	loginMu.Lock()
 	if attempt := loginAttempts[backend.ID]; attempt != nil {
@@ -616,13 +640,46 @@ func (s *service) Logout(ctx context.Context, providerType string) error {
 		return fmt.Errorf("read backend %q: %w", providerType, err)
 	}
 
+	return s.logout(ctx, backend)
+}
+
+// CancelLogin abandons an in-progress sign-in for the connection named after the
+// provider type. It never touches an established credential; use Logout for that.
+func (s *service) CancelLogin(ctx context.Context, providerType string) (*LoginStatus, error) {
+	providerType, defaults, err := normalizeProvider(providerType)
+	if err != nil {
+		return nil, err
+	}
+	if !defaults.RequiresLogin {
+		return nil, fmt.Errorf("%w: %s does not use a subscription sign-in", ErrInvalidProvider, providerType)
+	}
+	store := runtimetypes.New(s.dbInstance.WithoutTransaction())
+	backend, err := store.GetBackendByName(ctx, providerType)
+	if errors.Is(err, libdb.ErrNotFound) {
+		return &LoginStatus{Provider: providerType, State: "not_configured"}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
+	}
+	return s.cancelLogin(ctx, providerType, backend)
+}
+
+func (s *service) cancelLogin(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStatus, error) {
+	cancelLoginAttempt(backend.ID)
+	return s.loginStatus(ctx, providerType, backend)
+}
+
+func cancelLoginAttempt(backendID string) {
 	loginMu.Lock()
-	if attempt := loginAttempts[backend.ID]; attempt != nil {
+	if attempt := loginAttempts[backendID]; attempt != nil {
 		attempt.cancel()
-		delete(loginAttempts, backend.ID)
+		delete(loginAttempts, backendID)
 	}
 	loginMu.Unlock()
+}
 
+func (s *service) logout(ctx context.Context, backend *runtimetypes.Backend) error {
+	cancelLoginAttempt(backend.ID)
 	if err := modelauth.New(s.dbInstance).Logout(ctx, backend.ID); err != nil {
 		return err
 	}

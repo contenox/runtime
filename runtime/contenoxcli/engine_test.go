@@ -18,9 +18,9 @@ func TestReadinessDefaults(t *testing.T) {
 			wantModel: "phi-4-mini",
 		},
 		{
-			name: "hardcoded fallback model on fresh DB is not credited",
+			name: "no model on fresh DB is not credited",
 			opts: chatOpts{
-				EffectiveDefaultModel:    defaultModel,
+				EffectiveDefaultModel:    "",
 				EffectiveConfiguredModel: "",
 			},
 			wantModel: "",

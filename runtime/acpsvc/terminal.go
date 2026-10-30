@@ -38,6 +38,8 @@ type terminalRunResult struct {
 
 func (t *Transport) handleExtRequest(ctx context.Context, method string, params json.RawMessage) (json.RawMessage, *libacp.Error) {
 	switch method {
+	case ExtMethodWorkspaceConfigOptions:
+		return t.handleWorkspaceConfigOptions(ctx)
 	case extMethodTerminalRun:
 		return t.handleTerminalRun(ctx, params)
 	default:

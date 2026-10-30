@@ -19,6 +19,7 @@ type BackendRuntimeState struct {
 	PulledModels     []ModelPullStatus    `json:"pulledModels"`
 	Backend          runtimetypes.Backend `json:"backend"`
 	Error            string               `json:"error,omitempty" example:"connection timeout: context deadline exceeded"`
+	ErrorCode        string               `json:"errorCode,omitempty" example:"unreachable"`
 	ResolvedEndpoint string               `json:"resolvedEndpoint,omitempty"`
 	ResolvedInstance string               `json:"resolvedInstance,omitempty"`
 	LiveEngine       string               `json:"liveEngine,omitempty"`

@@ -32,6 +32,7 @@ type backendSummary struct {
 	Models       []string                    `json:"models"`
 	PulledModels []statetype.ModelPullStatus `json:"pulledModels"`
 	Error        string                      `json:"error,omitempty" example:"error-message"`
+	ErrorCode    string                      `json:"errorCode,omitempty" example:"unreachable"`
 
 	CreatedAt time.Time `json:"createdAt" example:"2023-01-01T00:00:00Z"`
 	UpdatedAt time.Time `json:"updatedAt" example:"2023-01-01T00:00:00Z"`
@@ -103,6 +104,7 @@ func (b *backendManager) listBackends(w http.ResponseWriter, r *http.Request) {
 			item.Models = observedModelNames(itemState)
 			item.PulledModels = itemState.PulledModels
 			item.Error = itemState.Error
+			item.ErrorCode = itemState.ErrorCode
 		}
 		resp = append(resp, item)
 	}
@@ -118,6 +120,7 @@ type backendDetails struct {
 	Models       []string                    `json:"models" example:"[\"mistral:instruct\", \"llama2:7b\", \"nomic-embed-text:latest\"]"`
 	PulledModels []statetype.ModelPullStatus `json:"pulledModels"`
 	Error        string                      `json:"error,omitempty" example:"connection timeout: context deadline exceeded"`
+	ErrorCode    string                      `json:"errorCode,omitempty" example:"unreachable"`
 	CreatedAt    time.Time                   `json:"createdAt" example:"2023-11-15T14:30:45Z"`
 	UpdatedAt    time.Time                   `json:"updatedAt" example:"2023-11-15T14:30:45Z"`
 }
@@ -167,6 +170,7 @@ func (b *backendManager) getBackend(w http.ResponseWriter, r *http.Request) {
 		resp.Models = observedModelNames(itemState)
 		resp.PulledModels = itemState.PulledModels
 		resp.Error = itemState.Error
+		resp.ErrorCode = itemState.ErrorCode
 	}
 
 	_ = apiframework.Encode(w, r, http.StatusOK, resp)

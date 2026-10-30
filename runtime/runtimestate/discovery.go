@@ -25,7 +25,22 @@ type backendRun struct {
 	job  backendJob
 }
 
+// AnyProvider is the reserved provider selector meaning "every connection that
+// serves the model". It matches all connections and never raises an
+// ambiguous-route error.
+const AnyProvider = "any"
+
+// IsAnyProvider reports whether a provider selector is the AnyProvider sentinel.
+func IsAnyProvider(provider string) bool {
+	return strings.EqualFold(strings.TrimSpace(provider), AnyProvider)
+}
+
 func matchesEveryProvider(providers []string) bool {
+	for _, provider := range providers {
+		if IsAnyProvider(provider) {
+			return true
+		}
+	}
 	for _, provider := range providers {
 		if modelrepo.CanonicalBackendType(provider) != "" {
 			return false

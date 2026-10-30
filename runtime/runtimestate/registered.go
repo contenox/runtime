@@ -46,6 +46,7 @@ func (s *State) ReconcileDeclarations(ctx context.Context, id string) error {
 		state.DiscoveryError = state.Error
 	}
 	state.Error = ""
+	state.ErrorCode = ""
 	credential, err := s.loadProviderAPIKey(ctx, backend)
 	if err != nil && !errors.Is(err, libdbexec.ErrNotFound) {
 		return err

@@ -160,6 +160,7 @@ func newLoopbackHarness(t *testing.T) *loopbackHarness {
 	router := NewSessionRouter()
 	factory := New(Deps{
 		Engine:        &enginesvc.Engine{Bus: bus},
+		DefaultModel:  "test-model",
 		DB:            db,
 		ChainRegistry: &ChainRegistry{defaultChain: &taskengine.TaskChainDefinition{}},
 		WorkspaceID:   "loopback-ws",
@@ -270,7 +271,7 @@ func TestLoopback_Prompt_StreamsUpdatesThroughRealClient(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, libacp.StopReasonEndTurn, promptResp.StopReason)
 
-	updates := h.lc.drain(t, 5)
+	updates := h.lc.drain(t, 6)
 	byKind := make(map[libacp.SessionUpdateKind]libacp.SessionUpdate, len(updates))
 	for _, u := range updates {
 		byKind[u.Update.SessionUpdate] = u.Update

@@ -15,11 +15,11 @@ func (s *State) processCodexBackend(ctx context.Context, backend *runtimetypes.B
 	defer s.state.Store(backend.ID, state)
 	status, err := auth.Status(ctx, backend.ID)
 	if err != nil {
-		state.Error = err.Error()
+		state.setError(err)
 		return
 	}
 	if status.State == "login_required" {
-		state.Error = modelauth.ErrLoginRequired.Error()
+		state.setError(modelauth.ErrLoginRequired)
 		return
 	}
 	state.authorize = func(ctx context.Context) (http.Header, error) { return auth.Headers(ctx, backend.ID) }
@@ -27,12 +27,12 @@ func (s *State) processCodexBackend(ctx context.Context, backend *runtimetypes.B
 	if !cached {
 		catalog, err := modelrepo.NewCatalogProvider(modelrepo.BackendSpec{Type: modelauth.ProviderType, BaseURL: backend.BaseURL}, modelrepo.WithCatalogAuthorizer(state.authorize))
 		if err != nil {
-			state.Error = err.Error()
+			state.setError(err)
 			return
 		}
 		models, err = catalog.ListModels(ctx)
 		if err != nil {
-			state.Error = err.Error()
+			state.setError(err)
 			return
 		}
 		s.storeObservedModelCache(ctx, backend.ID, status.Generation, models, catalog)
