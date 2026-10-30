@@ -504,6 +504,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			WorkspaceRoots:        workspaceFactory,
 			ShellSessions:         shellSessions,
 			SessionRouter:         sessionRouter,
+			DecisionRecorder:      decisionRecorderOf(hitlSvc),
 			Instances:             instances,
 			NativeTurns:           nativeTurns,
 			Fleet:                 fleet,
@@ -789,4 +790,11 @@ func servePinnedDefaults(cmd *cobra.Command, opts chatOpts) acpsvc.LiveDefaults 
 		p.Think = opts.EffectiveThink
 	}
 	return p
+}
+
+// decisionRecorderOf returns the approval service's audit recorder, or nil when
+// the service cannot record (it then simply does not write audit rows).
+func decisionRecorderOf(svc hitlservice.Service) hitlservice.DecisionRecorder {
+	rec, _ := svc.(hitlservice.DecisionRecorder)
+	return rec
 }

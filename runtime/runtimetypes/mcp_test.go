@@ -1,6 +1,7 @@
 package runtimetypes_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -35,349 +36,392 @@ func newStdio(name string) *runtimetypes.MCPServer {
 }
 
 func TestUnit_MCPServers_CreateAndGet(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("create-and-get")
-	srv.AuthType = "bearer"
-	srv.AuthEnvKey = "MY_MCP_TOKEN"
+		srv := newSSE("create-and-get")
+		srv.AuthType = "bearer"
+		srv.AuthEnvKey = "MY_MCP_TOKEN"
 
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Equal(t, srv.ID, got.ID)
-	require.Equal(t, srv.Name, got.Name)
-	require.Equal(t, srv.Transport, got.Transport)
-	require.Equal(t, srv.URL, got.URL)
-	require.Equal(t, srv.AuthType, got.AuthType)
-	require.Equal(t, srv.AuthEnvKey, got.AuthEnvKey)
-	require.Equal(t, srv.ConnectTimeoutSeconds, got.ConnectTimeoutSeconds)
-	require.WithinDuration(t, time.Now().UTC(), got.CreatedAt, 2*time.Second)
-	require.WithinDuration(t, time.Now().UTC(), got.UpdatedAt, 2*time.Second)
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.Equal(t, srv.ID, got.ID)
+		require.Equal(t, srv.Name, got.Name)
+		require.Equal(t, srv.Transport, got.Transport)
+		require.Equal(t, srv.URL, got.URL)
+		require.Equal(t, srv.AuthType, got.AuthType)
+		require.Equal(t, srv.AuthEnvKey, got.AuthEnvKey)
+		require.Equal(t, srv.ConnectTimeoutSeconds, got.ConnectTimeoutSeconds)
+		require.WithinDuration(t, time.Now().UTC(), got.CreatedAt, 2*time.Second)
+		require.WithinDuration(t, time.Now().UTC(), got.UpdatedAt, 2*time.Second)
 
-	byName, err := s.GetMCPServerByName(ctx, srv.Name)
-	require.NoError(t, err)
-	require.Equal(t, srv.ID, byName.ID)
+		byName, err := s.GetMCPServerByName(ctx, srv.Name)
+		require.NoError(t, err)
+		require.Equal(t, srv.ID, byName.ID)
+	})
 }
 
 func TestUnit_MCPServers_ArgsRoundTrip(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newStdio("stdio-args-roundtrip")
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newStdio("stdio-args-roundtrip")
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Equal(t, srv.Command, got.Command)
-	require.Equal(t, srv.Args, got.Args)
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.Equal(t, srv.Command, got.Command)
+		require.Equal(t, srv.Args, got.Args)
+	})
 }
 
 func TestUnit_MCPServers_NilArgs(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("nil-args")
-	srv.Args = nil
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newSSE("nil-args")
+		srv.Args = nil
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.True(t, len(got.Args) == 0, "expected empty/nil args")
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.True(t, len(got.Args) == 0, "expected empty/nil args")
+	})
 }
 
 func TestUnit_MCPServers_Update(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	original := newSSE("update-me")
-	require.NoError(t, s.CreateMCPServer(ctx, original))
+		original := newSSE("update-me")
+		require.NoError(t, s.CreateMCPServer(ctx, original))
+		tick()
 
-	updated := *original
-	updated.URL = "http://new-mcp.example.com/sse"
-	updated.ConnectTimeoutSeconds = 60
-	updated.AuthType = "bearer"
-	updated.AuthToken = "literal-token"
+		updated := *original
+		updated.URL = "http://new-mcp.example.com/sse"
+		updated.ConnectTimeoutSeconds = 60
+		updated.AuthType = "bearer"
+		updated.AuthToken = "literal-token"
 
-	require.NoError(t, s.UpdateMCPServer(ctx, &updated))
+		require.NoError(t, s.UpdateMCPServer(ctx, &updated))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, original.ID)
-	require.NoError(t, err)
-	require.Equal(t, "http://new-mcp.example.com/sse", got.URL)
-	require.Equal(t, 60, got.ConnectTimeoutSeconds)
-	require.Equal(t, "bearer", got.AuthType)
-	require.Equal(t, "literal-token", got.AuthToken)
-	require.True(t, got.UpdatedAt.After(original.UpdatedAt), "UpdatedAt should advance")
+		got, err := s.GetMCPServer(ctx, original.ID)
+		require.NoError(t, err)
+		require.Equal(t, "http://new-mcp.example.com/sse", got.URL)
+		require.Equal(t, 60, got.ConnectTimeoutSeconds)
+		require.Equal(t, "bearer", got.AuthType)
+		require.Equal(t, "literal-token", got.AuthToken)
+		require.True(t, got.UpdatedAt.After(original.UpdatedAt), "UpdatedAt should advance")
+	})
 }
 
 func TestUnit_MCPServers_Delete(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("delete-me")
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newSSE("delete-me")
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	require.NoError(t, s.DeleteMCPServer(ctx, srv.ID))
+		require.NoError(t, s.DeleteMCPServer(ctx, srv.ID))
 
-	_, err := s.GetMCPServer(ctx, srv.ID)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, libdb.ErrNotFound))
+		_, err := s.GetMCPServer(ctx, srv.ID)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, libdb.ErrNotFound))
+	})
 }
 
 func TestUnit_MCPServers_ListEmpty(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	items, err := s.ListMCPServers(ctx, nil, 100)
-	require.NoError(t, err)
-	require.Empty(t, items, "fresh DB should return empty list")
+		items, err := s.ListMCPServers(ctx, nil, 100)
+		require.NoError(t, err)
+		require.Empty(t, items, "fresh DB should return empty list")
+	})
 }
 
 func TestUnit_MCPServers_List(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	servers := []*runtimetypes.MCPServer{
-		newSSE("list-1"),
-		newSSE("list-2"),
-		newSSE("list-3"),
-	}
-	for _, srv := range servers {
-		require.NoError(t, s.CreateMCPServer(ctx, srv))
-	}
+		servers := []*runtimetypes.MCPServer{
+			newSSE("list-1"),
+			newSSE("list-2"),
+			newSSE("list-3"),
+		}
+		for _, srv := range servers {
+			require.NoError(t, s.CreateMCPServer(ctx, srv))
+			tick()
+		}
 
-	items, err := s.ListMCPServers(ctx, nil, 100)
-	require.NoError(t, err)
-	require.Len(t, items, 3)
+		items, err := s.ListMCPServers(ctx, nil, 100)
+		require.NoError(t, err)
+		require.Len(t, items, 3)
 
-	require.Equal(t, servers[2].ID, items[0].ID)
-	require.Equal(t, servers[1].ID, items[1].ID)
-	require.Equal(t, servers[0].ID, items[2].ID)
+		require.Equal(t, servers[2].ID, items[0].ID)
+		require.Equal(t, servers[1].ID, items[1].ID)
+		require.Equal(t, servers[0].ID, items[2].ID)
+	})
 }
 
 func TestUnit_MCPServers_ListPagination(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	var created []*runtimetypes.MCPServer
-	for i := range 5 {
-		srv := newSSE(fmt.Sprintf("pagination-mcp-%d", i))
-		require.NoError(t, s.CreateMCPServer(ctx, srv))
-		created = append(created, srv)
-	}
+		var created []*runtimetypes.MCPServer
+		for i := range 5 {
+			srv := newSSE(fmt.Sprintf("pagination-mcp-%d", i))
+			require.NoError(t, s.CreateMCPServer(ctx, srv))
+			tick()
+			created = append(created, srv)
+		}
 
-	var received []*runtimetypes.MCPServer
-	var cursor *time.Time
-	const limit = 2
+		var received []*runtimetypes.MCPServer
+		var cursor *time.Time
+		var cursorID string
+		const limit = 2
 
-	page1, err := s.ListMCPServers(ctx, cursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page1, 2)
-	received = append(received, page1...)
-	cursor = &page1[len(page1)-1].CreatedAt
+		page1, err := s.ListMCPServers(ctx, cursor, limit, cursorID)
+		require.NoError(t, err)
+		require.Len(t, page1, 2)
+		received = append(received, page1...)
+		cursor = &page1[len(page1)-1].CreatedAt
+		cursorID = page1[len(page1)-1].ID
 
-	page2, err := s.ListMCPServers(ctx, cursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page2, 2)
-	received = append(received, page2...)
-	cursor = &page2[len(page2)-1].CreatedAt
+		page2, err := s.ListMCPServers(ctx, cursor, limit, cursorID)
+		require.NoError(t, err)
+		require.Len(t, page2, 2)
+		received = append(received, page2...)
+		cursor = &page2[len(page2)-1].CreatedAt
+		cursorID = page2[len(page2)-1].ID
 
-	page3, err := s.ListMCPServers(ctx, cursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page3, 1)
-	received = append(received, page3...)
+		page3, err := s.ListMCPServers(ctx, cursor, limit, cursorID)
+		require.NoError(t, err)
+		require.Len(t, page3, 1)
+		received = append(received, page3...)
 
-	page4, err := s.ListMCPServers(ctx, &page3[0].CreatedAt, limit)
-	require.NoError(t, err)
-	require.Empty(t, page4)
+		page4, err := s.ListMCPServers(ctx, &page3[0].CreatedAt, limit, page3[0].ID)
+		require.NoError(t, err)
+		require.Empty(t, page4)
 
-	require.Len(t, received, 5)
-	require.Equal(t, created[4].ID, received[0].ID)
-	require.Equal(t, created[3].ID, received[1].ID)
-	require.Equal(t, created[2].ID, received[2].ID)
-	require.Equal(t, created[1].ID, received[3].ID)
-	require.Equal(t, created[0].ID, received[4].ID)
+		require.Len(t, received, 5)
+		require.Equal(t, created[4].ID, received[0].ID)
+		require.Equal(t, created[3].ID, received[1].ID)
+		require.Equal(t, created[2].ID, received[2].ID)
+		require.Equal(t, created[1].ID, received[3].ID)
+		require.Equal(t, created[0].ID, received[4].ID)
+	})
 }
 
 func TestUnit_MCPServers_UniqueNameConstraint(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv1 := newSSE("unique-mcp-name")
-	require.NoError(t, s.CreateMCPServer(ctx, srv1))
+		srv1 := newSSE("unique-mcp-name")
+		require.NoError(t, s.CreateMCPServer(ctx, srv1))
+		tick()
 
-	srv2 := *srv1
-	srv2.ID = uuid.New().String()
-	srv2.URL = "http://other-mcp.example.com/sse"
+		srv2 := *srv1
+		srv2.ID = uuid.New().String()
+		srv2.URL = "http://other-mcp.example.com/sse"
 
-	err := s.CreateMCPServer(ctx, &srv2)
-	require.Error(t, err, "duplicate name must be rejected")
+		err := s.CreateMCPServer(ctx, &srv2)
+		tick()
+		require.Error(t, err, "duplicate name must be rejected")
+	})
 }
 
 func TestUnit_MCPServers_DeleteAndRecreate(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("recreate-me")
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
-	require.NoError(t, s.DeleteMCPServer(ctx, srv.ID))
+		srv := newSSE("recreate-me")
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
+		require.NoError(t, s.DeleteMCPServer(ctx, srv.ID))
 
-	newSrv := *srv
-	newSrv.ID = uuid.New().String()
-	require.NoError(t, s.CreateMCPServer(ctx, &newSrv), "should allow recreating with same name after deletion")
+		newSrv := *srv
+		newSrv.ID = uuid.New().String()
+		require.NoError(t, s.CreateMCPServer(ctx, &newSrv), "should allow recreating with same name after deletion")
+		tick()
 
-	got, err := s.GetMCPServerByName(ctx, srv.Name)
-	require.NoError(t, err)
-	require.Equal(t, newSrv.ID, got.ID)
+		got, err := s.GetMCPServerByName(ctx, srv.Name)
+		require.NoError(t, err)
+		require.Equal(t, newSrv.ID, got.ID)
+	})
 }
 
 func TestUnit_MCPServers_NotFoundCases(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	t.Run("get_by_id_not_found", func(t *testing.T) {
-		_, err := s.GetMCPServer(ctx, uuid.New().String())
-		require.Error(t, err)
-		require.True(t, errors.Is(err, libdb.ErrNotFound))
-	})
+		t.Run("get_by_id_not_found", func(t *testing.T) {
+			_, err := s.GetMCPServer(ctx, uuid.New().String())
+			require.Error(t, err)
+			require.True(t, errors.Is(err, libdb.ErrNotFound))
+		})
 
-	t.Run("get_by_name_not_found", func(t *testing.T) {
-		_, err := s.GetMCPServerByName(ctx, "non-existent-mcp")
-		require.Error(t, err)
-		require.True(t, errors.Is(err, libdb.ErrNotFound))
-	})
+		t.Run("get_by_name_not_found", func(t *testing.T) {
+			_, err := s.GetMCPServerByName(ctx, "non-existent-mcp")
+			require.Error(t, err)
+			require.True(t, errors.Is(err, libdb.ErrNotFound))
+		})
 
-	t.Run("update_non_existent", func(t *testing.T) {
-		err := s.UpdateMCPServer(ctx, newSSE("ghost"))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, libdb.ErrNotFound))
-	})
+		t.Run("update_non_existent", func(t *testing.T) {
+			err := s.UpdateMCPServer(ctx, newSSE("ghost"))
+			tick()
+			require.Error(t, err)
+			require.True(t, errors.Is(err, libdb.ErrNotFound))
+		})
 
-	t.Run("delete_non_existent", func(t *testing.T) {
-		err := s.DeleteMCPServer(ctx, uuid.New().String())
-		require.Error(t, err)
+		t.Run("delete_non_existent", func(t *testing.T) {
+			err := s.DeleteMCPServer(ctx, uuid.New().String())
+			require.Error(t, err)
+		})
 	})
 }
 
 func TestUnit_MCPServers_ConcurrentUpdates(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("concurrent-mcp")
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newSSE("concurrent-mcp")
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	updateURL := func(url string) {
-		h, err := s.GetMCPServer(ctx, srv.ID)
+		updateURL := func(url string) {
+			h, err := s.GetMCPServer(ctx, srv.ID)
+			require.NoError(t, err)
+			h.URL = url
+			require.NoError(t, s.UpdateMCPServer(ctx, h))
+			tick()
+		}
+
+		var wg sync.WaitGroup
+		urls := []string{
+			"http://node1.example.com/sse",
+			"http://node2.example.com/sse",
+			"http://node3.example.com/sse",
+		}
+		for _, u := range urls {
+			wg.Add(1)
+			go func(url string) {
+				defer wg.Done()
+				updateURL(url)
+			}(u)
+		}
+		wg.Wait()
+
+		final, err := s.GetMCPServer(ctx, srv.ID)
 		require.NoError(t, err)
-		h.URL = url
-		require.NoError(t, s.UpdateMCPServer(ctx, h))
-	}
-
-	var wg sync.WaitGroup
-	urls := []string{
-		"http://node1.example.com/sse",
-		"http://node2.example.com/sse",
-		"http://node3.example.com/sse",
-	}
-	for _, u := range urls {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			updateURL(url)
-		}(u)
-	}
-	wg.Wait()
-
-	final, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Contains(t, urls, final.URL)
-	require.True(t, final.UpdatedAt.After(srv.UpdatedAt))
+		require.Contains(t, urls, final.URL)
+		require.True(t, final.UpdatedAt.After(srv.UpdatedAt))
+	})
 }
 
 func TestUnit_MCPServers_EstimateCount(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	for i := range 3 {
-		require.NoError(t, s.CreateMCPServer(ctx, newSSE(fmt.Sprintf("count-%d", i))))
-	}
+		for i := range 3 {
+			require.NoError(t, s.CreateMCPServer(ctx, newSSE(fmt.Sprintf("count-%d", i))))
+			tick()
+		}
 
-	_, err := s.EstimateMCPServerCount(ctx)
-	require.NoError(t, err)
+		_, err := s.EstimateMCPServerCount(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func TestUnit_MCPServers_HeadersAndInjectParams_GetByID(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("inject-by-id-" + uuid.New().String()[:8])
-	srv.Headers = map[string]string{"X-Tenant": "acme", "X-Version": "2"}
-	srv.InjectParams = map[string]string{"tenant_id": "acme", "env": "production"}
+		srv := newSSE("inject-by-id-" + uuid.New().String()[:8])
+		srv.Headers = map[string]string{"X-Tenant": "acme", "X-Version": "2"}
+		srv.InjectParams = map[string]string{"tenant_id": "acme", "env": "production"}
 
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"X-Tenant": "acme", "X-Version": "2"}, got.Headers)
-	require.Equal(t, map[string]string{"tenant_id": "acme", "env": "production"}, got.InjectParams)
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{"X-Tenant": "acme", "X-Version": "2"}, got.Headers)
+		require.Equal(t, map[string]string{"tenant_id": "acme", "env": "production"}, got.InjectParams)
+	})
 }
 
 func TestUnit_MCPServers_HeadersAndInjectParams_GetByName(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	name := "inject-by-name-" + uuid.New().String()[:8]
-	srv := newSSE(name)
-	srv.Headers = map[string]string{"Authorization": "Bearer tok"}
-	srv.InjectParams = map[string]string{"correlation_id": "trace-xyz"}
+		name := "inject-by-name-" + uuid.New().String()[:8]
+		srv := newSSE(name)
+		srv.Headers = map[string]string{"Authorization": "Bearer tok"}
+		srv.InjectParams = map[string]string{"correlation_id": "trace-xyz"}
 
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServerByName(ctx, name)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"Authorization": "Bearer tok"}, got.Headers)
-	require.Equal(t, map[string]string{"correlation_id": "trace-xyz"}, got.InjectParams)
+		got, err := s.GetMCPServerByName(ctx, name)
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{"Authorization": "Bearer tok"}, got.Headers)
+		require.Equal(t, map[string]string{"correlation_id": "trace-xyz"}, got.InjectParams)
+	})
 }
 
 func TestUnit_MCPServers_UpdateReplacesInjectParamsAndHeaders(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("inject-update-" + uuid.New().String()[:8])
-	srv.Headers = map[string]string{"Old-Header": "1"}
-	srv.InjectParams = map[string]string{"old_key": "old_val", "extra": "gone"}
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newSSE("inject-update-" + uuid.New().String()[:8])
+		srv.Headers = map[string]string{"Old-Header": "1"}
+		srv.InjectParams = map[string]string{"old_key": "old_val", "extra": "gone"}
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	srv.Headers = map[string]string{"New-Header": "2"}
-	srv.InjectParams = map[string]string{"tenant_id": "new"}
-	require.NoError(t, s.UpdateMCPServer(ctx, srv))
+		srv.Headers = map[string]string{"New-Header": "2"}
+		srv.InjectParams = map[string]string{"tenant_id": "new"}
+		require.NoError(t, s.UpdateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"New-Header": "2"}, got.Headers)
-	require.Equal(t, map[string]string{"tenant_id": "new"}, got.InjectParams)
-	_, hasExtra := got.InjectParams["extra"]
-	require.False(t, hasExtra, "update must replace entire map, not merge")
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{"New-Header": "2"}, got.Headers)
+		require.Equal(t, map[string]string{"tenant_id": "new"}, got.InjectParams)
+		_, hasExtra := got.InjectParams["extra"]
+		require.False(t, hasExtra, "update must replace entire map, not merge")
+	})
 }
 
 func TestUnit_MCPServers_ListIncludesInjectParamsAndHeaders(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newSSE("inject-list-" + uuid.New().String()[:8])
-	srv.Headers = map[string]string{"X-Key": "val"}
-	srv.InjectParams = map[string]string{"key": "val"}
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newSSE("inject-list-" + uuid.New().String()[:8])
+		srv.Headers = map[string]string{"X-Key": "val"}
+		srv.InjectParams = map[string]string{"key": "val"}
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	list, err := s.ListMCPServers(ctx, nil, 100)
-	require.NoError(t, err)
+		list, err := s.ListMCPServers(ctx, nil, 100)
+		require.NoError(t, err)
 
-	var found *runtimetypes.MCPServer
-	for _, m := range list {
-		if m.ID == srv.ID {
-			found = m
-			break
+		var found *runtimetypes.MCPServer
+		for _, m := range list {
+			if m.ID == srv.ID {
+				found = m
+				break
+			}
 		}
-	}
-	require.NotNil(t, found, "created server must appear in list")
-	require.Equal(t, map[string]string{"X-Key": "val"}, found.Headers)
-	require.Equal(t, map[string]string{"key": "val"}, found.InjectParams)
+		require.NotNil(t, found, "created server must appear in list")
+		require.Equal(t, map[string]string{"X-Key": "val"}, found.Headers)
+		require.Equal(t, map[string]string{"key": "val"}, found.InjectParams)
+	})
 }
 
 func TestUnit_MCPServers_EmptyMapsRoundTrip(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	srv := newStdio("empty-maps-" + uuid.New().String()[:8])
-	require.NoError(t, s.CreateMCPServer(ctx, srv))
+		srv := newStdio("empty-maps-" + uuid.New().String()[:8])
+		require.NoError(t, s.CreateMCPServer(ctx, srv))
+		tick()
 
-	got, err := s.GetMCPServer(ctx, srv.ID)
-	require.NoError(t, err)
-	require.Empty(t, got.InjectParams)
-	require.Empty(t, got.Headers)
+		got, err := s.GetMCPServer(ctx, srv.ID)
+		require.NoError(t, err)
+		require.Empty(t, got.InjectParams)
+		require.Empty(t, got.Headers)
+	})
 }
 
 func newTools(name string) *runtimetypes.RemoteTools {
@@ -390,51 +434,58 @@ func newTools(name string) *runtimetypes.RemoteTools {
 }
 
 func TestUnit_RemoteTools_InjectParamsRoundTrip(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	tools := newTools("tools-inject-" + uuid.New().String()[:8])
-	tools.InjectParams = map[string]string{"tenant_id": "acme", "env": "prod"}
-	require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tools := newTools("tools-inject-" + uuid.New().String()[:8])
+		tools.InjectParams = map[string]string{"tenant_id": "acme", "env": "prod"}
+		require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tick()
 
-	got, err := s.GetRemoteTools(ctx, tools.ID)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"tenant_id": "acme", "env": "prod"}, got.InjectParams)
+		got, err := s.GetRemoteTools(ctx, tools.ID)
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{"tenant_id": "acme", "env": "prod"}, got.InjectParams)
+	})
 }
 
 func TestUnit_RemoteTools_UpdateInjectParamsReplaceAll(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	tools := newTools("tools-upd-" + uuid.New().String()[:8])
-	tools.InjectParams = map[string]string{"old": "value", "extra": "gone"}
-	require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tools := newTools("tools-upd-" + uuid.New().String()[:8])
+		tools.InjectParams = map[string]string{"old": "value", "extra": "gone"}
+		require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tick()
 
-	tools.InjectParams = map[string]string{"tenant_id": "new"}
-	require.NoError(t, s.UpdateRemoteTools(ctx, tools))
+		tools.InjectParams = map[string]string{"tenant_id": "new"}
+		require.NoError(t, s.UpdateRemoteTools(ctx, tools))
+		tick()
 
-	got, err := s.GetRemoteTools(ctx, tools.ID)
-	require.NoError(t, err)
-	require.Equal(t, map[string]string{"tenant_id": "new"}, got.InjectParams)
-	_, hasExtra := got.InjectParams["extra"]
-	require.False(t, hasExtra, "update must replace entire map")
+		got, err := s.GetRemoteTools(ctx, tools.ID)
+		require.NoError(t, err)
+		require.Equal(t, map[string]string{"tenant_id": "new"}, got.InjectParams)
+		_, hasExtra := got.InjectParams["extra"]
+		require.False(t, hasExtra, "update must replace entire map")
+	})
 }
 
 func TestUnit_RemoteTools_ListIncludesInjectParams(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	tools := newTools("tools-list-" + uuid.New().String()[:8])
-	tools.InjectParams = map[string]string{"correlation_id": "trace-abc"}
-	require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tools := newTools("tools-list-" + uuid.New().String()[:8])
+		tools.InjectParams = map[string]string{"correlation_id": "trace-abc"}
+		require.NoError(t, s.CreateRemoteTools(ctx, tools))
+		tick()
 
-	list, err := s.ListRemoteTools(ctx, nil, 100)
-	require.NoError(t, err)
+		list, err := s.ListRemoteTools(ctx, nil, 100)
+		require.NoError(t, err)
 
-	var found *runtimetypes.RemoteTools
-	for _, h := range list {
-		if h.ID == tools.ID {
-			found = h
-			break
+		var found *runtimetypes.RemoteTools
+		for _, h := range list {
+			if h.ID == tools.ID {
+				found = h
+				break
+			}
 		}
-	}
-	require.NotNil(t, found)
-	require.Equal(t, map[string]string{"correlation_id": "trace-abc"}, found.InjectParams)
+		require.NotNil(t, found)
+		require.Equal(t, map[string]string{"correlation_id": "trace-abc"}, found.InjectParams)
+	})
 }

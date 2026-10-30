@@ -269,8 +269,9 @@ func (s *service) GetByInstance(ctx context.Context, instanceID string) (*Missio
 		return nil, fmt.Errorf("instanceId is required")
 	}
 	var cursor *time.Time
+	var cursorKey string
 	for {
-		batch, next, err := s.listPage(ctx, cursor, scanPageSize)
+		batch, next, nextKey, err := s.listPage(ctx, cursor, cursorKey, scanPageSize)
 		if err != nil {
 			return nil, err
 		}
@@ -282,10 +283,12 @@ func (s *service) GetByInstance(ctx context.Context, instanceID string) (*Missio
 		if len(batch) < scanPageSize || next == nil {
 			return nil, libdb.ErrNotFound
 		}
-		if cursor != nil && !next.Before(*cursor) {
+		// Keyset paging (created_at, key) always advances; this only guards
+		// against a store that returns the same page again.
+		if cursor != nil && nextKey == cursorKey && next.Equal(*cursor) {
 			return nil, libdb.ErrNotFound
 		}
-		cursor = next
+		cursor, cursorKey = next, nextKey
 	}
 }
 
@@ -293,29 +296,31 @@ func (s *service) List(ctx context.Context, createdAtCursor *time.Time, limit in
 	if limit <= 0 {
 		limit = 100
 	}
-	missions, _, err := s.listPage(ctx, createdAtCursor, limit)
+	missions, _, _, err := s.listPage(ctx, createdAtCursor, "", limit)
 	return missions, err
 }
 
-func (s *service) listPage(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Mission, *time.Time, error) {
-	kvs, err := s.store().ListKVPrefix(ctx, missionKVPrefix, createdAtCursor, limit)
+func (s *service) listPage(ctx context.Context, createdAtCursor *time.Time, afterKey string, limit int) ([]*Mission, *time.Time, string, error) {
+	kvs, err := s.store().ListKVPrefix(ctx, missionKVPrefix, createdAtCursor, limit, afterKey)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	missions := make([]*Mission, 0, len(kvs))
 	for _, kv := range kvs {
 		var m Mission
 		if err := json.Unmarshal(kv.Value, &m); err != nil {
-			return nil, nil, fmt.Errorf("mission %q: %w", kv.Key, err)
+			return nil, nil, "", fmt.Errorf("mission %q: %w", kv.Key, err)
 		}
 		missions = append(missions, &m)
 	}
 	var next *time.Time
+	var nextKey string
 	if len(kvs) > 0 {
 		last := kvs[len(kvs)-1].CreatedAt
 		next = &last
+		nextKey = kvs[len(kvs)-1].Key
 	}
-	return missions, next, nil
+	return missions, next, nextKey, nil
 }
 
 func (s *service) Update(ctx context.Context, m *Mission) error {

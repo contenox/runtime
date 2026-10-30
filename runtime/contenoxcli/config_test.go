@@ -3,7 +3,6 @@ package contenoxcli
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -101,8 +100,7 @@ func TestUnit_normalizeMaxTokensConfig(t *testing.T) {
 }
 
 func TestUnit_resolveDBPath_defaultsToGlobalDB(t *testing.T) {
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
+	home := isolateHome(t)
 	expected := filepath.Join(home, ".contenox-harness", "local.db")
 
 	cmd := testCobraCmd()

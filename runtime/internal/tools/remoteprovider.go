@@ -367,10 +367,11 @@ func (p *PersistentRepo) GetSchemasForSupportedTools(ctx context.Context) (map[s
 
 	store := runtimetypes.New(p.dbInstance.WithoutTransaction())
 	var cursor *time.Time
+	var cursorID string
 	const limit = 100
 
 	for {
-		page, err := store.ListRemoteTools(ctx, cursor, limit)
+		page, err := store.ListRemoteTools(ctx, cursor, limit, cursorID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list remote tools: %w", err)
 		}
@@ -387,6 +388,7 @@ func (p *PersistentRepo) GetSchemasForSupportedTools(ctx context.Context) (map[s
 			break
 		}
 		cursor = &page[len(page)-1].CreatedAt
+		cursorID = page[len(page)-1].ID
 	}
 
 	return schemas, nil
@@ -400,10 +402,11 @@ func (p *PersistentRepo) Supports(ctx context.Context) ([]string, error) {
 
 	store := runtimetypes.New(p.dbInstance.WithoutTransaction())
 	var cursor *time.Time
+	var cursorID string
 	const limit = 100
 
 	for {
-		page, err := store.ListMCPServers(ctx, cursor, limit)
+		page, err := store.ListMCPServers(ctx, cursor, limit, cursorID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list MCP servers: %w", err)
 		}
@@ -417,11 +420,13 @@ func (p *PersistentRepo) Supports(ctx context.Context) ([]string, error) {
 			break
 		}
 		cursor = &page[len(page)-1].CreatedAt
+		cursorID = page[len(page)-1].ID
 	}
 
 	cursor = nil
+	cursorID = ""
 	for {
-		page, err := store.ListRemoteTools(ctx, cursor, limit)
+		page, err := store.ListRemoteTools(ctx, cursor, limit, cursorID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list remote tools: %w", err)
 		}
@@ -432,6 +437,7 @@ func (p *PersistentRepo) Supports(ctx context.Context) ([]string, error) {
 			break
 		}
 		cursor = &page[len(page)-1].CreatedAt
+		cursorID = page[len(page)-1].ID
 	}
 
 	return names, nil

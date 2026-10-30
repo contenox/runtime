@@ -99,12 +99,14 @@ func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID stri
 		if msg.Timestamp.IsZero() {
 			msg.Timestamp = time.Now().UTC()
 		}
-		// History is read back ordered by added_at. Stores keep the timestamp
-		// at a coarser precision than Go (SQLite can land on the same second),
-		// so two messages written together could come back swapped. Make the
-		// append order the stored order.
-		if !msg.Timestamp.After(lastAdded) {
-			msg.Timestamp = lastAdded.Add(time.Microsecond)
+		// History is read back ordered by (added_at, seq, id) and the store
+		// assigns seq in append order, so messages sharing a timestamp keep the
+		// order they were written in without touching their timestamps. A
+		// message stamped before what is already stored would still sort ahead
+		// of it by added_at, so clamp it to the stream's latest timestamp (a
+		// tie, resolved by seq) instead of letting it jump the queue.
+		if msg.Timestamp.Before(lastAdded) {
+			msg.Timestamp = lastAdded
 		}
 		lastAdded = msg.Timestamp
 		payload, err := json.Marshal(msg)

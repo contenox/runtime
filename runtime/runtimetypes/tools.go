@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -256,26 +257,18 @@ func (s *store) UpdateRemoteTools(ctx context.Context, tools *RemoteTools) error
 	return checkRowsAffected(result)
 }
 
-func (s *store) ListRemoteTools(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*RemoteTools, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListRemoteTools(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*RemoteTools, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
 
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), created_at, updated_at
-        FROM remote_tools
-        WHERE created_at < $1
+        FROM remote_tools`+whereAnd(cond)+`
         ORDER BY created_at DESC, id DESC
-        LIMIT $2;
-    `, cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query remote tools: %w", err)
 	}

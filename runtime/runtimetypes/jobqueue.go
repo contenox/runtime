@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -199,23 +200,15 @@ func (s *store) GetJobsForType(ctx context.Context, taskType string) ([]*Job, er
 	return jobs, nil
 }
 
-func (s *store) ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Job, error) {
+func (s *store) ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Job, error) {
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	query := `
 		SELECT id, task_type, payload, scheduled_for, valid_until, retry_count, created_at
-		FROM job_queue_v2
-		WHERE created_at < $1
-		ORDER BY created_at DESC
-		LIMIT $2;
-	`
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
-	rows, err := s.Exec.QueryContext(ctx, query, cursor, limit)
+		FROM job_queue_v2` + whereAnd(cond) + `
+		ORDER BY created_at DESC, id DESC
+		LIMIT $` + strconv.Itoa(len(args))
+	rows, err := s.Exec.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -79,8 +79,8 @@ func requireTapPreconditions(t *testing.T) {
 	if !usernsNetnsSupported() {
 		t.Skip("unprivileged user+network namespaces unavailable on this host")
 	}
-	if !seccompUserNotifSupported() {
-		t.Skip("seccomp user-notify (SECCOMP_RET_USER_NOTIF, kernel 5.0+) unavailable on this kernel")
+	if err := libsandbox.PreflightSyscallTap(); err != nil {
+		t.Skipf("syscall tap cannot be built on this host: %v", err)
 	}
 }
 
@@ -191,9 +191,10 @@ func TestIntegration_SyscallTap_WallUnchanged(t *testing.T) {
 	}
 }
 
-func TestUnit_SyscallTap_UnsupportedKernelFailsClosed(t *testing.T) {
-	if seccompUserNotifSupported() {
-		t.Skip("seccomp user-notify IS supported here; nothing to assert about the unsupported path")
+func TestUnit_SyscallTap_UnavailableTapFailsClosed(t *testing.T) {
+	preflightErr := libsandbox.PreflightSyscallTap()
+	if preflightErr == nil {
+		t.Skip("the syscall tap IS available here; nothing to assert about the unavailable path")
 	}
 	_, err := libsandbox.Command(context.Background(), libsandbox.Spec{
 		WorkspaceRoot: "/tmp",
@@ -201,4 +202,20 @@ func TestUnit_SyscallTap_UnsupportedKernelFailsClosed(t *testing.T) {
 		SyscallTap:    true,
 	}, "/bin/true")
 	require.ErrorIs(t, err, libsandbox.ErrIsolation)
+	require.Contains(t, err.Error(), "seccomp user-notify", "the refusal must name the missing capability")
+	require.Contains(t, preflightErr.Error(), "seccomp user-notify")
+}
+
+func TestUnit_PreflightSyscallTap_ReportsALiveCapabilityNotJustTheKernelVersion(t *testing.T) {
+	// The kernel may support user-notify while the listener slot of this process's
+	// filter chain is taken (WSL2, container runtimes). The preflight must say so
+	// itself instead of letting the shim fail later with a bare EBUSY.
+	err := libsandbox.PreflightSyscallTap()
+	if err == nil {
+		t.Skip("the syscall tap is available here")
+	}
+	require.ErrorIs(t, err, libsandbox.ErrIsolation)
+	if seccompUserNotifSupported() {
+		require.Contains(t, err.Error(), "already installed", "kernel supports user-notify, so the cause must be the taken listener slot")
+	}
 }

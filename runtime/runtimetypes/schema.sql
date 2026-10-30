@@ -416,6 +416,15 @@ CREATE INDEX IF NOT EXISTS idx_workspace_chunks_fts_config
 -- Incremental migrations — every ADD COLUMN carries IF NOT EXISTS, so an
 -- already-upgraded database re-applies the whole section as a no-op.
 
+-- messages: seq is the append sequence within a stream (idx_id), assigned by
+-- messagestore.AppendMessages. History is read ORDER BY added_at, seq, id so
+-- the order of messages written with identical timestamps (coarse clocks,
+-- SQLite text timestamps, batch inserts) never depends on timestamp precision.
+-- Rows written before this column existed keep seq = 0 and are ordered by
+-- added_at alone, exactly as before.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS seq BIGINT NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_messages_idx_added_seq ON messages (idx_id, added_at, seq, id);
+
 -- remote_tools columns added after initial release
 ALTER TABLE remote_tools ADD COLUMN IF NOT EXISTS headers             TEXT;
 ALTER TABLE remote_tools ADD COLUMN IF NOT EXISTS properties         BYTEA;

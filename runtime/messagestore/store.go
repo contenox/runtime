@@ -206,18 +206,35 @@ func (s *store) AppendMessages(ctx context.Context, messages ...*Message) error 
 
 	now := time.Now().UTC()
 	valueStrings := make([]string, 0, len(messages))
-	valueArgs := make([]any, 0, len(messages)*4)
+	valueArgs := make([]any, 0, len(messages)*5)
+
+	// seq is the append sequence within a stream: it keeps messages that share
+	// a timestamp in the order they were written. Continue from the stream's
+	// current maximum, once per stream in this batch.
+	nextSeq := map[string]int64{}
 
 	for i, msg := range messages {
 		if msg.AddedAt.IsZero() {
 			msg.AddedAt = now
 		}
-		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d)", i*4+1, i*4+2, i*4+3, i*4+4))
-		valueArgs = append(valueArgs, msg.ID, msg.IDX, msg.Payload, msg.AddedAt)
+		// Stored as text on SQLite: keep every row in UTC so the text order is
+		// the time order.
+		msg.AddedAt = msg.AddedAt.UTC()
+		seq, ok := nextSeq[msg.IDX]
+		if !ok {
+			if err := s.Exec.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq), 0) FROM messages WHERE idx_id = $1`, msg.IDX).Scan(&seq); err != nil {
+				return fmt.Errorf("failed to read message sequence: %w", err)
+			}
+		}
+		seq++
+		nextSeq[msg.IDX] = seq
+		msg.Seq = seq
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", i*5+1, i*5+2, i*5+3, i*5+4, i*5+5))
+		valueArgs = append(valueArgs, msg.ID, msg.IDX, msg.Payload, msg.AddedAt, seq)
 	}
 
 	stmt := fmt.Sprintf(`
-		INSERT INTO messages (id, idx_id, payload, added_at)
+		INSERT INTO messages (id, idx_id, payload, added_at, seq)
 		VALUES %s`,
 		strings.Join(valueStrings, ","),
 	)
@@ -243,10 +260,10 @@ func (s *store) DeleteMessages(ctx context.Context, stream string) error {
 
 func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, idx_id, payload, added_at
+		SELECT id, idx_id, payload, added_at, seq
 		FROM messages
 		WHERE idx_id = $1
-		ORDER BY added_at ASC`,
+		ORDER BY added_at ASC, seq ASC, id ASC`,
 		stream,
 	)
 	if err != nil {
@@ -257,7 +274,7 @@ func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, er
 	var msgs []*Message
 	for rows.Next() {
 		var msg Message
-		if err := rows.Scan(&msg.ID, &msg.IDX, &msg.Payload, &msg.AddedAt); err != nil {
+		if err := rows.Scan(&msg.ID, &msg.IDX, &msg.Payload, &msg.AddedAt, &msg.Seq); err != nil {
 			return nil, fmt.Errorf("failed to scan messages: %w", err)
 		}
 		msgs = append(msgs, &msg)
@@ -270,16 +287,16 @@ func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, er
 
 func (s *store) LastMessage(ctx context.Context, stream string) (*Message, error) {
 	row := s.Exec.QueryRowContext(ctx, `
-		SELECT id, idx_id, payload, added_at
+		SELECT id, idx_id, payload, added_at, seq
 		FROM messages
 		WHERE idx_id = $1
-		ORDER BY added_at DESC
+		ORDER BY added_at DESC, seq DESC, id DESC
 		LIMIT 1`,
 		stream,
 	)
 
 	var msg Message
-	if err := row.Scan(&msg.ID, &msg.IDX, &msg.Payload, &msg.AddedAt); err != nil {
+	if err := row.Scan(&msg.ID, &msg.IDX, &msg.Payload, &msg.AddedAt, &msg.Seq); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}

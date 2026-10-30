@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,25 +230,18 @@ func (s *store) DeleteAgent(ctx context.Context, id string) error {
 	return checkRowsAffected(result)
 }
 
-func (s *store) ListAgents(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Agent, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListAgents(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Agent, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
 
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT id, name, kind, enabled, config_json, harness_id, workspace_id, source, registry_id, registry_version, created_at, updated_at
-		FROM agents
-		WHERE created_at < $1
+		FROM agents`+whereAnd(cond)+`
 		ORDER BY created_at DESC, id DESC
-		LIMIT $2`, cursor, limit)
+		LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("agents: list query: %w", err)
 	}

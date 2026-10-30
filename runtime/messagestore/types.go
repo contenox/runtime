@@ -10,6 +10,9 @@ type Message struct {
 	IDX     string    `json:"idx_id"`
 	Payload []byte    `json:"payload"`
 	AddedAt time.Time `json:"added_at"`
+	// Seq is the append sequence within the stream. It orders messages that
+	// share AddedAt; store.AppendMessages assigns it, callers leave it zero.
+	Seq int64 `json:"seq"`
 }
 
 type SessionInfo struct {

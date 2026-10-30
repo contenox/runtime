@@ -38,9 +38,7 @@ func redCirclePNG(t *testing.T) []byte {
 }
 
 func TestSystem_Ollama_Vision(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping ollama vision system test: starts a container and pulls a multi-GB vision model")
-	}
+	requireOllamaContainerTests(t)
 	testcontainers.SkipIfProviderIsNotHealthy(t)
 	ctx := t.Context()
 	uri, _, cleanup, err := modelrepo.SetupOllamaLocalInstance(ctx, "latest")

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -179,25 +180,17 @@ func (s *store) UpdateModel(ctx context.Context, data *Model) error {
 	return checkRowsAffected(result)
 }
 
-func (s *store) ListModels(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Model, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListModels(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Model, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT id, model, context_length, can_chat, can_embed, can_prompt, can_stream, created_at, updated_at
-        FROM ollama_models
-        WHERE created_at < $1
+        FROM ollama_models`+whereAnd(cond)+`
         ORDER BY created_at DESC, id DESC
-        LIMIT $2;
-    `, cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query models: %w", err)
 	}

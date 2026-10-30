@@ -1,6 +1,7 @@
 package runtimetypes_test
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -12,463 +13,517 @@ import (
 )
 
 func TestUnit_groups_CreateAndGetgroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{
-		ID:          uuid.NewString(),
-		Name:        "TestUnit_GroupAffinity",
-		PurposeType: "inference",
-	}
+		group := &runtimetypes.AffinityGroup{
+			ID:          uuid.NewString(),
+			Name:        "TestUnit_GroupAffinity",
+			PurposeType: "inference",
+		}
 
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
-	require.NotEmpty(t, group.ID)
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
+		require.NotEmpty(t, group.ID)
 
-	got, err := s.GetAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Equal(t, group.Name, got.Name)
-	require.Equal(t, group.PurposeType, got.PurposeType)
-	require.WithinDuration(t, group.CreatedAt, got.CreatedAt, time.Second)
-	require.WithinDuration(t, group.UpdatedAt, got.UpdatedAt, time.Second)
+		got, err := s.GetAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Equal(t, group.Name, got.Name)
+		require.Equal(t, group.PurposeType, got.PurposeType)
+		require.WithinDuration(t, group.CreatedAt, got.CreatedAt, time.Second)
+		require.WithinDuration(t, group.UpdatedAt, got.UpdatedAt, time.Second)
+	})
 }
 
 func TestUnit_groups_Updategroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{
-		ID:          uuid.NewString(),
-		Name:        "Initialgroup",
-		PurposeType: "testing",
-	}
+		group := &runtimetypes.AffinityGroup{
+			ID:          uuid.NewString(),
+			Name:        "Initialgroup",
+			PurposeType: "testing",
+		}
 
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	group.Name = "Updatedgroup"
-	group.PurposeType = "production"
+		group.Name = "Updatedgroup"
+		group.PurposeType = "production"
 
-	err = s.UpdateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		err = s.UpdateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	got, err := s.GetAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Equal(t, "Updatedgroup", got.Name)
-	require.Equal(t, "production", got.PurposeType)
-	require.True(t, got.UpdatedAt.After(got.CreatedAt))
+		got, err := s.GetAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Equal(t, "Updatedgroup", got.Name)
+		require.Equal(t, "production", got.PurposeType)
+		require.True(t, got.UpdatedAt.After(got.CreatedAt))
+	})
 }
 
 func TestUnit_groups_Deletegroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{
-		ID:          uuid.NewString(),
-		Name:        "ToDelete",
-		PurposeType: "testing",
-	}
+		group := &runtimetypes.AffinityGroup{
+			ID:          uuid.NewString(),
+			Name:        "ToDelete",
+			PurposeType: "testing",
+		}
 
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	err = s.DeleteAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
+		err = s.DeleteAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
 
-	_, err = s.GetAffinityGroup(ctx, group.ID)
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err = s.GetAffinityGroup(ctx, group.ID)
+		require.ErrorIs(t, err, libdb.ErrNotFound)
+	})
 }
 
 func TestUnit_groups_Listgroups(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	groups, err := s.ListAffinityGroups(ctx, nil, 100)
-	require.NoError(t, err)
-	require.Empty(t, groups)
+		groups, err := s.ListAffinityGroups(ctx, nil, 100)
+		require.NoError(t, err)
+		require.Empty(t, groups)
 
-	group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1", PurposeType: "type1"}
-	group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2", PurposeType: "type2"}
+		group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1", PurposeType: "type1"}
+		group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2", PurposeType: "type2"}
 
-	err = s.CreateAffinityGroup(ctx, group1)
-	require.NoError(t, err)
-	err = s.CreateAffinityGroup(ctx, group2)
-	require.NoError(t, err)
+		err = s.CreateAffinityGroup(ctx, group1)
+		tick()
+		require.NoError(t, err)
+		err = s.CreateAffinityGroup(ctx, group2)
+		tick()
+		require.NoError(t, err)
 
-	groups, err = s.ListAffinityGroups(ctx, nil, 100)
-	require.NoError(t, err)
-	require.Len(t, groups, 2)
-	require.Equal(t, group2.ID, groups[0].ID)
-	require.Equal(t, group1.ID, groups[1].ID)
+		groups, err = s.ListAffinityGroups(ctx, nil, 100)
+		require.NoError(t, err)
+		require.Len(t, groups, 2)
+		require.Equal(t, group2.ID, groups[0].ID)
+		require.Equal(t, group1.ID, groups[1].ID)
+	})
 }
 
 func TestUnit_groups_ListgroupsPagination(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	var createdgroups []*runtimetypes.AffinityGroup
-	for i := range 5 {
-		group := &runtimetypes.AffinityGroup{
-			ID:          uuid.NewString(),
-			Name:        fmt.Sprintf("pagination-group-%d", i),
-			PurposeType: "inference",
+		var createdgroups []*runtimetypes.AffinityGroup
+		for i := range 5 {
+			group := &runtimetypes.AffinityGroup{
+				ID:          uuid.NewString(),
+				Name:        fmt.Sprintf("pagination-group-%d", i),
+				PurposeType: "inference",
+			}
+			err := s.CreateAffinityGroup(ctx, group)
+			tick()
+			require.NoError(t, err)
+			createdgroups = append(createdgroups, group)
 		}
-		err := s.CreateAffinityGroup(ctx, group)
+
+		var receivedgroups []*runtimetypes.AffinityGroup
+		var lastCursor *time.Time
+		var lastCursorID string
+		limit := 2
+
+		page1, err := s.ListAffinityGroups(ctx, lastCursor, limit, lastCursorID)
 		require.NoError(t, err)
-		createdgroups = append(createdgroups, group)
-	}
+		require.Len(t, page1, 2)
+		receivedgroups = append(receivedgroups, page1...)
+		lastCursor = &page1[len(page1)-1].CreatedAt
+		lastCursorID = page1[len(page1)-1].ID
 
-	var receivedgroups []*runtimetypes.AffinityGroup
-	var lastCursor *time.Time
-	limit := 2
+		page2, err := s.ListAffinityGroups(ctx, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page2, 2)
+		receivedgroups = append(receivedgroups, page2...)
+		lastCursor = &page2[len(page2)-1].CreatedAt
+		lastCursorID = page2[len(page2)-1].ID
 
-	page1, err := s.ListAffinityGroups(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page1, 2)
-	receivedgroups = append(receivedgroups, page1...)
-	lastCursor = &page1[len(page1)-1].CreatedAt
+		page3, err := s.ListAffinityGroups(ctx, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page3, 1)
+		receivedgroups = append(receivedgroups, page3...)
 
-	page2, err := s.ListAffinityGroups(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page2, 2)
-	receivedgroups = append(receivedgroups, page2...)
-	lastCursor = &page2[len(page2)-1].CreatedAt
+		page4, err := s.ListAffinityGroups(ctx, &page3[0].CreatedAt, limit, page3[0].ID)
+		require.NoError(t, err)
+		require.Empty(t, page4)
 
-	page3, err := s.ListAffinityGroups(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page3, 1)
-	receivedgroups = append(receivedgroups, page3...)
+		require.Len(t, receivedgroups, 5)
 
-	page4, err := s.ListAffinityGroups(ctx, &page3[0].CreatedAt, limit)
-	require.NoError(t, err)
-	require.Empty(t, page4)
-
-	require.Len(t, receivedgroups, 5)
-
-	require.Equal(t, createdgroups[4].ID, receivedgroups[0].ID)
-	require.Equal(t, createdgroups[3].ID, receivedgroups[1].ID)
-	require.Equal(t, createdgroups[2].ID, receivedgroups[2].ID)
-	require.Equal(t, createdgroups[1].ID, receivedgroups[3].ID)
-	require.Equal(t, createdgroups[0].ID, receivedgroups[4].ID)
+		require.Equal(t, createdgroups[4].ID, receivedgroups[0].ID)
+		require.Equal(t, createdgroups[3].ID, receivedgroups[1].ID)
+		require.Equal(t, createdgroups[2].ID, receivedgroups[2].ID)
+		require.Equal(t, createdgroups[1].ID, receivedgroups[3].ID)
+		require.Equal(t, createdgroups[0].ID, receivedgroups[4].ID)
+	})
 }
 
 func TestUnit_groups_GetgroupByName(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{
-		ID:          uuid.NewString(),
-		Name:        "Uniquegroup",
-		PurposeType: "inference",
-	}
+		group := &runtimetypes.AffinityGroup{
+			ID:          uuid.NewString(),
+			Name:        "Uniquegroup",
+			PurposeType: "inference",
+		}
 
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	got, err := s.GetAffinityGroupByName(ctx, "Uniquegroup")
-	require.NoError(t, err)
-	require.Equal(t, group.ID, got.ID)
+		got, err := s.GetAffinityGroupByName(ctx, "Uniquegroup")
+		require.NoError(t, err)
+		require.Equal(t, group.ID, got.ID)
+	})
 }
 
 func TestUnit_groups_ListgroupsByPurpose(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	purpose := "inference"
-	group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1", PurposeType: purpose}
-	group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2", PurposeType: "training"}
+		purpose := "inference"
+		group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1", PurposeType: purpose}
+		group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2", PurposeType: "training"}
 
-	err := s.CreateAffinityGroup(ctx, group1)
-	require.NoError(t, err)
-	err = s.CreateAffinityGroup(ctx, group2)
-	require.NoError(t, err)
+		err := s.CreateAffinityGroup(ctx, group1)
+		tick()
+		require.NoError(t, err)
+		err = s.CreateAffinityGroup(ctx, group2)
+		tick()
+		require.NoError(t, err)
 
-	groups, err := s.ListAffinityGroupByPurpose(ctx, purpose, nil, 100)
-	require.NoError(t, err)
-	require.Len(t, groups, 1)
-	require.Equal(t, group1.ID, groups[0].ID)
+		groups, err := s.ListAffinityGroupByPurpose(ctx, purpose, nil, 100)
+		require.NoError(t, err)
+		require.Len(t, groups, 1)
+		require.Equal(t, group1.ID, groups[0].ID)
+	})
 }
 
 func TestUnit_groups_ListgroupsByPurposePagination(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	purpose := "inference"
-	otherPurpose := "training"
-	var createdgroups []*runtimetypes.AffinityGroup
-	for i := range 5 {
-		group := &runtimetypes.AffinityGroup{
-			ID:          uuid.NewString(),
-			Name:        fmt.Sprintf("inference-group-%d", i),
-			PurposeType: purpose,
+		purpose := "inference"
+		otherPurpose := "training"
+		var createdgroups []*runtimetypes.AffinityGroup
+		for i := range 5 {
+			group := &runtimetypes.AffinityGroup{
+				ID:          uuid.NewString(),
+				Name:        fmt.Sprintf("inference-group-%d", i),
+				PurposeType: purpose,
+			}
+			err := s.CreateAffinityGroup(ctx, group)
+			tick()
+			require.NoError(t, err)
+			createdgroups = append(createdgroups, group)
 		}
-		err := s.CreateAffinityGroup(ctx, group)
+
+		othergroup := &runtimetypes.AffinityGroup{
+			ID:          uuid.NewString(),
+			Name:        "other-group",
+			PurposeType: otherPurpose,
+		}
+		err := s.CreateAffinityGroup(ctx, othergroup)
+		tick()
 		require.NoError(t, err)
-		createdgroups = append(createdgroups, group)
-	}
 
-	othergroup := &runtimetypes.AffinityGroup{
-		ID:          uuid.NewString(),
-		Name:        "other-group",
-		PurposeType: otherPurpose,
-	}
-	err := s.CreateAffinityGroup(ctx, othergroup)
-	require.NoError(t, err)
+		var receivedgroups []*runtimetypes.AffinityGroup
+		var lastCursor *time.Time
+		var lastCursorID string
+		limit := 2
 
-	var receivedgroups []*runtimetypes.AffinityGroup
-	var lastCursor *time.Time
-	limit := 2
+		page1, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page1, 2)
+		receivedgroups = append(receivedgroups, page1...)
+		lastCursor = &page1[len(page1)-1].CreatedAt
+		lastCursorID = page1[len(page1)-1].ID
 
-	page1, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page1, 2)
-	receivedgroups = append(receivedgroups, page1...)
-	lastCursor = &page1[len(page1)-1].CreatedAt
+		page2, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page2, 2)
+		receivedgroups = append(receivedgroups, page2...)
+		lastCursor = &page2[len(page2)-1].CreatedAt
+		lastCursorID = page2[len(page2)-1].ID
 
-	page2, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page2, 2)
-	receivedgroups = append(receivedgroups, page2...)
-	lastCursor = &page2[len(page2)-1].CreatedAt
+		page3, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page3, 1)
+		receivedgroups = append(receivedgroups, page3...)
 
-	page3, err := s.ListAffinityGroupByPurpose(ctx, purpose, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page3, 1)
-	receivedgroups = append(receivedgroups, page3...)
+		page4, err := s.ListAffinityGroupByPurpose(ctx, purpose, &page3[0].CreatedAt, limit, page3[0].ID)
+		require.NoError(t, err)
+		require.Empty(t, page4)
 
-	page4, err := s.ListAffinityGroupByPurpose(ctx, purpose, &page3[0].CreatedAt, limit)
-	require.NoError(t, err)
-	require.Empty(t, page4)
+		require.Len(t, receivedgroups, 5)
+		require.Equal(t, createdgroups[4].ID, receivedgroups[0].ID)
+		require.Equal(t, createdgroups[3].ID, receivedgroups[1].ID)
+		require.Equal(t, createdgroups[2].ID, receivedgroups[2].ID)
+		require.Equal(t, createdgroups[1].ID, receivedgroups[3].ID)
+		require.Equal(t, createdgroups[0].ID, receivedgroups[4].ID)
 
-	require.Len(t, receivedgroups, 5)
-	require.Equal(t, createdgroups[4].ID, receivedgroups[0].ID)
-	require.Equal(t, createdgroups[3].ID, receivedgroups[1].ID)
-	require.Equal(t, createdgroups[2].ID, receivedgroups[2].ID)
-	require.Equal(t, createdgroups[1].ID, receivedgroups[3].ID)
-	require.Equal(t, createdgroups[0].ID, receivedgroups[4].ID)
-
-	for _, p := range receivedgroups {
-		require.Equal(t, purpose, p.PurposeType)
-	}
+		for _, p := range receivedgroups {
+			require.Equal(t, purpose, p.PurposeType)
+		}
+	})
 }
 
 func TestUnit_groups_AssignAndListBackendsForgroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	backend := &runtimetypes.Backend{
-		ID:      uuid.NewString(),
-		Name:    "Backend1",
-		BaseURL: "http://backend1",
-		Type:    "ollama",
-	}
-	err = s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		backend := &runtimetypes.Backend{
+			ID:      uuid.NewString(),
+			Name:    "Backend1",
+			BaseURL: "http://backend1",
+			Type:    "ollama",
+		}
+		err = s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	err = s.AssignBackendToAffinityGroup(ctx, group.ID, backend.ID)
-	require.NoError(t, err)
+		err = s.AssignBackendToAffinityGroup(ctx, group.ID, backend.ID)
+		require.NoError(t, err)
 
-	backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Len(t, backends, 1)
-	require.Equal(t, backend.ID, backends[0].ID)
+		backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Len(t, backends, 1)
+		require.Equal(t, backend.ID, backends[0].ID)
+	})
 }
 
 func TestUnit_groups_RemoveBackendFromgroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "Backend1"}
-	err = s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "Backend1"}
+		err = s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	err = s.AssignBackendToAffinityGroup(ctx, group.ID, backend.ID)
-	require.NoError(t, err)
+		err = s.AssignBackendToAffinityGroup(ctx, group.ID, backend.ID)
+		require.NoError(t, err)
 
-	backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Len(t, backends, 1)
+		backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Len(t, backends, 1)
 
-	err = s.RemoveBackendFromAffinityGroup(ctx, group.ID, backend.ID)
-	require.NoError(t, err)
+		err = s.RemoveBackendFromAffinityGroup(ctx, group.ID, backend.ID)
+		require.NoError(t, err)
 
-	backends, err = s.ListBackendsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Empty(t, backends)
+		backends, err = s.ListBackendsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Empty(t, backends)
+	})
 }
 
 func TestUnit_groups_ListgroupsForBackend(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "Backend1"}
-	err := s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "Backend1"}
+		err := s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
-	group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2"}
-	err = s.CreateAffinityGroup(ctx, group1)
-	require.NoError(t, err)
-	err = s.CreateAffinityGroup(ctx, group2)
-	require.NoError(t, err)
+		group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
+		group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2"}
+		err = s.CreateAffinityGroup(ctx, group1)
+		tick()
+		require.NoError(t, err)
+		err = s.CreateAffinityGroup(ctx, group2)
+		tick()
+		require.NoError(t, err)
 
-	err = s.AssignBackendToAffinityGroup(ctx, group1.ID, backend.ID)
-	require.NoError(t, err)
-	err = s.AssignBackendToAffinityGroup(ctx, group2.ID, backend.ID)
-	require.NoError(t, err)
+		err = s.AssignBackendToAffinityGroup(ctx, group1.ID, backend.ID)
+		require.NoError(t, err)
+		err = s.AssignBackendToAffinityGroup(ctx, group2.ID, backend.ID)
+		require.NoError(t, err)
 
-	groups, err := s.ListAffinityGroupsForBackend(ctx, backend.ID)
-	require.NoError(t, err)
-	require.Len(t, groups, 2)
-	groupIDs := map[string]bool{group1.ID: true, group2.ID: true}
-	for _, p := range groups {
-		require.True(t, groupIDs[p.ID])
-	}
+		groups, err := s.ListAffinityGroupsForBackend(ctx, backend.ID)
+		require.NoError(t, err)
+		require.Len(t, groups, 2)
+		groupIDs := map[string]bool{group1.ID: true, group2.ID: true}
+		for _, p := range groups {
+			require.True(t, groupIDs[p.ID])
+		}
+	})
 }
 
 func TestUnit_groupModel_AssignModelTogroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	model := &runtimetypes.Model{
-		ID:            uuid.New().String(),
-		Model:         "test-model",
-		ContextLength: 4096,
-		CanChat:       true,
-		CanEmbed:      false,
-		CanPrompt:     true,
-		CanStream:     false,
-	}
-	require.NoError(t, s.AppendModel(ctx, model))
+		model := &runtimetypes.Model{
+			ID:            uuid.New().String(),
+			Model:         "test-model",
+			ContextLength: 4096,
+			CanChat:       true,
+			CanEmbed:      false,
+			CanPrompt:     true,
+			CanStream:     false,
+		}
+		require.NoError(t, s.AppendModel(ctx, model))
+		tick()
 
-	group := &runtimetypes.AffinityGroup{
-		ID:          uuid.New().String(),
-		Name:        "test-group",
-		PurposeType: "test-purpose",
-	}
-	require.NoError(t, s.CreateAffinityGroup(ctx, group))
+		group := &runtimetypes.AffinityGroup{
+			ID:          uuid.New().String(),
+			Name:        "test-group",
+			PurposeType: "test-purpose",
+		}
+		require.NoError(t, s.CreateAffinityGroup(ctx, group))
+		tick()
 
-	require.NoError(t, s.AssignModelToAffinityGroup(ctx, group.ID, model.ID))
+		require.NoError(t, s.AssignModelToAffinityGroup(ctx, group.ID, model.ID))
 
-	models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Len(t, models, 1)
+		models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Len(t, models, 1)
 
-	require.Equal(t, model.ID, models[0].ID)
-	require.Equal(t, "test-model", models[0].Model)
-	require.Equal(t, 4096, models[0].ContextLength)
-	require.True(t, models[0].CanChat)
-	require.False(t, models[0].CanEmbed)
-	require.True(t, models[0].CanPrompt)
-	require.False(t, models[0].CanStream)
-	require.WithinDuration(t, model.CreatedAt, models[0].CreatedAt, time.Second)
-	require.WithinDuration(t, model.UpdatedAt, models[0].UpdatedAt, time.Second)
+		require.Equal(t, model.ID, models[0].ID)
+		require.Equal(t, "test-model", models[0].Model)
+		require.Equal(t, 4096, models[0].ContextLength)
+		require.True(t, models[0].CanChat)
+		require.False(t, models[0].CanEmbed)
+		require.True(t, models[0].CanPrompt)
+		require.False(t, models[0].CanStream)
+		require.WithinDuration(t, model.CreatedAt, models[0].CreatedAt, time.Second)
+		require.WithinDuration(t, model.UpdatedAt, models[0].UpdatedAt, time.Second)
+	})
 }
 
 func TestUnit_groups_RemoveModelFromgroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	model := &runtimetypes.Model{Model: "model1", ContextLength: 1024, CanPrompt: true, CanStream: false}
-	err := s.AppendModel(ctx, model)
-	require.NoError(t, err)
+		model := &runtimetypes.Model{Model: "model1", ContextLength: 1024, CanPrompt: true, CanStream: false}
+		err := s.AppendModel(ctx, model)
+		tick()
+		require.NoError(t, err)
 
-	group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
-	err = s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
+		err = s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	err = s.AssignModelToAffinityGroup(ctx, group.ID, model.ID)
-	require.NoError(t, err)
+		err = s.AssignModelToAffinityGroup(ctx, group.ID, model.ID)
+		require.NoError(t, err)
 
-	models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Len(t, models, 1)
+		models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Len(t, models, 1)
 
-	err = s.RemoveModelFromAffinityGroup(ctx, group.ID, model.ID)
-	require.NoError(t, err)
+		err = s.RemoveModelFromAffinityGroup(ctx, group.ID, model.ID)
+		require.NoError(t, err)
 
-	models, err = s.ListModelsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.Empty(t, models)
+		models, err = s.ListModelsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.Empty(t, models)
+	})
 }
 
 func TestUnit_groups_ListgroupsForModel(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	model := &runtimetypes.Model{Model: "model1", ContextLength: 1024, CanPrompt: true, CanStream: false}
-	err := s.AppendModel(ctx, model)
-	require.NoError(t, err)
+		model := &runtimetypes.Model{Model: "model1", ContextLength: 1024, CanPrompt: true, CanStream: false}
+		err := s.AppendModel(ctx, model)
+		tick()
+		require.NoError(t, err)
 
-	group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
-	group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2"}
-	err = s.CreateAffinityGroup(ctx, group1)
-	require.NoError(t, err)
-	err = s.CreateAffinityGroup(ctx, group2)
-	require.NoError(t, err)
+		group1 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group1"}
+		group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "group2"}
+		err = s.CreateAffinityGroup(ctx, group1)
+		tick()
+		require.NoError(t, err)
+		err = s.CreateAffinityGroup(ctx, group2)
+		tick()
+		require.NoError(t, err)
 
-	err = s.AssignModelToAffinityGroup(ctx, group1.ID, model.ID)
-	require.NoError(t, err)
-	err = s.AssignModelToAffinityGroup(ctx, group2.ID, model.ID)
-	require.NoError(t, err)
+		err = s.AssignModelToAffinityGroup(ctx, group1.ID, model.ID)
+		require.NoError(t, err)
+		err = s.AssignModelToAffinityGroup(ctx, group2.ID, model.ID)
+		require.NoError(t, err)
 
-	groups, err := s.ListAffinityGroupsForModel(ctx, model.ID)
-	require.NoError(t, err)
-	require.Len(t, groups, 2)
-	groupIDs := map[string]bool{group1.ID: true, group2.ID: true}
-	for _, p := range groups {
-		require.True(t, groupIDs[p.ID])
-	}
+		groups, err := s.ListAffinityGroupsForModel(ctx, model.ID)
+		require.NoError(t, err)
+		require.Len(t, groups, 2)
+		groupIDs := map[string]bool{group1.ID: true, group2.ID: true}
+		for _, p := range groups {
+			require.True(t, groupIDs[p.ID])
+		}
+	})
 }
 
 func TestUnit_groups_GetNonExistentgroup(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	_, err := s.GetAffinityGroup(ctx, uuid.NewString())
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err := s.GetAffinityGroup(ctx, uuid.NewString())
+		require.ErrorIs(t, err, libdb.ErrNotFound)
 
-	_, err = s.GetAffinityGroupByName(ctx, "non-existent")
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err = s.GetAffinityGroupByName(ctx, "non-existent")
+		require.ErrorIs(t, err, libdb.ErrNotFound)
+	})
 }
 
 func TestUnit_groups_DuplicategroupName(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Duplicate"}
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Duplicate"}
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Duplicate"}
-	err = s.CreateAffinityGroup(ctx, group2)
-	require.Error(t, err)
+		group2 := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Duplicate"}
+		err = s.CreateAffinityGroup(ctx, group2)
+		tick()
+		require.Error(t, err)
+	})
 }
 
 func TestUnit_groups_ListEmptyAssociations(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Emptygroup"}
-	err := s.CreateAffinityGroup(ctx, group)
-	require.NoError(t, err)
+		group := &runtimetypes.AffinityGroup{ID: uuid.NewString(), Name: "Emptygroup"}
+		err := s.CreateAffinityGroup(ctx, group)
+		tick()
+		require.NoError(t, err)
 
-	backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.NotNil(t, backends, "ListBackendsForgroup should return an empty slice, not nil")
-	require.Len(t, backends, 0)
+		backends, err := s.ListBackendsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.NotNil(t, backends, "ListBackendsForgroup should return an empty slice, not nil")
+		require.Len(t, backends, 0)
 
-	models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
-	require.NoError(t, err)
-	require.NotNil(t, models, "ListModelsForgroup should return an empty slice, not nil")
-	require.Len(t, models, 0)
+		models, err := s.ListModelsForAffinityGroup(ctx, group.ID)
+		require.NoError(t, err)
+		require.NotNil(t, models, "ListModelsForgroup should return an empty slice, not nil")
+		require.Len(t, models, 0)
 
-	backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "EmptyBackend"}
-	err = s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		backend := &runtimetypes.Backend{ID: uuid.NewString(), Name: "EmptyBackend"}
+		err = s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	groups, err := s.ListAffinityGroupsForBackend(ctx, backend.ID)
-	require.NoError(t, err)
-	require.NotNil(t, groups, "ListgroupsForBackend should return an empty slice, not nil")
-	require.Len(t, groups, 0)
+		groups, err := s.ListAffinityGroupsForBackend(ctx, backend.ID)
+		require.NoError(t, err)
+		require.NotNil(t, groups, "ListgroupsForBackend should return an empty slice, not nil")
+		require.Len(t, groups, 0)
 
-	model := &runtimetypes.Model{Model: "empty-model", ContextLength: 1024, CanChat: true}
-	err = s.AppendModel(ctx, model)
-	require.NoError(t, err)
+		model := &runtimetypes.Model{Model: "empty-model", ContextLength: 1024, CanChat: true}
+		err = s.AppendModel(ctx, model)
+		tick()
+		require.NoError(t, err)
 
-	groupsForModel, err := s.ListAffinityGroupsForModel(ctx, model.ID)
-	require.NoError(t, err)
-	require.NotNil(t, groupsForModel, "ListgroupsForModel should return an empty slice, not nil")
-	require.Len(t, groupsForModel, 0)
+		groupsForModel, err := s.ListAffinityGroupsForModel(ctx, model.ID)
+		require.NoError(t, err)
+		require.NotNil(t, groupsForModel, "ListgroupsForModel should return an empty slice, not nil")
+		require.Len(t, groupsForModel, 0)
+	})
 }

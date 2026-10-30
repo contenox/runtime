@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -142,27 +143,21 @@ func (s *store) ListExpiredHITLApprovals(ctx context.Context, asOf time.Time, li
 	return scanHITLApprovalRows(rows)
 }
 
-func (s *store) ListHITLApprovals(ctx context.Context, state HITLApprovalState, createdAtCursor *time.Time, limit int) ([]*HITLApproval, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListHITLApprovals(ctx context.Context, state HITLApprovalState, createdAtCursor *time.Time, limit int, afterID ...string) ([]*HITLApproval, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
 	if limit <= 0 {
 		limit = MAXLIMIT
 	}
+	cond, cargs := keysetBefore("created_at", "id", createdAtCursor, afterID, 2)
+	args := append([]any{string(state)}, cargs...)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT `+hitlApprovalColumns+`
-		FROM hitl_approvals
-		WHERE state = $1 AND created_at < $2
+		FROM hitl_approvals`+whereAnd("state = $1", cond)+`
 		ORDER BY created_at DESC, id DESC
-		LIMIT $3`, string(state), cursor, limit)
+		LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("hitl_approvals: list query: %w", err)
 	}

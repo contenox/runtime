@@ -1,5 +1,3 @@
-//go:build unix
-
 package contenoxcli
 
 import (
@@ -13,7 +11,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -88,6 +85,7 @@ func TestSystem_ScriptedMissionSequence(t *testing.T) {
 
 	baseEnv := append(os.Environ(),
 		"HOME="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=scripted-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 	)
@@ -146,8 +144,7 @@ func TestSystem_ScriptedMissionSequence(t *testing.T) {
 	})
 
 	t.Run("success_chains_with_and", func(t *testing.T) {
-		script := shJoin(bin, fireArgs("agent-scripted-lands")) + " && " + shJoin(bin, fireArgs("agent-scripted-lands"))
-		stdout, stderr, code := runScripted(t, "/bin/sh", baseEnv, "-c", script)
+		stdout, stderr, code := runScriptedAndThen(t, bin, baseEnv, fireArgs("agent-scripted-lands"), fireArgs("agent-scripted-lands"))
 		require.Equalf(t, 0, code, "fire --wait && fire --wait must compose on success.\nstdout:%s\nstderr:%s", stdout, stderr)
 
 		ids := missionIDsIn(stdout)
@@ -156,8 +153,7 @@ func TestSystem_ScriptedMissionSequence(t *testing.T) {
 	})
 
 	t.Run("blocker_breaks_the_chain", func(t *testing.T) {
-		script := shJoin(bin, fireArgs("agent-scripted-blocker")) + " && " + shJoin(bin, fireArgs("agent-scripted-lands"))
-		stdout, stderr, code := runScripted(t, "/bin/sh", baseEnv, "-c", script)
+		stdout, stderr, code := runScriptedAndThen(t, bin, baseEnv, fireArgs("agent-scripted-blocker"), fireArgs("agent-scripted-lands"))
 		require.Equalf(t, missionWaitBlocked, code, "a blocker exits 2 and breaks the && chain.\nstdout:%s\nstderr:%s", stdout, stderr)
 
 		ids := missionIDsIn(stdout)
@@ -176,7 +172,7 @@ func TestSystem_ScriptedMissionSequence(t *testing.T) {
 
 func buildScriptedContenoxBin(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "contenox")
+	binPath := filepath.Join(t.TempDir(), "contenox"+e2eExeSuffix)
 	out, err := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox").CombinedOutput()
 	require.NoErrorf(t, err, "build contenox:\n%s", out)
 	return binPath
@@ -199,6 +195,8 @@ func seedScriptedAgents(t *testing.T, dbPath, bin string, agentsToChain map[stri
 		}))
 		require.NoError(t, registry.Create(ctx, agent), "seed external agent %q", name)
 	}
+	store := runtimetypes.New(db.WithoutTransaction())
+	seedE2EDefaultModel(ctx, t, store, "scripted-e2e-fake-model", "ollama")
 }
 
 func runScriptedCLI(t *testing.T, bin string, env []string, args ...string) {
@@ -236,17 +234,14 @@ func asExitError(err error, target **exec.ExitError) bool {
 	return false
 }
 
-func shJoin(bin string, args []string) string {
-	parts := make([]string, 0, len(args)+1)
-	parts = append(parts, shQuote(bin))
-	for _, a := range args {
-		parts = append(parts, shQuote(a))
+func runScriptedAndThen(t *testing.T, bin string, env []string, first, second []string) (string, string, int) {
+	t.Helper()
+	out1, err1, code := runScripted(t, bin, env, first...)
+	if code != 0 {
+		return out1, err1, code
 	}
-	return strings.Join(parts, " ")
-}
-
-func shQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	out2, err2, code := runScripted(t, bin, env, second...)
+	return out1 + out2, err1 + err2, code
 }
 
 func missionIDsIn(stdout string) []string {
@@ -299,7 +294,7 @@ func bootScriptedServeOnce(t *testing.T, bin string, env []string, dataDir, dbPa
 	cmd.Env = env
 	cmd.Stdout = &log
 	cmd.Stderr = &log
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	e2eOwnProcessGroup(cmd)
 	require.NoError(t, cmd.Start())
 
 	pid := cmd.Process.Pid
@@ -307,12 +302,12 @@ func bootScriptedServeOnce(t *testing.T, bin string, env []string, dataDir, dbPa
 	go func() { _, _ = cmd.Process.Wait(); close(exited) }()
 	logFn := func() string { return log.String() }
 	kill := func() {
-		_ = syscall.Kill(-pid, syscall.SIGTERM)
+		graceful := e2eTerminateTree(pid)
 		select {
 		case <-exited:
-		case <-time.After(10 * time.Second):
+		case <-time.After(gracePeriod(graceful)):
 		}
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		e2eKillTree(pid)
 	}
 
 	healthURL := serverURL + "/health"

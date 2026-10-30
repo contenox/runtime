@@ -874,10 +874,15 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				toolExecErr = taskErr
 				content = toolErrorContent(taskErr.Error())
 			}
-			if guidance := repeatGuidance(toolCall.Function.Name, repeatIndex, toolExecErr != nil); guidance != "" && resultType == DataTypeString {
-				content += "\n" + guidance
-			}
 			content, capInfo := capToolResultContentFromContext(callCtx, toolCall.Function.Name, content)
+			// Guidance is appended after capping so the cap can never cut it off.
+			if repeatIndex >= repeatGuidanceThreshold {
+				sameError := toolExecErr != nil && priorSameErrorCount(chatHistory.Messages, toolCall.Function.Name, argsStr, content) >= repeatIndex-1
+				if guidance := repeatGuidance(toolCall.Function.Name, repeatIndex, toolExecErr != nil, sameError); guidance != "" && (resultType == DataTypeString || toolExecErr != nil) {
+					content += "\n" + guidance
+					capInfo.FinalBytes = len(content)
+				}
+			}
 			if taskErr == nil {
 				reportToolResultContent(toolReportChange, resultType, capInfo)
 				reportToolCallRepeat(toolReportChange, repeatIndex)
@@ -1877,23 +1882,34 @@ func reconcileToolCallArguments(calls []ToolCall, continuation *libmodelprovider
 		return 0
 	}
 	used := make([]bool, len(ordered))
+	wants := make([]string, len(calls))
+	known := make([]bool, len(calls))
+	// Pass 1: exact id matches, so a name fallback can never consume an entry
+	// that a later call owns by id.
+	for i := range calls {
+		if idx, ok := indexByID[calls[i].ID]; ok && !used[idx] {
+			wants[i], known[i], used[idx] = ordered[idx].arguments, true, true
+		}
+	}
+	// Pass 2: calls whose ids the engine rewrote fall back to the first unused
+	// entry with the same tool. The continuation records the provider wire name
+	// (sanitized) while the call carries the engine name, so compare in wire space.
+	for i := range calls {
+		if known[i] {
+			continue
+		}
+		for idx := range ordered {
+			if used[idx] || !sameToolName(ordered[idx].name, calls[i].Function.Name) {
+				continue
+			}
+			wants[i], known[i], used[idx] = ordered[idx].arguments, true, true
+			break
+		}
+	}
 	repaired := 0
 	for i := range calls {
-		var want string
-		known := false
-		if idx, ok := indexByID[calls[i].ID]; ok && !used[idx] {
-			want, known, used[idx] = ordered[idx].arguments, true, true
-		}
-		if !known {
-			for idx := range ordered {
-				if used[idx] || ordered[idx].name != calls[i].Function.Name {
-					continue
-				}
-				want, known, used[idx] = ordered[idx].arguments, true, true
-				break
-			}
-		}
-		if !known || strings.TrimSpace(want) == "" {
+		want := wants[i]
+		if !known[i] || strings.TrimSpace(want) == "" {
 			continue
 		}
 		if normalizedToolArguments(calls[i].Function.Arguments) == normalizedToolArguments(want) {
@@ -1904,6 +1920,12 @@ func reconcileToolCallArguments(calls []ToolCall, continuation *libmodelprovider
 		repaired++
 	}
 	return repaired
+}
+
+// sameToolName reports whether a tool name recorded on the provider wire
+// matches an engine tool name, allowing for wire-name sanitization.
+func sameToolName(wire, engine string) bool {
+	return wire == engine || wire == libmodelprovider.SanitizeToolName(engine)
 }
 
 func normalizedToolArguments(arguments string) string {
@@ -2052,12 +2074,49 @@ func (exe *SimpleExec) reportInvalidToolCall(ctx context.Context, toolCall ToolC
 
 const repeatGuidanceThreshold = 3
 
-func repeatGuidance(toolName string, repeatIndex int, failed bool) string {
+const repeatGuidanceMarker = "\n[harness] "
+
+// priorSameErrorCount counts earlier failed results of the exact same call
+// (tool and normalized arguments) whose content equals content, ignoring any
+// harness guidance appended to the stored result.
+func priorSameErrorCount(messages []Message, toolName, arguments, content string) int {
+	ids := make(map[string]struct{})
+	key := toolCallRepeatKey(toolName, arguments)
+	for _, msg := range messages {
+		for _, call := range msg.CallTools {
+			if call.ID != "" && toolCallRepeatKey(call.Function.Name, normalizedToolArguments(call.Function.Arguments)) == key {
+				ids[call.ID] = struct{}{}
+			}
+		}
+	}
+	n := 0
+	for _, msg := range messages {
+		if msg.Role != "tool" || !msg.ToolResultError {
+			continue
+		}
+		if _, ok := ids[msg.ToolCallID]; !ok {
+			continue
+		}
+		stored := msg.Content
+		if i := strings.Index(stored, repeatGuidanceMarker); i >= 0 {
+			stored = stored[:i]
+		}
+		if stored == content {
+			n++
+		}
+	}
+	return n
+}
+
+func repeatGuidance(toolName string, repeatIndex int, failed bool, sameError bool) string {
 	if repeatIndex < repeatGuidanceThreshold {
 		return ""
 	}
 	if !failed && !isReadLikeToolName(toolName) {
 		return ""
+	}
+	if failed && !sameError {
+		return fmt.Sprintf("[harness] This exact %s call has now been attempted %d times and keeps failing. Do not call it again with the same arguments. Answer from the results you already have and state plainly what is still missing.", toolName, repeatIndex)
 	}
 	if failed {
 		return fmt.Sprintf("[harness] This exact %s call has now failed %d times with the same error. Do not call it again with the same arguments. Answer from the results you already have and state plainly what is still missing.", toolName, repeatIndex)

@@ -425,6 +425,15 @@ ALTER TABLE remote_tools ADD COLUMN insecure_skip_verify BOOLEAN NOT NULL DEFAUL
 -- TABLE above); silently skipped on databases where it was already added.
 ALTER TABLE message_indices ADD COLUMN agent_id VARCHAR(255);
 
+-- messages: seq is the append sequence within a stream (idx_id), assigned by
+-- messagestore.AppendMessages. History is read ORDER BY added_at, seq, id so
+-- the order of messages written with identical timestamps (coarse clocks,
+-- SQLite text timestamps, batch inserts) never depends on timestamp precision.
+-- Rows written before this column existed keep seq = 0 and are ordered by
+-- added_at alone, exactly as before.
+ALTER TABLE messages ADD COLUMN seq BIGINT NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_messages_idx_added_seq ON messages (idx_id, added_at, seq, id);
+
 -- hitl_approvals: attribution columns added after the table shipped — which
 -- UNIT is asking, not just which tool it called. An inbox that can only say
 -- "write_file" is unanswerable once more than one unit is running, and it

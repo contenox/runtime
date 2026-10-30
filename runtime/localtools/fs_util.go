@@ -23,13 +23,47 @@ func isExecutable(info os.FileInfo) bool {
 		return false
 	}
 	if runtime.GOOS == "windows" {
-		switch strings.ToLower(filepath.Ext(info.Name())) {
-		case ".exe", ".com", ".bat", ".cmd", ".ps1":
-			return true
-		}
-		return false
+		return hasExecutableExtension(info.Name(), os.Getenv("PATHEXT"))
 	}
 	return info.Mode().Perm()&0111 != 0
+}
+
+// defaultWindowsExecExts is used when PATHEXT is unset or empty.
+var defaultWindowsExecExts = []string{".exe", ".com", ".bat", ".cmd", ".ps1"}
+
+// hasExecutableExtension reports whether name ends in one of the extensions the
+// Windows shell would run: the entries of pathext (the PATHEXT value, ';'
+// separated), or a built-in list when pathext has no usable entries.
+func hasExecutableExtension(name, pathext string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	if ext == "" {
+		return false
+	}
+	exts := defaultWindowsExecExts
+	if fields := splitPathExt(pathext); len(fields) > 0 {
+		exts = fields
+	}
+	for _, candidate := range exts {
+		if ext == candidate {
+			return true
+		}
+	}
+	return false
+}
+
+func splitPathExt(pathext string) []string {
+	var out []string
+	for _, part := range strings.Split(pathext, ";") {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" {
+			continue
+		}
+		if !strings.HasPrefix(part, ".") {
+			part = "." + part
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 func humanSize(n int64) string {

@@ -14,9 +14,7 @@ import (
 const thinkModel = "qwen3:0.6b"
 
 func TestSystem_Ollama_Thinking(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping ollama thinking system test: starts a container and pulls a reasoning model")
-	}
+	requireOllamaContainerTests(t)
 	testcontainers.SkipIfProviderIsNotHealthy(t)
 	ctx := t.Context()
 	uri, _, cleanup, err := modelrepo.SetupOllamaLocalInstance(ctx, "latest")

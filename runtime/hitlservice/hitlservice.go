@@ -63,7 +63,7 @@ type approvalStore interface {
 	ResolveHITLApproval(ctx context.Context, id string, state runtimetypes.HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error
 	ResolveHITLApprovalWithinBound(ctx context.Context, id string, bound runtimetypes.AgentAnswerBound, state runtimetypes.HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error
 	ListExpiredHITLApprovals(ctx context.Context, asOf time.Time, limit int) ([]*runtimetypes.HITLApproval, error)
-	ListHITLApprovals(ctx context.Context, state runtimetypes.HITLApprovalState, createdAtCursor *time.Time, limit int) ([]*runtimetypes.HITLApproval, error)
+	ListHITLApprovals(ctx context.Context, state runtimetypes.HITLApprovalState, createdAtCursor *time.Time, limit int, afterID ...string) ([]*runtimetypes.HITLApproval, error)
 	ListHITLApprovalsForMission(ctx context.Context, missionID string, limit int) ([]*runtimetypes.HITLApproval, error)
 }
 
@@ -412,6 +412,7 @@ type approvalResolution struct {
 	AnsweredBy *string `json:"answeredBy,omitempty"`
 	DecidedBy  *string `json:"decidedBy,omitempty"`
 	Guidance   *string `json:"guidance,omitempty"`
+	Reason     *string `json:"reason,omitempty"`
 }
 
 type answer struct {
@@ -445,11 +446,19 @@ func summarizeApprovalArgs(args map[string]any) string {
 		if !ok || strings.TrimSpace(v) == "" {
 			continue
 		}
-		s := strings.TrimSpace(strings.ReplaceAll(v, "\n", " "))
+		s := redactSecrets(strings.TrimSpace(strings.ReplaceAll(v, "\n", " ")))
 		if len([]rune(s)) > 96 {
 			return string([]rune(s)[:95]) + "..."
 		}
 		return s
 	}
 	return ""
+}
+
+func marshalResolution(res approvalResolution) (json.RawMessage, error) {
+	raw, err := json.Marshal(res)
+	if err != nil {
+		return nil, fmt.Errorf("hitlservice: marshal resolution: %w", err)
+	}
+	return raw, nil
 }

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -86,23 +87,17 @@ func (s *store) DeleteModelRegistryEntry(ctx context.Context, id string) error {
 	return checkRowsAffected(result)
 }
 
-func (s *store) ListModelRegistryEntries(ctx context.Context, cursor *time.Time, limit int) ([]*ModelRegistryEntry, error) {
-	// See the other List methods: the first page includes rows written in the
-	// same instant as the listing, which a strict "< now" comparison hides on
-	// second-precision clocks (SQLite).
-	t := time.Now().UTC().Add(time.Second)
-	if cursor != nil {
-		t = *cursor
-	}
+func (s *store) ListModelRegistryEntries(ctx context.Context, cursor *time.Time, limit int, afterID ...string) ([]*ModelRegistryEntry, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
+	cond, args := keysetBefore("created_at", "id", cursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT id, name, source_url, size_bytes, created_at, updated_at
-		FROM llm_model_registry
-		WHERE created_at < $1
+		FROM llm_model_registry`+whereAnd(cond)+`
 		ORDER BY created_at DESC, id DESC
-		LIMIT $2`, t, limit)
+		LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query model registry: %w", err)
 	}

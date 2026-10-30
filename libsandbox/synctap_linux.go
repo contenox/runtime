@@ -5,12 +5,14 @@ package libsandbox
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
+	"sync"
 	"unsafe"
 
 	"github.com/contenox/runtime/libtracker"
@@ -65,7 +67,7 @@ func installSyscallTap(sockFD int) error {
 	notifyFD, err := seccompNewListener(fprog)
 	runtime.KeepAlive(prog)
 	if err != nil {
-		return fmt.Errorf("install seccomp user-notify filter: %w", err)
+		return tapListenerError(err)
 	}
 
 	if err := sendNotifyFD(sockFD, notifyFD); err != nil {
@@ -401,4 +403,61 @@ func seccompIoctl(fd int, req uintptr, arg unsafe.Pointer) error {
 		return e
 	}
 	return nil
+}
+
+var (
+	tapProbeOnce sync.Once
+	tapProbeErr  error
+)
+
+// PreflightSyscallTap reports whether SyscallTap can be built on this host. It
+// returns nil when it can, and an ErrIsolation error naming the missing
+// capability otherwise. Two things are required: a kernel with seccomp
+// user-notify (5.0+), and a free listener slot, because a filter chain can hold
+// only one user-notify listener. A process that already runs under a filter
+// with a listener (a container runtime, WSL2's init, another sandbox) cannot
+// install a second one: the kernel answers EBUSY.
+func PreflightSyscallTap() error {
+	tapProbeOnce.Do(func() { tapProbeErr = probeSyscallTap() })
+	return tapProbeErr
+}
+
+func probeSyscallTap() error {
+	if !seccompUserNotifSupported() {
+		return fmt.Errorf("%w: SyscallTap was requested but this kernel has no seccomp "+
+			"user-notify (SECCOMP_RET_USER_NOTIF / kernel 5.0+); the telemetry tap cannot "+
+			"be built, so the wall is refused rather than run unobserved", ErrIsolation)
+	}
+	done := make(chan error, 1)
+	go func() {
+		// The thread is deliberately never unlocked: when this goroutine returns
+		// the runtime destroys it, and the probe filter (per thread) goes with it.
+		runtime.LockOSThread()
+		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+			done <- fmt.Errorf("%w: SyscallTap probe: set no_new_privs: %v", ErrIsolation, err)
+			return
+		}
+		prog := []unix.SockFilter{bpfStmt(bpfRET|bpfK, uint32(unix.SECCOMP_RET_ALLOW))}
+		fd, err := seccompNewListener(&unix.SockFprog{Len: uint16(len(prog)), Filter: &prog[0]})
+		runtime.KeepAlive(prog)
+		if err != nil {
+			done <- tapListenerError(err)
+			return
+		}
+		unix.Close(fd)
+		done <- nil
+	}()
+	return <-done
+}
+
+// tapListenerError turns a failed listener installation into an error that
+// names the cause. EBUSY means the listener slot of the filter chain is taken.
+func tapListenerError(err error) error {
+	if errors.Is(err, unix.EBUSY) {
+		return fmt.Errorf("%w: SyscallTap was requested but a seccomp user-notify listener is "+
+			"already installed in this process's filter chain (a container runtime, the WSL2 init "+
+			"or another sandbox owns the single listener slot), so a second one cannot be added; "+
+			"the telemetry tap cannot be built, so the wall is refused rather than run unobserved", ErrIsolation)
+	}
+	return fmt.Errorf("install seccomp user-notify filter: %w", err)
 }

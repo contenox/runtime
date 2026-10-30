@@ -12,6 +12,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/enginesvc"
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -52,6 +53,11 @@ type Deps struct {
 	EnvSetup *EnvSetupSpec
 
 	SessionRouter *SessionRouter
+
+	// DecisionRecorder, when set, receives every interactive approval decision
+	// answered through session/request_permission, so hitl_approvals keeps an
+	// audit row for it. Optional: nil disables recording.
+	DecisionRecorder hitlservice.DecisionRecorder
 
 	Instances agentinstance.Manager
 

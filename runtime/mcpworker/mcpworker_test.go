@@ -20,7 +20,7 @@ type minimalStore struct {
 	runtimetypes.Store
 }
 
-func (m *minimalStore) ListMCPServers(_ context.Context, _ *time.Time, _ int) ([]*runtimetypes.MCPServer, error) {
+func (m *minimalStore) ListMCPServers(_ context.Context, _ *time.Time, _ int, _ ...string) ([]*runtimetypes.MCPServer, error) {
 	return nil, nil
 }
 
@@ -214,7 +214,7 @@ type preloadedStore struct {
 	servers []*runtimetypes.MCPServer
 }
 
-func (s *preloadedStore) ListMCPServers(_ context.Context, _ *time.Time, _ int) ([]*runtimetypes.MCPServer, error) {
+func (s *preloadedStore) ListMCPServers(_ context.Context, _ *time.Time, _ int, _ ...string) ([]*runtimetypes.MCPServer, error) {
 	return s.servers, nil
 }
 
@@ -246,7 +246,7 @@ func TestUnit_MCPWorker_DecodeListToolsReply_ErrorPropagation(t *testing.T) {
 }
 
 var _ interface {
-	ListMCPServers(context.Context, *time.Time, int) ([]*runtimetypes.MCPServer, error)
+	ListMCPServers(context.Context, *time.Time, int, ...string) ([]*runtimetypes.MCPServer, error)
 } = (*minimalStore)(nil)
 
 var _ error = errors.New("")

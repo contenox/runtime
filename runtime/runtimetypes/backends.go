@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -138,22 +139,16 @@ func (s *store) ListAllBackends(ctx context.Context) ([]*Backend, error) {
 	return backends, nil
 }
 
-func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Backend, error) {
+func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Backend, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
-	// The first page must not filter by "created before now": a backend created
-	// in the same instant as the listing would compare equal and disappear.
 	const columns = `SELECT id, name, base_url, type, created_at, updated_at
         FROM llm_backends`
 	const order = ` ORDER BY created_at DESC, id DESC`
-	query := columns + order + ` LIMIT $1`
-	args := []any{limit}
-	if createdAtCursor != nil {
-		query = columns + ` WHERE created_at < $1` + order + ` LIMIT $2`
-		args = []any{*createdAtCursor, limit}
-	}
-	rows, err := s.Exec.QueryContext(ctx, query, args...)
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
+	rows, err := s.Exec.QueryContext(ctx, columns+whereAnd(cond)+order+` LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query backends: %w", err)
 	}

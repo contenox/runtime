@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -111,25 +112,18 @@ func (s *store) ListAllAffinityGroups(ctx context.Context) ([]*AffinityGroup, er
 	return groups, nil
 }
 
-func (s *store) ListAffinityGroups(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListAffinityGroups(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*AffinityGroup, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
+	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT id, name, purpose_type, created_at, updated_at
-        FROM llm_affinity_group
-        WHERE created_at < $1
+        FROM llm_affinity_group`+whereAnd(cond)+`
         ORDER BY created_at DESC, id DESC
-        LIMIT $2`,
-		cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)),
+		args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query affinity groups: %w", err)
 	}
@@ -153,22 +147,17 @@ func (s *store) ListAffinityGroups(ctx context.Context, createdAtCursor *time.Ti
 	return groups, nil
 }
 
-func (s *store) ListAffinityGroupByPurpose(ctx context.Context, purposeType string, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListAffinityGroupByPurpose(ctx context.Context, purposeType string, createdAtCursor *time.Time, limit int, afterID ...string) ([]*AffinityGroup, error) {
 
+	cond, cargs := keysetBefore("created_at", "id", createdAtCursor, afterID, 2)
+	args := append([]any{purposeType}, cargs...)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT id, name, purpose_type, created_at, updated_at
-        FROM llm_affinity_group WHERE purpose_type = $1 AND created_at < $2
+        FROM llm_affinity_group`+whereAnd("purpose_type = $1", cond)+`
         ORDER BY created_at DESC, id DESC
-        LIMIT $3`,
-		purposeType, cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)),
+		args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query affinity groups by purpose: %w", err)
 	}

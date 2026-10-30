@@ -798,8 +798,9 @@ func (t *Transport) runtimeToolsAllowlist(ctx context.Context, store runtimetype
 		current[name] = struct{}{}
 	}
 	var cursor *time.Time
+	var cursorID string
 	for {
-		page, err := store.ListMCPServers(ctx, cursor, 100)
+		page, err := store.ListMCPServers(ctx, cursor, 100, cursorID)
 		if err != nil {
 			return nil, fmt.Errorf("acpsvc: list mcp servers for runtime allowlist: %w", err)
 		}
@@ -816,6 +817,7 @@ func (t *Transport) runtimeToolsAllowlist(ctx context.Context, store runtimetype
 			return allowlist, nil
 		}
 		cursor = &page[len(page)-1].CreatedAt
+		cursorID = page[len(page)-1].ID
 	}
 }
 
@@ -826,8 +828,9 @@ func CleanupStaleACPManagedMCPServers(ctx context.Context, db libdb.DBManager) e
 	store := runtimetypes.New(db.WithoutTransaction())
 	var stale []*runtimetypes.MCPServer
 	var cursor *time.Time
+	var cursorID string
 	for {
-		page, err := store.ListMCPServers(ctx, cursor, 100)
+		page, err := store.ListMCPServers(ctx, cursor, 100, cursorID)
 		if err != nil {
 			return err
 		}
@@ -840,6 +843,7 @@ func CleanupStaleACPManagedMCPServers(ctx context.Context, db libdb.DBManager) e
 			break
 		}
 		cursor = &page[len(page)-1].CreatedAt
+		cursorID = page[len(page)-1].ID
 	}
 	for _, srv := range stale {
 		cleanupMCPSessionIDs(ctx, store, srv.Name)

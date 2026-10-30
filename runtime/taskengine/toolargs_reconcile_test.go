@@ -121,3 +121,50 @@ func TestUnit_ReconcileToolCallArguments_DoesNotMatchADifferentTool(t *testing.T
 	assert.Zero(t, reconcileToolCallArguments(calls, continuation))
 	assert.Equal(t, "{}", calls[0].Function.Arguments)
 }
+
+func TestUnit_ReconcileToolCallArguments_MatchesSanitizedWireNames(t *testing.T) {
+	continuation := &libmodelprovider.Continuation{
+		Items: json.RawMessage(`{"output":[
+			{"type":"function_call","call_id":"call_1","name":"local_fs_read_file","arguments":"{\"path\":\"a\"}"}
+		]}`),
+	}
+	calls := []ToolCall{{ID: "rewritten", Function: FunctionCall{Name: "local_fs.read_file", Arguments: "{}"}, ArgsMissing: true}}
+
+	repaired := reconcileToolCallArguments(calls, continuation)
+
+	assert.Equal(t, 1, repaired, "the engine name local_fs.read_file must match the wire name local_fs_read_file")
+	assert.Equal(t, `{"path":"a"}`, calls[0].Function.Arguments)
+	assert.False(t, calls[0].ArgsMissing)
+}
+
+func TestUnit_ReconcileToolCallArguments_WireNameDoesNotMatchADifferentTool(t *testing.T) {
+	continuation := &libmodelprovider.Continuation{
+		Items: json.RawMessage(`{"output":[
+			{"type":"function_call","call_id":"call_1","name":"local_fs_write_file","arguments":"{\"path\":\"a\"}"}
+		]}`),
+	}
+	calls := []ToolCall{{ID: "rewritten", Function: FunctionCall{Name: "local_fs.read_file", Arguments: "{}"}}}
+
+	assert.Zero(t, reconcileToolCallArguments(calls, continuation))
+}
+
+func TestUnit_ReconcileToolCallArguments_IDMatchesWinOverEarlierNameFallbacks(t *testing.T) {
+	continuation := &libmodelprovider.Continuation{
+		Items: json.RawMessage(`{"output":[
+			{"type":"function_call","call_id":"call_1","name":"read_file","arguments":"{\"path\":\"one\"}"},
+			{"type":"function_call","call_id":"call_2","name":"read_file","arguments":"{\"path\":\"two\"}"}
+		]}`),
+	}
+	// The first call has a rewritten id and only matches by name; the second
+	// owns call_1 by id. Matching in order would hand call_1's entry to the first.
+	calls := []ToolCall{
+		{ID: "rewritten", Function: FunctionCall{Name: "read_file", Arguments: "{}"}},
+		{ID: "call_1", Function: FunctionCall{Name: "read_file", Arguments: "{}"}},
+	}
+
+	repaired := reconcileToolCallArguments(calls, continuation)
+
+	assert.Equal(t, 2, repaired)
+	assert.Equal(t, `{"path":"two"}`, calls[0].Function.Arguments, "the name fallback gets only the entry nobody owns by id")
+	assert.Equal(t, `{"path":"one"}`, calls[1].Function.Arguments, "the id match keeps its own entry")
+}

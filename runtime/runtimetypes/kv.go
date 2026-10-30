@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -92,25 +93,17 @@ func (s *store) deleteKVScoped(ctx context.Context, workspaceID string, key stri
 	return checkRowsAffected(result)
 }
 
-func (s *store) ListKV(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*KV, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListKV(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error) {
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
+	cond, args := keysetBefore("created_at", "key", createdAtCursor, afterID, 1)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT key, value, created_at, updated_at
-        FROM kv
-        WHERE workspace_id = '' AND created_at < $1
+        FROM kv`+whereAnd("workspace_id = ''", cond)+`
         ORDER BY created_at DESC, key DESC
-        LIMIT $2;
-    `, cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query key-value pairs: %w", err)
 	}
@@ -132,22 +125,15 @@ func (s *store) ListKV(ctx context.Context, createdAtCursor *time.Time, limit in
 	return kvs, nil
 }
 
-func (s *store) ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int) ([]*KV, error) {
-	// The first page must include rows written in the same instant as the
-	// listing: a strict "< now" comparison hides them when the database stores
-	// second precision (SQLite), which showed up as freshly created rows
-	// vanishing. Pagination still uses the exact cursor of the last row.
-	cursor := time.Now().UTC().Add(time.Second)
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
+func (s *store) ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error) {
+	cond, cargs := keysetBefore("created_at", "key", createdAtCursor, afterID, 2)
+	args := append([]any{prefix}, cargs...)
+	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
         SELECT key, value, created_at, updated_at
-        FROM kv
-        WHERE workspace_id = '' AND key LIKE $1 || '%' AND created_at < $2
+        FROM kv`+whereAnd("workspace_id = ''", "key LIKE $1 || '%'", cond)+`
         ORDER BY created_at DESC, key DESC
-        LIMIT $3;
-    `, prefix, cursor, limit)
+        LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query key-value pairs with prefix: %w", err)
 	}

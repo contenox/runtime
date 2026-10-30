@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -132,7 +133,7 @@ type Store interface {
 	GetLLMProviderModelFacts(ctx context.Context, providerID string) (map[string]ModelFacts, error)
 	SetLLMProviderModelFact(ctx context.Context, providerID, model string, facts ModelFacts) error
 	ListAllBackends(ctx context.Context) ([]*Backend, error)
-	ListBackends(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Backend, error)
+	ListBackends(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Backend, error)
 	GetBackendByName(ctx context.Context, name string) (*Backend, error)
 	EstimateBackendCount(ctx context.Context) (int64, error)
 
@@ -142,7 +143,7 @@ type Store interface {
 	DeleteModel(ctx context.Context, modelName string) error
 	ListAllModels(ctx context.Context) ([]*Model, error)
 	UpdateModel(ctx context.Context, data *Model) error
-	ListModels(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Model, error)
+	ListModels(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Model, error)
 	EstimateModelCount(ctx context.Context) (int64, error)
 
 	CreateAffinityGroup(ctx context.Context, group *AffinityGroup) error
@@ -151,8 +152,8 @@ type Store interface {
 	UpdateAffinityGroup(ctx context.Context, group *AffinityGroup) error
 	DeleteAffinityGroup(ctx context.Context, id string) error
 	ListAllAffinityGroups(ctx context.Context) ([]*AffinityGroup, error)
-	ListAffinityGroups(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error)
-	ListAffinityGroupByPurpose(ctx context.Context, purposeType string, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error)
+	ListAffinityGroups(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*AffinityGroup, error)
+	ListAffinityGroupByPurpose(ctx context.Context, purposeType string, createdAtCursor *time.Time, limit int, afterID ...string) ([]*AffinityGroup, error)
 	EstimateAffinityGroupCount(ctx context.Context) (int64, error)
 
 	AssignBackendToAffinityGroup(ctx context.Context, groupID string, backendID string) error
@@ -172,15 +173,15 @@ type Store interface {
 	PopNJobsForType(ctx context.Context, taskType string, n int) ([]*Job, error)
 	PopJobForType(ctx context.Context, taskType string) (*Job, error)
 	GetJobsForType(ctx context.Context, taskType string) ([]*Job, error)
-	ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Job, error)
+	ListJobs(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Job, error)
 	EstimateJobCount(ctx context.Context) (int64, error)
 
 	SetKV(ctx context.Context, key string, value json.RawMessage) error
 	UpdateKV(ctx context.Context, key string, value json.RawMessage) error
 	GetKV(ctx context.Context, key string, out interface{}) error
 	DeleteKV(ctx context.Context, key string) error
-	ListKV(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*KV, error)
-	ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int) ([]*KV, error)
+	ListKV(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error)
+	ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error)
 	EstimateKVCount(ctx context.Context) (int64, error)
 	SetWorkspaceKV(ctx context.Context, workspaceID string, key string, value json.RawMessage) error
 	GetWorkspaceKV(ctx context.Context, workspaceID string, key string, out interface{}) error
@@ -191,7 +192,7 @@ type Store interface {
 	GetRemoteToolsByName(ctx context.Context, name string) (*RemoteTools, error)
 	UpdateRemoteTools(ctx context.Context, tools *RemoteTools) error
 	DeleteRemoteTools(ctx context.Context, id string) error
-	ListRemoteTools(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*RemoteTools, error)
+	ListRemoteTools(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*RemoteTools, error)
 	EstimateRemoteToolsCount(ctx context.Context) (int64, error)
 
 	CreateModelRegistryEntry(ctx context.Context, e *ModelRegistryEntry) error
@@ -199,7 +200,7 @@ type Store interface {
 	GetModelRegistryEntryByName(ctx context.Context, name string) (*ModelRegistryEntry, error)
 	UpdateModelRegistryEntry(ctx context.Context, e *ModelRegistryEntry) error
 	DeleteModelRegistryEntry(ctx context.Context, id string) error
-	ListModelRegistryEntries(ctx context.Context, cursor *time.Time, limit int) ([]*ModelRegistryEntry, error)
+	ListModelRegistryEntries(ctx context.Context, cursor *time.Time, limit int, afterID ...string) ([]*ModelRegistryEntry, error)
 	EstimateModelRegistryEntryCount(ctx context.Context) (int64, error)
 
 	CreateMCPServer(ctx context.Context, srv *MCPServer) error
@@ -207,7 +208,7 @@ type Store interface {
 	GetMCPServerByName(ctx context.Context, name string) (*MCPServer, error)
 	UpdateMCPServer(ctx context.Context, srv *MCPServer) error
 	DeleteMCPServer(ctx context.Context, id string) error
-	ListMCPServers(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*MCPServer, error)
+	ListMCPServers(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*MCPServer, error)
 	EstimateMCPServerCount(ctx context.Context) (int64, error)
 	UpsertMCPServerByName(ctx context.Context, srv *MCPServer) error
 
@@ -216,14 +217,14 @@ type Store interface {
 	GetAgentByName(ctx context.Context, name string) (*Agent, error)
 	UpdateAgent(ctx context.Context, agent *Agent) error
 	DeleteAgent(ctx context.Context, id string) error
-	ListAgents(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Agent, error)
+	ListAgents(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*Agent, error)
 	EstimateAgentCount(ctx context.Context) (int64, error)
 
 	CreateHITLApproval(ctx context.Context, a *HITLApproval) error
 	GetHITLApproval(ctx context.Context, id string) (*HITLApproval, error)
 	ResolveHITLApproval(ctx context.Context, id string, state HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error
 	ListExpiredHITLApprovals(ctx context.Context, asOf time.Time, limit int) ([]*HITLApproval, error)
-	ListHITLApprovals(ctx context.Context, state HITLApprovalState, createdAtCursor *time.Time, limit int) ([]*HITLApproval, error)
+	ListHITLApprovals(ctx context.Context, state HITLApprovalState, createdAtCursor *time.Time, limit int, afterID ...string) ([]*HITLApproval, error)
 	ListHITLApprovalsForMission(ctx context.Context, missionID string, limit int) ([]*HITLApproval, error)
 	EstimateHITLApprovalCount(ctx context.Context) (int64, error)
 
@@ -296,10 +297,48 @@ func quiet() func() {
 	}
 }
 
-func SetupStore(t *testing.T) (context.Context, Store) {
+// EachStore runs fn as a contract test against every database the store
+// supports: SQLite (always: it is what the desktop app ships) and Postgres
+// (when a Docker daemon can provide a disposable instance; otherwise that
+// subtest is skipped with a reason, never silently dropped).
+func EachStore(t *testing.T, fn func(t *testing.T, ctx context.Context, s Store)) {
+	t.Helper()
+	EachDB(t, func(t *testing.T, ctx context.Context, exec libdb.Exec) {
+		fn(t, ctx, New(exec))
+	})
+}
+
+// EachDB is EachStore for tests that also need the raw executor (for example
+// to force identical timestamps).
+func EachDB(t *testing.T, fn func(t *testing.T, ctx context.Context, exec libdb.Exec)) {
+	t.Helper()
+	t.Run("sqlite", func(t *testing.T) {
+		ctx, exec := setupSQLite(t)
+		fn(t, ctx, exec)
+	})
+	t.Run("postgres", func(t *testing.T) {
+		ctx, exec := setupPostgres(t)
+		fn(t, ctx, exec)
+	})
+}
+
+// setupSQLite opens a fresh on-disk SQLite database with the shipped schema,
+// removed when the test ends.
+func setupSQLite(t *testing.T) (context.Context, libdb.Exec) {
+	t.Helper()
+	ctx := context.TODO()
+	dbManager, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "store.db"), SchemaSQLite)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, dbManager.Close()) })
+	return ctx, dbManager.WithoutTransaction()
+}
+
+// setupPostgres starts a disposable Postgres instance, or skips the test when
+// Docker is not available on this host.
+func setupPostgres(t *testing.T) (context.Context, libdb.Exec) {
 	t.Helper()
 	if !localPostgresAvailable() {
-		t.Skip("needs Docker for the Postgres test instance: the pagination contract here is exercised against Postgres in CI; Docker is not available on this host")
+		t.Skip("Postgres contract run needs a Docker daemon for the disposable instance; not available on this host (the SQLite run still covers the same assertions)")
 	}
 
 	unquiet := quiet()
@@ -317,8 +356,7 @@ func SetupStore(t *testing.T) (context.Context, Store) {
 		cleanup()
 	})
 
-	s := New(dbManager.WithoutTransaction())
-	return ctx, s
+	return ctx, dbManager.WithoutTransaction()
 }
 
 // localPostgresAvailable reports whether a Docker daemon can provide the
@@ -328,4 +366,52 @@ func localPostgresAvailable() bool {
 		return false
 	}
 	return exec.Command("docker", "info").Run() == nil
+}
+
+// keysetBefore builds the WHERE condition for the page that follows a cursor
+// in "ORDER BY <timeCol> DESC, <idCol> DESC" listings. The cursor is the last
+// row of the previous page: its created_at, plus (optionally) its id.
+//
+// With an id the condition is a real keyset
+//
+//	timeCol < t OR (timeCol = t AND idCol < id)
+//
+// so rows sharing a timestamp with the last row of a page are neither skipped
+// nor repeated. Without an id it degrades to "timeCol < t", which is only safe
+// when created_at is unique; callers that page should pass the id.
+//
+// The cursor is normalised to UTC because SQLite stores time.Time as text in
+// Go's format ("2006-01-02 15:04:05.999999999 -0700 MST"); every writer in this
+// package stores UTC, so text comparison orders the same as time comparison
+// (the format trims trailing zeros, and ' ' sorts before '.' and digits, so a
+// shorter fraction of the same instant prefix always sorts first). Postgres
+// compares real timestamps. argN is the 1-based index of the first placeholder
+// the condition uses. It returns "" and no args when cursor is nil (first page).
+func keysetBefore(timeCol, idCol string, cursor *time.Time, afterID []string, argN int) (string, []any) {
+	if cursor == nil {
+		return "", nil
+	}
+	t := cursor.UTC()
+	id := ""
+	if len(afterID) > 0 {
+		id = afterID[0]
+	}
+	if id == "" {
+		return fmt.Sprintf("%s < $%d", timeCol, argN), []any{t}
+	}
+	return fmt.Sprintf("(%s < $%d OR (%s = $%d AND %s < $%d))", timeCol, argN, timeCol, argN, idCol, argN+1), []any{t, id}
+}
+
+// whereAnd joins non-empty conditions into a WHERE clause ("" when none).
+func whereAnd(conds ...string) string {
+	var parts []string
+	for _, c := range conds {
+		if c != "" {
+			parts = append(parts, c)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " WHERE " + strings.Join(parts, " AND ")
 }

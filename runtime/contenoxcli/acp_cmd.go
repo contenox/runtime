@@ -402,6 +402,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		KnownPolicies:         embeddedPolicyNames(),
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,
+		DecisionRecorder:      decisionRecorderOf(acpHITL),
 		Fleet:                 missionFleet,
 		Agents:                missionAgents,
 		MissionForwarded:      missionForward,

@@ -24,3 +24,19 @@ func envTruthy(v string) bool {
 		return false
 	}
 }
+
+const runOllamaTestsEnv = "CONTENOX_RUN_OLLAMA_TESTS"
+
+// requireOllamaContainerTests gates the Ollama system tests: they start a
+// container and pull multi-GB models, so a plain `go test ./...` must not run
+// them just because Docker happens to be healthy.
+func requireOllamaContainerTests(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping Ollama container test in -short mode")
+	}
+	if envTruthy(os.Getenv(runOllamaTestsEnv)) {
+		return
+	}
+	t.Skipf("skipping Ollama container test (starts a container and pulls multi-GB models); set %s=1 to run", runOllamaTestsEnv)
+}

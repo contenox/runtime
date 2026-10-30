@@ -38,10 +38,8 @@ func applyIsolation(ctx context.Context, cmd *exec.Cmd, spec Spec, tracker libtr
 	}
 
 	if spec.SyscallTap {
-		if !seccompUserNotifSupported() {
-			return fmt.Errorf("%w: SyscallTap was requested but this kernel has no seccomp "+
-				"user-notify (SECCOMP_RET_USER_NOTIF / kernel 5.0+); the telemetry tap cannot "+
-				"be built, so the wall is refused rather than run unobserved", ErrIsolation)
+		if err := PreflightSyscallTap(); err != nil {
+			return err
 		}
 		sockFD, terr := setupSyscallTap(ctx, cmd, tracker)
 		if terr != nil {

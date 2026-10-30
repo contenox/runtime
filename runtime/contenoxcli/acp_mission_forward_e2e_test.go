@@ -1,5 +1,3 @@
-//go:build unix
-
 package contenoxcli
 
 import (
@@ -14,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -72,6 +69,7 @@ func TestSystem_ACPMissionForward(t *testing.T) {
 	baseEnv := append(os.Environ(),
 		"CONTENOX_UPDATE_CHECK=false",
 		"HOME="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=fwd-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 		"CONTENOX_SERVER_URL=",
@@ -224,7 +222,7 @@ func fwdSpawnACP(t *testing.T, bin string, env []string) *fwdACPHarness {
 	t.Cleanup(func() {
 		cancel()
 		_ = stdin.Close()
-		_ = cmd.Process.Signal(syscall.SIGTERM)
+		e2eTerminateProcess(cmd.Process)
 		done := make(chan struct{})
 		go func() { _, _ = cmd.Process.Wait(); close(done) }()
 		select {
@@ -287,21 +285,21 @@ func fwdStartServe(t *testing.T, bin string, env []string, dataDir, dbPath, serv
 	cmd.Env = env
 	cmd.Stdout = log
 	cmd.Stderr = log
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	e2eOwnProcessGroup(cmd)
 	require.NoError(t, cmd.Start())
 
 	pgid := cmd.Process.Pid
 	var stopOnce sync.Once
 	stop := func() {
 		stopOnce.Do(func() {
-			_ = syscall.Kill(-pgid, syscall.SIGTERM)
+			graceful := e2eTerminateTree(pgid)
 			done := make(chan struct{})
 			go func() { _, _ = cmd.Process.Wait(); close(done) }()
 			select {
 			case <-done:
-			case <-time.After(10 * time.Second):
+			case <-time.After(gracePeriod(graceful)):
 			}
-			_ = syscall.Kill(-pgid, syscall.SIGKILL)
+			e2eKillTree(pgid)
 		})
 	}
 	t.Cleanup(stop)
@@ -345,7 +343,7 @@ func (b *fwdLockedBuffer) String() string {
 
 func fwdBuildBin(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "contenox")
+	binPath := filepath.Join(t.TempDir(), "contenox"+e2eExeSuffix)
 	out, err := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox").CombinedOutput()
 	require.NoErrorf(t, err, "build contenox:\n%s", out)
 	return binPath
@@ -385,6 +383,26 @@ func fwdSeedRegistryAndConfig(t *testing.T, dbPath, bin, chainPath string) {
 	require.NoError(t, agentregistryservice.New(db).Create(ctx, agent))
 
 	store := runtimetypes.New(db.WithoutTransaction())
+	seedE2EDefaultModel(ctx, t, store, "fwd-e2e-fake-model", "ollama")
 	require.NoError(t, clikv.WriteConfig(ctx, store, "", "default-mission-policy", "hitl-policy-default.json"))
 	require.NoError(t, clikv.WriteConfig(ctx, store, "", "update-check", "false"))
+}
+
+// seedE2EDefaultModel persists the default model and provider the booted serve
+// needs. serve takes them from the config store (or --model); only the acp
+// subcommand reads CONTENOX_DEFAULT_MODEL from the environment, and there is
+// deliberately no hardcoded fallback model.
+func seedE2EDefaultModel(ctx context.Context, t *testing.T, store runtimetypes.Store, model, provider string) {
+	t.Helper()
+	require.NoError(t, clikv.WriteConfig(ctx, store, "", "default-model", model))
+	require.NoError(t, clikv.WriteConfig(ctx, store, "", "default-provider", provider))
+}
+
+// gracePeriod is how long a stopped process may take to exit after a graceful
+// request. With no graceful request (Windows) it goes straight to the kill.
+func gracePeriod(graceful bool) time.Duration {
+	if graceful {
+		return 10 * time.Second
+	}
+	return 0
 }

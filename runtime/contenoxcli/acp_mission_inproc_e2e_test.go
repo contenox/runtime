@@ -1,18 +1,14 @@
-//go:build unix
-
 package contenoxcli
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -64,6 +60,7 @@ func TestSystem_ACPMissionInProcess(t *testing.T) {
 	baseEnv := append(os.Environ(),
 		"CONTENOX_UPDATE_CHECK=false",
 		"HOME="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=inproc-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 		"CONTENOX_SERVER_URL=",
@@ -177,6 +174,7 @@ func TestSystem_ACPMissionForwardOptInHonest(t *testing.T) {
 
 	baseEnv := append(os.Environ(),
 		"HOME="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=inproc-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 		"CONTENOX_SERVER_TOKEN=",
@@ -322,47 +320,4 @@ func waitProcess(t *testing.T, cmd *exec.Cmd, timeout time.Duration, h *fwdACPHa
 		_ = cmd.Process.Kill()
 		t.Fatalf("the acp editor did not exit within %s of stdin close\nacp stderr:\n%s", timeout, h.stderr())
 	}
-}
-
-func childPIDs(parentPid int) []int {
-	entries, err := os.ReadDir("/proc")
-	if err != nil {
-		return nil
-	}
-	var out []int
-	for _, e := range entries {
-		pid, convErr := strconv.Atoi(e.Name())
-		if convErr != nil {
-			continue
-		}
-		if ppid, ok := procPPID(pid); ok && ppid == parentPid {
-			out = append(out, pid)
-		}
-	}
-	return out
-}
-
-func procPPID(pid int) (int, bool) {
-	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
-	if err != nil {
-		return 0, false
-	}
-	s := string(data)
-	i := strings.LastIndex(s, ")")
-	if i < 0 || i+1 >= len(s) {
-		return 0, false
-	}
-	fields := strings.Fields(s[i+1:])
-	if len(fields) < 2 {
-		return 0, false
-	}
-	ppid, err := strconv.Atoi(fields[1])
-	if err != nil {
-		return 0, false
-	}
-	return ppid, true
-}
-
-func pidAlive(pid int) bool {
-	return !errors.Is(syscall.Kill(pid, 0), syscall.ESRCH)
 }

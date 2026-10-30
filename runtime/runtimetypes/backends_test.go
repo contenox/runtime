@@ -1,6 +1,7 @@
 package runtimetypes_test
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"testing"
@@ -13,152 +14,167 @@ import (
 )
 
 func TestUnit_Backend_CreatesAndFetchesByID(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	backend := &runtimetypes.Backend{
-		ID:      uuid.NewString(),
-		Name:    "TestBackend",
-		BaseURL: "http://localhost:8080",
-		Type:    "ollama",
-	}
+		backend := &runtimetypes.Backend{
+			ID:      uuid.NewString(),
+			Name:    "TestBackend",
+			BaseURL: "http://localhost:8080",
+			Type:    "ollama",
+		}
 
-	err := s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
-	require.NotEmpty(t, backend.ID)
+		err := s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
+		require.NotEmpty(t, backend.ID)
 
-	got, err := s.GetBackend(ctx, backend.ID)
-	require.NoError(t, err)
-	require.Equal(t, backend.Name, got.Name)
-	require.Equal(t, backend.BaseURL, got.BaseURL)
-	require.Equal(t, backend.Type, got.Type)
-	require.WithinDuration(t, backend.CreatedAt, got.CreatedAt, time.Second)
-	require.WithinDuration(t, backend.UpdatedAt, got.UpdatedAt, time.Second)
+		got, err := s.GetBackend(ctx, backend.ID)
+		require.NoError(t, err)
+		require.Equal(t, backend.Name, got.Name)
+		require.Equal(t, backend.BaseURL, got.BaseURL)
+		require.Equal(t, backend.Type, got.Type)
+		require.WithinDuration(t, backend.CreatedAt, got.CreatedAt, time.Second)
+		require.WithinDuration(t, backend.UpdatedAt, got.UpdatedAt, time.Second)
+	})
 }
 
 func TestUnit_Backend_UpdatesFieldsCorrectly(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	backend := &runtimetypes.Backend{
-		ID:      uuid.NewString(),
-		Name:    "InitialBackend",
-		BaseURL: "http://initial.url",
-		Type:    "ollama",
-	}
+		backend := &runtimetypes.Backend{
+			ID:      uuid.NewString(),
+			Name:    "InitialBackend",
+			BaseURL: "http://initial.url",
+			Type:    "ollama",
+		}
 
-	err := s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		err := s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	backend.Name = "UpdatedBackend"
-	backend.BaseURL = "http://updated.url"
-	backend.Type = "OpenAI"
+		backend.Name = "UpdatedBackend"
+		backend.BaseURL = "http://updated.url"
+		backend.Type = "OpenAI"
 
-	err = s.UpdateBackend(ctx, backend)
-	require.NoError(t, err)
+		err = s.UpdateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	got, err := s.GetBackend(ctx, backend.ID)
-	require.NoError(t, err)
-	require.Equal(t, "UpdatedBackend", got.Name)
-	require.Equal(t, "http://updated.url", got.BaseURL)
-	require.Equal(t, "OpenAI", got.Type)
-	require.True(t, got.UpdatedAt.After(got.CreatedAt))
+		got, err := s.GetBackend(ctx, backend.ID)
+		require.NoError(t, err)
+		require.Equal(t, "UpdatedBackend", got.Name)
+		require.Equal(t, "http://updated.url", got.BaseURL)
+		require.Equal(t, "OpenAI", got.Type)
+		require.True(t, got.UpdatedAt.After(got.CreatedAt))
+	})
 }
 
 func TestUnit_Backend_DeletesSuccessfully(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	backend := &runtimetypes.Backend{
-		ID:      uuid.NewString(),
-		Name:    "ToDelete",
-		BaseURL: "http://delete.me",
-		Type:    "ollama",
-	}
+		backend := &runtimetypes.Backend{
+			ID:      uuid.NewString(),
+			Name:    "ToDelete",
+			BaseURL: "http://delete.me",
+			Type:    "ollama",
+		}
 
-	err := s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		err := s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	err = s.DeleteBackend(ctx, backend.ID)
-	require.NoError(t, err)
+		err = s.DeleteBackend(ctx, backend.ID)
+		require.NoError(t, err)
 
-	_, err = s.GetBackend(ctx, backend.ID)
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err = s.GetBackend(ctx, backend.ID)
+		require.ErrorIs(t, err, libdb.ErrNotFound)
+	})
 }
 
 func TestUnit_Backend_ListHandlesPagination(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	var backends []*runtimetypes.Backend
-	for i := range 5 {
-		backend := &runtimetypes.Backend{
-			ID:      uuid.NewString(),
-			Name:    fmt.Sprintf("Backend%d", i),
-			BaseURL: "http://example.com" + strconv.Itoa(i),
-			Type:    "ollama",
+		var backends []*runtimetypes.Backend
+		for i := range 5 {
+			backend := &runtimetypes.Backend{
+				ID:      uuid.NewString(),
+				Name:    fmt.Sprintf("Backend%d", i),
+				BaseURL: "http://example.com" + strconv.Itoa(i),
+				Type:    "ollama",
+			}
+			err := s.CreateBackend(ctx, backend)
+			tick()
+			require.NoError(t, err)
+			backends = append(backends, backend)
 		}
-		err := s.CreateBackend(ctx, backend)
+
+		var receivedBackends []*runtimetypes.Backend
+		var lastCursor *time.Time
+		var lastCursorID string
+		limit := 2
+
+		page1, err := s.ListBackends(ctx, lastCursor, limit, lastCursorID)
 		require.NoError(t, err)
-		backends = append(backends, backend)
-	}
+		require.Len(t, page1, 2)
+		receivedBackends = append(receivedBackends, page1...)
 
-	var receivedBackends []*runtimetypes.Backend
-	var lastCursor *time.Time
-	limit := 2
+		lastCursor = &page1[len(page1)-1].CreatedAt
+		lastCursorID = page1[len(page1)-1].ID
 
-	page1, err := s.ListBackends(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page1, 2)
-	receivedBackends = append(receivedBackends, page1...)
+		page2, err := s.ListBackends(ctx, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page2, 2)
+		receivedBackends = append(receivedBackends, page2...)
 
-	lastCursor = &page1[len(page1)-1].CreatedAt
+		lastCursor = &page2[len(page2)-1].CreatedAt
+		lastCursorID = page2[len(page2)-1].ID
 
-	page2, err := s.ListBackends(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page2, 2)
-	receivedBackends = append(receivedBackends, page2...)
+		page3, err := s.ListBackends(ctx, lastCursor, limit, lastCursorID)
+		require.NoError(t, err)
+		require.Len(t, page3, 1)
+		receivedBackends = append(receivedBackends, page3...)
 
-	lastCursor = &page2[len(page2)-1].CreatedAt
+		page4, err := s.ListBackends(ctx, &page3[0].CreatedAt, limit, page3[0].ID)
+		require.NoError(t, err)
+		require.Empty(t, page4)
 
-	page3, err := s.ListBackends(ctx, lastCursor, limit)
-	require.NoError(t, err)
-	require.Len(t, page3, 1)
-	receivedBackends = append(receivedBackends, page3...)
+		require.Len(t, receivedBackends, 5)
 
-	page4, err := s.ListBackends(ctx, &page3[0].CreatedAt, limit)
-	require.NoError(t, err)
-	require.Empty(t, page4)
-
-	require.Len(t, receivedBackends, 5)
-
-	require.Equal(t, backends[4].ID, receivedBackends[0].ID)
-	require.Equal(t, backends[3].ID, receivedBackends[1].ID)
-	require.Equal(t, backends[2].ID, receivedBackends[2].ID)
-	require.Equal(t, backends[1].ID, receivedBackends[3].ID)
-	require.Equal(t, backends[0].ID, receivedBackends[4].ID)
+		require.Equal(t, backends[4].ID, receivedBackends[0].ID)
+		require.Equal(t, backends[3].ID, receivedBackends[1].ID)
+		require.Equal(t, backends[2].ID, receivedBackends[2].ID)
+		require.Equal(t, backends[1].ID, receivedBackends[3].ID)
+		require.Equal(t, backends[0].ID, receivedBackends[4].ID)
+	})
 }
 
 func TestUnit_Backend_FetchesByName(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	backend := &runtimetypes.Backend{
-		ID:      uuid.NewString(),
-		Name:    "UniqueBackend",
-		BaseURL: "http://unique",
-		Type:    "ollama",
-	}
+		backend := &runtimetypes.Backend{
+			ID:      uuid.NewString(),
+			Name:    "UniqueBackend",
+			BaseURL: "http://unique",
+			Type:    "ollama",
+		}
 
-	err := s.CreateBackend(ctx, backend)
-	require.NoError(t, err)
+		err := s.CreateBackend(ctx, backend)
+		tick()
+		require.NoError(t, err)
 
-	got, err := s.GetBackendByName(ctx, "UniqueBackend")
-	require.NoError(t, err)
-	require.Equal(t, backend.ID, got.ID)
+		got, err := s.GetBackendByName(ctx, "UniqueBackend")
+		require.NoError(t, err)
+		require.Equal(t, backend.ID, got.ID)
+	})
 }
 
 func TestUnit_Backend_GetNonexistentReturnsNotFound(t *testing.T) {
-	ctx, s := runtimetypes.SetupStore(t)
+	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
 
-	_, err := s.GetBackend(ctx, uuid.NewString())
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err := s.GetBackend(ctx, uuid.NewString())
+		require.ErrorIs(t, err, libdb.ErrNotFound)
 
-	_, err = s.GetBackendByName(ctx, "non-existent-name")
-	require.ErrorIs(t, err, libdb.ErrNotFound)
+		_, err = s.GetBackendByName(ctx, "non-existent-name")
+		require.ErrorIs(t, err, libdb.ErrNotFound)
+	})
 }
