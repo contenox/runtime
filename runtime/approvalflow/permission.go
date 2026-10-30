@@ -20,6 +20,7 @@ type BuildOptions struct {
 }
 
 type Meta struct {
+	Detail     string `json:"detail,omitempty"`
 	ToolsName  string `json:"toolsName,omitempty"`
 	ToolName   string `json:"toolName,omitempty"`
 	PolicyName string `json:"policyName,omitempty"`
@@ -44,6 +45,7 @@ func BuildRequest(req hitlservice.ApprovalRequest, opts BuildOptions) libacp.Req
 	}
 
 	meta := MarshalMeta(Meta{
+		Detail:     req.Detail,
 		ToolsName:  req.ToolsName,
 		ToolName:   req.ToolName,
 		PolicyName: opts.PolicyName,

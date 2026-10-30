@@ -29,8 +29,10 @@ require (
 require (
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.11
 	github.com/creack/pty v1.1.24
+	github.com/pelletier/go-toml/v2 v2.4.3
 	golang.org/x/net v0.57.0
 	gvisor.dev/gvisor v0.0.0-20260224225140-573d5e7127a8
+	mvdan.cc/sh/v3 v3.14.1
 )
 
 require (
@@ -75,7 +77,6 @@ require (
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.3 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

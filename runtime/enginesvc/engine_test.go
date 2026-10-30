@@ -2,8 +2,12 @@ package enginesvc_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/enginesvc"
@@ -61,6 +65,20 @@ func TestSystem_Build_ReadinessDefaultModel_creditsExplicitFlag(t *testing.T) {
 		}
 	})
 
+	t.Run("without a configured model the engine still builds and reports the issue", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.DefaultModel = ""
+		cfg.DefaultProvider = ""
+		eng, err := enginesvc.Build(ctx, newDB(t), cfg)
+		if err != nil {
+			t.Fatalf("build engine without a configured model: %v", err)
+		}
+		defer eng.Stop()
+		if !hasIssueCode(eng.SetupCheck.Issues, "missing_default_model") {
+			t.Fatalf("unconfigured engine must report missing_default_model; issues=%v", issueCodes(eng.SetupCheck.Issues))
+		}
+	})
+
 	t.Run("with readiness override the model is credited and the issue is gone", func(t *testing.T) {
 		cfg := baseCfg()
 		cfg.ReadinessDefaultModel = "phi-4-mini"
@@ -88,4 +106,55 @@ func TestSystem_Build_ReadinessDefaultModel_creditsExplicitFlag(t *testing.T) {
 			t.Errorf("live DefaultModel = %q, want phi-4-mini", live.DefaultModel)
 		}
 	})
+}
+
+func TestSystem_Build_BackendCycleBudget_boundsAnUnresponsiveProvider(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "b002.db")
+	db, err := libdbexec.NewSQLiteDBManager(ctx, path, runtimetypes.SchemaSQLite)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	release := make(chan struct{})
+	var once sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		case <-time.After(10 * time.Second):
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(func() {
+		once.Do(func() { close(release) })
+		server.Close()
+	})
+
+	if err := runtimetypes.New(db.WithoutTransaction()).CreateBackend(ctx, &runtimetypes.Backend{
+		ID:      "unresponsive",
+		Name:    "unresponsive",
+		Type:    "ollama",
+		BaseURL: server.URL,
+	}); err != nil {
+		t.Fatalf("create backend: %v", err)
+	}
+
+	start := time.Now()
+	eng, err := enginesvc.Build(ctx, db, enginesvc.Config{
+		BackendCycleBudget: 300 * time.Millisecond,
+		NoDeleteModels:     true,
+	})
+	if err != nil {
+		t.Fatalf("build engine: %v", err)
+	}
+	defer eng.Stop()
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("Build took %s; the budget must bound the first backend cycle", elapsed)
+	}
+	if _, ok := eng.State.Get(ctx)["unresponsive"]; !ok {
+		t.Fatal("state has no entry for the unresponsive provider")
+	}
+	once.Do(func() { close(release) })
 }

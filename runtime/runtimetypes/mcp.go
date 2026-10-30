@@ -276,3 +276,32 @@ func (s *store) ListMCPServers(ctx context.Context, createdAtCursor *time.Time, 
 func (s *store) EstimateMCPServerCount(ctx context.Context) (int64, error) {
 	return s.estimateCount(ctx, "mcp_servers")
 }
+
+// DeclaredToolNamePrefix marks MCP servers and remote tools an agent
+// declaration brought with it, rather than ones the operator registered.
+const DeclaredToolNamePrefix = "decl-"
+
+// IsDeclaredToolName reports a registration owned by an agent declaration.
+func IsDeclaredToolName(name string) bool {
+	return strings.HasPrefix(name, DeclaredToolNamePrefix)
+}
+
+// DeclaredToolName is the registered name for a source declared by one agent.
+func DeclaredToolName(agentID, declared string) string {
+	return DeclaredToolNamePrefix + sanitizeDeclaredComponent(agentID) + "-" + sanitizeDeclaredComponent(declared)
+}
+
+func sanitizeDeclaredComponent(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
+}

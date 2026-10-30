@@ -22,6 +22,7 @@ import (
 	"github.com/contenox/runtime/libkvstore"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/acpsvc"
+	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/agentservice"
@@ -43,6 +44,7 @@ import (
 	"github.com/contenox/runtime/runtime/oracletools"
 	"github.com/contenox/runtime/runtime/presence"
 	"github.com/contenox/runtime/runtime/reportrouter"
+	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/serverapi"
 	"github.com/contenox/runtime/runtime/shellenvservice"
@@ -64,6 +66,16 @@ const (
 	defaultServePort = "32123"
 	remoteBindAddr   = "0.0.0.0"
 )
+
+// serveBackendCycleBudget bounds startup discovery so a provider that answers slowly or not
+// at all cannot keep the listener from binding; the state records the timeout and the next
+// refresh probes again.
+const serveBackendCycleBudget = 15 * time.Second
+
+// catalogRefreshInterval is how often a serving runtime re-probes its providers. A provider
+// that was down or slow at startup otherwise stays out of the model catalog until a restart,
+// because nothing else asks the state to reconcile.
+const catalogRefreshInterval = 60 * time.Second
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
@@ -99,8 +111,8 @@ token is resolved as: TOKEN env, else ~/.contenox-harness/serve-token.txt, else 
 --remote) a freshly generated token saved there (0600); programmatic clients
 (contenox approvals/mission/fleet) discover the same file automatically. Serving
 is plain HTTP — put a TLS-terminating reverse proxy in front for untrusted
-networks. A configured model is required — run
-` + "`contenox-runtime setup`" + ` first if you have not configured one.`,
+networks. Chat needs a configured model; without one, serve still starts and
+reports what is missing through /api/setup-status so a client can configure it.`,
 	RunE: runServe,
 }
 
@@ -358,6 +370,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		AltDefaultProvider: opts.EffectiveAltDefaultProvider,
 		ContextLength:      opts.EffectiveContext,
 		NoDeleteModels:     opts.EffectiveNoDeleteModels,
+		BackendCycleBudget: serveBackendCycleBudget,
 		LocalTools:         localTools,
 		EnableHITL:         true,
 		AskApproval: func(ctx context.Context, req hitlservice.ApprovalRequest) (bool, error) {
@@ -382,6 +395,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("build engine: runtime state is not configured")
 	}
 	defer engine.Stop()
+	if opts.EffectiveDefaultModel == "" {
+		fmt.Fprintln(os.Stderr, "contenox-runtime serve: no default-model configured; serving setup-only — configure a provider and model in the app, or run `contenox-runtime setup`.")
+	}
+	stopCatalogRefresh := startCatalogRefresh(ctx, engine.State, catalogRefreshInterval)
+	defer stopCatalogRefresh()
 
 	if oracleCfg.enabled() {
 		oracleChain, oracleChainRef, oracleErr := loadOracleChain(ctx, contenoxDir, oracleCfg)
@@ -453,6 +471,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 	stopNativeTurnReaper := startNativeTurnReaper(ctx, nativeTurns, nativeTurnReapInterval(nativeTurnCfg.GraceWindow))
 	defer stopNativeTurnReaper()
 
+	// The app's runtime compiles the declared agents before anything discovers
+	// them: a fresh home has no chain to serve otherwise.
+	if err := seedAgentDeclarations(ctx, contenoxDir); err != nil {
+		return fmt.Errorf("seed agent declarations: %w", err)
+	}
+	stopAgentWatch := watchAgentDeclarations(ctx, contenoxDir)
+	defer stopAgentWatch()
 	discoverChainAgents(ctx, agentRegistry, contenoxDir)
 
 	fleet := fleetservice.New(instances, agentRegistry, missions, workspaceFactory, workspaceRoot, tracker,
@@ -485,7 +510,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	defer stopReportRouter()
 
 	var acpAgentFactory libacp.AgentFactory
-	if acpChains, err := acpsvc.LoadChainRegistry(); err != nil {
+	if acpChains, err := defaultChainFor(contenoxDir, acpProfileACP); err != nil {
 		slog.Warn("contenox-runtime serve: /acp transport disabled: ACP chain registry unavailable", "error", err)
 	} else {
 		acpAgentFactory = acpsvc.New(acpsvc.Deps{
@@ -510,7 +535,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Fleet:                 fleet,
 			Agents:                agentRegistry,
 			KnownPolicies:         embeddedPolicyNames(),
-			HITLDefaultPolicyName: "",
+			HITLDefaultPolicyName: acpDefaultPolicyName,
 		})
 	}
 
@@ -546,7 +571,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		WorkspaceRoots:        workspaceFactory,
 		WorkspaceRootMutators: workspaceReloader.mutators(bus),
 		HITLPolicySource:      hitlSource,
-		HITLDefaultPolicyName: "",
+		HITLDefaultPolicyName: acpDefaultPolicyName,
 		Defaults:              runtimeDefaults,
 	})
 	if err != nil {
@@ -713,6 +738,28 @@ func startNativeTurnReaper(ctx context.Context, reg *nativeturn.Registry, interv
 	return cancel
 }
 
+func startCatalogRefresh(ctx context.Context, state *runtimestate.State, interval time.Duration) func() {
+	if state == nil || interval <= 0 {
+		return func() {}
+	}
+	refreshCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-refreshCtx.Done():
+				return
+			case <-ticker.C:
+				if err := state.ReconcileIfStale(refreshCtx); err != nil {
+					slog.Warn("contenox-runtime serve: backend catalog refresh failed", "error", err)
+				}
+			}
+		}
+	}()
+	return cancel
+}
+
 const hitlApprovalSweepInterval = 30 * time.Second
 
 func parseHITLApprovalCeiling(raw string) (time.Duration, error) {
@@ -748,7 +795,9 @@ func startHITLApprovalSweeper(ctx context.Context, svc hitlservice.Service, inte
 }
 
 func discoverChainAgents(ctx context.Context, agents agentregistryservice.Service, contenoxDir string) {
-	roots := []string{contenoxDir}
+	// Declarations are the source: the generated directory holds every chain
+	// sessions actually run, so its copy owns the id.
+	roots := []string{filepath.Join(contenoxDir, agentdecl.GeneratedDirName), contenoxDir}
 	if homeDir, err := globalContenoxDir(); err == nil {
 		roots = append(roots, homeDir)
 	}
@@ -766,8 +815,6 @@ func discoverChainAgents(ctx context.Context, agents agentregistryservice.Servic
 	}
 }
 
-// servePinnedDefaults returns the defaults explicitly set via CLI flags; those
-// stay fixed for the process lifetime while everything else tracks the DB.
 func servePinnedDefaults(cmd *cobra.Command, opts chatOpts) acpsvc.LiveDefaults {
 	var p acpsvc.LiveDefaults
 	changed := cmd.Flags().Changed
@@ -797,4 +844,42 @@ func servePinnedDefaults(cmd *cobra.Command, opts chatOpts) acpsvc.LiveDefaults 
 func decisionRecorderOf(svc hitlservice.Service) hitlservice.DecisionRecorder {
 	rec, _ := svc.(hitlservice.DecisionRecorder)
 	return rec
+}
+
+// watchAgentDeclarations recompiles the catalog when a declaration or
+// agents.toml changes, and tells connected clients so the Agents view can
+// re-read the problems. It polls a cheap signature: a tick over a folder holding
+// a few dozen files costs less than a dependency on a platform watcher, and it
+// behaves the same on Windows and Linux.
+func watchAgentDeclarations(ctx context.Context, contenoxDir string) func() {
+	const interval = 500 * time.Millisecond
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		signature := agentdecl.TreeSignature(contenoxDir)
+		var pending <-chan time.Time
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				current := agentdecl.TreeSignature(contenoxDir)
+				if current == signature {
+					continue
+				}
+				signature = current
+				// Debounce a burst of saves: one compile per quiet period.
+				pending = time.After(300 * time.Millisecond)
+			case <-pending:
+				pending = nil
+				if err := seedAgentDeclarations(ctx, contenoxDir); err != nil {
+					slog.Error("contenox-runtime serve: agent declarations failed to recompile", "error", err)
+					continue
+				}
+				acpsvc.NotifyAgentDeclarationsChanged()
+			}
+		}
+	}()
+	return cancel
 }

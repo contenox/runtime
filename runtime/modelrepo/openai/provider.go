@@ -29,6 +29,7 @@ type OpenAIProvider struct {
 	canStream       bool
 	canThink        bool
 	canVision       bool
+	canAudio        bool
 	tracker         libtracker.ActivityTracker
 	thinking        *modelrepo.ThinkingTypes
 	dialect         modelrepo.ChatDialect
@@ -67,6 +68,7 @@ func NewOpenAIProvider(apiKey, modelName string, backendURLs []string, capabilit
 		canStream:       capability.CanStream,
 		canThink:        capability.CanThink,
 		canVision:       capability.CanVision,
+		canAudio:        capability.CanAudio,
 		tracker:         tracker,
 		thinking:        openAIThinkingDeclaration(modelName, capability.ThinkingTypes),
 		dialect:         modelrepo.MustChatDialectFor(capability.Dialect),
@@ -120,7 +122,7 @@ func (p *OpenAIProvider) CanVision() bool {
 }
 
 func (p *OpenAIProvider) CanAudio() bool {
-	return false
+	return p.canAudio
 }
 
 func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string) (modelrepo.LLMChatClient, error) {
@@ -138,6 +140,7 @@ func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string
 			maxOutputTokens: p.maxOutputTokens,
 			tracker:         p.tracker,
 			supportsThink:   p.CanThink(),
+			canAudio:        p.canAudio,
 			thinking:        p.thinking,
 			dialect:         p.dialect,
 		},
@@ -159,6 +162,7 @@ func (p *OpenAIProvider) GetPromptConnection(ctx context.Context, backendID stri
 			maxOutputTokens: p.maxOutputTokens,
 			tracker:         p.tracker,
 			supportsThink:   p.CanThink(),
+			canAudio:        p.canAudio,
 			thinking:        p.thinking,
 			dialect:         p.dialect,
 		},
@@ -196,6 +200,7 @@ func (p *OpenAIProvider) GetStreamConnection(ctx context.Context, backendID stri
 			maxOutputTokens: p.maxOutputTokens,
 			tracker:         p.tracker,
 			supportsThink:   p.CanThink(),
+			canAudio:        p.canAudio,
 			thinking:        p.thinking,
 			dialect:         p.dialect,
 		},

@@ -61,6 +61,11 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 	reportErr, reportChange, end := t.tracker().Start(ctx, "prompt", "acp_session", "session_id", string(req.SessionID), "prompt_blocks", len(req.Prompt))
 	defer end()
 
+	// Re-read the compiled chain before each new turn: the declaration watcher
+	// may have recompiled it since the session was created.
+	if err := t.deps.ChainRegistry.Reload(); err != nil {
+		reportErr(err)
+	}
 	if t.deps.ChainRegistry == nil || t.deps.ChainRegistry.Default() == nil {
 		err := libacp.InternalError("no chain configured")
 		reportErr(err)

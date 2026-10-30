@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
+
+	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
 type Action string
@@ -32,6 +37,9 @@ type ApprovalRequest struct {
 	MatchedRule *int
 	TimeoutS    int
 	OnTimeout   Action
+	// Detail explains the match to the person being asked: which condition
+	// fired, or why a trusted-binary gate withheld an automatic allow.
+	Detail string
 
 	InstanceID string
 	SessionID  string
@@ -42,12 +50,13 @@ type ApprovalRequest struct {
 type ConditionOp string
 
 const (
-	OpEq                    ConditionOp = "eq"
-	OpGlob                  ConditionOp = "glob"
-	OpHost                  ConditionOp = "host"
-	OpCommandBlacklist      ConditionOp = "command_blacklist"
-	OpCommandAskAlways      ConditionOp = "command_ask_always"
-	OpNoCommandSubstitution ConditionOp = "no_command_substitution"
+	OpEq                     ConditionOp = "eq"
+	OpGlob                   ConditionOp = "glob"
+	OpHost                   ConditionOp = "host"
+	OpCommandBlacklist       ConditionOp = "command_blacklist"
+	OpCommandAskAlways       ConditionOp = "command_ask_always"
+	OpNoCommandSubstitution  ConditionOp = "no_command_substitution"
+	OpCommandPrefixAllowlist ConditionOp = "command_prefix_allowlist"
 )
 
 type Condition struct {
@@ -65,11 +74,29 @@ type Rule struct {
 	OnTimeout Action      `json:"on_timeout,omitempty"`
 }
 
+// ClientMCPToolsSelector matches every session-scoped MCP server a client
+// supplied, as opposed to one the operator registered.
+const ClientMCPToolsSelector = "@client-mcp"
+
+// PolicySchemaVersion is the wire version of the policy document this binary
+// can load.
+const PolicySchemaVersion = 1
+
+// ErrPolicyVersion reports an envelope whose declared version this binary
+// cannot load.
+var ErrPolicyVersion = errors.New("hitlservice: unsupported hitl policy version")
+
 type Policy struct {
+	// Version is the envelope's wire version; absent (0) means
+	// PolicySchemaVersion.
+	Version       int              `json:"version,omitempty"`
 	DefaultAction Action           `json:"default_action,omitempty"`
 	Rules         []Rule           `json:"rules"`
 	Compute       *ComputeBounds   `json:"compute,omitempty"`
 	Attention     *AttentionBounds `json:"attention,omitempty"`
+	// TrustedBinaries gates every allow that a command_prefix_allowlist grants
+	// on the identity and integrity of the resolved binary; nil is inert.
+	TrustedBinaries *TrustedBinaries `json:"trusted_binaries,omitempty"`
 }
 
 type OnExhausted string
@@ -105,14 +132,24 @@ type EvaluationResult struct {
 	Action      Action
 	MatchedRule *int
 	Reason      string
-	TimeoutS    int
-	OnTimeout   Action
-	PolicyName  string
+	// Detail explains the match in words a person can act on: which condition
+	// fired, and why a trusted-binary gate withheld an allow.
+	Detail     string
+	TimeoutS   int
+	OnTimeout  Action
+	PolicyName string
 }
 
-func evaluate(p *Policy, toolsName, toolName string, args map[string]any) EvaluationResult {
+func evaluate(ctx context.Context, p *Policy, toolsName, toolName string, args map[string]any) EvaluationResult {
+	// Structural reading needs to know which shell will run the line. Callers
+	// that know (the tool layer) set it; when nobody did, POSIX is the honest
+	// default on the hosts whose shell is sh. Windows keeps the conservative
+	// segment scan instead of pretending to parse PowerShell.
+	if ShellKindFromContext(ctx) == "" && runtime.GOOS != "windows" {
+		ctx = WithShellKind(ctx, string(ShellKindPOSIX))
+	}
 	for i, r := range p.Rules {
-		if ruleMatches(r, toolsName, toolName, args) {
+		if matched, detail := ruleMatches(ctx, r, toolsName, toolName, args, p.TrustedBinaries); matched {
 			idx := i
 			return EvaluationResult{
 				Action:      r.Action,
@@ -120,6 +157,7 @@ func evaluate(p *Policy, toolsName, toolName string, args map[string]any) Evalua
 				Reason:      ReasonMatchedRule,
 				TimeoutS:    r.TimeoutS,
 				OnTimeout:   r.OnTimeout,
+				Detail:      detail,
 			}
 		}
 	}
@@ -133,49 +171,96 @@ func evaluate(p *Policy, toolsName, toolName string, args map[string]any) Evalua
 	}
 }
 
-func ruleMatches(r Rule, toolsName, toolName string, args map[string]any) bool {
-	toolsOK := r.Tools == "" || r.Tools == "*" || r.Tools == toolsName
+func ruleMatches(ctx context.Context, r Rule, toolsName, toolName string, args map[string]any, trusted *TrustedBinaries) (bool, string) {
+	toolsOK := r.Tools == "" || r.Tools == "*" || r.Tools == toolsName ||
+		(r.Tools == ClientMCPToolsSelector && runtimetypes.IsACPManagedMCPServerName(toolsName))
 	toolOK := r.Tool == "" || r.Tool == "*" || r.Tool == toolName
 	if !toolsOK || !toolOK {
-		return false
+		return false, ""
 	}
+	detail := ""
 	for _, c := range r.When {
-		if !conditionMatches(c, args) {
-			return false
+		matched, why := conditionMatches(ctx, c, r.Action, args, trusted)
+		if !matched {
+			return false, ""
+		}
+		if why != "" {
+			detail = why
 		}
 	}
-	return true
+	return true, detail
 }
 
-func conditionMatches(c Condition, args map[string]any) bool {
+func conditionMatches(ctx context.Context, c Condition, action Action, args map[string]any, trusted *TrustedBinaries) (bool, string) {
 	val, ok := args[c.Key]
 	if !ok {
-		return false
+		return false, ""
 	}
 	for _, s := range conditionValues(val) {
 		switch c.Op {
 		case OpEq:
 			if s == c.Value {
-				return true
+				return true, ""
 			}
 		case OpGlob:
 			if globMatch(c.Value, s) {
-				return true
+				return true, ""
 			}
 		case OpHost:
 			if urlHostMatches(s, c.Value) {
-				return true
+				return true, ""
 			}
 		case OpCommandBlacklist:
-			if isCommandBlacklisted(args, c.Value) {
-				return true
+			if isCommandBlacklisted(args, c.Value) || structuralInList(ctx, args, c.Value) {
+				return true, fmt.Sprintf("matched %q on the command line", c.Value)
 			}
 		case OpCommandAskAlways:
-			if isCommandInAskAlwaysList(args, c.Value) {
-				return true
+			if isCommandInAskAlwaysList(args, c.Value) || structuralInList(ctx, args, c.Value) {
+				return true, fmt.Sprintf("%q asks before it runs", c.Value)
 			}
 		case OpNoCommandSubstitution:
-			if detectCommandSubstitution(args) {
+			if detectCommandSubstitution(args) || structuralCommandSubstitution(analyzeShellArgs(ShellKindFromContext(ctx), args)) {
+				return true, "the line contains a command substitution"
+			}
+		case OpCommandPrefixAllowlist:
+			if ok, why := commandPrefixAllowMatch(args, c.Value, action, trusted); ok {
+				return true, why
+			}
+		}
+	}
+	return false, ""
+}
+
+// structuralInList reads the whole command line — not just its first word — so
+// a blacklisted or ask-always program hidden behind a pipe or a sequencing
+// operator is still seen. The tokenizer path above stays as the fast case.
+func structuralInList(ctx context.Context, args map[string]any, list string) bool {
+	if len(list) == 0 {
+		return false
+	}
+	if _, hit := structuralCommandInList(analyzeShellArgs(ShellKindFromContext(ctx), args), list); hit {
+		return true
+	}
+	// A shell mvdan cannot read (PowerShell, cmd, or no kind at all) is checked
+	// conservatively: the first word of every segment between shell separators
+	// is treated as a program, so `echo hi | shred` still finds shred. Matching
+	// an extra word can only raise the action, never lower it.
+	line := commandLineFromArgs(args)
+	segments := strings.FieldsFunc(line, func(r rune) bool {
+		return r == '|' || r == ';' || r == '&' || r == '(' || r == ')' || r == '{' || r == '}' || r == '\n'
+	})
+	for _, segment := range segments {
+		words := strings.Fields(segment)
+		if len(words) == 0 {
+			continue
+		}
+		program := allowlistProgramWord(words[0])
+		for _, denied := range strings.Split(list, ",") {
+			denied = strings.TrimSpace(denied)
+			if denied == "" {
+				continue
+			}
+			if program == allowlistProgramWord(denied) {
 				return true
 			}
 		}
@@ -453,6 +538,93 @@ func isCommandInAskAlwaysList(args map[string]any, commandList string) bool {
 	return false
 }
 
+func commandLineFromArgs(args map[string]any) string {
+	parts := make([]string, 0, 4)
+	if command, ok := args["command"].(string); ok && strings.TrimSpace(command) != "" {
+		parts = append(parts, command)
+	}
+	switch argv := args["args"].(type) {
+	case []string:
+		parts = append(parts, argv...)
+	case []any:
+		for _, a := range argv {
+			parts = append(parts, fmt.Sprintf("%v", a))
+		}
+	case string:
+		if strings.TrimSpace(argv) != "" {
+			parts = append(parts, argv)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func commandLineUnsafe(line string) bool {
+	if strings.ContainsAny(line, ";&|<>`\n\r") || strings.Contains(line, "$(") {
+		return true
+	}
+	if runtime.GOOS == "windows" {
+		return strings.ContainsAny(line, "(){}@%^!$")
+	}
+	return false
+}
+
+func hasCommandPrefix(line, prefix string) bool {
+	lineTokens := strings.Fields(line)
+	prefixTokens := strings.Fields(prefix)
+	if len(prefixTokens) == 0 || len(lineTokens) < len(prefixTokens) {
+		return false
+	}
+	for i, want := range prefixTokens {
+		if lineTokens[i] != want {
+			return false
+		}
+	}
+	return true
+}
+
+func commandProgram(line string) string {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
+}
+
+func commandPrefixAllowMatch(args map[string]any, prefixList string, action Action, trusted *TrustedBinaries) (bool, string) {
+	line := commandLineFromArgs(args)
+	if strings.TrimSpace(line) == "" || commandLineUnsafe(line) {
+		return false, ""
+	}
+	matched := false
+	for _, prefix := range strings.Split(prefixList, ",") {
+		prefix = strings.TrimSpace(prefix)
+		if prefix == "" {
+			continue
+		}
+		if hasCommandPrefix(line, prefix) {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return false, ""
+	}
+	if action != ActionAllow || trusted == nil || !trusted.enforced() {
+		return true, ""
+	}
+	if note := trusted.verifyCommand(commandProgram(line)); note != "" {
+		return false, "the allow was withheld: " + note
+	}
+	return true, ""
+}
+
+func checkPolicyVersion(v int) error {
+	if v == 0 || v == PolicySchemaVersion {
+		return nil
+	}
+	return fmt.Errorf("%w: %d (this build loads version %d)", ErrPolicyVersion, v, PolicySchemaVersion)
+}
+
 func loadPolicy(ctx context.Context, src PolicySource, tenantID, policyPath string) (*Policy, error) {
 	data, err := src.ReadPolicy(ctx, tenantID, policyPath)
 	if err != nil {
@@ -461,6 +633,9 @@ func loadPolicy(ctx context.Context, src PolicySource, tenantID, policyPath stri
 	var p Policy
 	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, fmt.Errorf("parse hitl policy %q: %w", policyPath, err)
+	}
+	if err := checkPolicyVersion(p.Version); err != nil {
+		return nil, fmt.Errorf("invalid hitl policy %q: %w", policyPath, err)
 	}
 	if err := rejectUnknownComputeFields(data); err != nil {
 		return nil, fmt.Errorf("invalid hitl policy %q: %w", policyPath, err)
@@ -507,7 +682,7 @@ func validatePolicy(p *Policy) error {
 		}
 		for j, c := range r.When {
 			switch c.Op {
-			case OpEq, OpHost, OpCommandBlacklist, OpCommandAskAlways, OpNoCommandSubstitution:
+			case OpEq, OpHost, OpCommandBlacklist, OpCommandAskAlways, OpNoCommandSubstitution, OpCommandPrefixAllowlist:
 			case OpGlob:
 				if err := validateGlobValue(c.Value); err != nil {
 					return fmt.Errorf("rule %d, condition %d: %w", i, j, err)
@@ -524,6 +699,11 @@ func validatePolicy(p *Policy) error {
 	}
 	if p.Compute != nil {
 		if err := validateComputeBounds(p.Compute); err != nil {
+			return err
+		}
+	}
+	if p.TrustedBinaries != nil {
+		if err := validateTrustedBinaries(p.TrustedBinaries); err != nil {
 			return err
 		}
 	}
@@ -656,4 +836,48 @@ func defaultPolicy() *Policy {
 			{Tools: "print", Action: ActionAllow},
 		}...),
 	}
+}
+
+func CommandLineAllowedByPrefix(line, prefixList string) bool {
+	line = strings.TrimSpace(line)
+	if line == "" || commandLineUnsafe(line) {
+		return false
+	}
+	for _, prefix := range strings.Split(prefixList, ",") {
+		prefix = strings.TrimSpace(prefix)
+		if prefix == "" {
+			continue
+		}
+		if hasCommandPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func allowlistProgramWord(word string) string {
+	if !filepath.IsAbs(word) && strings.ContainsAny(word, `/\`) {
+		return word
+	}
+	return path.Base(word)
+}
+
+func prefixListMatchesTokens(tokens []string, prefixList string) bool {
+	for _, entry := range strings.Split(prefixList, ",") {
+		want := strings.Fields(entry)
+		if len(want) == 0 || len(want) > len(tokens) {
+			continue
+		}
+		matched := true
+		for i, w := range want {
+			if tokens[i] != w {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }

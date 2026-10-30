@@ -3,9 +3,12 @@ package acpsvc
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/contenox/runtime/runtime/homedir"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/contenox/runtime/runtime/homedir"
 
 	"github.com/contenox/runtime/runtime/taskengine"
 )
@@ -16,6 +19,7 @@ const (
 )
 
 type ChainRegistry struct {
+	mu           sync.RWMutex
 	defaultChain *taskengine.TaskChainDefinition
 	source       string
 }
@@ -33,10 +37,17 @@ func LoadChainRegistryFrom(filename, envVar string) (*ChainRegistry, error) {
 		}
 		path = filepath.Join(dir, filename)
 	}
+	registry, err := LoadChainRegistryPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("%w (set %s to point at another chain)", err, envVar)
+	}
+	return registry, nil
+}
 
+func LoadChainRegistryPath(path string) (*ChainRegistry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("acpsvc: chain file %q not found; populate it like any other contenox chain or set %s: %w", path, envVar, err)
+		return nil, fmt.Errorf("acpsvc: chain file %q not found; populate it like any other contenox chain: %w", path, err)
 	}
 	var chain taskengine.TaskChainDefinition
 	if err := json.Unmarshal(data, &chain); err != nil {
@@ -51,6 +62,34 @@ func LoadChainRegistryFrom(filename, envVar string) (*ChainRegistry, error) {
 	return &ChainRegistry{defaultChain: &chain, source: path}, nil
 }
 
-func (r *ChainRegistry) Default() *taskengine.TaskChainDefinition { return r.defaultChain }
+func (r *ChainRegistry) Default() *taskengine.TaskChainDefinition {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.defaultChain
+}
+
+// Reload re-reads the chain from the file it was loaded from, so a session
+// started after the declaration watcher recompiled sees the new version without
+// a restart. An in-memory chain (shipped-tree fallback) has nothing to reload.
+func (r *ChainRegistry) Reload() error {
+	r.mu.RLock()
+	source := r.source
+	r.mu.RUnlock()
+	if source == "" || strings.HasPrefix(source, "embedded:") {
+		return nil
+	}
+	next, err := LoadChainRegistryPath(source)
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.defaultChain = next.defaultChain
+	r.mu.Unlock()
+	return nil
+}
 
 func (r *ChainRegistry) Source() string { return r.source }
+
+func NewChainRegistryFor(chain *taskengine.TaskChainDefinition, source string) *ChainRegistry {
+	return &ChainRegistry{defaultChain: chain, source: source}
+}

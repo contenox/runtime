@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	libacp "github.com/contenox/runtime/libacp"
+	"github.com/contenox/runtime/runtime/agentdecl"
+	"github.com/contenox/runtime/runtime/homedir"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/shellsession"
 )
@@ -42,6 +44,10 @@ func (t *Transport) handleExtRequest(ctx context.Context, method string, params 
 		return t.handleWorkspaceConfigOptions(ctx)
 	case extMethodTerminalRun:
 		return t.handleTerminalRun(ctx, params)
+	case ExtMethodEnvelopesList:
+		return t.handleEnvelopesList()
+	case ExtMethodAgentProblems:
+		return t.handleAgentProblems()
 	default:
 		return nil, libacp.MethodNotFound(method)
 	}
@@ -158,4 +164,68 @@ func (t *Transport) sendTerminalChunk(sid libacp.SessionID, c shellsession.Chunk
 			Meta:          meta,
 		},
 	})
+}
+
+const ExtMethodEnvelopesList = "_contenox/envelopes/list"
+
+type envelopeListing struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (t *Transport) handleEnvelopesList() (json.RawMessage, *libacp.Error) {
+	cfg, err := agentdecl.Shipped()
+	if err != nil {
+		return nil, libacp.InternalError(err.Error())
+	}
+	if home, homeErr := homedir.Dir(); homeErr == nil {
+		if root, rootErr := agentdecl.LocalRoot(home); rootErr == nil {
+			if layered, loadErr := agentdecl.Load(context.Background(), root); loadErr == nil {
+				cfg = layered
+			}
+		}
+	}
+	names := cfg.EnvelopeNames()
+	out := make([]envelopeListing, 0, len(names))
+	for _, name := range names {
+		env, err := cfg.ResolveEnvelope(name)
+		if err != nil {
+			return nil, libacp.InternalError(err.Error())
+		}
+		out = append(out, envelopeListing{Name: name, Description: env.Description})
+	}
+	raw, err := json.Marshal(map[string]any{"envelopes": out})
+	if err != nil {
+		return nil, libacp.InternalError(err.Error())
+	}
+	return raw, nil
+}
+
+// ExtMethodAgentProblems reports what the last declaration sync could not do:
+// a refused or ignored file, or a field this build does not carry. The app shows
+// it instead of leaving it in the log.
+const ExtMethodAgentProblems = "_contenox/agents/problems"
+
+func (t *Transport) handleAgentProblems() (json.RawMessage, *libacp.Error) {
+	problems := agentdecl.LastProblems()
+	if problems == nil {
+		problems = []agentdecl.Problem{}
+	}
+	payload := map[string]any{"problems": problems}
+	if t.deps.ContenoxDir != "" {
+		payload["dir"] = agentdecl.AgentsDir(t.deps.ContenoxDir)
+		files, err := agentdecl.AgentFiles(t.deps.ContenoxDir)
+		if err != nil {
+			return nil, libacp.InternalError(err.Error())
+		}
+		if files == nil {
+			files = []agentdecl.AgentFileStatus{}
+		}
+		payload["files"] = files
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, libacp.InternalError(err.Error())
+	}
+	return raw, nil
 }

@@ -1,0 +1,319 @@
+package agentdecl
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/contenox/runtime/runtime/taskengine"
+)
+
+const TreeDialect = DialectClaudeCode
+
+const AgentFilename = "agent.md"
+
+const RecoveryFilename = "recovery.md"
+
+const FailureFilename = "failure.md"
+
+type AgentTree struct {
+	Name     string
+	Agent    *AgentIR
+	Recovery *AgentIR
+	Children []*AgentTree
+	Default  string
+	Failure  *AgentIR
+}
+
+func (t *AgentTree) IsRouter() bool { return len(t.Children) > 0 }
+
+func (t *AgentTree) Labels() []string {
+	out := make([]string, 0, len(t.Children))
+	for _, c := range t.Children {
+		out = append(out, c.Name)
+	}
+	return out
+}
+
+func LoadTree(ctx context.Context, dir Root, cfg Config) (*AgentTree, error) {
+	if dir.FS == nil {
+		return nil, fmt.Errorf("agentdecl: %s holds no handle", dir.Key)
+	}
+	data, err := dir.FS.ReadFile(ctx, AgentFilename)
+	if err != nil {
+		return nil, fmt.Errorf("agentdecl: %s: %w", dir.Path(AgentFilename), err)
+	}
+	ir, err := ParseAs(TreeDialect, dir.Path(AgentFilename), data, cfg)
+	if err != nil {
+		return nil, err
+	}
+	node := &AgentTree{Name: dir.Base(), Agent: ir, Default: ir.DefaultBranch}
+
+	if rec, rErr := dir.FS.ReadFile(ctx, RecoveryFilename); rErr == nil {
+		recIR, pErr := ParseAs(TreeDialect, dir.Path(RecoveryFilename), rec, cfg)
+		if pErr != nil {
+			return nil, pErr
+		}
+		node.Recovery = recIR
+	}
+
+	if fail, fErr := dir.FS.ReadFile(ctx, FailureFilename); fErr == nil {
+		failIR, pErr := ParseAs(TreeDialect, dir.Path(FailureFilename), fail, cfg)
+		if pErr != nil {
+			return nil, pErr
+		}
+		node.Failure = failIR
+	}
+
+	entries, err := dir.FS.ReadDir(ctx, ".")
+	if err != nil {
+		return nil, fmt.Errorf("agentdecl: read %s: %w", dir.Key, err)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		child, cErr := dir.Child(e.Name())
+		if cErr != nil {
+			return nil, cErr
+		}
+		if _, sErr := child.FS.Stat(ctx, AgentFilename); sErr != nil {
+			continue
+		}
+		sub, sErr := LoadTree(ctx, child, cfg)
+		if sErr != nil {
+			return nil, sErr
+		}
+		node.Children = append(node.Children, sub)
+	}
+
+	if node.IsRouter() {
+		if node.Recovery != nil {
+			return nil, fmt.Errorf("agentdecl: %s: a router has no recovery of its own — put %s beside the leaf that needs it",
+				dir.Key, RecoveryFilename)
+		}
+		if err := node.validateDefault(dir.Key); err != nil {
+			return nil, err
+		}
+	}
+	return node, nil
+}
+
+func (t *AgentTree) validateDefault(dir string) error {
+	if t.Default == "" {
+		if len(t.Children) == 1 {
+			t.Default = t.Children[0].Name
+			return nil
+		}
+		return fmt.Errorf("agentdecl: %s routes to %s and names no default — add `default: <one of them>` to its %s",
+			dir, strings.Join(t.Labels(), ", "), AgentFilename)
+	}
+	for _, c := range t.Children {
+		if c.Name == t.Default {
+			return nil
+		}
+	}
+	return fmt.Errorf("agentdecl: %s declares default %q, which is not one of %s",
+		dir, t.Default, strings.Join(t.Labels(), ", "))
+}
+
+func EmitTree(root *AgentTree, cfg Config) (*taskengine.TaskChainDefinition, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	id := root.Agent.Name
+	if id == "" {
+		id = root.Name
+	}
+	terminal := id + "-summarise"
+
+	var tasks []taskengine.TaskDefinition
+	entry, lastLoop, err := emitNode(root, cfg, id, terminal, &tasks)
+	if err != nil {
+		return nil, err
+	}
+	_ = lastLoop
+	term := terminalTask(terminal, cfg, "previous_output")
+	if root.Failure != nil {
+		term.SystemInstruction = systemInstruction(root.Failure)
+	}
+	tasks = append(tasks, term)
+
+	if tasks[0].ID != entry {
+		for i, t := range tasks {
+			if t.ID == entry {
+				tasks[0], tasks[i] = tasks[i], tasks[0]
+				break
+			}
+		}
+	}
+	return &taskengine.TaskChainDefinition{
+		ID:          id,
+		Description: root.Agent.Description,
+		TokenLimit:  cfg.Chain.TokenLimit,
+		Tasks:       tasks,
+	}, nil
+}
+
+func emitNode(node *AgentTree, cfg Config, prefix, terminal string, tasks *[]taskengine.TaskDefinition) (string, string, error) {
+	if err := refuseUnsafe(node.Agent); err != nil {
+		return "", "", err
+	}
+	if !node.IsRouter() {
+		*tasks = append(*tasks, leafLoop(node.Agent, node.Recovery, cfg, prefix, terminal)...)
+		return prefix + "-agent", prefix + "-recovery", nil
+	}
+
+	routeID := prefix + "-route"
+	branches := make([]taskengine.TransitionBranch, 0, len(node.Children)+1)
+	var defaultGoto, lastLoop string
+	for _, child := range node.Children {
+		childEntry, childLast, err := emitNode(child, cfg, prefix+"-"+child.Name, terminal, tasks)
+		if err != nil {
+			return "", "", err
+		}
+		branches = append(branches, taskengine.TransitionBranch{
+			Operator: taskengine.OpEquals, When: child.Name, Goto: childEntry,
+		})
+		if child.Name == node.Default {
+			defaultGoto = childEntry
+		}
+		lastLoop = childLast
+	}
+	branches = append(branches, taskengine.TransitionBranch{
+		Operator: taskengine.OpDefault, When: "", Goto: defaultGoto,
+	})
+
+	*tasks = append(*tasks, taskengine.TaskDefinition{
+		ID:                routeID,
+		Description:       node.Agent.Description,
+		Handler:           taskengine.HandleRoute,
+		SystemInstruction: routerInstruction(node),
+		ExecuteConfig:     routerConfig(cfg),
+		Transition: taskengine.TaskTransition{
+			OnFailure: defaultGoto,
+			Branches:  branches,
+		},
+	}, taskengine.TaskDefinition{})
+	*tasks = (*tasks)[:len(*tasks)-1]
+	return routeID, lastLoop, nil
+}
+
+func routerInstruction(node *AgentTree) string {
+	body := strings.TrimRight(systemInstruction(node.Agent), "\n")
+	labels := node.Labels()
+	lines := make([]string, 0, len(labels))
+	for _, c := range node.Children {
+		desc := strings.TrimSpace(c.Agent.Description)
+		if desc == "" {
+			lines = append(lines, "- "+c.Name)
+			continue
+		}
+		lines = append(lines, "- "+c.Name+": "+desc)
+	}
+	return body + "\n\nAnswer with exactly one of these labels and nothing else:\n" +
+		strings.Join(lines, "\n") + "\n\nIf none clearly applies, answer " + node.Default + "."
+}
+
+func routerConfig(cfg Config) *taskengine.LLMExecutionConfig {
+	model, provider := cfg.Routing.RouterModel, cfg.Routing.RouterProvider
+	if model == "" {
+		model = cfg.Routing.Model
+	}
+	if provider == "" {
+		provider = cfg.Routing.Provider
+	}
+	return &taskengine.LLMExecutionConfig{
+		Model:            model,
+		Provider:         provider,
+		Tools:            []string{},
+		PassClientsTools: false,
+	}
+}
+
+func (t *AgentTree) MergedIR() *AgentIR {
+	out := &AgentIR{
+		Name:        t.Name,
+		Description: t.Agent.Description,
+		Source:      t.Agent.Source,
+	}
+	sum := sha256.New()
+	var walk func(n *AgentTree)
+	walk = func(n *AgentTree) {
+		for _, ir := range []*AgentIR{n.Agent, n.Recovery, n.Failure} {
+			if ir == nil {
+				continue
+			}
+			sum.Write([]byte(ir.Source.SHA256))
+		}
+		if !n.IsRouter() {
+			if n.Agent.Tools.Inherit {
+				out.Tools.Inherit = true
+			}
+			out.Tools.Allow = append(out.Tools.Allow, n.Agent.Tools.Allow...)
+			if n.Agent.Posture > out.Posture {
+				out.Posture = n.Agent.Posture
+			}
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(t)
+	out.Tools.Allow = dedupeSorted(out.Tools.Allow)
+	out.Tools.Deny = commonDeny(t)
+	out.Source.SHA256 = hex.EncodeToString(sum.Sum(nil))
+	return out
+}
+
+func dedupeSorted(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if seen[v] {
+			continue
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func commonDeny(root *AgentTree) []string {
+	var leaves []*AgentTree
+	var walk func(n *AgentTree)
+	walk = func(n *AgentTree) {
+		if !n.IsRouter() {
+			leaves = append(leaves, n)
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(root)
+	if len(leaves) == 0 {
+		return nil
+	}
+	counts := map[string]int{}
+	for _, l := range leaves {
+		for _, d := range dedupeSorted(l.Agent.Tools.Deny) {
+			counts[d]++
+		}
+	}
+	var out []string
+	for tool, n := range counts {
+		if n == len(leaves) {
+			out = append(out, tool)
+		}
+	}
+	sort.Strings(out)
+	return out
+}

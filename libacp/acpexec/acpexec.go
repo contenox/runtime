@@ -69,6 +69,7 @@ func Spawn(ctx context.Context, cmd *exec.Cmd, opts ...Option) (*Process, error)
 	cmd.Stderr = cfg.stderr
 
 	setProcessGroup(cmd)
+	hideWindow(cmd)
 
 	if err := cmd.Start(); err != nil {
 		_ = stdin.Close()

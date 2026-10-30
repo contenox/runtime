@@ -46,11 +46,23 @@ func TestUnit_GroupAffinityStartLoop(t *testing.T) {
 
 		time.Sleep(25 * time.Millisecond)
 
-		mu.Lock()
-		if callCount < 1 {
-			t.Errorf("Expected at least 1 call, got %d", callCount)
+		// Windows timer granularity can be coarser than the loop's 10ms
+		// interval, so wait for the first tick instead of assuming 25ms is
+		// enough on a loaded machine.
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			mu.Lock()
+			n := callCount
+			mu.Unlock()
+			if n >= 1 {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Errorf("Expected at least 1 call, got %d", n)
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
 		}
-		mu.Unlock()
 
 		if !group.IsLoopActive(key) {
 			t.Error("Loop should be tracked as active")
@@ -129,12 +141,14 @@ func TestUnit_GroupAffinityStartLoop(t *testing.T) {
 		var wg sync.WaitGroup
 		var callCount int
 		var mu sync.Mutex
+		loopCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
 		for range 10 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				group.StartLoop(ctx, &libroutine.LoopConfig{
+				group.StartLoop(loopCtx, &libroutine.LoopConfig{
 					Key:          key,
 					Threshold:    1,
 					ResetTimeout: time.Second,
@@ -150,15 +164,23 @@ func TestUnit_GroupAffinityStartLoop(t *testing.T) {
 		}
 
 		wg.Wait()
-		time.Sleep(50 * time.Millisecond)
-		mu.Lock()
-		if callCount < 1 {
-			t.Errorf("Expected at least 1 call, got %d", callCount)
+		deadline := time.Now().Add(2 * time.Second)
+		for {
+			mu.Lock()
+			n := callCount
+			mu.Unlock()
+			if n > 0 {
+				if n > 6 {
+					t.Errorf("Expected approximately 5-6 calls, got %d (too many, concurrency issue)", n)
+				}
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Error("Expected at least 1 call, got 0")
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
 		}
-		if callCount > 6 {
-			t.Errorf("Expected approximately 5-6 calls, got %d (too many, concurrency issue)", callCount)
-		}
-		mu.Unlock()
 	})
 }
 

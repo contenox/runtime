@@ -40,7 +40,8 @@ func (p *catalogProvider) ListModels(ctx context.Context) ([]modelrepo.ObservedM
 	defer cancel()
 
 	type modelItem struct {
-		ID string `json:"id"`
+		ID              string   `json:"id"`
+		InputModalities []string `json:"input_modalities"`
 	}
 	type modelsPage struct {
 		Data []modelItem `json:"data"`
@@ -76,7 +77,9 @@ func (p *catalogProvider) ListModels(ctx context.Context) ([]modelrepo.ObservedM
 	}
 	all := make([]modelrepo.ObservedModel, 0, len(page.Data))
 	for _, item := range page.Data {
-		all = append(all, inferObservedModel(item.ID))
+		observed := inferObservedModel(item.ID)
+		applyOpenAIModalities(&observed, item.InputModalities)
+		all = append(all, observed)
 	}
 	return all, nil
 }
@@ -150,4 +153,15 @@ func inferObservedModel(id string) modelrepo.ObservedModel {
 	}
 
 	return observed
+}
+
+func applyOpenAIModalities(model *modelrepo.ObservedModel, modalities []string) {
+	for _, modality := range modalities {
+		switch strings.ToLower(strings.TrimSpace(modality)) {
+		case "image":
+			model.CanVision = true
+		case "audio":
+			model.CanAudio = true
+		}
+	}
 }

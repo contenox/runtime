@@ -77,3 +77,19 @@ func TestUnit_LiveDefaultsFollowDBConfig(t *testing.T) {
 	require.Equal(t, "m", tr.chainTemplateVars(pinned)["model"])
 	require.Equal(t, "p", tr.chainTemplateVars(pinned)["provider"])
 }
+
+func TestUnit_HandleModel_ProviderQualifiedValueSetsBothDefaults(t *testing.T) {
+	ctx, db := setupConfigOptionsDB(t)
+	tr := &Transport{deps: Deps{DB: db}}
+	tr.statesFn = func() []statetype.BackendRuntimeState {
+		return []statetype.BackendRuntimeState{
+			conn("d1", "deepseek", "deepseek", "", chat("deepseek-flash", 1_000_000)),
+		}
+	}
+
+	reply, err := tr.handleModel(ctx, "deepseek/deepseek-flash")
+	require.NoError(t, err)
+	require.Contains(t, reply, "deepseek-flash")
+	require.Equal(t, "deepseek-flash", ReadConfigValue(ctx, db, "default-model"))
+	require.Equal(t, "deepseek", ReadConfigValue(ctx, db, "default-provider"), "a picked provider/model pins both defaults")
+}

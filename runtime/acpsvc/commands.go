@@ -242,6 +242,19 @@ func (t *Transport) handleModel(ctx context.Context, args string) (string, error
 	if value == "" {
 		return fmt.Sprintf("Model: %s", t.model()), nil
 	}
+	if provider, model, split := splitModelValue(value); split {
+		if _, _, served := resolveModelValue(t.runtimeStates(ctx), value); served {
+			if err := t.persistConfig(ctx, "default-provider", provider); err != nil {
+				return "", err
+			}
+			if err := t.persistConfig(ctx, "default-model", model); err != nil {
+				return "", err
+			}
+			t.setProvider(provider)
+			t.setModel(model)
+			return fmt.Sprintf("Model set to %s (%s).", model, provider), nil
+		}
+	}
 	if err := t.persistConfig(ctx, "default-model", value); err != nil {
 		return "", err
 	}

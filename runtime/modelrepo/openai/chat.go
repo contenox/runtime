@@ -120,6 +120,9 @@ func (c *openAIContent) UnmarshalJSON(data []byte) error {
 
 func (c *OpenAIChatClient) Chat(ctx context.Context, messages []modelrepo.Message, args ...modelrepo.ChatArgument) (modelrepo.ChatResult, error) {
 	if c.codex != nil {
+		if err := modelrepo.RefuseAudioInput(c.codex.Type(), c.modelName, messages); err != nil {
+			return modelrepo.ChatResult{}, err
+		}
 		ctx, cancel := modelrepo.NonStreamingContext(ctx)
 		defer cancel()
 		client := &OpenAIStreamClient{openAIClient: c.openAIClient}
@@ -145,12 +148,15 @@ func (c *OpenAIChatClient) Chat(ctx context.Context, messages []modelrepo.Messag
 	reportErr, reportChange, end := c.tracker.Start(ctx, "chat", "openai", "model", c.modelName)
 	defer end()
 
-	if err := modelrepo.RefuseAudioInput("openai", c.modelName, messages); err != nil {
-		reportErr(err)
-		return modelrepo.ChatResult{}, err
+	usesResponses := openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
+	if !c.canAudio || usesResponses {
+		if err := modelrepo.RefuseAudioInput("openai", c.modelName, messages); err != nil {
+			reportErr(err)
+			return modelrepo.ChatResult{}, err
+		}
 	}
 
-	if openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args)) {
+	if usesResponses {
 		req, nameMap, err := c.buildResponsesRequest(messages, args)
 		if err != nil {
 			return modelrepo.ChatResult{}, err

@@ -15,6 +15,8 @@ func setProcessGroup(cmd *exec.Cmd) {
 	cmd.SysProcAttr.Setpgid = true
 }
 
+func hideWindow(*exec.Cmd) {}
+
 func killProcessTree(cmd *exec.Cmd) {
 	if cmd.Process == nil {
 		return

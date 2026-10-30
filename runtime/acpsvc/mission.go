@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	libacp "github.com/contenox/runtime/libacp"
+	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/chatservice"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
@@ -59,6 +61,11 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 		return "", fmt.Errorf("no mission agent: name one as `/mission <agent-name> <intent>`, or set a default under Settings → Missions (or `contenox config set default-mission-agent <name>`)")
 	}
 	policy := strings.TrimSpace(clikv.Read(ctx, store, "default-mission-policy"))
+	if policy == "" {
+		// No setting: a mission naming a declared agent runs under that agent's
+		// own posture, whose policy the declaration compiler already rendered.
+		policy = t.declaredAgentPolicy(ctx, agentName)
+	}
 	if policy == "" {
 		return "", fmt.Errorf("no mission envelope: set one under Settings → Missions (or `contenox config set default-mission-policy <policy>`) — a mission must name the HITL policy that bounds it")
 	}
@@ -227,4 +234,21 @@ func sessionListMeta(agentName, missionID string) json.RawMessage {
 		return nil
 	}
 	return mustJSON(meta)
+}
+
+// declaredAgentPolicy finds the policy a compiled agent's own posture rendered
+// to, so a mission run by a declared agent is bounded by that agent rather than
+// by a global setting. Empty when the agent has no generated policy.
+func (t *Transport) declaredAgentPolicy(ctx context.Context, agentName string) string {
+	if t.deps.ContenoxDir == "" || agentName == "" {
+		return ""
+	}
+	root, err := agentdecl.LocalRoot(filepath.Join(t.deps.ContenoxDir, agentdecl.GeneratedDirName))
+	if err != nil {
+		return ""
+	}
+	if policy, ok := agentdecl.PolicyForAgent(ctx, root, agentName); ok {
+		return policy
+	}
+	return ""
 }

@@ -16,7 +16,10 @@ import (
 
 const defaultBaseURL = "https://api.deepseek.com"
 
-const imageModality = "image"
+const (
+	imageModality = "image"
+	audioModality = "audio"
+)
 
 type catalogProvider struct {
 	spec    modelrepo.BackendSpec
@@ -105,6 +108,7 @@ func capabilityFor(item modelCard) modelrepo.CapabilityConfig {
 		CanChat:         true,
 		CanStream:       true,
 		CanVision:       slices.Contains(item.InputModalities, imageModality),
+		CanAudio:        slices.Contains(item.InputModalities, audioModality),
 	}
 	if thinking := thinkingTypes(item); thinking != nil {
 		caps.CanThink = true

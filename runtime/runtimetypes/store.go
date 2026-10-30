@@ -14,6 +14,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -365,7 +366,9 @@ func localPostgresAvailable() bool {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return false
 	}
-	return exec.Command("docker", "info").Run() == nil
+	cmd := exec.Command("docker", "info")
+	winproc.Hide(cmd)
+	return cmd.Run() == nil
 }
 
 // keysetBefore builds the WHERE condition for the page that follows a cursor

@@ -3,12 +3,15 @@ package contenoxcli
 import (
 	"context"
 	"fmt"
-	"github.com/contenox/runtime/runtime/homedir"
 	"log/slog"
 	"os"
+	"path/filepath"
+
+	"github.com/contenox/runtime/runtime/homedir"
 
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
@@ -109,7 +112,7 @@ func readinessDefaults(opts chatOpts) (model, provider string) {
 }
 
 func hitlPolicySource(primaryDir string) hitlservice.PolicySource {
-	dirs := []string{primaryDir}
+	dirs := []string{filepath.Join(primaryDir, agentdecl.GeneratedDirName), primaryDir}
 	if dir, err := homedir.Dir(); err == nil {
 		dirs = append(dirs, dir)
 	}

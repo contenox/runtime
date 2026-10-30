@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/contenox/runtime/runtime/localtools/mcpoauth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/oauth2"
@@ -259,6 +260,7 @@ func (p *MCPSessionPool) buildTransport() (mcp.Transport, error) {
 			return nil, fmt.Errorf("stdio transport requires a command")
 		}
 		cmd := exec.Command(p.cfg.Command, p.cfg.Args...)
+		winproc.Hide(cmd)
 		return &mcp.CommandTransport{Command: cmd}, nil
 
 	case MCPTransportSSE:
@@ -784,6 +786,7 @@ func openBrowserDefault(rawURL string) error {
 	default:
 		cmd = exec.Command("cmd", "/c", "start", rawURL)
 	}
+	winproc.Hide(cmd)
 	return cmd.Start()
 }
 

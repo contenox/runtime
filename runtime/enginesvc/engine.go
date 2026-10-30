@@ -82,29 +82,31 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	if tenantID == "" {
 		tenantID = runtimetypes.LocalTenantID
 	}
-	config := &runtimestate.Config{
-		TenantID:  tenantID,
-		TaskModel: cfg.DefaultModel,
-		ChatModel: cfg.DefaultModel,
-	}
-	if err := runtimestate.InitPromptExec(ctx, config, db, state, cfg.ContextLength); err != nil {
-		return nil, fmt.Errorf("failed to init prompt executor: %w", err)
-	}
-	if err := runtimestate.InitChatExec(ctx, config, db, state, cfg.ContextLength); err != nil {
-		return nil, fmt.Errorf("failed to init chat executor: %w", err)
-	}
+	if cfg.DefaultModel != "" {
+		config := &runtimestate.Config{
+			TenantID:  tenantID,
+			TaskModel: cfg.DefaultModel,
+			ChatModel: cfg.DefaultModel,
+		}
+		if err := runtimestate.InitPromptExec(ctx, config, db, state, cfg.ContextLength); err != nil {
+			return nil, fmt.Errorf("failed to init prompt executor: %w", err)
+		}
+		if err := runtimestate.InitChatExec(ctx, config, db, state, cfg.ContextLength); err != nil {
+			return nil, fmt.Errorf("failed to init chat executor: %w", err)
+		}
 
-	specs := []runtimestate.ExtraModelSpec{
-		{
-			Name:          cfg.DefaultModel,
-			ContextLength: cfg.ContextLength,
-			CanChat:       true,
-			CanPrompt:     true,
-			CanEmbed:      false,
-		},
-	}
-	if err := runtimestate.EnsureModels(ctx, db, tenantID, specs); err != nil {
-		return nil, fmt.Errorf("failed to ensure models: %w", err)
+		specs := []runtimestate.ExtraModelSpec{
+			{
+				Name:          cfg.DefaultModel,
+				ContextLength: cfg.ContextLength,
+				CanChat:       true,
+				CanPrompt:     true,
+				CanEmbed:      false,
+			},
+		}
+		if err := runtimestate.EnsureModels(ctx, db, tenantID, specs); err != nil {
+			return nil, fmt.Errorf("failed to ensure models: %w", err)
+		}
 	}
 
 	tracker := cfg.Tracker
@@ -117,26 +119,33 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	}
 
 	if !cfg.SkipBackendCycle {
+		cycleCtx := ctx
+		cancelCycle := func() {}
+		if cfg.BackendCycleBudget > 0 {
+			cycleCtx, cancelCycle = context.WithTimeout(ctx, cfg.BackendCycleBudget)
+		}
 		cycleReportErr, _, cycleEnd := tracker.Start(ctx, "sync", "backend_cycle")
-		if err := state.RunBackendCycle(ctx); err != nil {
+		if err := state.RunBackendCycle(cycleCtx); err != nil {
 			cycleReportErr(err)
 		}
 		cycleEnd()
-	}
-	rt := state.Get(ctx)
-	anyReachable := false
-	_, reportReachable, reachableEnd := tracker.Start(ctx, "check", "backend_reachability")
-	for id, bs := range rt {
-		if bs.Error != "" {
-			reportReachable(id, map[string]any{"url": bs.Backend.BaseURL, "error": bs.Error})
-		} else {
-			anyReachable = true
+		cancelCycle()
+
+		rt := state.Get(ctx)
+		anyReachable := false
+		_, reportReachable, reachableEnd := tracker.Start(ctx, "check", "backend_reachability")
+		for id, bs := range rt {
+			if bs.Error != "" {
+				reportReachable(id, map[string]any{"url": bs.Backend.BaseURL, "error": bs.Error})
+			} else {
+				anyReachable = true
+			}
 		}
+		if !anyReachable {
+			reportReachable("", "no reachable backends; subsequent model operations may fail")
+		}
+		reachableEnd()
 	}
-	if !anyReachable {
-		reportReachable("", "no reachable backends; subsequent model operations may fail")
-	}
-	reachableEnd()
 
 	ss := stateservice.New(state, db, cfg.WorkspaceID)
 	setupStatus := func(ctx context.Context) (setupcheck.Result, error) {

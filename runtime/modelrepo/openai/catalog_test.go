@@ -120,3 +120,29 @@ func TestUnit_CatalogProvider_VisionLandmines(t *testing.T) {
 	require.True(t, vision["o4-mini"], "o4-mini has vision")
 	require.False(t, vision["gpt-4o-audio-preview"], "audio model is not chat-vision")
 }
+
+func TestUnit_CatalogProvider_InputModalitiesSetAudioAndVision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
+				{"id": "gpt-audio-gateway", "input_modalities": []string{"text", "image", "audio"}},
+				{"id": "gpt-text-gateway", "input_modalities": []string{"text"}},
+				{"id": "gpt-5"},
+			},
+		})
+	}))
+	defer server.Close()
+	catalog, err := modelrepo.NewCatalogProvider(modelrepo.BackendSpec{Type: "openai", BaseURL: server.URL})
+	require.NoError(t, err)
+	models, err := catalog.ListModels(context.Background())
+	require.NoError(t, err)
+	byName := map[string]modelrepo.ObservedModel{}
+	for _, m := range models {
+		byName[m.Name] = m
+	}
+	require.True(t, byName["gpt-audio-gateway"].CanAudio)
+	require.True(t, byName["gpt-audio-gateway"].CanVision)
+	require.False(t, byName["gpt-text-gateway"].CanAudio)
+	require.False(t, byName["gpt-5"].CanAudio)
+}

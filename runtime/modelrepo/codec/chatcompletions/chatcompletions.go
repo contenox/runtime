@@ -228,8 +228,8 @@ func Build(model string, messages []modelrepo.Message, cfg *modelrepo.ChatConfig
 			ToolCallID: msg.ToolCallID,
 		}
 		switch {
-		case len(msg.Images) > 0:
-			wm.Content = wireImageContent(msg)
+		case len(msg.Images) > 0, len(msg.Audio) > 0:
+			wm.Content = wireRichContent(msg)
 		case msg.Content == "" && len(msg.ToolCalls) > 0:
 			wm.Content = nil
 		default:
@@ -284,8 +284,8 @@ func wireResponseFormat(format *modelrepo.ResponseFormat) *ResponseFormat {
 	return wire
 }
 
-func wireImageContent(msg modelrepo.Message) []ContentPart {
-	parts := make([]ContentPart, 0, len(msg.Images)+1)
+func wireRichContent(msg modelrepo.Message) []ContentPart {
+	parts := make([]ContentPart, 0, len(msg.Images)+len(msg.Audio)+1)
 	if msg.Content != "" {
 		parts = append(parts, ContentPart{Type: "text", Text: msg.Content})
 	}
@@ -295,7 +295,28 @@ func wireImageContent(msg modelrepo.Message) []ContentPart {
 			ImageURL: &ImageURL{URL: imageDataURI(img.MimeType, img.Data)},
 		})
 	}
+	for _, audio := range msg.Audio {
+		parts = append(parts, ContentPart{
+			Type:       "input_audio",
+			InputAudio: &InputAudio{Data: base64.StdEncoding.EncodeToString(audio.Data), Format: audioFormat(audio.MimeType)},
+		})
+	}
 	return parts
+}
+
+// audioFormat returns the wire format token OpenAI-compatible endpoints use for
+// inline audio. The subtype after "audio/" is the token, so every MIME type the
+// modelrepo accepts maps to a format the provider can reject with its own message.
+func audioFormat(mimeType string) string {
+	mimeType = strings.ToLower(strings.TrimSpace(mimeType))
+	format := strings.TrimPrefix(mimeType, "audio/")
+	switch format {
+	case "mpeg", "mp3":
+		return "mp3"
+	case "x-wav", "wave":
+		return "wav"
+	}
+	return format
 }
 
 func imageDataURI(mimeType string, data []byte) string {

@@ -135,6 +135,7 @@ func (h *HITLWrapper) Exec(
 			DiffNew:     newContent,
 			PolicyName:  result.PolicyName,
 			MatchedRule: result.MatchedRule,
+			Detail:      result.Detail,
 			TimeoutS:    result.TimeoutS,
 			OnTimeout:   result.OnTimeout,
 		}

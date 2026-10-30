@@ -23,6 +23,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/approvalapi"
 	"github.com/contenox/runtime/runtime/internal/backendapi"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
+	"github.com/contenox/runtime/runtime/internal/envelopeapi"
 	"github.com/contenox/runtime/runtime/internal/fleetapi"
 	"github.com/contenox/runtime/runtime/internal/hitlpolicyapi"
 	"github.com/contenox/runtime/runtime/internal/localfileapi"
@@ -204,6 +205,7 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		}
 		taskchainapi.AddTaskChainRoutes(mux, chains)
 		hitlpolicyapi.AddRoutes(mux, chainFiles)
+		envelopeapi.AddRoutes(mux, deps.ContenoxDir)
 	}
 
 	if deps.Agent != nil {

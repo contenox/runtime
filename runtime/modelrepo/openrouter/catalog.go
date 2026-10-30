@@ -114,10 +114,23 @@ func toObservedModel(m orModel) (modelrepo.ObservedModel, bool) {
 		om.CanPrompt = true
 		om.CanStream = true
 		om.CanVision = orAcceptsImageInput(m)
+		om.CanAudio = orAcceptsAudioInput(m)
 	default:
 		return modelrepo.ObservedModel{}, false
 	}
 	return om, true
+}
+
+func orAcceptsAudioInput(m orModel) bool {
+	for _, mod := range m.Architecture.InputModalities {
+		if strings.EqualFold(strings.TrimSpace(mod), "audio") {
+			return true
+		}
+	}
+	if in, _, ok := strings.Cut(strings.ToLower(m.Architecture.Modality), "->"); ok {
+		return strings.Contains(in, "audio")
+	}
+	return false
 }
 
 func orAcceptsImageInput(m orModel) bool {

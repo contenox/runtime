@@ -67,6 +67,53 @@ func TestUnit_Build_SerializesImageAsContentParts(t *testing.T) {
 	}
 }
 
+func TestUnit_Build_SerializesAudioAsInputAudioParts(t *testing.T) {
+	wavBytes := []byte{0x52, 0x49, 0x46, 0x46}
+	msgs := []modelrepo.Message{
+		{Role: "user", Content: "transcribe this", Audio: []modelrepo.AudioPart{
+			{Data: wavBytes, MimeType: "audio/wav"},
+		}},
+	}
+
+	req, _ := chatcompletions.Build("gpt-audio", msgs, nil)
+	raw, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got struct {
+		Messages []struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, raw)
+	}
+	var parts []struct {
+		Type       string `json:"type"`
+		Text       string `json:"text"`
+		InputAudio *struct {
+			Data   string `json:"data"`
+			Format string `json:"format"`
+		} `json:"input_audio"`
+	}
+	if err := json.Unmarshal(got.Messages[0].Content, &parts); err != nil {
+		t.Fatalf("audio message content is not a parts array: %v\n%s", err, got.Messages[0].Content)
+	}
+	if len(parts) != 2 {
+		t.Fatalf("expected [text, input_audio] parts, got %d: %s", len(parts), got.Messages[0].Content)
+	}
+	if parts[1].Type != "input_audio" || parts[1].InputAudio == nil {
+		t.Fatalf("audio part wrong: %+v", parts[1])
+	}
+	if parts[1].InputAudio.Format != "wav" {
+		t.Errorf("format: want wav, got %q", parts[1].InputAudio.Format)
+	}
+	if want := base64.StdEncoding.EncodeToString(wavBytes); parts[1].InputAudio.Data != want {
+		t.Errorf("audio data mismatch: want %s, got %s", want, parts[1].InputAudio.Data)
+	}
+}
+
 func TestUnit_Build_PlacesModelAndSanitizesToolNames(t *testing.T) {
 	maxTok := 256
 	cfg := &modelrepo.ChatConfig{

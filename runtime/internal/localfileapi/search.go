@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	apiframework "github.com/contenox/runtime/apiframework"
+	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/contenox/runtime/runtime/vfs"
 )
 
@@ -121,6 +122,7 @@ func (h *searchHandler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	args = append(args, "--", q, ".")
 	cmd := exec.CommandContext(ctx, rgPath, args...)
+	winproc.Hide(cmd)
 	cmd.Dir = resolved
 	cmd.Stderr = io.Discard
 

@@ -30,6 +30,10 @@ var initRunChain string
 //go:embed chain-compact.json
 var initCompactChain string
 
+// chain-acp.json is the equivalence fixture: the compiled `acp` tree is
+// compared against it by agentdecl/chain_equivalence_test.go. Nothing reads or
+// writes it at boot, and `init` no longer seeds it — edit agents/acp/ instead.
+//
 //go:embed chain-acp.json
 var initACPChain string
 
@@ -60,17 +64,6 @@ func seedHeadlessACPChainIfMissing(contenoxDir string) error {
 		return err
 	}
 	return os.WriteFile(dst, []byte(initACPXChain), 0644)
-}
-
-func seedACPChainIfMissing(contenoxDir string) error {
-	dst := filepath.Join(contenoxDir, "default-acp-chain.json")
-	if _, err := os.Stat(dst); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(contenoxDir, 0750); err != nil {
-		return err
-	}
-	return os.WriteFile(dst, []byte(initACPChain), 0644)
 }
 
 type providerConfig struct {
@@ -213,9 +206,7 @@ func RunGlobalInit(out io.Writer) error {
 	if err := writeFile(filepath.Join(homeDir, "chain-compact.json"), initCompactChain); err != nil {
 		return err
 	}
-	if err := writeFile(filepath.Join(homeDir, "default-acp-chain.json"), initACPChain); err != nil {
-		return err
-	}
+
 	if err := writeFile(filepath.Join(homeDir, headlessACPChainFilename), initACPXChain); err != nil {
 		return err
 	}
@@ -226,6 +217,9 @@ func RunGlobalInit(out io.Writer) error {
 		return err
 	}
 	if err := writeEmbeddedHITLPolicies(homeDir, false); err != nil {
+		return err
+	}
+	if err := seedAgentDeclarations(context.Background(), homeDir); err != nil {
 		return err
 	}
 	pruneLegacyLocalBackendsFromHome(out)
@@ -324,9 +318,7 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	if err := writeFile(filepath.Join(homeDir, "chain-compact.json"), initCompactChain); err != nil {
 		return err
 	}
-	if err := writeFile(filepath.Join(homeDir, "default-acp-chain.json"), initACPChain); err != nil {
-		return err
-	}
+
 	if err := writeFile(filepath.Join(homeDir, headlessACPChainFilename), initACPXChain); err != nil {
 		return err
 	}
@@ -337,6 +329,9 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		return err
 	}
 	if err := writeEmbeddedHITLPolicies(homeDir, force); err != nil {
+		return err
+	}
+	if err := seedAgentDeclarations(context.Background(), homeDir); err != nil {
 		return err
 	}
 

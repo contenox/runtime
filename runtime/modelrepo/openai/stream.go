@@ -21,14 +21,16 @@ type OpenAIStreamClient struct {
 func (c *OpenAIStreamClient) Stream(ctx context.Context, messages []modelrepo.Message, args ...modelrepo.ChatArgument) (<-chan *modelrepo.StreamParcel, error) {
 	reportErr, reportChange, end := c.tracker.Start(ctx, "stream", c.providerType(), "model", c.modelName)
 
-	if err := modelrepo.RefuseAudioInput(c.providerType(), c.modelName, messages); err != nil {
-		reportErr(err)
-		end()
-		return nil, err
+	usesResponses := c.codex != nil || openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
+	if !c.canAudio || usesResponses {
+		if err := modelrepo.RefuseAudioInput(c.providerType(), c.modelName, messages); err != nil {
+			reportErr(err)
+			end()
+			return nil, err
+		}
 	}
 
 	streamCh := make(chan *modelrepo.StreamParcel)
-	usesResponses := c.codex != nil || openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
 	endpoint := "/chat/completions"
 	var requestBody []byte
 	var nameMap map[string]string

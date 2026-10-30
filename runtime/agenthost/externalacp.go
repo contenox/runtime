@@ -15,6 +15,7 @@ import (
 	"github.com/contenox/runtime/libacp/acpexec"
 	"github.com/contenox/runtime/libsandbox"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -174,6 +175,7 @@ func selfInvocation(command string) bool {
 
 func selfSpawnCmd(a *ExternalACPAgent) *exec.Cmd {
 	cmd := exec.Command(a.Config.Command, a.Config.Args...)
+	winproc.Hide(cmd)
 	cmd.Dir = a.Config.Cwd
 	env := os.Environ()
 	for k, v := range a.Config.Env {

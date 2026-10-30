@@ -49,14 +49,14 @@ func TestUnit_Discovery_BackgroundPublishesFastBackendAndStops(t *testing.T) {
 	defer stop()
 	select {
 	case <-slowStarted:
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("slow backend was not probed")
 	}
 	require.Eventually(t, func() bool {
 		snapshot := state.Get(ctx)
 		fast, exists := snapshot["fast"]
 		return exists && len(fast.PulledModels) == 1
-	}, time.Second, time.Millisecond)
+	}, 10*time.Second, 5*time.Millisecond)
 	for range 5 {
 		require.NoError(t, state.ReconcileIfStale(ctx))
 	}

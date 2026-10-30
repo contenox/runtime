@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/contenox/runtime/runtime/internal/winproc"
 )
 
 var ErrOutputBudgetExceeded = errors.New("local_shell: command output exceeded the remaining context budget")
@@ -55,6 +57,7 @@ func (r osCommandRunner) Run(ctx context.Context, spec CommandSpec, stdout, stde
 	} else {
 		cmd = exec.CommandContext(ctx, spec.Command, spec.Args...)
 	}
+	winproc.Hide(cmd)
 	if spec.Cwd != "" {
 		cmd.Dir = spec.Cwd
 	}

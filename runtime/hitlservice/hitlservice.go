@@ -226,7 +226,7 @@ func (s *service) Evaluate(ctx context.Context, toolsName, toolName string, args
 		p = defaultPolicy()
 	}
 	reportChange("policy", policyPath)
-	result := evaluate(p, toolsName, toolName, args)
+	result := evaluate(ctx, p, toolsName, toolName, args)
 	result.PolicyName = policyPath
 	return result, nil
 }

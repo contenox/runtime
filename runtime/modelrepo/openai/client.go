@@ -24,6 +24,7 @@ type openAIClient struct {
 	maxOutputTokens int
 	tracker         libtracker.ActivityTracker
 	supportsThink   bool
+	canAudio        bool
 	thinking        *modelrepo.ThinkingTypes
 	dialect         modelrepo.ChatDialect
 }
@@ -78,13 +79,19 @@ type apiChatMessage struct {
 }
 
 type apiContentPart struct {
-	Type     string       `json:"type"`
-	Text     string       `json:"text,omitempty"`
-	ImageURL *apiImageURL `json:"image_url,omitempty"`
+	Type       string         `json:"type"`
+	Text       string         `json:"text,omitempty"`
+	ImageURL   *apiImageURL   `json:"image_url,omitempty"`
+	InputAudio *apiInputAudio `json:"input_audio,omitempty"`
 }
 
 type apiImageURL struct {
 	URL string `json:"url"`
+}
+
+type apiInputAudio struct {
+	Data   string `json:"data"`
+	Format string `json:"format"`
 }
 
 type apiToolCallReq struct {
@@ -324,8 +331,8 @@ func buildOpenAIRequestForDialect(dialect modelrepo.ChatDialect, modelName strin
 			ToolCallID: msg.ToolCallID,
 		}
 		switch {
-		case len(msg.Images) > 0:
-			apiMsg.Content = openAIImageContent(msg)
+		case len(msg.Images) > 0, len(msg.Audio) > 0:
+			apiMsg.Content = openAIRichContent(msg)
 		case msg.Content == "" && len(msg.ToolCalls) > 0:
 			apiMsg.Content = nil
 		default:
@@ -375,8 +382,8 @@ func dialectOwnsReasoning(dialect modelrepo.ChatDialect) bool {
 	return dialect != nil && dialect.OwnsReasoning()
 }
 
-func openAIImageContent(msg modelrepo.Message) []apiContentPart {
-	parts := make([]apiContentPart, 0, len(msg.Images)+1)
+func openAIRichContent(msg modelrepo.Message) []apiContentPart {
+	parts := make([]apiContentPart, 0, len(msg.Images)+len(msg.Audio)+1)
 	if msg.Content != "" {
 		parts = append(parts, apiContentPart{Type: "text", Text: msg.Content})
 	}
@@ -386,7 +393,24 @@ func openAIImageContent(msg modelrepo.Message) []apiContentPart {
 			ImageURL: &apiImageURL{URL: imageDataURI(img.MimeType, img.Data)},
 		})
 	}
+	for _, audio := range msg.Audio {
+		parts = append(parts, apiContentPart{
+			Type:       "input_audio",
+			InputAudio: &apiInputAudio{Data: base64.StdEncoding.EncodeToString(audio.Data), Format: openAIAudioFormat(audio.MimeType)},
+		})
+	}
 	return parts
+}
+
+func openAIAudioFormat(mimeType string) string {
+	format := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(mimeType)), "audio/")
+	switch format {
+	case "mpeg", "mp3":
+		return "mp3"
+	case "x-wav", "wave":
+		return "wav"
+	}
+	return format
 }
 
 func imageDataURI(mimeType string, data []byte) string {

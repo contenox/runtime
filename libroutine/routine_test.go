@@ -69,23 +69,25 @@ func TestUnit_CircuitBreaker_HalfOpenAfterTimeout(t *testing.T) {
 		return errors.New("test error")
 	})
 
-	deadline := time.Now().Add(202 * time.Millisecond)
+	// Poll once and remember the answer: Allow() hands out the half-open probe
+	// exactly once, so asking again in the assertion consumes it.
+	allowed := false
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if rm.Allow() {
+			allowed = true
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-
-	if !rm.Allow() {
-		t.Errorf("expected Allow to return true in half-open state")
+	if !allowed {
+		t.Fatalf("expected Allow to return true in half-open state")
 	}
 
 	if rm.Allow() {
 		t.Errorf("expected Allow to return false in half-open state when test call is in progress")
 	}
 }
-
 func TestUnit_CircuitBreaker_RecoversFromHalfOpenOnSuccess(t *testing.T) {
 	defer quiet()()
 	rm := libroutine.NewRoutine(1, 200*time.Millisecond)

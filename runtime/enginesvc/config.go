@@ -2,6 +2,7 @@ package enginesvc
 
 import (
 	"context"
+	"time"
 
 	"github.com/contenox/runtime/libbus"
 	"github.com/contenox/runtime/libkvstore"
@@ -45,6 +46,11 @@ type Config struct {
 	Tracing bool
 
 	SkipBackendCycle bool
+
+	// BackendCycleBudget bounds the first backend cycle, so a serving process binds even
+	// when a registered provider answers slowly or not at all. Zero leaves the cycle
+	// unbounded; a caller that answers with the state it just built needs it unbounded.
+	BackendCycleBudget time.Duration
 
 	WorkspaceID      string
 	TenantID         string

@@ -11,11 +11,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const localExecToolsName = "local_shell"
+
+// LocalExecToolsName is the registered toolset name local_shell answers on.
+const LocalExecToolsName = localExecToolsName
 
 type LocalExecResult struct {
 	ExitCode        int     `json:"exit_code"`
@@ -135,7 +139,7 @@ func (h *LocalExecTools) Exec(ctx context.Context, startTime time.Time, input an
 		return nil, taskengine.DataTypeAny, err
 	}
 	allowedCommands, allowedDir, deniedCommands := h.resolvePolicy(ctx)
-	if err := h.checkAllowlist(command, useShell, allowedCommands, allowedDir, deniedCommands); err != nil {
+	if err := h.checkAllowlist(command, argsSlice, useShell, allowedCommands, allowedDir, deniedCommands); err != nil {
 		return nil, taskengine.DataTypeAny, err
 	}
 	result, err := h.run(ctx, command, argsSlice, cwd, timeout, useShell, stdin)
@@ -240,11 +244,22 @@ func receivedShellArguments(tools *taskengine.ToolsCall, input any) map[string]a
 	return received
 }
 
-func (h *LocalExecTools) checkAllowlist(command string, useShell bool, allowedCommands []string, allowedDir string, deniedCommands []string) error {
-	if useShell && (len(allowedCommands) > 0 || allowedDir != "" || len(deniedCommands) > 0) {
-		return fmt.Errorf("local_shell: 'shell: true' is strictly forbidden when security " +
-			"policies (allowlist / denylist / allowed-dir) are active to prevent command injection; " +
-			"set shell:false and supply the command and args separately")
+func (h *LocalExecTools) checkAllowlist(command string, argsSlice []string, useShell bool, allowedCommands []string, allowedDir string, deniedCommands []string) error {
+	if useShell && (len(allowedCommands) > 0 || len(deniedCommands) > 0 || allowedDir != "") {
+		// Check the line the shell will actually run — command plus argv — not
+		// just the program name, or an argument could carry a second command.
+		script := strings.TrimSpace(command + " " + strings.Join(argsSlice, " "))
+		if len(allowedCommands) == 0 {
+			return fmt.Errorf("local_shell: 'shell: true' needs _allowed_commands; name the programs the line may start with")
+		}
+		if !hitlservice.CommandLineAllowedByPrefix(script, strings.Join(allowedCommands, ",")) {
+			return fmt.Errorf("local_shell: %q is not one of the allowed commands, or it carries a character the shell would evaluate; run it without shell:true or name it in _allowed_commands", script)
+		}
+		// The gate refuses every metacharacter, so the line holds one program:
+		// the denylist and the directory rule apply to it below.
+		if fields := strings.Fields(script); len(fields) > 0 {
+			command = fields[0]
+		}
 	}
 
 	resolved := command

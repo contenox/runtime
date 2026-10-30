@@ -230,9 +230,11 @@ func New(deps Deps) libacp.AgentFactory {
 		}
 		conn.SetExtRequestHandler(t.handleExtRequest)
 		stopWatch := t.watchBackendState()
+		stopAgentWatch := t.listenAgentDeclarations()
 		go func() {
 			<-conn.Closed()
 			stopWatch()
+			stopAgentWatch()
 			connCancel()
 			t.releaseSessionRouting()
 			t.unsubscribeAllTerminals()

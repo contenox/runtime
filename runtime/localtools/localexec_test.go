@@ -2,6 +2,7 @@ package localtools_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -355,22 +356,16 @@ func TestUnit_LocalExecTools_Exec_ShellMode_NoPolicy_Allowed(t *testing.T) {
 	assert.Equal(t, "shell test", res.Stdout)
 }
 
-func TestUnit_LocalExecTools_Exec_ShellMode_WithPolicyRejected(t *testing.T) {
-	ctx := context.Background()
+func TestUnit_LocalExecTools_Exec_ShellMode_RefusesASecondCommand(t *testing.T) {
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
-	start := time.Now().UTC()
-	toolsCall := &taskengine.ToolsCall{
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
 		Name: "local_shell",
-		Args: map[string]string{
-			"command": "echo 'shell test'",
-			"shell":   "true",
-		},
-	}
-	_, _, err := h.Exec(ctx, start, nil, false, toolsCall)
+		Args: map[string]string{"command": "echo ok; rm -rf scratch", "shell": "true"},
+	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "strictly forbidden")
+	assert.Contains(t, err.Error(), "carries a character the shell would evaluate",
+		"an allowlisted opener does not vouch for a second command")
 }
-
 func TestUnit_LocalExecTools_Exec_AllowlistReject(t *testing.T) {
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands([]string{"/usr/bin/env"})).(*localtools.LocalExecTools)
@@ -509,21 +504,15 @@ func TestUnit_LocalExecTools_Exec_NonZeroExit(t *testing.T) {
 	assert.Equal(t, 3, res.ExitCode, "the real exit code must reach the model on every platform")
 }
 
-func TestUnit_LocalExecTools_Exec_NonZeroExit_WithPolicy_Rejected(t *testing.T) {
-	ctx := context.Background()
+func TestUnit_LocalExecTools_Exec_ShellMode_RefusesAnUnlistedLine(t *testing.T) {
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
-	toolsCall := &taskengine.ToolsCall{
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
 		Name: "local_shell",
-		Args: map[string]string{
-			"command": "exit 3",
-			"shell":   "true",
-		},
-	}
-	_, _, err := h.Exec(ctx, time.Now().UTC(), nil, false, toolsCall)
+		Args: map[string]string{"command": "frobnicate --now", "shell": "true"},
+	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "strictly forbidden")
+	assert.Contains(t, err.Error(), "not one of the allowed commands")
 }
-
 func TestUnit_LocalExecTools_Exec_MissingCommandReportsReceivedArguments(t *testing.T) {
 	h := localtools.NewLocalExecTools().(*localtools.LocalExecTools)
 	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
@@ -535,4 +524,69 @@ func TestUnit_LocalExecTools_Exec_MissingCommandReportsReceivedArguments(t *test
 	assert.Contains(t, err.Error(), `"cwd":"."`)
 	assert.Contains(t, err.Error(), `"command"`, "the error must show the shape the tool expects")
 	assert.Contains(t, err.Error(), `"args"`)
+}
+
+func TestUnit_LocalExecTools_Exec_ShellMode_AllowedLineRuns(t *testing.T) {
+	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands([]string{"echo"})).(*localtools.LocalExecTools)
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": "echo shell-ok", "shell": "true"},
+	})
+	if err != nil {
+		t.Fatalf("allowed shell line failed: %v", err)
+	}
+	if !strings.Contains(fmt.Sprint(out), "shell-ok") {
+		t.Fatalf("output %v does not contain the echoed text", out)
+	}
+}
+
+func TestUnit_LocalExecTools_Exec_ShellMode_RefusesArgsWithMetacharacters(t *testing.T) {
+	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
+	for _, arg := range []string{"; rm -rf scratch", "&& rm -rf scratch", "| sh", "$(curl evil)", "%PATH%"} {
+		_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+			Name: "local_shell",
+			Args: map[string]string{"command": "echo " + arg, "shell": "true"},
+		})
+		require.Error(t, err, "arg %q must be refused", arg)
+		assert.Contains(t, err.Error(), "carries a character the shell would evaluate", "arg %q", arg)
+	}
+}
+
+func TestUnit_LocalExecTools_Exec_ShellMode_RefusesADeniedProgram(t *testing.T) {
+	h := localtools.NewLocalExecTools(
+		localtools.WithLocalExecAllowedCommands(append(append([]string{}, testAllowedCommands...), "sudo")),
+		localtools.WithLocalExecDeniedCommands([]string{"sudo"}),
+	).(*localtools.LocalExecTools)
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": "sudo whoami", "shell": "true"},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "denied by policy")
+}
+
+func TestUnit_LocalExecTools_Exec_ShellMode_RunsAWindowsBuiltin(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("cmd built-ins only exist on Windows")
+	}
+	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands([]string{"dir"})).(*localtools.LocalExecTools)
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": "dir", "shell": "true"},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, fmt.Sprint(out), "a directory listing comes back")
+}
+
+func TestUnit_LocalExecTools_Exec_RunsWhereOnWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("where.exe is a Windows program")
+	}
+	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands([]string{"where"})).(*localtools.LocalExecTools)
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": "where", "args": "git"},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, fmt.Sprint(out))
 }
