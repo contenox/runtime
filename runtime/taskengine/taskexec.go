@@ -742,6 +742,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			argsStr := normalizedToolArguments(toolCall.Function.Arguments)
 			repeatIndex := nextToolCallRepeatIndex(priorToolMessages, batchRepeatCounts, toolCall.Function.Name, argsStr)
 
+			var args map[string]any
+			argsErr := json.Unmarshal([]byte(argsStr), &args)
+
 			resolutionInfo, found := resolveToolWithResolution(chainContext, toolCall.Function.Name)
 			if !found {
 				errStr := fmt.Sprintf("tool %s not found", toolCall.Function.Name)
@@ -749,7 +752,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 					errStr += hint
 				}
 				exe.reportInvalidToolCall(taskCtx, toolCall, "not_found", errStr, repeatIndex)
-				exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, nil)
+				exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, args)
 				answeredBatch[toolCall.ID] = true
 				continue
 			}
@@ -760,7 +763,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			if isExecutionToolHidden(hiddenTools, toolCall.Function.Name, resolutionInfo) {
 				errStr := fmt.Sprintf("tool %s is hidden for task %s", toolCall.Function.Name, currentTask.ID)
 				exe.reportInvalidToolCall(taskCtx, toolCall, "hidden", errStr, repeatIndex)
-				exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, nil)
+				exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, args)
 				answeredBatch[toolCall.ID] = true
 				continue
 			}
@@ -768,16 +771,15 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				if _, ok := allowedTools[resolutionInfo.ToolsName]; !ok {
 					errStr := fmt.Sprintf("tool %s from tools %q is not allowed for task %s", toolCall.Function.Name, resolutionInfo.ToolsName, currentTask.ID)
 					exe.reportInvalidToolCall(taskCtx, toolCall, "not_allowed", errStr, repeatIndex, "tools_name", resolutionInfo.ToolsName)
-					exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, nil)
+					exe.appendToolErrorResult(taskCtx, &chatHistory, toolCall, errStr, args)
 					answeredBatch[toolCall.ID] = true
 					continue
 				}
 			}
 
-			var args map[string]any
-			if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
+			if argsErr != nil {
 				taskErr = fmt.Errorf("failed to unmarshal tool arguments for %s: %w",
-					toolCall.Function.Name, err)
+					toolCall.Function.Name, argsErr)
 
 				errStr := taskErr.Error()
 				exe.reportInvalidToolCall(taskCtx, toolCall, "invalid_arguments", errStr, repeatIndex, "tools_name", resolutionInfo.ToolsName)
@@ -816,6 +818,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			budgetBytes := max(int64(remainingTokens-500)*3, 0)
 			callCtx = context.WithValue(callCtx, ContextKeyOutputByteLimit, budgetBytes)
 			callCtx = context.WithValue(callCtx, ContextKeyToolCallID, toolCall.ID)
+			if toolCall.ArgsMissing {
+				callCtx = WithToolArgsMissing(callCtx, true)
+			}
 			callCtx = WithSuspendableToolCall(callCtx)
 
 			toolReportErr, toolReportChange, toolEnd := exe.tracker.Start(
@@ -853,7 +858,11 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				taskErr = err
 			case err != nil:
 				toolReportErr(fmt.Errorf("tool %s execution failed: %w", toolCall.Function.Name, err))
-				result = fmt.Sprintf("tool %s execution failed: %s", toolCall.Function.Name, err)
+				if toolCall.ArgsMissing {
+					result = fmt.Sprintf("the arguments for tool %s never reached the runtime (runtime problem, not your mistake; repeating the same call will not help). The tool reported: %s", toolCall.Function.Name, err)
+				} else {
+					result = fmt.Sprintf("tool %s execution failed: %s", toolCall.Function.Name, err)
+				}
 				err = nil
 			}
 
@@ -865,6 +874,9 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				toolExecErr = taskErr
 				content = toolErrorContent(taskErr.Error())
 			}
+			if guidance := repeatGuidance(toolCall.Function.Name, repeatIndex, toolExecErr != nil); guidance != "" && resultType == DataTypeString {
+				content += "\n" + guidance
+			}
 			content, capInfo := capToolResultContentFromContext(callCtx, toolCall.Function.Name, content)
 			if taskErr == nil {
 				reportToolResultContent(toolReportChange, resultType, capInfo)
@@ -873,11 +885,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			toolEnd()
 
 			toolResultMessage := Message{
-				ID:         uuid.NewString(),
-				Role:       "tool",
-				Content:    content,
-				ToolCallID: toolCall.ID,
-				Timestamp:  time.Now().UTC(),
+				ID:              uuid.NewString(),
+				Role:            "tool",
+				Content:         content,
+				ToolCallID:      toolCall.ID,
+				ToolResultError: toolExecErr != nil,
+				Timestamp:       time.Now().UTC(),
 			}
 			chatHistory.Messages = append(chatHistory.Messages, toolResultMessage)
 			answeredBatch[toolCall.ID] = true
@@ -1287,9 +1300,16 @@ func (exe *SimpleExec) executeLLM(
 			Function:     function,
 			Type:         tc.Type,
 			ProviderMeta: tc.ProviderMeta,
+			ArgsMissing:  tc.ArgsMissing,
 		}
 	}
 	respMessage := resp.Message
+	if repaired := reconcileToolCallArguments(callTools, respMessage.Continuation); repaired > 0 {
+		reportChange("tool_arguments_repaired", map[string]any{
+			"count": repaired,
+			"model": meta.ModelName,
+		})
+	}
 	input.Messages = append(input.Messages, Message{
 		Continuation: respMessage.Continuation,
 		ID:           uuid.NewString(),
@@ -1439,9 +1459,11 @@ func (exe *SimpleExec) streamWithRetry(
 }
 
 func chatArgsForLLMCall(llmCall *LLMExecutionConfig, tools []libmodelprovider.Tool) []libmodelprovider.ChatArgument {
-	chatArgs := make([]libmodelprovider.ChatArgument, 0, 5)
+	chatArgs := make([]libmodelprovider.ChatArgument, 0, 6)
 	if len(tools) > 0 {
 		chatArgs = append(chatArgs, libmodelprovider.WithTools(tools...))
+	} else if !llmCallRequestedTools(llmCall) {
+		chatArgs = append(chatArgs, libmodelprovider.WithToolChoice(libmodelprovider.ToolChoice{Mode: libmodelprovider.ToolChoiceNone}))
 	}
 	if v, ok := temperatureValue(llmCall.Temperature); ok {
 		chatArgs = append(chatArgs, libmodelprovider.WithTemperature(float64(v)))
@@ -1815,6 +1837,75 @@ func toolDiffFromResult(result any) (toolDiff, bool) {
 	return toolDiff{Path: path, OldText: oldText, NewText: newText}, true
 }
 
+func reconcileToolCallArguments(calls []ToolCall, continuation *libmodelprovider.Continuation) int {
+	if continuation == nil || len(calls) == 0 || len(continuation.Items) == 0 {
+		return 0
+	}
+	var replay struct {
+		Output []struct {
+			Type      string `json:"type"`
+			ID        string `json:"id"`
+			CallID    string `json:"call_id"`
+			Name      string `json:"name"`
+			Arguments string `json:"arguments"`
+		} `json:"output"`
+	}
+	if err := json.Unmarshal(continuation.Items, &replay); err != nil || len(replay.Output) == 0 {
+		return 0
+	}
+	type recordedCall struct {
+		name      string
+		arguments string
+	}
+	var ordered []recordedCall
+	indexByID := make(map[string]int, len(replay.Output))
+	for _, item := range replay.Output {
+		if !strings.EqualFold(item.Type, "function_call") {
+			continue
+		}
+		key := item.CallID
+		if key == "" {
+			key = item.ID
+		}
+		if key == "" {
+			continue
+		}
+		indexByID[key] = len(ordered)
+		ordered = append(ordered, recordedCall{name: item.Name, arguments: item.Arguments})
+	}
+	if len(ordered) == 0 {
+		return 0
+	}
+	used := make([]bool, len(ordered))
+	repaired := 0
+	for i := range calls {
+		var want string
+		known := false
+		if idx, ok := indexByID[calls[i].ID]; ok && !used[idx] {
+			want, known, used[idx] = ordered[idx].arguments, true, true
+		}
+		if !known {
+			for idx := range ordered {
+				if used[idx] || ordered[idx].name != calls[i].Function.Name {
+					continue
+				}
+				want, known, used[idx] = ordered[idx].arguments, true, true
+				break
+			}
+		}
+		if !known || strings.TrimSpace(want) == "" {
+			continue
+		}
+		if normalizedToolArguments(calls[i].Function.Arguments) == normalizedToolArguments(want) {
+			continue
+		}
+		calls[i].Function.Arguments = want
+		calls[i].ArgsMissing = false
+		repaired++
+	}
+	return repaired
+}
+
 func normalizedToolArguments(arguments string) string {
 	trimmed := strings.TrimSpace(arguments)
 	if trimmed == "" {
@@ -1959,16 +2050,46 @@ func (exe *SimpleExec) reportInvalidToolCall(ctx context.Context, toolCall ToolC
 	end()
 }
 
+const repeatGuidanceThreshold = 3
+
+func repeatGuidance(toolName string, repeatIndex int, failed bool) string {
+	if repeatIndex < repeatGuidanceThreshold {
+		return ""
+	}
+	if !failed && !isReadLikeToolName(toolName) {
+		return ""
+	}
+	if failed {
+		return fmt.Sprintf("[harness] This exact %s call has now failed %d times with the same error. Do not call it again with the same arguments. Answer from the results you already have and state plainly what is still missing.", toolName, repeatIndex)
+	}
+	return fmt.Sprintf("[harness] This exact %s call has already succeeded %d times and its result is above. Do not repeat it. Continue with the next step or answer the user.", toolName, repeatIndex)
+}
+
+func isReadLikeToolName(name string) bool {
+	leaf := name
+	if idx := strings.LastIndex(leaf, "."); idx >= 0 {
+		leaf = leaf[idx+1:]
+	}
+	leaf = strings.ToLower(leaf)
+	for _, marker := range []string{"read", "list", "grep", "find", "stat", "count", "search"} {
+		if strings.Contains(leaf, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func (exe *SimpleExec) appendToolErrorResult(ctx context.Context, chatHistory *ChatHistory, toolCall ToolCall, errStr string, args map[string]any) {
 	if chatHistory == nil {
 		return
 	}
 	toolResultMessage := Message{
-		ID:         uuid.NewString(),
-		Role:       "tool",
-		Content:    toolErrorContent(errStr),
-		ToolCallID: toolCall.ID,
-		Timestamp:  time.Now().UTC(),
+		ID:              uuid.NewString(),
+		Role:            "tool",
+		Content:         toolErrorContent(errStr),
+		ToolCallID:      toolCall.ID,
+		ToolResultError: true,
+		Timestamp:       time.Now().UTC(),
 	}
 	chatHistory.Messages = append(chatHistory.Messages, toolResultMessage)
 
@@ -1979,6 +2100,7 @@ func (exe *SimpleExec) appendToolErrorResult(ctx context.Context, chatHistory *C
 		toolEvent.Scope.ToolCall = toolCall.ID
 		toolEvent.ApprovalArgs = args
 		toolEvent.Error = errStr
+		toolEvent.Content = toolErrorContent(errStr)
 		publishTaskEventBestEffort(ctx, exe.tracker, exe.eventSink, toolEvent)
 	}
 }

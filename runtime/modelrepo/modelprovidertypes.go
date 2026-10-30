@@ -92,6 +92,7 @@ type ToolCall struct {
 		Arguments string `json:"arguments"`
 	} `json:"function"`
 	ProviderMeta map[string]string `json:"provider_meta,omitempty"`
+	ArgsMissing  bool              `json:"-"`
 }
 
 type ImagePart struct {
@@ -154,6 +155,7 @@ type ToolCallDelta struct {
 	Type         string
 	Name         string
 	ArgsFragment string
+	ArgsReplace  bool
 	ProviderMeta map[string]string
 }
 

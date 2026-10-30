@@ -76,6 +76,7 @@ func writeAskChainAgentFixture(t *testing.T, contenoxDir string) string {
 }
 
 func TestFleetE2E_AttentionAsk_OperatorAnswerReachesTheUnit(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping attention-ask e2e: builds and boots the full contenox binary")
 	}

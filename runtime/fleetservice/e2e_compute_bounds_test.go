@@ -19,6 +19,7 @@ import (
 )
 
 func TestFleetE2E_ComputeBounds_MaxTurnsLandsMissionStuck(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping compute-bounds e2e: builds and spawns a real ACP agent")
 	}

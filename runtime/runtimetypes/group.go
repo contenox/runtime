@@ -112,7 +112,11 @@ func (s *store) ListAllAffinityGroups(ctx context.Context) ([]*AffinityGroup, er
 }
 
 func (s *store) ListAffinityGroups(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error) {
-	cursor := time.Now().UTC()
+	// The first page must include rows written in the same instant as the
+	// listing: a strict "< now" comparison hides them when the database stores
+	// second precision (SQLite), which showed up as freshly created rows
+	// vanishing. Pagination still uses the exact cursor of the last row.
+	cursor := time.Now().UTC().Add(time.Second)
 	if createdAtCursor != nil {
 		cursor = *createdAtCursor
 	}
@@ -150,7 +154,11 @@ func (s *store) ListAffinityGroups(ctx context.Context, createdAtCursor *time.Ti
 }
 
 func (s *store) ListAffinityGroupByPurpose(ctx context.Context, purposeType string, createdAtCursor *time.Time, limit int) ([]*AffinityGroup, error) {
-	cursor := time.Now().UTC()
+	// The first page must include rows written in the same instant as the
+	// listing: a strict "< now" comparison hides them when the database stores
+	// second precision (SQLite), which showed up as freshly created rows
+	// vanishing. Pagination still uses the exact cursor of the last row.
+	cursor := time.Now().UTC().Add(time.Second)
 	if createdAtCursor != nil {
 		cursor = *createdAtCursor
 	}

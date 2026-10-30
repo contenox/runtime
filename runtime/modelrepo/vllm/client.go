@@ -355,10 +355,12 @@ func buildChatRequestFromConfig(modelName string, messages []modelrepo.Message, 
 		ParallelToolCalls: config.ParallelToolCalls,
 		Stop:              config.StopSequences,
 		ResponseFormat:    wireResponseFormat(config.Format),
-		ToolChoice:        wireToolChoice(config.ToolChoice, origToSanitized),
 	}
 	if config.CacheHints != nil {
 		req.SessionID = config.CacheHints.SessionKey
+	}
+	if len(tools) > 0 {
+		req.ToolChoice = wireToolChoice(config.ToolChoice, origToSanitized)
 	}
 
 	if vllmThinkingAllowed(canThink) {

@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,11 +183,12 @@ func TestUnit_LocalExecTools_Exec_ContextPolicy_Enforced(t *testing.T) {
 func TestUnit_LocalExecTools_Exec_ContextPolicy_Allows(t *testing.T) {
 	h := localtools.NewLocalExecTools().(*localtools.LocalExecTools)
 	ctx := taskengine.WithToolsArgs(context.Background(), "local_shell", map[string]string{
-		"_allowed_commands": "echo",
+		"_allowed_commands": "echo,cmd",
 	})
+	echoCommand, echoArgs := portableEcho("ctx policy works")
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
-		Args: map[string]string{"command": "echo", "args": "ctx policy works"},
+		Args: map[string]string{"command": echoCommand, "args": echoArgs},
 	}
 	out, dt, err := h.Exec(ctx, time.Now().UTC(), nil, false, toolsCall)
 	require.NoError(t, err)
@@ -196,17 +199,50 @@ func TestUnit_LocalExecTools_Exec_ContextPolicy_Allows(t *testing.T) {
 	assert.Equal(t, "ctx policy works", res.Stdout)
 }
 
-var testAllowedCommands = []string{"echo", "cat", "sleep", "/bin/sh", "exit"}
+func portableEcho(words ...string) (string, string) {
+	if runtime.GOOS == "windows" {
+		return "cmd", "/c echo " + strings.Join(words, " ")
+	}
+	return "echo", strings.Join(words, " ")
+}
+
+func portableEchoArgv(words ...string) []any {
+	argv := make([]any, 0, len(words)+2)
+	if runtime.GOOS == "windows" {
+		argv = append(argv, "/c", "echo")
+	}
+	for _, word := range words {
+		argv = append(argv, word)
+	}
+	return argv
+}
+
+func portableStdinReader() (string, string) {
+	if runtime.GOOS == "windows" {
+		return "findstr", "/r ."
+	}
+	return "cat", ""
+}
+
+func platformAllowedCommands() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"cmd", "findstr"}
+	}
+	return nil
+}
+
+var testAllowedCommands = append([]string{"echo", "cat", "sleep", "/bin/sh", "exit"}, platformAllowedCommands()...)
 
 func TestUnit_LocalExecTools_Exec_Success(t *testing.T) {
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
 	start := time.Now().UTC()
+	echoCommand, echoArgs := portableEcho("hello world")
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
 		Args: map[string]string{
-			"command": "echo",
-			"args":    "hello world",
+			"command": echoCommand,
+			"args":    echoArgs,
 		},
 	}
 	out, dt, err := h.Exec(ctx, start, nil, false, toolsCall)
@@ -224,9 +260,10 @@ func TestUnit_LocalExecTools_Exec_AcceptsJSONDecodedArgsArray(t *testing.T) {
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
 
+	echoCommand, _ := portableEcho()
 	out, dt, err := h.Exec(ctx, time.Now().UTC(), map[string]any{
-		"command": "echo",
-		"args":    []any{"json", "array"},
+		"command": echoCommand,
+		"args":    portableEchoArgv("json", "array"),
 	}, false, &taskengine.ToolsCall{Name: "local_shell"})
 	require.NoError(t, err)
 	assert.Equal(t, taskengine.DataTypeJSON, dt)
@@ -263,10 +300,12 @@ func TestUnit_LocalExecTools_Exec_Success_InputAsStdin(t *testing.T) {
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
 	start := time.Now().UTC()
+	stdinCommand, stdinArgs := portableStdinReader()
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
 		Args: map[string]string{
-			"command": "cat",
+			"command": stdinCommand,
+			"args":    stdinArgs,
 		},
 	}
 	out, _, err := h.Exec(ctx, start, "stdin content here", false, toolsCall)
@@ -281,11 +320,12 @@ func TestUnit_LocalExecTools_Exec_NoPolicy_Allowed(t *testing.T) {
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools().(*localtools.LocalExecTools)
 	start := time.Now().UTC()
+	echoCommand, echoArgs := portableEcho("open posture")
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
 		Args: map[string]string{
-			"command": "echo",
-			"args":    "open posture",
+			"command": echoCommand,
+			"args":    echoArgs,
 		},
 	}
 	out, _, err := h.Exec(ctx, start, nil, false, toolsCall)
@@ -303,7 +343,7 @@ func TestUnit_LocalExecTools_Exec_ShellMode_NoPolicy_Allowed(t *testing.T) {
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
 		Args: map[string]string{
-			"command": "echo shell test",
+			"command": "echo 'shell test'",
 			"shell":   "true",
 		},
 	}
@@ -322,7 +362,7 @@ func TestUnit_LocalExecTools_Exec_ShellMode_WithPolicyRejected(t *testing.T) {
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
 		Args: map[string]string{
-			"command": "echo shell test",
+			"command": "echo 'shell test'",
 			"shell":   "true",
 		},
 	}
@@ -362,6 +402,9 @@ func TestUnit_LocalExecTools_Exec_AllowlistDirReject(t *testing.T) {
 }
 
 func TestUnit_LocalExecTools_Exec_AllowlistDirAllow(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows cannot execute a script file by path without a launcher; the allowed-dir path is covered on Unix")
+	}
 	dir := t.TempDir()
 	scriptPath := filepath.Join(dir, "script.sh")
 	err := os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0755)
@@ -402,6 +445,9 @@ func TestUnit_LocalExecTools_Exec_Timeout(t *testing.T) {
 }
 
 func TestUnit_LocalExecTools_Exec_NoTrimWhitespace(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("cmd.exe echo collapses whitespace; argv fidelity without trimming is covered on Unix")
+	}
 	ctx := context.Background()
 	h := localtools.NewLocalExecTools().(*localtools.LocalExecTools)
 	start := time.Now().UTC()
@@ -436,22 +482,31 @@ func TestUnit_LocalExecTools_Exec_NilTools(t *testing.T) {
 }
 
 func TestUnit_LocalExecTools_Exec_NonZeroExit(t *testing.T) {
-	dir := t.TempDir()
-	scriptPath := filepath.Join(dir, "fail.sh")
-	err := os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 3\n"), 0755)
-	require.NoError(t, err)
 	ctx := context.Background()
-	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedDir(dir)).(*localtools.LocalExecTools)
-	toolsCall := &taskengine.ToolsCall{
-		Name: "local_shell",
-		Args: map[string]string{"command": scriptPath},
+	var h *localtools.LocalExecTools
+	var toolsCall *taskengine.ToolsCall
+	if runtime.GOOS == "windows" {
+		h = localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands([]string{"cmd"})).(*localtools.LocalExecTools)
+		toolsCall = &taskengine.ToolsCall{
+			Name: "local_shell",
+			Args: map[string]string{"command": "cmd", "args": "/c exit 3"},
+		}
+	} else {
+		dir := t.TempDir()
+		scriptPath := filepath.Join(dir, "fail.sh")
+		require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\nexit 3\n"), 0755))
+		h = localtools.NewLocalExecTools(localtools.WithLocalExecAllowedDir(dir)).(*localtools.LocalExecTools)
+		toolsCall = &taskengine.ToolsCall{
+			Name: "local_shell",
+			Args: map[string]string{"command": scriptPath},
+		}
 	}
 	out, _, err := h.Exec(ctx, time.Now().UTC(), nil, false, toolsCall)
 	require.NoError(t, err)
 	res, ok := out.(*localtools.LocalExecResult)
 	require.True(t, ok)
 	assert.False(t, res.Success)
-	assert.Equal(t, 3, res.ExitCode)
+	assert.Equal(t, 3, res.ExitCode, "the real exit code must reach the model on every platform")
 }
 
 func TestUnit_LocalExecTools_Exec_NonZeroExit_WithPolicy_Rejected(t *testing.T) {
@@ -467,4 +522,17 @@ func TestUnit_LocalExecTools_Exec_NonZeroExit_WithPolicy_Rejected(t *testing.T) 
 	_, _, err := h.Exec(ctx, time.Now().UTC(), nil, false, toolsCall)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "strictly forbidden")
+}
+
+func TestUnit_LocalExecTools_Exec_MissingCommandReportsReceivedArguments(t *testing.T) {
+	h := localtools.NewLocalExecTools().(*localtools.LocalExecTools)
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"cwd": "."},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "received arguments:")
+	assert.Contains(t, err.Error(), `"cwd":"."`)
+	assert.Contains(t, err.Error(), `"command"`, "the error must show the shape the tool expects")
+	assert.Contains(t, err.Error(), `"args"`)
 }

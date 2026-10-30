@@ -79,8 +79,12 @@ func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID stri
 	}
 
 	existingIDs := make(map[string]bool)
+	var lastAdded time.Time
 	for _, msg := range conversation {
 		existingIDs[msg.ID] = true
+		if msg.AddedAt.After(lastAdded) {
+			lastAdded = msg.AddedAt
+		}
 	}
 
 	var newMessages []*messagestore.Message
@@ -95,6 +99,14 @@ func (m *Manager) PersistDiff(ctx context.Context, tx libdb.Exec, subjectID stri
 		if msg.Timestamp.IsZero() {
 			msg.Timestamp = time.Now().UTC()
 		}
+		// History is read back ordered by added_at. Stores keep the timestamp
+		// at a coarser precision than Go (SQLite can land on the same second),
+		// so two messages written together could come back swapped. Make the
+		// append order the stored order.
+		if !msg.Timestamp.After(lastAdded) {
+			msg.Timestamp = lastAdded.Add(time.Microsecond)
+		}
+		lastAdded = msg.Timestamp
 		payload, err := json.Marshal(msg)
 		if err != nil {
 			return fmt.Errorf("failed to marshal message: %w", err)

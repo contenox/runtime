@@ -2,6 +2,7 @@ package acpsvc
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -262,4 +263,82 @@ func TestUnit_ReplayToolResult_FsWriteProducesDiff(t *testing.T) {
 	require.Equal(t, "/tmp/a.txt", upd.ToolContent[0].Path)
 	require.Equal(t, "old", upd.ToolContent[0].OldText)
 	require.Equal(t, "new", upd.ToolContent[0].NewText)
+}
+
+func TestUnit_ToolCallUpdate_RejectedCallCarriesInputAndErrorText(t *testing.T) {
+	const reason = `tool local_fs.read_file from tools "local_fs" is not allowed for task summarise_failure`
+	ev := taskengine.TaskEvent{
+		Kind:         taskengine.TaskEventToolCall,
+		ToolName:     "local_fs.read_file",
+		ApprovalID:   "call-1",
+		ApprovalArgs: map[string]any{"path": "README.md"},
+		Error:        reason,
+		Content:      toolErrorContentForTest(reason),
+	}
+
+	upd := toolCallUpdateNotification(libacp.SessionID("sess-1"), ev, "call-1").Update
+
+	require.Equal(t, libacp.ToolCallStatusFailed, upd.Status)
+	require.JSONEq(t, `{"path":"README.md"}`, string(upd.RawInput), "a rejected call must still show what it asked for")
+	require.JSONEq(t, `{"error":`+strconv.Quote(reason)+`}`, string(upd.Meta))
+	require.Len(t, upd.ToolContent, 1, "any ACP client must see the error, not just _meta readers")
+	require.Equal(t, libacp.ToolCallContentRegular, upd.ToolContent[0].Type)
+	require.NotNil(t, upd.ToolContent[0].Content)
+	require.Equal(t, "text", upd.ToolContent[0].Content.Type)
+	require.Equal(t, reason, upd.ToolContent[0].Content.Text)
+}
+
+func TestUnit_ReplayToolResult_ErrorReplaysAsFailed(t *testing.T) {
+	const reason = "tool local_fs.read_file execution failed: path required for read_file"
+	m := taskengine.Message{
+		Role:            "tool",
+		ToolCallID:      "call-1",
+		Content:         toolErrorContentForTest(reason),
+		ToolResultError: true,
+	}
+
+	upd := toolCallUpdateFromResult(m)
+
+	require.Equal(t, libacp.ToolCallStatusFailed, upd.Status)
+	require.Len(t, upd.ToolContent, 1)
+	require.Equal(t, reason, upd.ToolContent[0].Content.Text)
+	require.JSONEq(t, `{"error":`+strconv.Quote(reason)+`}`, string(upd.Meta))
+}
+
+func TestUnit_ReplayToolResult_LegacyErrorContentIsRecognised(t *testing.T) {
+	for name, content := range map[string]string{
+		"canonical error object": `{"error":"tool local_fs.read_file execution failed: path required"}`,
+		"legacy execution text":  "tool local_fs.read_file execution failed: path required",
+		"lost arguments text":    "the arguments for tool local_fs.read_file never reached the runtime (runtime problem, not your mistake)",
+	} {
+		t.Run(name, func(t *testing.T) {
+			upd := toolCallUpdateFromResult(taskengine.Message{Role: "tool", ToolCallID: "call-1", Content: content})
+			require.Equal(t, libacp.ToolCallStatusFailed, upd.Status, "old rows must not claim success")
+			require.Len(t, upd.ToolContent, 1)
+			require.NotEmpty(t, upd.ToolContent[0].Content.Text)
+		})
+	}
+}
+
+func TestUnit_ReplayToolResult_SuccessStaysCompleted(t *testing.T) {
+	for name, content := range map[string]string{
+		"json result":        `{"stdout":"ok","stderr":"","exitCode":0}`,
+		"shell error result": `{"stdout":"","stderr":"boom","exitCode":1,"success":false,"error":"command exited with status 1"}`,
+		"plain text":         "hello",
+	} {
+		t.Run(name, func(t *testing.T) {
+			upd := toolCallUpdateFromResult(taskengine.Message{Role: "tool", ToolCallID: "call-1", Content: content})
+			require.Equal(t, libacp.ToolCallStatusCompleted, upd.Status)
+			require.Empty(t, upd.ToolContent)
+			require.Empty(t, upd.Meta)
+		})
+	}
+}
+
+func toolErrorContentForTest(text string) string {
+	payload, err := json.Marshal(map[string]string{"error": text})
+	if err != nil {
+		panic(err)
+	}
+	return string(payload)
 }

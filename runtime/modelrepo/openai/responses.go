@@ -209,7 +209,6 @@ func buildOpenAIResponsesRequestWithContinuation(modelName string, messages []mo
 	req.TopP = cfg.TopP
 	req.ParallelToolCalls = cfg.ParallelToolCalls
 	req.Text = responsesText(cfg.Format)
-	req.ToolChoice = responsesToolChoice(cfg.ToolChoice, nil)
 
 	cfgCacheKey, cfgCacheRetention := cacheControls(cfg.CacheHints)
 	req.PromptCacheKey, req.PromptCacheRetention = cfgCacheKey, cfgCacheRetention
@@ -268,7 +267,9 @@ func buildOpenAIResponsesRequestWithContinuation(modelName string, messages []mo
 			req.Tools = tools
 		}
 	}
-	req.ToolChoice = responsesToolChoice(cfg.ToolChoice, origToSanitized)
+	if len(req.Tools) > 0 {
+		req.ToolChoice = responsesToolChoice(cfg.ToolChoice, origToSanitized)
+	}
 
 	var systemParts []string
 	for _, msg := range messages {

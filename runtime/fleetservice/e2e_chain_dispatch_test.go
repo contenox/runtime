@@ -103,6 +103,7 @@ func (v *recordingViewer) messageText() string {
 }
 
 func TestFleetE2E_ChainAgent_DiscoveredDispatchedAndAnswers(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping chain-unit e2e: builds and boots the full contenox binary")
 	}

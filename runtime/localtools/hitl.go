@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -48,7 +49,25 @@ func NewHITLWrapper(inner taskengine.ToolsRepo, ask AskApproval, policy hitlserv
 	}
 }
 
-const DenyMessage = "User denied the operation. Please ask for clarification or try a different, less destructive approach."
+const (
+	denyMessageUser   = "The user denied the operation. Ask for clarification or try a different, less destructive approach."
+	DenyMessage       = denyMessageUser
+	denyMessagePolicy = "A permission policy denied this operation. Do not retry it unchanged; choose a different approach or ask the user to change the permission setting."
+)
+
+func policyDenyMessage(result hitlservice.EvaluationResult) string {
+	message := denyMessagePolicy
+	if result.Reason != "" && result.Reason != "deny" {
+		message += " Reason: " + result.Reason + "."
+	}
+	if result.PolicyName != "" {
+		message += " Policy: " + result.PolicyName + "."
+	}
+	if result.MatchedRule != nil {
+		message += " Rule: " + strconv.Itoa(*result.MatchedRule) + "."
+	}
+	return message
+}
 
 func (h *HITLWrapper) Exec(
 	ctx context.Context,
@@ -81,7 +100,8 @@ func (h *HITLWrapper) Exec(
 			Action: hitlservice.ActionDeny,
 			Reason: "policy_error",
 		}, false)
-		return DenyMessage, taskengine.DataTypeString, nil
+		reportChange("denied", "policy_error")
+		return "", taskengine.DataTypeAny, errors.New("the permission policy could not be evaluated, so the operation was denied. This is a configuration problem, not your mistake: report the error and do not retry")
 	}
 
 	switch result.Action {
@@ -91,7 +111,8 @@ func (h *HITLWrapper) Exec(
 
 	case hitlservice.ActionDeny:
 		h.publishDecision(ctx, tools.Name, toolName, args, result, false)
-		return DenyMessage, taskengine.DataTypeString, nil
+		reportChange("denied", "policy")
+		return "", taskengine.DataTypeAny, errors.New(policyDenyMessage(result))
 
 	case hitlservice.ActionApprove:
 		oldContent, newContent, diffErr := h.buildDiff(ctx, tools, toolName, args)
@@ -138,25 +159,36 @@ func (h *HITLWrapper) Exec(
 					onTimeout = hitlservice.ActionDeny
 				}
 				if onTimeout == hitlservice.ActionAllow {
+					reportChange("approved", "timeout_allow")
 					return h.inner.Exec(ctx, startTime, input, debug, tools)
 				}
 				reportErr(fmt.Errorf("hitl: approval timed out: %w", err))
-				return "Approval timed out. The operation was automatically denied.", taskengine.DataTypeString, nil
+				reportChange("denied", "timeout")
+				return "", taskengine.DataTypeAny, fmt.Errorf("approval timed out after %ds and the operation was automatically denied (policy %s, on_timeout=%s); ask the user before retrying",
+					result.TimeoutS, policyLabel(result), onTimeout)
 			}
 			err = fmt.Errorf("hitl: approval error: %w", err)
 			reportErr(err)
 			return nil, taskengine.DataTypeAny, err
 		}
 		if !approved {
-			reportChange("denied", DenyMessage)
-			return DenyMessage, taskengine.DataTypeString, nil
+			reportChange("denied", "user")
+			return "", taskengine.DataTypeAny, errors.New(denyMessageUser)
 		}
+		reportChange("approved", "user")
 		return h.inner.Exec(ctx, startTime, input, debug, tools)
 
 	default:
 		h.publishDecision(ctx, tools.Name, toolName, args, result, false)
 		return h.inner.Exec(ctx, startTime, input, debug, tools)
 	}
+}
+
+func policyLabel(result hitlservice.EvaluationResult) string {
+	if strings.TrimSpace(result.PolicyName) != "" {
+		return result.PolicyName
+	}
+	return "unnamed policy"
 }
 
 func (h *HITLWrapper) publishDecision(ctx context.Context, toolsName, toolName string, args map[string]any, result hitlservice.EvaluationResult, approvalRequested bool) {

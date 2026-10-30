@@ -101,8 +101,7 @@ func TestUnit_NewServeClient_DefaultsToServeAddrPort(t *testing.T) {
 }
 
 func TestUnit_NewServeClient_DiscoversServeTokenFileWhenDefaulted(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := isolateHome(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(home, ".contenox-harness"), 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".contenox-harness", serveTokenFileName), []byte("file-token\n"), 0o600))
 
@@ -117,8 +116,7 @@ func TestUnit_NewServeClient_DiscoversServeTokenFileWhenDefaulted(t *testing.T) 
 }
 
 func TestUnit_NewServeClient_IgnoresServeTokenFileForExplicitServer(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := isolateHome(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(home, ".contenox-harness"), 0o700))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".contenox-harness", serveTokenFileName), []byte("local-token\n"), 0o600))
 

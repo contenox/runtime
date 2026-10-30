@@ -3,6 +3,7 @@ package contenoxcli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,11 @@ func TestUnit_ServeToken_FileRoundTrip(t *testing.T) {
 	path := filepath.Join(home, ".contenox-harness", serveTokenFileName)
 	info, err := os.Stat(path)
 	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "token file is owner-only")
+	if runtime.GOOS != "windows" {
+		// Windows has no POSIX owner bit; there the profile directory's ACL is
+		// what keeps the token private.
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "token file is owner-only")
+	}
 }
 
 func TestUnit_ServeToken_ReadTrimsWhitespace(t *testing.T) {

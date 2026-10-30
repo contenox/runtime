@@ -35,14 +35,11 @@ func TestShellTools_RunIsHITLGated(t *testing.T) {
 	strict := localtools.NewHITLWrapper(NewTools(m), deny, fakePolicy{runAction: hitlservice.ActionApprove}, nil)
 
 	out, _, err := strict.Exec(ctx, time.Now(), map[string]any{"command": "echo denied-line"}, false, runCall(ToolRun))
-	if err != nil {
-		t.Fatalf("strict run exec: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "user denied") {
+		t.Fatalf("denied run must fail with the user-deny message, got %T %v / err %v", out, out, err)
 	}
 	if asked != 1 {
 		t.Fatalf("strict policy must ask for approval exactly once, asked=%d", asked)
-	}
-	if s, _ := out.(string); s != localtools.DenyMessage {
-		t.Fatalf("denied run must return the deny message, got %T %v", out, out)
 	}
 	if r := m.Read("hitl-sess", 0, 0); r.Exists && strings.Contains(r.Content, "denied-line") {
 		t.Fatalf("denied command must not have executed; scrollback=%q", r.Content)

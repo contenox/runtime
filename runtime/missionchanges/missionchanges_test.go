@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -202,13 +203,14 @@ func TestUnit_Fold_ChangedListCap(t *testing.T) {
 }
 
 func TestUnit_Scope_DistinctFilesAndDirs(t *testing.T) {
+	root := t.TempDir()
 	updates := []libacp.SessionNotification{
-		edit("/ws/a.txt", "", "1"),
-		edit("/ws/sub/b.txt", "", "2"),
-		edit("/ws/sub/c.txt", "", "3"),
-		touch("/ws/pkg/d.go", libacp.ToolKindRead),
+		edit(filepath.Join(root, "a.txt"), "", "1"),
+		edit(filepath.Join(root, "sub", "b.txt"), "", "2"),
+		edit(filepath.Join(root, "sub", "c.txt"), "", "3"),
+		touch(filepath.Join(root, "pkg", "d.go"), libacp.ToolKindRead),
 	}
-	scope := fold(updates).changes("/ws").Scope
+	scope := fold(updates).changes(root).Scope
 	if scope.Files != 4 {
 		t.Fatalf("files = %d, want 4 distinct", scope.Files)
 	}
@@ -221,29 +223,31 @@ func TestUnit_Scope_DistinctFilesAndDirs(t *testing.T) {
 }
 
 func TestUnit_Scope_AnomalyOnOutsidePath(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "passwd")
 	updates := []libacp.SessionNotification{
-		edit("/ws/repo/a.go", "", "x"),
-		touch("/etc/passwd", libacp.ToolKindRead),
+		edit(filepath.Join(root, "repo", "a.go"), "", "x"),
+		touch(outside, libacp.ToolKindRead),
 	}
-	scope := fold(updates).changes("/ws/repo").Scope
+	scope := fold(updates).changes(filepath.Join(root, "repo")).Scope
 	if !scope.Anomaly {
 		t.Fatal("anomaly must trip when a touched path falls outside cwd")
 	}
-	if len(scope.OutsidePaths) != 1 || scope.OutsidePaths[0] != "/etc/passwd" {
-		t.Fatalf("outsidePaths = %v, want [/etc/passwd]", scope.OutsidePaths)
+	if len(scope.OutsidePaths) != 1 || scope.OutsidePaths[0] != outside {
+		t.Fatalf("outsidePaths = %v, want [%s]", scope.OutsidePaths, outside)
 	}
 }
 
 func TestUnit_Scope_RelativePathsAreInside(t *testing.T) {
 	updates := []libacp.SessionNotification{touch("a/b.txt", libacp.ToolKindRead)}
-	scope := fold(updates).changes("/ws").Scope
+	scope := fold(updates).changes(t.TempDir()).Scope
 	if scope.Anomaly {
 		t.Fatal("a relative path is inside by construction; no anomaly")
 	}
 }
 
 func TestUnit_Scope_EmptyRootDisablesAnomaly(t *testing.T) {
-	updates := []libacp.SessionNotification{touch("/anywhere/x", libacp.ToolKindRead)}
+	updates := []libacp.SessionNotification{touch(filepath.Join(t.TempDir(), "x"), libacp.ToolKindRead)}
 	scope := fold(updates).changes("").Scope
 	if scope.Anomaly {
 		t.Fatal("empty root must disable anomaly detection")
@@ -251,19 +255,32 @@ func TestUnit_Scope_EmptyRootDisablesAnomaly(t *testing.T) {
 }
 
 func TestUnit_TopLevelDir(t *testing.T) {
+	root := t.TempDir()
+	outsideDir := t.TempDir()
+
 	cases := []struct{ root, path, want string }{
-		{"/ws", "/ws/a.txt", "."},
-		{"/ws", "/ws/src/a.txt", "src"},
-		{"/ws", "/ws/src/deep/a.txt", "src"},
-		{"/ws", "/etc/hostname", "/etc"},
-		{"/ws", "/home/u/x", "/home"},
-		{"", "rel/x.txt", "rel"},
+		{root, filepath.Join(root, "a.txt"), "."},
+		{root, filepath.Join(root, "src", "a.txt"), "src"},
+		{root, filepath.Join(root, "src", "deep", "a.txt"), "src"},
+		{"", filepath.Join("rel", "x.txt"), "rel"},
 		{"", "bare.txt", "."},
 	}
 	for _, tc := range cases {
 		if got := topLevelDir(tc.root, tc.path); got != tc.want {
 			t.Errorf("topLevelDir(%q, %q) = %q, want %q", tc.root, tc.path, got, tc.want)
 		}
+	}
+
+	// Outside the workspace, paths group by their top-level directory below
+	// the volume ("/etc", "/home", "C:\Users"), never by the file itself and
+	// never as "." (which would merge them into the workspace root).
+	first := topLevelDir(root, filepath.Join(outsideDir, "one.txt"))
+	second := topLevelDir(root, filepath.Join(outsideDir, "deep", "two.txt"))
+	if first == "." || first == "" {
+		t.Fatalf("an outside path must name a top-level directory, got %q", first)
+	}
+	if first != second {
+		t.Fatalf("paths under one top-level directory must group together, got %q and %q", first, second)
 	}
 }
 
@@ -312,13 +329,15 @@ func boundMission() *missionservice.Mission {
 }
 
 func TestUnit_Service_Changes_EndToEnd(t *testing.T) {
+	root := t.TempDir()
+	wander := filepath.Join(t.TempDir(), "wander")
 	svc := New(
 		stubMissions{m: boundMission()},
-		stubJournal{ok: true, cwd: "/ws", updates: []libacp.SessionNotification{
-			edit("/ws/a.txt", "", "hello"),
-			edit("/ws/a.txt", "hello", "hello world"),
-			edit("/ws/b.txt", "old", "new"),
-			touch("/tmp/wander", libacp.ToolKindRead),
+		stubJournal{ok: true, cwd: root, updates: []libacp.SessionNotification{
+			edit(filepath.Join(root, "a.txt"), "", "hello"),
+			edit(filepath.Join(root, "a.txt"), "hello", "hello world"),
+			edit(filepath.Join(root, "b.txt"), "old", "new"),
+			touch(wander, libacp.ToolKindRead),
 		}},
 	)
 	got, err := svc.Changes(context.Background(), "m1")
@@ -328,17 +347,17 @@ func TestUnit_Service_Changes_EndToEnd(t *testing.T) {
 	if len(got.Files) != 2 {
 		t.Fatalf("want 2 changed files, got %d", len(got.Files))
 	}
-	if got.Files[0].Path != "/ws/a.txt" || got.Files[0].Status != StatusAdded {
+	if got.Files[0].Path != filepath.Join(root, "a.txt") || got.Files[0].Status != StatusAdded {
 		t.Fatalf("files[0] = %+v, want a.txt/added first", got.Files[0])
 	}
 	if got.Files[1].Status != StatusModified {
 		t.Fatalf("files[1] status = %q, want modified", got.Files[1].Status)
 	}
 	if !got.Scope.Anomaly {
-		t.Fatal("the /tmp/wander read is outside /ws → anomaly")
+		t.Fatalf("the %s read is outside %s → anomaly", wander, root)
 	}
 	if got.Scope.Files != 3 {
-		t.Fatalf("scope files = %d, want 3 (a.txt, b.txt, /tmp/wander)", got.Scope.Files)
+		t.Fatalf("scope files = %d, want 3 (a.txt, b.txt, the outside read)", got.Scope.Files)
 	}
 }
 

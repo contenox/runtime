@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func trueCmd(context.Context) *exec.Cmd { return exec.Command("cat") }
+func trueCmd(context.Context) *exec.Cmd { return fixture("echo") }
 
 func TestSupervisor_SucceedsFirstAttemptNoRestart(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -111,17 +112,25 @@ func TestSupervisor_AppliesBackoffAndHonorsCancellation(t *testing.T) {
 	defer cancel()
 
 	var backoffAttempts []int
+	firstBackoff := make(chan struct{})
+	var once sync.Once
 	sup := acpexec.Supervisor{
 		Command:     trueCmd,
 		MaxRestarts: 5,
 		Backoff: func(attempt int) time.Duration {
 			backoffAttempts = append(backoffAttempts, attempt)
+			once.Do(func() { close(firstBackoff) })
 			return 50 * time.Millisecond
 		},
 	}
 
+	// Cancel only once the first backoff was consulted: process startup takes
+	// longer on Windows than a fixed 10 ms budget allows.
 	go func() {
-		time.Sleep(10 * time.Millisecond)
+		select {
+		case <-firstBackoff:
+		case <-time.After(5 * time.Second):
+		}
 		cancel()
 	}()
 

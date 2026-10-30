@@ -22,6 +22,7 @@ import (
 )
 
 func TestFleetE2E_UnattendedNudge_MuteUnitHeartbeatsNudgedAndBlocked(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping unattended-nudge e2e: builds and boots the full contenox binary")
 	}

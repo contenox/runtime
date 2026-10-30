@@ -153,11 +153,11 @@ func TestUnit_HITLWrapper_Deny_BlocksInner(t *testing.T) {
 		map[string]any{}, false,
 		&taskengine.ToolsCall{Name: "local_fs", ToolName: "write_file"})
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "permission policy denied") {
+		t.Fatalf("a policy deny must be a failed tool result, got err=%v res=%v", err, res)
 	}
-	if res != localtools.DenyMessage {
-		t.Errorf("expected deny message, got %v", res)
+	if strings.Contains(err.Error(), "The user denied") {
+		t.Errorf("a policy deny must not read like a user deny: %v", err)
 	}
 	if len(inner.calls) != 0 {
 		t.Errorf("inner must not be called on deny, got %v", inner.calls)
@@ -191,11 +191,8 @@ func TestUnit_HITLWrapper_Approve_HumanDenies_BlocksInner(t *testing.T) {
 		map[string]any{"path": "a.txt", "content": "new"}, false,
 		&taskengine.ToolsCall{Name: "local_fs", ToolName: "write_file"})
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res != localtools.DenyMessage {
-		t.Errorf("expected deny message, got %v", res)
+	if err == nil || !strings.Contains(err.Error(), "user denied") {
+		t.Fatalf("a user deny must be a failed tool result, got err=%v res=%v", err, res)
 	}
 	for _, c := range inner.calls {
 		if c == "write_file" {
@@ -213,11 +210,8 @@ func TestUnit_HITLWrapper_PolicyError_FailsClosed(t *testing.T) {
 		map[string]any{}, false,
 		&taskengine.ToolsCall{Name: "local_fs", ToolName: "write_file"})
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res != localtools.DenyMessage {
-		t.Errorf("expected deny on policy error, got %v", res)
+	if err == nil || !strings.Contains(err.Error(), "could not be evaluated") {
+		t.Fatalf("a policy failure must be a failed tool result, got err=%v res=%v", err, res)
 	}
 	if len(inner.calls) != 0 {
 		t.Errorf("inner must not be called when policy fails, got %v", inner.calls)
@@ -260,11 +254,8 @@ func TestUnit_HITLWrapper_HITLTimeout_DeniesOnTimeout(t *testing.T) {
 		map[string]any{"path": "a.txt", "content": "x"}, false,
 		&taskengine.ToolsCall{Name: "local_fs", ToolName: "write_file"})
 
-	if err != nil {
-		t.Fatalf("unexpected error on HITL timeout: %v", err)
-	}
-	if s, ok := res.(string); !ok || !strings.Contains(s, "timed out") {
-		t.Errorf("expected timeout message, got %v", res)
+	if err == nil || !strings.Contains(err.Error(), "timed out") {
+		t.Fatalf("a timeout denial must be a failed tool result, got err=%v res=%v", err, res)
 	}
 	for _, c := range inner.calls {
 		if c == "write_file" {

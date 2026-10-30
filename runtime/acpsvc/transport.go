@@ -345,6 +345,11 @@ func (t *Transport) chainTemplateVars(sess *sessionEntry) map[string]string {
 	if maxTokens := t.maxTokens(); maxTokens != "" {
 		vars["max_tokens"] = maxTokens
 	}
+	// The project folder is the session's, not the runtime process's: one
+	// runtime can serve several projects.
+	if cwd := strings.TrimSpace(sess.Cwd); cwd != "" {
+		vars["cwd"] = cwd
+	}
 	return vars
 }
 

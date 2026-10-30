@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -297,6 +298,9 @@ func quiet() func() {
 
 func SetupStore(t *testing.T) (context.Context, Store) {
 	t.Helper()
+	if !localPostgresAvailable() {
+		t.Skip("needs Docker for the Postgres test instance: the pagination contract here is exercised against Postgres in CI; Docker is not available on this host")
+	}
 
 	unquiet := quiet()
 	t.Cleanup(unquiet)
@@ -315,4 +319,13 @@ func SetupStore(t *testing.T) (context.Context, Store) {
 
 	s := New(dbManager.WithoutTransaction())
 	return ctx, s
+}
+
+// localPostgresAvailable reports whether a Docker daemon can provide the
+// disposable Postgres instance the store tests use.
+func localPostgresAvailable() bool {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return false
+	}
+	return exec.Command("docker", "info").Run() == nil
 }

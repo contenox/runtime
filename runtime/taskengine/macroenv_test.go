@@ -3,6 +3,7 @@ package taskengine_test
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -577,5 +578,59 @@ func TestUnit_MacroEnv_CwdIsOptionalAndReal(t *testing.T) {
 	}
 	if raw != "root=/w/repo" {
 		t.Fatalf("cwd rendered %q, want root=/w/repo", raw)
+	}
+}
+
+func TestUnit_MacroEnv_HostShellAndWorkspaceRoot(t *testing.T) {
+	inner := &noopEnv{}
+	env, err := taskengine.NewMacroEnv(inner, nil, taskengine.WithPlatformShell(func() string {
+		return "PowerShell (pwsh.exe)"
+	}))
+	if err != nil {
+		t.Fatalf("NewMacroEnv: %v", err)
+	}
+	chain := newMacroChain("os={{host:os}} shell={{host:shell}} root={{workspace:root}}", nil)
+	raw, _, _, err := env.ExecEnv(libtracker.WithNewRequestID(context.Background()), chain, "", taskengine.DataTypeString)
+	if err != nil {
+		t.Fatalf("ExecEnv: %v", err)
+	}
+	out, _ := raw.(string)
+	if !strings.Contains(out, "os="+runtime.GOOS) {
+		t.Errorf("expected the host OS in %q", out)
+	}
+	if !strings.Contains(out, "shell=PowerShell (pwsh.exe)") {
+		t.Errorf("expected the wired shell description in %q", out)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	if !strings.Contains(out, "root="+wd) {
+		t.Errorf("expected the project folder %q in %q", wd, out)
+	}
+}
+
+func TestUnit_MacroEnv_HostShellIsExplicitWithoutWiring(t *testing.T) {
+	out := runMacroExpand(t, nil, "{{host:shell}}", nil)
+	if out != "unknown" {
+		t.Errorf("an unwired shell must be explicit, not guessed: got %q", out)
+	}
+}
+
+func TestUnit_MacroEnv_WorkspaceRootPrefersTheSessionCwd(t *testing.T) {
+	inner := &noopEnv{}
+	env, err := taskengine.NewMacroEnv(inner, nil)
+	if err != nil {
+		t.Fatalf("NewMacroEnv: %v", err)
+	}
+	ctx := taskengine.WithTemplateVars(libtracker.WithNewRequestID(context.Background()), map[string]string{"cwd": `D:\dev\example`})
+	chain := newMacroChain("root={{workspace:root}}", nil)
+	raw, _, _, err := env.ExecEnv(ctx, chain, "", taskengine.DataTypeString)
+	if err != nil {
+		t.Fatalf("ExecEnv: %v", err)
+	}
+	out, _ := raw.(string)
+	if out != `root=D:\dev\example` {
+		t.Errorf("the session cwd must win over the process folder, got %q", out)
 	}
 }

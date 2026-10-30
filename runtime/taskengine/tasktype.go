@@ -376,19 +376,20 @@ type ChatHistory struct {
 }
 
 type Message struct {
-	Continuation *modelrepo.Continuation `json:"continuation,omitempty"`
-	ID           string                  `json:"id" example:"msg_123456"`
-	Role         string                  `json:"role" example:"user"`
-	Content      string                  `json:"content,omitempty" example:"What is the capital of France?"`
-	Images       []ImagePart             `json:"images,omitempty"`
-	Audio        []AudioPart             `json:"audio,omitempty"`
-	Thinking     string                  `json:"thinking,omitempty"`
-	ToolCallID   string                  `json:"tool_call_id,omitempty"`
-	CallTools    []ToolCall              `json:"callTools,omitempty"`
-	Timestamp    time.Time               `json:"timestamp" example:"2023-11-15T14:30:45Z"`
-	RequestID    string                  `json:"requestId,omitempty"`
-	ChainRef     string                  `json:"chainRef,omitempty"`
-	Author       *MessageAuthor          `json:"author,omitempty"`
+	Continuation    *modelrepo.Continuation `json:"continuation,omitempty"`
+	ID              string                  `json:"id" example:"msg_123456"`
+	Role            string                  `json:"role" example:"user"`
+	Content         string                  `json:"content,omitempty" example:"What is the capital of France?"`
+	Images          []ImagePart             `json:"images,omitempty"`
+	Audio           []AudioPart             `json:"audio,omitempty"`
+	Thinking        string                  `json:"thinking,omitempty"`
+	ToolCallID      string                  `json:"tool_call_id,omitempty"`
+	ToolResultError bool                    `json:"tool_result_error,omitempty"`
+	CallTools       []ToolCall              `json:"callTools,omitempty"`
+	Timestamp       time.Time               `json:"timestamp" example:"2023-11-15T14:30:45Z"`
+	RequestID       string                  `json:"requestId,omitempty"`
+	ChainRef        string                  `json:"chainRef,omitempty"`
+	Author          *MessageAuthor          `json:"author,omitempty"`
 }
 
 type MessageAuthor struct {
@@ -422,6 +423,7 @@ type ToolCall struct {
 	Type         string            `json:"type" example:"function"`
 	Function     FunctionCall      `json:"function"`
 	ProviderMeta map[string]string `json:"provider_meta,omitempty" example:"{\"thought_signature\":\"123456\"}"`
+	ArgsMissing  bool              `json:"-"`
 }
 
 type FunctionCall struct {

@@ -244,7 +244,6 @@ func TestUnit_OpenAIStreamClient_ResponsesAPIStreamsTextDeltas(t *testing.T) {
 
 func TestUnit_OpenAIStreamClient_ResponsesAPIEmitsReasoningSummary(t *testing.T) {
 	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprint(w, "event: response.output_text.delta\n")
@@ -275,4 +274,223 @@ func TestUnit_OpenAIStreamClient_ResponsesAPIEmitsReasoningSummary(t *testing.T)
 	}
 	require.Equal(t, "ans", data)
 	require.Equal(t, "I reasoned this", thinking)
+}
+
+type responsesTestCall struct {
+	index int
+	id    string
+	name  string
+	args  string
+}
+
+func responsesTestCalls(n int) []responsesTestCall {
+	calls := make([]responsesTestCall, 0, n)
+	for i := 1; i <= n; i++ {
+		calls = append(calls, responsesTestCall{
+			index: i,
+			id:    fmt.Sprintf("call_%d", i),
+			name:  fmt.Sprintf("tool_%d", i),
+			args:  fmt.Sprintf(`{"path": "dir-%d", "recursive": true}`, i),
+		})
+	}
+	return calls
+}
+
+func responsesAddedEvents(calls []responsesTestCall) []string {
+	events := make([]string, 0, len(calls))
+	for _, c := range calls {
+		events = append(events, fmt.Sprintf(
+			`{"type":"response.output_item.added","output_index":%d,"item":{"type":"function_call","id":"fc_%d","call_id":%q,"name":%q,"arguments":""}}`,
+			c.index, c.index, c.id, c.name))
+	}
+	return events
+}
+
+func responsesArgumentsDoneEvents(calls []responsesTestCall) []string {
+	events := make([]string, 0, len(calls))
+	for _, c := range calls {
+		events = append(events, fmt.Sprintf(
+			`{"type":"response.function_call_arguments.done","item_id":"fc_%d","output_index":%d,"arguments":%q}`,
+			c.index, c.index, c.args))
+	}
+	return events
+}
+
+func responsesItemDoneEvents(calls []responsesTestCall) []string {
+	events := make([]string, 0, len(calls))
+	for _, c := range calls {
+		events = append(events, fmt.Sprintf(
+			`{"type":"response.output_item.done","output_index":%d,"item":{"type":"function_call","id":"fc_%d","call_id":%q,"name":%q,"arguments":%q}}`,
+			c.index, c.index, c.id, c.name, c.args))
+	}
+	return events
+}
+
+func responsesCompletedEvent(calls []responsesTestCall) string {
+	output := make([]map[string]any, 0, len(calls))
+	for _, c := range calls {
+		output = append(output, map[string]any{
+			"type":      "function_call",
+			"id":        fmt.Sprintf("fc_%d", c.index),
+			"call_id":   c.id,
+			"name":      c.name,
+			"arguments": c.args,
+		})
+	}
+	payload, err := json.Marshal(map[string]any{
+		"type": "response.completed",
+		"response": map[string]any{
+			"output": output,
+			"usage":  map[string]any{"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
+		},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return string(payload)
+}
+
+func runResponsesStream(t *testing.T, events []string) modelrepo.StreamResult {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/responses", r.URL.Path)
+		w.Header().Set("Content-Type", "text/event-stream")
+		for _, event := range events {
+			fmt.Fprintf(w, "data: %s\n\n", event)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	client := &OpenAIStreamClient{
+		openAIClient: openAIClient{
+			baseURL:    srv.URL,
+			apiKey:     "key",
+			httpClient: srv.Client(),
+			modelName:  "gpt-5",
+			tracker:    libtracker.NoopTracker{},
+		},
+	}
+	stream, err := client.Stream(context.Background(), []modelrepo.Message{{Role: "user", Content: "list things"}})
+	require.NoError(t, err)
+
+	asm := modelrepo.NewStreamAssembler("openai", "gpt-5")
+	for parcel := range stream {
+		require.NoError(t, asm.Consume(parcel))
+	}
+	res, err := asm.Result()
+	require.NoError(t, err)
+	return res
+}
+
+func assertResponsesCallArguments(t *testing.T, res modelrepo.StreamResult, calls []responsesTestCall) {
+	t.Helper()
+	require.Len(t, res.ToolCalls, len(calls))
+	assert.Empty(t, res.Violations, "no provider stream violation is expected once the final arguments are used")
+	for i, want := range calls {
+		got := res.ToolCalls[i]
+		assert.Equal(t, want.id, got.ID)
+		assert.Equal(t, want.name, got.Function.Name)
+		assert.Equal(t, want.args, got.Function.Arguments, "call %d must keep the arguments the provider sent", i)
+		assert.False(t, got.ArgsMissing, "call %d has arguments", i)
+	}
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesParallelCalls_ArgumentsOnlyInDoneEvents(t *testing.T) {
+	t.Parallel()
+
+	calls := responsesTestCalls(6)
+	events := responsesAddedEvents(calls)
+	events = append(events, responsesArgumentsDoneEvents(calls)...)
+	events = append(events, responsesCompletedEvent(calls))
+
+	assertResponsesCallArguments(t, runResponsesStream(t, events), calls)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesParallelCalls_ArgumentsOnlyInOutputItemDone(t *testing.T) {
+	t.Parallel()
+
+	calls := responsesTestCalls(6)
+	events := responsesAddedEvents(calls)
+	events = append(events, responsesItemDoneEvents(calls)...)
+	events = append(events, responsesCompletedEvent(calls))
+
+	assertResponsesCallArguments(t, runResponsesStream(t, events), calls)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesParallelCalls_ArgumentsOnlyInCompleted(t *testing.T) {
+	t.Parallel()
+
+	calls := responsesTestCalls(6)
+	events := responsesAddedEvents(calls)
+	events = append(events, responsesCompletedEvent(calls))
+
+	assertResponsesCallArguments(t, runResponsesStream(t, events), calls)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesToolCalls_ReconstructedFromCompletedOnly(t *testing.T) {
+	t.Parallel()
+
+	calls := responsesTestCalls(2)
+	assertResponsesCallArguments(t, runResponsesStream(t, []string{responsesCompletedEvent(calls)}), calls)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesToolArguments_DeltasAndDoneNotDuplicated(t *testing.T) {
+	t.Parallel()
+
+	events := []string{
+		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"get_weather","arguments":""}}`,
+		`{"type":"response.function_call_arguments.delta","output_index":1,"delta":"{\"city\":"}`,
+		`{"type":"response.function_call_arguments.delta","output_index":1,"delta":"\"Berlin\"}"}`,
+		`{"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":1,"arguments":"{\"city\":\"Berlin\"}"}`,
+		`{"type":"response.completed","response":{"output":[{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"get_weather","arguments":"{\"city\":\"Berlin\"}"}]}}`,
+	}
+	res := runResponsesStream(t, events)
+	require.Len(t, res.ToolCalls, 1)
+	assert.Equal(t, `{"city":"Berlin"}`, res.ToolCalls[0].Function.Arguments)
+	assert.Empty(t, res.Violations)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesToolArguments_TruncatedDeltasOverriddenByDone(t *testing.T) {
+	t.Parallel()
+
+	events := []string{
+		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"read_file","arguments":""}}`,
+		`{"type":"response.function_call_arguments.delta","output_index":1,"delta":"{\"path\": \"REA"}`,
+		`{"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":1,"arguments":"{\"path\": \"README.md\"}"}`,
+		`{"type":"response.completed","response":{"output":[{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"read_file","arguments":"{\"path\": \"README.md\"}"}]}}`,
+	}
+	res := runResponsesStream(t, events)
+	require.Len(t, res.ToolCalls, 1)
+	assert.Equal(t, `{"path": "README.md"}`, res.ToolCalls[0].Function.Arguments)
+	assert.Empty(t, res.Violations)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesToolArguments_ExplicitEmptyObjectIsNotMissing(t *testing.T) {
+	t.Parallel()
+
+	events := []string{
+		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"list_sessions","arguments":""}}`,
+		`{"type":"response.function_call_arguments.done","item_id":"fc_1","output_index":1,"arguments":"{}"}`,
+		`{"type":"response.completed","response":{"output":[{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"list_sessions","arguments":"{}"}]}}`,
+	}
+	res := runResponsesStream(t, events)
+	require.Len(t, res.ToolCalls, 1)
+	assert.Equal(t, "{}", res.ToolCalls[0].Function.Arguments)
+	assert.False(t, res.ToolCalls[0].ArgsMissing, "an explicit {} is what the model sent")
+	assert.Empty(t, res.Violations)
+}
+
+func TestUnit_OpenAIStreamClient_ResponsesToolArguments_NoArgumentsAtAllIsFlagged(t *testing.T) {
+	t.Parallel()
+
+	events := []string{
+		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"read_file","arguments":""}}`,
+		`{"type":"response.completed","response":{"output":[{"type":"function_call","id":"fc_1","call_id":"call_r1","name":"read_file","arguments":""}]}}`,
+	}
+	res := runResponsesStream(t, events)
+	require.Len(t, res.ToolCalls, 1)
+	assert.Equal(t, "{}", res.ToolCalls[0].Function.Arguments)
+	assert.True(t, res.ToolCalls[0].ArgsMissing, "the model sent no arguments; the engine must know that")
+	require.Len(t, res.Violations, 1)
+	assert.Contains(t, res.Violations[0], "without arguments")
 }

@@ -22,6 +22,7 @@ import (
 )
 
 func TestFleetE2E_ReportRouting_ParentSessionAndInbox(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping report-routing e2e: builds and boots the full contenox binary")
 	}

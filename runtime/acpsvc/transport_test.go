@@ -2,6 +2,7 @@ package acpsvc
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -13,14 +14,11 @@ import (
 func setupResolverDB(t *testing.T) (context.Context, libdb.DBManager) {
 	t.Helper()
 	ctx := context.TODO()
-	connStr, _, cleanup, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
+	// These cases are plain SQL over message_indices, so SQLite proves them on
+	// every host without a database container.
+	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "acp-resolver.db"), runtimetypes.SchemaSQLite)
 	require.NoError(t, err)
-	db, err := libdb.NewPostgresDBManager(ctx, connStr, runtimetypes.Schema)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-		cleanup()
-	})
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return ctx, db
 }
 

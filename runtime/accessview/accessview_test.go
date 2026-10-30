@@ -88,6 +88,9 @@ func TestEvaluate_SecretPath_DenyWithMatchedRule(t *testing.T) {
 }
 
 func TestEvaluate_EscapingPath_UnreachableNilDimensions(t *testing.T) {
+	if err := os.Symlink(t.TempDir(), filepath.Join(t.TempDir(), "probe")); err != nil {
+		t.Skipf("this host cannot create symlinks (%v); the escape checks run on Linux CI", err)
+	}
 	outside := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outside, "target.txt"), []byte("x"), 0o644))
 	root := t.TempDir()

@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -61,7 +62,10 @@ func (s *localService) Find(ctx context.Context, opts FindOptions, emit func(Ent
 		return res, err
 	}
 	for _, g := range opts.Globs {
-		if _, err := filepath.Match(g, ""); err != nil {
+		// Patterns are matched against slash-normalized relative paths, so a
+		// "/" in a pattern is a separator on every OS; filepath.Match would
+		// treat it as a literal character on Windows.
+		if _, err := path.Match(g, ""); err != nil {
 			return res, fmt.Errorf("%w: bad glob %q: %v", ErrInvalidPath, g, err)
 		}
 	}
@@ -126,7 +130,7 @@ func matchesAnyGlob(globs []string, rel, name string) bool {
 		if strings.ContainsRune(g, '/') {
 			target = rel
 		}
-		if ok, _ := filepath.Match(g, target); ok {
+		if ok, _ := path.Match(g, target); ok {
 			return true
 		}
 	}

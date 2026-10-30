@@ -12,6 +12,8 @@ import (
 
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnit_LocalFSTools_Exec(t *testing.T) {
@@ -203,7 +205,7 @@ func TestUnit_LocalFSTools_Exec(t *testing.T) {
 	})
 
 	t.Run("SecurityRestriction", func(t *testing.T) {
-		args := map[string]any{"path": "/etc/passwd"}
+		args := map[string]any{"path": filepath.Join(t.TempDir(), "passwd")}
 		toolsCall := &taskengine.ToolsCall{ToolName: "read_file"}
 		_, _, err := h.Exec(ctx, now, args, false, toolsCall)
 		if err == nil {
@@ -702,4 +704,39 @@ func contains(ss []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func TestUnit_LocalFSTools_MissingArgumentReportsWhatArrived(t *testing.T) {
+	h := localtools.NewLocalFSTools(t.TempDir(), nil)
+	now := time.Now().UTC()
+
+	cases := map[string]struct {
+		tool string
+		args map[string]any
+	}{
+		"read_file without path":     {"read_file", map[string]any{"force": true}},
+		"grep without pattern":       {"grep", map[string]any{"path": "."}},
+		"write_file without path":    {"write_file", map[string]any{"content": "x"}},
+		"find_files without pattern": {"find_files", map[string]any{"path": "."}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := h.Exec(context.Background(), now, tc.args, false, &taskengine.ToolsCall{ToolName: tc.tool})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "required for")
+			assert.Contains(t, err.Error(), "received arguments:", "the model must see what its call actually carried")
+			assert.Contains(t, err.Error(), "recoverable", "correctable parameters stay recoverable")
+		})
+	}
+}
+
+func TestUnit_LocalFSTools_LostArgumentsAreNotBlamedOnTheModel(t *testing.T) {
+	h := localtools.NewLocalFSTools(t.TempDir(), nil)
+	ctx := taskengine.WithToolArgsMissing(context.Background(), true)
+
+	_, _, err := h.Exec(ctx, time.Now().UTC(), map[string]any{}, false, &taskengine.ToolsCall{ToolName: "read_file"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "never reached the runtime")
+	assert.Contains(t, err.Error(), "not your mistake")
+	assert.NotContains(t, err.Error(), "recoverable", "retrying cannot fix arguments the runtime lost")
 }

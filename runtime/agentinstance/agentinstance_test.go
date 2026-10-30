@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/contenox/runtime/libacp"
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libsandbox"
 	"github.com/contenox/runtime/runtime/agenthost"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -21,7 +23,11 @@ import (
 
 func buildStubAgent(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "acp-stub-agent")
+	name := "acp-stub-agent"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	binPath := filepath.Join(t.TempDir(), name)
 	cmd := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/libacp/cmd/acp-stub-agent")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -32,6 +38,9 @@ func buildStubAgent(t *testing.T) string {
 
 func setupRegistry(t *testing.T) (context.Context, libdb.DBManager, agentregistryservice.Service) {
 	t.Helper()
+	if err := libsandbox.Preflight(); err != nil {
+		t.Skipf("agent instances run as confined processes, which this host cannot provide: %v", err)
+	}
 	ctx := context.Background()
 	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "agentinstance.db"), runtimetypes.SchemaSQLite)
 	require.NoError(t, err)

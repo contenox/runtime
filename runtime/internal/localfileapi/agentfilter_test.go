@@ -50,6 +50,14 @@ func TestUnit_WorkspaceRoutes_AgentFilter(t *testing.T) {
 
 	outside := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outside, "t.txt"), []byte("x"), 0o644))
+	// Windows only allows symlinks with Developer Mode or the privilege to
+	// create them; where that is missing the escape case cannot be built.
+	probe := t.TempDir()
+	probeTarget := filepath.Join(probe, "target")
+	require.NoError(t, os.WriteFile(probeTarget, []byte("x"), 0o644))
+	if err := os.Symlink(probeTarget, filepath.Join(probe, "link")); err != nil {
+		t.Skipf("this host cannot create symlinks (%v); the escape filtering runs where they can", err)
+	}
 	require.NoError(t, os.Symlink(filepath.Join(outside, "t.txt"), filepath.Join(root, "escape.txt")))
 
 	factory, err := vfs.NewFactory(root)

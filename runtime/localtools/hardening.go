@@ -2,6 +2,8 @@ package localtools
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -9,12 +11,32 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+
+	"github.com/contenox/runtime/runtime/taskengine"
 )
 
 const (
 	severityRecoverable = "(recoverable: adjust parameters and retry)"
 	severityFatalToken  = "(fatal:"
 )
+
+func argumentProblem(ctx context.Context, message string, args map[string]any) error {
+	if taskengine.ToolArgsMissingFromContext(ctx) {
+		return fmt.Errorf("%s; the arguments for this call never reached the runtime (fatal: runtime problem, not your mistake; repeating the same call will not help)", message)
+	}
+	return fmt.Errorf("%s; received arguments: %s %s", message, compactArguments(args), severityRecoverable)
+}
+
+func compactArguments(args map[string]any) string {
+	if len(args) == 0 {
+		return "{}"
+	}
+	raw, err := json.Marshal(args)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
+}
 
 func hasSeverityMarker(s string) bool {
 	return strings.Contains(s, severityRecoverable) || strings.Contains(s, severityFatalToken)

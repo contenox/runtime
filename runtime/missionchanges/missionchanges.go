@@ -308,8 +308,21 @@ func topLevelDir(root, p string) string {
 		}
 	}
 	if filepath.IsAbs(cp) {
-		trimmed := strings.TrimPrefix(filepath.ToSlash(cp), "/")
-		return "/" + firstSegment(trimmed)
+		// An outside path is grouped by the first directory below its volume:
+		// "/etc" on Unix, "C:\Users" on Windows.
+		vol := filepath.VolumeName(cp)
+		rest := strings.TrimLeft(strings.TrimPrefix(cp, vol), `/\`)
+		seg := firstSegment(filepath.ToSlash(rest))
+		if seg == "." {
+			if vol != "" {
+				return vol + string(filepath.Separator)
+			}
+			return "/"
+		}
+		if vol != "" {
+			return vol + string(filepath.Separator) + seg
+		}
+		return "/" + seg
 	}
 	return firstSegment(filepath.ToSlash(cp))
 }

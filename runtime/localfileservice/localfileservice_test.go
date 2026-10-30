@@ -44,6 +44,14 @@ func TestUnit_LocalFileService_RejectsTraversalAndSymlinkEscape(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0644))
+	// Windows only allows symlinks with Developer Mode or the privilege to
+	// create them; where that is missing the escape case cannot be built.
+	probe := t.TempDir()
+	probeTarget := filepath.Join(probe, "target")
+	require.NoError(t, os.WriteFile(probeTarget, []byte("x"), 0644))
+	if err := os.Symlink(probeTarget, filepath.Join(probe, "link")); err != nil {
+		t.Skipf("this host cannot create symlinks (%v); the escape checks run where they can", err)
+	}
 	require.NoError(t, os.Symlink(outside, filepath.Join(root, "out")))
 
 	svc, err := localfileservice.New(root)

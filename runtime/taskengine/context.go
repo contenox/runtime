@@ -67,7 +67,17 @@ type contextKey string
 const (
 	ContextKeyOutputByteLimit contextKey = "output_byte_limit"
 	ContextKeyToolCallID      contextKey = "tool_call_id"
+	ContextKeyToolArgsMissing contextKey = "tool_args_missing"
 )
+
+func WithToolArgsMissing(ctx context.Context, missing bool) context.Context {
+	return context.WithValue(ctx, ContextKeyToolArgsMissing, missing)
+}
+
+func ToolArgsMissingFromContext(ctx context.Context) bool {
+	missing, _ := ctx.Value(ContextKeyToolArgsMissing).(bool)
+	return missing
+}
 
 type edgeCountsKey struct{}
 

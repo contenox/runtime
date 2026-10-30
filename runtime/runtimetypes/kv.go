@@ -93,7 +93,11 @@ func (s *store) deleteKVScoped(ctx context.Context, workspaceID string, key stri
 }
 
 func (s *store) ListKV(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*KV, error) {
-	cursor := time.Now().UTC()
+	// The first page must include rows written in the same instant as the
+	// listing: a strict "< now" comparison hides them when the database stores
+	// second precision (SQLite), which showed up as freshly created rows
+	// vanishing. Pagination still uses the exact cursor of the last row.
+	cursor := time.Now().UTC().Add(time.Second)
 	if createdAtCursor != nil {
 		cursor = *createdAtCursor
 	}
@@ -129,7 +133,11 @@ func (s *store) ListKV(ctx context.Context, createdAtCursor *time.Time, limit in
 }
 
 func (s *store) ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int) ([]*KV, error) {
-	cursor := time.Now().UTC()
+	// The first page must include rows written in the same instant as the
+	// listing: a strict "< now" comparison hides them when the database stores
+	// second precision (SQLite), which showed up as freshly created rows
+	// vanishing. Pagination still uses the exact cursor of the last row.
+	cursor := time.Now().UTC().Add(time.Second)
 	if createdAtCursor != nil {
 		cursor = *createdAtCursor
 	}

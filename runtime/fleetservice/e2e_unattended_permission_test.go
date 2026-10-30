@@ -177,6 +177,7 @@ func (fx *unattendedFixture) requireUnattended(t *testing.T, result DispatchResu
 }
 
 func TestFleetE2E_UnattendedPermission_ReachesInboxAndUnblocksOnAnswer(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping unattended-permission e2e: builds and spawns a real ACP agent")
 	}
@@ -231,6 +232,7 @@ func TestFleetE2E_UnattendedPermission_ReachesInboxAndUnblocksOnAnswer(t *testin
 }
 
 func TestFleetE2E_UnattendedPermission_RuleAllowedNeedsNoHuman(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping unattended-permission e2e: builds and spawns a real ACP agent")
 	}
@@ -260,6 +262,7 @@ func TestFleetE2E_UnattendedPermission_RuleAllowedNeedsNoHuman(t *testing.T) {
 }
 
 func TestFleetE2E_UnattendedPermission_UnansweredExpiresByPolicy(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping unattended-permission e2e: builds and spawns a real ACP agent")
 	}

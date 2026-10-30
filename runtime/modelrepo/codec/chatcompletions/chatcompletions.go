@@ -217,7 +217,7 @@ func Build(model string, messages []modelrepo.Message, cfg *modelrepo.ChatConfig
 			req.Tools = tools
 		}
 	}
-	if cfg != nil && cfg.ToolChoice != nil {
+	if cfg != nil && cfg.ToolChoice != nil && len(req.Tools) > 0 {
 		wireToolChoice(&req, *cfg.ToolChoice, origToSanitized)
 	}
 

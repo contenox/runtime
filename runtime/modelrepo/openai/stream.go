@@ -171,6 +171,8 @@ func truncateString(s string, maxLen int) string {
 type responsesSSEEvent struct {
 	Type        string                    `json:"type"`
 	Delta       string                    `json:"delta"`
+	Arguments   string                    `json:"arguments"`
+	ItemID      string                    `json:"item_id"`
 	OutputIndex int                       `json:"output_index"`
 	Item        *openAIResponseOutputItem `json:"item"`
 	Response    *openAIResponse           `json:"response"`
@@ -209,6 +211,135 @@ func (ev responsesSSEEvent) errorText() string {
 	return code + ": " + msg
 }
 
+type responsesToolCallState struct {
+	index  int
+	id     string
+	itemID string
+	name   string
+	final  string
+}
+
+type responsesCallTracker struct {
+	byIndex map[int]*responsesToolCallState
+	byKey   map[string]*responsesToolCallState
+	nameMap map[string]string
+}
+
+func newResponsesCallTracker(nameMap map[string]string) *responsesCallTracker {
+	return &responsesCallTracker{
+		byIndex: map[int]*responsesToolCallState{},
+		byKey:   map[string]*responsesToolCallState{},
+		nameMap: nameMap,
+	}
+}
+
+func (t *responsesCallTracker) state(index int) *responsesToolCallState {
+	if s, ok := t.byIndex[index]; ok {
+		return s
+	}
+	s := &responsesToolCallState{index: index}
+	t.byIndex[index] = s
+	return s
+}
+
+func (t *responsesCallTracker) lookup(keys ...string) *responsesToolCallState {
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if s, ok := t.byKey[key]; ok {
+			return s
+		}
+	}
+	return nil
+}
+
+func (t *responsesCallTracker) identity(index int, item *openAIResponseOutputItem) []*modelrepo.ToolCallDelta {
+	s := t.lookup(item.CallID, item.ID)
+	changed := false
+	if s == nil {
+		s = t.state(index)
+		changed = true
+	}
+	if id := firstNonEmptyString(item.CallID, item.ID); id != "" && s.id == "" {
+		s.id = id
+		changed = true
+	}
+	if item.ID != "" && s.itemID == "" {
+		s.itemID = item.ID
+	}
+	if item.Name != "" && s.name == "" {
+		name := item.Name
+		if orig, ok := t.nameMap[name]; ok && orig != "" {
+			name = orig
+		}
+		s.name = name
+		changed = true
+	}
+	for _, key := range []string{item.ID, item.CallID, s.id, s.itemID} {
+		if key != "" {
+			t.byKey[key] = s
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return []*modelrepo.ToolCallDelta{{
+		Index: s.index,
+		ID:    s.id,
+		Type:  "function",
+		Name:  s.name,
+	}}
+}
+
+func (t *responsesCallTracker) finalArguments(index int, itemID, arguments string) []*modelrepo.ToolCallDelta {
+	if strings.TrimSpace(arguments) == "" {
+		return nil
+	}
+	s := t.lookup(itemID)
+	if s == nil {
+		s = t.state(index)
+	}
+	if s.final == arguments {
+		return nil
+	}
+	s.final = arguments
+	return []*modelrepo.ToolCallDelta{{
+		Index:        s.index,
+		ArgsFragment: arguments,
+		ArgsReplace:  true,
+	}}
+}
+
+func (t *responsesCallTracker) reconcile(resp *openAIResponse) []*modelrepo.ToolCallDelta {
+	if resp == nil {
+		return nil
+	}
+	var out []*modelrepo.ToolCallDelta
+	for i := range resp.Output {
+		item := &resp.Output[i]
+		if !strings.EqualFold(item.Type, "function_call") {
+			continue
+		}
+		index := i
+		if s := t.lookup(item.CallID, item.ID); s != nil {
+			index = s.index
+		}
+		out = append(out, t.identity(index, item)...)
+		out = append(out, t.finalArguments(index, item.ID, item.Arguments)...)
+	}
+	return out
+}
+
+func sendToolCallDeltas(send func(*modelrepo.StreamParcel) bool, deltas []*modelrepo.ToolCallDelta) bool {
+	for _, d := range deltas {
+		if !send(&modelrepo.StreamParcel{ToolCall: d}) {
+			return false
+		}
+	}
+	return true
+}
+
 func streamResponsesSSE(
 	ctx context.Context,
 	body io.ReadCloser,
@@ -232,6 +363,8 @@ func streamResponsesSSE(
 			return false
 		}
 	}
+
+	calls := newResponsesCallTracker(nameMap)
 
 	for sc.Scan() {
 		line := sc.Text()
@@ -277,23 +410,10 @@ func streamResponsesSSE(
 			refusalText.WriteString(ev.Delta)
 
 		case "response.output_item.added":
-			if ev.Item == nil || strings.ToLower(ev.Item.Type) != "function_call" {
+			if ev.Item == nil || !strings.EqualFold(ev.Item.Type, "function_call") {
 				continue
 			}
-			id := ev.Item.CallID
-			if id == "" {
-				id = ev.Item.ID
-			}
-			name := ev.Item.Name
-			if orig, ok := nameMap[name]; ok && orig != "" {
-				name = orig
-			}
-			if !send(&modelrepo.StreamParcel{ToolCall: &modelrepo.ToolCallDelta{
-				Index: ev.OutputIndex,
-				ID:    id,
-				Type:  "function",
-				Name:  name,
-			}}) {
+			if !sendToolCallDeltas(send, calls.identity(ev.OutputIndex, ev.Item)) {
 				return
 			}
 
@@ -308,7 +428,26 @@ func streamResponsesSSE(
 				return
 			}
 
+		case "response.function_call_arguments.done":
+			if !sendToolCallDeltas(send, calls.finalArguments(ev.OutputIndex, ev.ItemID, ev.Arguments)) {
+				return
+			}
+
+		case "response.output_item.done":
+			if ev.Item == nil || !strings.EqualFold(ev.Item.Type, "function_call") {
+				continue
+			}
+			if !sendToolCallDeltas(send, calls.identity(ev.OutputIndex, ev.Item)) {
+				return
+			}
+			if !sendToolCallDeltas(send, calls.finalArguments(ev.OutputIndex, ev.Item.ID, ev.Item.Arguments)) {
+				return
+			}
+
 		case "response.completed":
+			if !sendToolCallDeltas(send, calls.reconcile(ev.Response)) {
+				return
+			}
 			if refusal := firstNonEmptyString(refusalText.String(), responsesRefusalText(ev.Response)); refusal != "" {
 				err := &modelrepo.RefusalError{Provider: "openai", Code: refusalFinishReason, Text: refusal}
 				reportErr(err)

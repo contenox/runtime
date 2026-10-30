@@ -191,7 +191,9 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	if err != nil {
 		return nil, fmt.Errorf("failed to create environment executor: %w", err)
 	}
-	envExec, err = taskengine.NewMacroEnv(envExec, toolsRepo)
+	envExec, err = taskengine.NewMacroEnv(envExec, toolsRepo, taskengine.WithPlatformShell(func() string {
+		return localtools.DetectPlatformShell().Summary()
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create macro environment: %w", err)
 	}

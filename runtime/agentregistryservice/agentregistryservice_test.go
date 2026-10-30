@@ -77,7 +77,7 @@ func TestUnit_Validate(t *testing.T) {
 		},
 		{
 			name:    "chain kind with an absolute chain path is accepted",
-			agent:   newChainAgent(t, "chain-runner", filepath.Join(string(filepath.Separator), "chains", "agent-thing.json")),
+			agent:   newChainAgent(t, "chain-runner", filepath.Join(t.TempDir(), "chains", "agent-thing.json")),
 			wantErr: false,
 		},
 		{

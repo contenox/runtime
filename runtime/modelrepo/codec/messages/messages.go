@@ -106,7 +106,6 @@ func Build(messages []modelrepo.Message, cfg *modelrepo.ChatConfig) (Request, ma
 		req.Temperature = cfg.Temperature
 		req.TopP = cfg.TopP
 		req.StopSequences = cfg.StopSequences
-		req.ToolChoice = wireToolChoice(cfg)
 
 		seen := map[string]int{}
 		for _, t := range cfg.Tools {
@@ -128,12 +127,17 @@ func Build(messages []modelrepo.Message, cfg *modelrepo.ChatConfig) (Request, ma
 				InputSchema: wireInputSchema(t.Function.Parameters),
 			})
 		}
-		if cfg.ToolChoice != nil && cfg.ToolChoice.Tool != "" && req.ToolChoice != nil {
-			declared := origToSanitized[cfg.ToolChoice.Tool]
-			if declared == "" {
-				declared = sanitizeToolName(cfg.ToolChoice.Tool)
+		// Providers reject a tool_choice that names no tools, so the choice
+		// only travels with the definitions it applies to.
+		if len(req.Tools) > 0 {
+			req.ToolChoice = wireToolChoice(cfg)
+			if cfg.ToolChoice != nil && cfg.ToolChoice.Tool != "" && req.ToolChoice != nil {
+				declared := origToSanitized[cfg.ToolChoice.Tool]
+				if declared == "" {
+					declared = sanitizeToolName(cfg.ToolChoice.Tool)
+				}
+				req.ToolChoice.Name = declared
 			}
-			req.ToolChoice.Name = declared
 		}
 		req.OutputConfig = wireOutputFormat(cfg)
 	}

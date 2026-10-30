@@ -32,11 +32,19 @@ func TestUnit_Build_ToolChoiceModesReachTheRequest(t *testing.T) {
 		modelrepo.ToolChoiceRequired: "any",
 	}
 	for mode, want := range cases {
-		req := buildOne(t, &modelrepo.ChatConfig{ToolChoice: &modelrepo.ToolChoice{Mode: mode}})
+		req := buildOne(t, &modelrepo.ChatConfig{
+			Tools:      []modelrepo.Tool{{Type: "function", Function: &modelrepo.FunctionTool{Name: "fs.list"}}},
+			ToolChoice: &modelrepo.ToolChoice{Mode: mode},
+		})
 		require.NotNil(t, req.ToolChoice, "mode %s must reach the request", mode)
 		assert.Equal(t, want, req.ToolChoice.Type)
 		assert.Empty(t, req.ToolChoice.Name)
 	}
+}
+
+func TestUnit_Build_ToolChoiceWithoutToolsIsOmitted(t *testing.T) {
+	req := buildOne(t, &modelrepo.ChatConfig{ToolChoice: &modelrepo.ToolChoice{Mode: modelrepo.ToolChoiceNone}})
+	assert.Nil(t, req.ToolChoice, "a tool_choice without tool definitions is rejected by providers")
 }
 
 func TestUnit_Build_NamedToolChoiceUsesTheDeclaredName(t *testing.T) {
@@ -56,13 +64,14 @@ func TestUnit_Build_NamedToolChoiceUsesTheDeclaredName(t *testing.T) {
 }
 
 func TestUnit_Build_DisablingParallelCallsReachesTheRequest(t *testing.T) {
+	tool := []modelrepo.Tool{{Type: "function", Function: &modelrepo.FunctionTool{Name: "fs.list"}}}
 	disabled := false
-	req := buildOne(t, &modelrepo.ChatConfig{ParallelToolCalls: &disabled})
+	req := buildOne(t, &modelrepo.ChatConfig{Tools: tool, ParallelToolCalls: &disabled})
 	require.NotNil(t, req.ToolChoice)
 	assert.True(t, req.ToolChoice.DisableParallelToolUse)
 
 	enabled := true
-	on := buildOne(t, &modelrepo.ChatConfig{ParallelToolCalls: &enabled})
+	on := buildOne(t, &modelrepo.ChatConfig{Tools: tool, ParallelToolCalls: &enabled})
 	assert.Nil(t, on.ToolChoice, "enabling parallel calls is the dialect default and says nothing")
 }
 

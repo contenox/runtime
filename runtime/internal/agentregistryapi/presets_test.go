@@ -75,21 +75,32 @@ func TestUnit_AgentPresetInstallRegistersAgent(t *testing.T) {
 
 func TestUnit_AgentWriteEndpointsCreateUpdateDelete(t *testing.T) {
 	mux, _ := presetTestServer(t)
+	chainPath := filepath.Join(t.TempDir(), "agent-custom.json")
 
-	create := doJSON(t, mux, http.MethodPost, "/agents", `{"name":"custom","kind":"chain","enabled":true,"configJson":{"path":"/workspace/agent-custom.json"}}`)
+	createBody, err := json.Marshal(map[string]any{
+		"name": "custom", "kind": "chain", "enabled": true,
+		"configJson": map[string]any{"path": chainPath},
+	})
+	require.NoError(t, err)
+	create := doJSON(t, mux, http.MethodPost, "/agents", string(createBody))
 	require.Equal(t, http.StatusCreated, create.Code, create.Body.String())
 	var created runtimetypes.Agent
 	require.NoError(t, json.Unmarshal(create.Body.Bytes(), &created))
 	require.NotEmpty(t, created.ID)
 	require.Equal(t, "custom", created.Name)
 
-	update := doJSON(t, mux, http.MethodPut, "/agents/"+created.ID, `{"name":"custom","kind":"chain","enabled":false,"configJson":{"path":"/workspace/agent-custom.json"}}`)
+	updateBody, err := json.Marshal(map[string]any{
+		"name": "custom", "kind": "chain", "enabled": false,
+		"configJson": map[string]any{"path": chainPath},
+	})
+	require.NoError(t, err)
+	update := doJSON(t, mux, http.MethodPut, "/agents/"+created.ID, string(updateBody))
 	require.Equal(t, http.StatusOK, update.Code, update.Body.String())
 	require.Contains(t, update.Body.String(), `"enabled":false`)
 
 	del := doJSON(t, mux, http.MethodDelete, "/agents/"+created.ID, "")
 	require.Equal(t, http.StatusOK, del.Code)
-	_, err := os.Stat(filepath.Join(t.TempDir(), "unused"))
+	_, err = os.Stat(filepath.Join(t.TempDir(), "unused"))
 	require.Error(t, err)
 
 	missing := doJSON(t, mux, http.MethodGet, "/agents/"+created.ID, "")

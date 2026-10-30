@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/contenox/runtime/runtime/agentregistryservice"
@@ -46,7 +47,8 @@ func TestUnit_agentIsReservedSubcommand(t *testing.T) {
 
 func TestUnit_AgentList_And_Show(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "agents.db")
-	seedChainAgent(t, dbPath, "shown-agent", "/home/user/.contenox/agent-reviewer.json")
+	chainPath := filepath.Join(t.TempDir(), ".contenox", "agent-reviewer.json")
+	seedChainAgent(t, dbPath, "shown-agent", chainPath)
 
 	list := &cobra.Command{Use: "list", Args: cobra.NoArgs, RunE: agentListCmd.RunE}
 	root := agentTestRoot(list)
@@ -66,13 +68,15 @@ func TestUnit_AgentList_And_Show(t *testing.T) {
 	rootShow.SetArgs([]string{"--db", dbPath, "show", "shown-agent"})
 	require.NoError(t, rootShow.Execute())
 	out := showBuf.String()
-	require.Contains(t, out, "/home/user/.contenox/agent-reviewer.json")
+	// The path is printed inside pretty-printed JSON, so backslashes on Windows
+	// appear escaped; compare against the same quoting.
+	require.Contains(t, out, strconv.Quote(chainPath))
 	require.Contains(t, out, "config_json")
 }
 
 func TestUnit_AgentRemove(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "agents.db")
-	seedChainAgent(t, dbPath, "gone-agent", "/home/user/.contenox/x.json")
+	seedChainAgent(t, dbPath, "gone-agent", filepath.Join(t.TempDir(), ".contenox", "x.json"))
 
 	rm := &cobra.Command{Use: "remove", Args: cobra.ExactArgs(1), RunE: agentRemoveCmd.RunE}
 	root := agentTestRoot(rm)
@@ -89,7 +93,7 @@ func TestUnit_AgentRemove(t *testing.T) {
 
 func TestUnit_AgentEnableDisable(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "agents.db")
-	seedChainAgent(t, dbPath, "toggle-agent", "/home/user/.contenox/y.json")
+	seedChainAgent(t, dbPath, "toggle-agent", filepath.Join(t.TempDir(), ".contenox", "y.json"))
 
 	disable := &cobra.Command{Use: "disable", Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { return setAgentEnabled(cmd, args[0], false) }}

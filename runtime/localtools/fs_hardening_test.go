@@ -120,7 +120,7 @@ func TestUnit_DidYouMean_SuggestsSiblings(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tool := range []string{"read_file", "stat_file"} {
-		_, err := execTool(t, ctx, h, tool, map[string]any{"path": "readme.md"})
+		_, err := execTool(t, ctx, h, tool, map[string]any{"path": "README.mdx"})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "Did you mean", "%s should suggest siblings", tool)
 		require.Contains(t, err.Error(), "README.md", "%s should name the close sibling", tool)

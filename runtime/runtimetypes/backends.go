@@ -139,20 +139,21 @@ func (s *store) ListAllBackends(ctx context.Context) ([]*Backend, error) {
 }
 
 func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*Backend, error) {
-	cursor := time.Now().UTC()
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
-	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, name, base_url, type, created_at, updated_at
-        FROM llm_backends
-        WHERE created_at < $1
-        ORDER BY created_at DESC, id DESC
-        LIMIT $2;
-    `, cursor, limit)
+	// The first page must not filter by "created before now": a backend created
+	// in the same instant as the listing would compare equal and disappear.
+	const columns = `SELECT id, name, base_url, type, created_at, updated_at
+        FROM llm_backends`
+	const order = ` ORDER BY created_at DESC, id DESC`
+	query := columns + order + ` LIMIT $1`
+	args := []any{limit}
+	if createdAtCursor != nil {
+		query = columns + ` WHERE created_at < $1` + order + ` LIMIT $2`
+		args = []any{*createdAtCursor, limit}
+	}
+	rows, err := s.Exec.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query backends: %w", err)
 	}

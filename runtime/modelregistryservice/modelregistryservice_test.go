@@ -2,6 +2,7 @@ package modelregistryservice_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -15,15 +16,13 @@ func setupServiceDB(t *testing.T) (context.Context, libdb.DBManager) {
 	t.Helper()
 
 	ctx := context.Background()
-	connStr, _, cleanup, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
-	require.NoError(t, err)
-
-	db, err := libdb.NewPostgresDBManager(ctx, connStr, runtimetypes.Schema)
+	// The registry is SQL, not Postgres-specific; SQLite keeps this test
+	// runnable everywhere and is the database the desktop app ships.
+	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "modelregistry.db"), runtimetypes.SchemaSQLite)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		require.NoError(t, db.Close())
-		cleanup()
 	})
 	return ctx, db
 }

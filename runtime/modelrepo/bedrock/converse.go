@@ -204,6 +204,9 @@ func planBedrockTools(m converseModel, cfg *modelrepo.ChatConfig, names *toolNam
 	if cfg.ToolChoice != nil && cfg.ToolChoice.Mode == modelrepo.ToolChoiceNone {
 		return bedrockToolPlan{}, nil
 	}
+	if len(cfg.Tools) == 0 {
+		return bedrockToolPlan{}, nil
+	}
 	plan := bedrockToolPlan{choice: cfg.ToolChoice}
 	for _, t := range cfg.Tools {
 		if strings.ToLower(t.Type) != "function" || t.Function == nil {

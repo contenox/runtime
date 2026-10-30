@@ -74,6 +74,11 @@ func Spawn(ctx context.Context, cmd *exec.Cmd, opts ...Option) (*Process, error)
 		_ = stdin.Close()
 		_ = stdout.Close()
 		_ = childStdout.Close()
+		// Windows reports a missing program as exec.ErrNotFound, Unix as
+		// ENOENT; callers treat "the executable is not there" the same way.
+		if errors.Is(err, exec.ErrNotFound) {
+			err = fmt.Errorf("%w (%v)", os.ErrNotExist, err)
+		}
 		return nil, fmt.Errorf("acpexec: start %s: %w", cmd.Path, err)
 	}
 

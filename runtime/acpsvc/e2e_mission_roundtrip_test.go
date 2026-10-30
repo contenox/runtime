@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/contenox/runtime/libacp"
 	libbus "github.com/contenox/runtime/libbus"
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libsandbox"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
@@ -54,11 +56,18 @@ func TestFleetE2E_MissionRoundTrip(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping mission round-trip e2e: builds the contenox binary and spawns real ACP subprocesses")
 	}
+	if err := libsandbox.Preflight(); err != nil {
+		t.Skipf("mission dispatch spawns confined agent processes, which this host cannot provide: %v", err)
+	}
 
 	bin := mrtBuildContenoxBinary(t)
 	home := t.TempDir()
 
 	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		// os.UserHomeDir() reads USERPROFILE on Windows, not HOME.
+		t.Setenv("USERPROFILE", home)
+	}
 	for _, k := range []string{
 		"CONTENOX_DEFAULT_MODEL", "CONTENOX_DEFAULT_PROVIDER",
 		"CONTENOX_DEFAULT_ALT_MODEL", "CONTENOX_DEFAULT_ALT_PROVIDER",
@@ -229,10 +238,17 @@ func TestFleetE2E_MissionRoundTrip_UnitReportRoutesToSupervisor(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping mission round-trip e2e: builds the contenox binary and spawns real ACP subprocesses")
 	}
+	if err := libsandbox.Preflight(); err != nil {
+		t.Skipf("mission dispatch spawns confined agent processes, which this host cannot provide: %v", err)
+	}
 
 	bin := mrtBuildContenoxBinary(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		// os.UserHomeDir() reads USERPROFILE on Windows, not HOME.
+		t.Setenv("USERPROFILE", home)
+	}
 	for _, k := range []string{
 		"CONTENOX_DEFAULT_MODEL", "CONTENOX_DEFAULT_PROVIDER",
 		"CONTENOX_DEFAULT_ALT_MODEL", "CONTENOX_DEFAULT_ALT_PROVIDER",
@@ -339,7 +355,11 @@ func TestFleetE2E_MissionRoundTrip_UnitReportRoutesToSupervisor(t *testing.T) {
 
 func mrtBuildContenoxBinary(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "contenox")
+	binName := "contenox"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	binPath := filepath.Join(t.TempDir(), binName)
 	out, err := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox").CombinedOutput()
 	require.NoErrorf(t, err, "build contenox:\n%s", out)
 	return binPath

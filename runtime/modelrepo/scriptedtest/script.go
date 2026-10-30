@@ -183,7 +183,7 @@ func (s *Script) Next(operation string) (Turn, int, error) {
 	index := s.cursor
 	if index >= len(s.Turns) {
 		return Turn{}, index, fmt.Errorf(
-			"scripted-test script %q is exhausted: %s asked for turn %d but the script holds %d turn(s); add the missing turn or shorten the run",
+			"scripted-test script \"%s\" is exhausted: %s asked for turn %d but the script holds %d turn(s); add the missing turn or shorten the run",
 			s.Path, operation, index, len(s.Turns))
 	}
 	s.cursor++

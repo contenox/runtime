@@ -313,7 +313,9 @@ func buildOpenAIRequestForDialect(dialect modelrepo.ChatDialect, modelName strin
 	for san, orig := range nameMap {
 		origToSanitized[orig] = san
 	}
-	req.ToolChoice = chatToolChoice(cfg.ToolChoice, origToSanitized)
+	if len(req.Tools) > 0 {
+		req.ToolChoice = chatToolChoice(cfg.ToolChoice, origToSanitized)
+	}
 
 	apiMsgs := make([]apiChatMessage, 0, len(messages))
 	for _, msg := range messages {

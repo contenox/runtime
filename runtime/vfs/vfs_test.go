@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/contenox/runtime/runtime/vfs"
@@ -38,7 +39,21 @@ func TestUnit_Contain_RejectsTraversalEscape(t *testing.T) {
 	assert.True(t, errors.Is(err, vfs.ErrEscape), "traversal must wrap ErrEscape, got %v", err)
 }
 
+// requireSymlinks skips escape checks on hosts that cannot create symlinks:
+// Windows needs Developer Mode or SeCreateSymbolicLinkPrivilege for that, and
+// the containment contract is exercised on Linux CI instead.
+func requireSymlinks(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	require.NoError(t, os.WriteFile(target, []byte("x"), 0o644))
+	if err := os.Symlink(target, filepath.Join(dir, "link")); err != nil {
+		t.Skipf("this host cannot create symlinks (%v); symlink escape checks run on Linux CI", err)
+	}
+}
+
 func TestUnit_Contain_RejectsSymlinkEscape(t *testing.T) {
+	requireSymlinks(t)
 	root := t.TempDir()
 	outside := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("s"), 0o644))
@@ -145,6 +160,7 @@ func TestUnit_Factory_Containment(t *testing.T) {
 	})
 
 	t.Run("a symlink under the root whose target escapes every root is refused", func(t *testing.T) {
+		requireSymlinks(t)
 		outside := t.TempDir()
 		link := filepath.Join(root, "escape-link")
 		require.NoError(t, os.Symlink(outside, link))
@@ -229,13 +245,18 @@ func TestUnit_ResolveSessionCwd(t *testing.T) {
 	})
 
 	t.Run("no allowlist: an absolute cwd passes through, an absent one takes the caller's fallback", func(t *testing.T) {
-		got, err := vfs.ResolveSessionCwd(nil, "/anywhere/at/all", "/fallback")
+		absolute := filepath.Join(t.TempDir(), "anywhere")
+		got, err := vfs.ResolveSessionCwd(nil, absolute, "/fallback")
 		require.NoError(t, err)
-		assert.Equal(t, "/anywhere/at/all", got, "the editor owns the filesystem on the stdio path")
+		assert.Equal(t, absolute, got, "the editor owns the filesystem on the stdio path")
 
-		got, err = vfs.ResolveSessionCwd(nil, "/", "/fallback")
-		require.NoError(t, err)
-		assert.Equal(t, "/", got)
+		// "/" is absolute only on Unix; without an allowlist it passes through
+		// verbatim, which is meaningful only where it names a real root.
+		if runtime.GOOS != "windows" {
+			got, err = vfs.ResolveSessionCwd(nil, "/", "/fallback")
+			require.NoError(t, err)
+			assert.Equal(t, "/", got)
+		}
 
 		got, err = vfs.ResolveSessionCwd(nil, "", "/fallback")
 		require.NoError(t, err)
@@ -341,6 +362,7 @@ func TestUnit_ControlPlane_ResolveRefusesRootAndSubpaths(t *testing.T) {
 }
 
 func TestUnit_ControlPlane_SymlinkIntoIsRefused(t *testing.T) {
+	requireSymlinks(t)
 	root := t.TempDir()
 	controlPlane := filepath.Join(root, ".contenox")
 	require.NoError(t, os.MkdirAll(controlPlane, 0o700))
@@ -491,6 +513,7 @@ func TestUnit_ControlPlane_UnregisteredIsNoOp(t *testing.T) {
 }
 
 func TestUnit_Contain_RejectsDanglingSymlinkEscape(t *testing.T) {
+	requireSymlinks(t)
 	root := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "does-not-exist.txt")
 	link := filepath.Join(root, "dangling")

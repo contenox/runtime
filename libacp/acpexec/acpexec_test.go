@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -14,11 +16,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The fixtures a Unix shell used to provide (cat, sh -c, sleep, a child
+// process tree) are served by re-running this test binary in fixture mode.
+// That keeps every byte-exact assertion valid on Windows and Linux alike.
+func TestMain(m *testing.M) {
+	if mode := os.Getenv("ACPEXEC_TEST_FIXTURE"); mode != "" {
+		runFixture(mode)
+		return
+	}
+	os.Exit(m.Run())
+}
+
+func runFixture(mode string) {
+	switch mode {
+	case "echo":
+		_, _ = io.Copy(os.Stdout, os.Stdin)
+	case "sleep":
+		time.Sleep(300 * time.Second)
+	case "exit3":
+		os.Exit(3)
+	case "stderr":
+		_, _ = fmt.Fprintln(os.Stderr, "oops")
+	case "child-exit":
+		_, _ = fmt.Fprintln(os.Stdout, "from-child")
+	case "tree":
+		child := fixture("tree-child")
+		_ = child.Start()
+		time.Sleep(300 * time.Second)
+	case "tree-child":
+		time.Sleep(300 * time.Second)
+	}
+	os.Exit(0)
+}
+
+// fixture builds a command that runs this test binary in the given fixture
+// mode. It behaves identically on Unix and Windows.
+func fixture(mode string) *exec.Cmd {
+	cmd := exec.Command(os.Args[0])
+	cmd.Env = append(os.Environ(), "ACPEXEC_TEST_FIXTURE="+mode)
+	return cmd
+}
+
 func TestSpawn_EchoesStdinToStdout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("cat"))
+	proc, err := acpexec.Spawn(ctx, fixture("echo"))
 	require.NoError(t, err)
 
 	_, err = proc.Write([]byte("hello\n"))
@@ -36,7 +79,7 @@ func TestSpawn_ProcessExitingOnItsOwnYieldsEOFAndCloseDoesNotHang(t *testing.T) 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("sh", "-c", "echo from-child"))
+	proc, err := acpexec.Spawn(ctx, fixture("child-exit"))
 	require.NoError(t, err)
 
 	out, err := io.ReadAll(proc)
@@ -57,7 +100,7 @@ func TestSpawn_DoubleCloseIsSafeAndReturnsSameResult(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("cat"))
+	proc, err := acpexec.Spawn(ctx, fixture("echo"))
 	require.NoError(t, err)
 
 	err1 := proc.Close()
@@ -70,7 +113,7 @@ func TestSpawn_CloseKillsAProcessThatIgnoresStdinClosing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("sleep", "30"), acpexec.WithKillGrace(200*time.Millisecond))
+	proc, err := acpexec.Spawn(ctx, fixture("sleep"), acpexec.WithKillGrace(200*time.Millisecond))
 	require.NoError(t, err)
 
 	closeDone := make(chan error, 1)
@@ -90,8 +133,7 @@ func TestSpawn_CloseKillsTheWholeProcessTree(t *testing.T) {
 	defer cancel()
 
 	var stderr acpexec.LockedBuffer
-	proc, err := acpexec.Spawn(ctx,
-		exec.Command("sh", "-c", "sleep 300 & exec sleep 300"),
+	proc, err := acpexec.Spawn(ctx, fixture("tree"),
 		acpexec.WithStderr(&stderr),
 		acpexec.WithKillGrace(200*time.Millisecond))
 	require.NoError(t, err)
@@ -110,7 +152,7 @@ func TestSpawn_CloseSurfacesASelfInflictedBadExit(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("sh", "-c", "exit 3"))
+	proc, err := acpexec.Spawn(ctx, fixture("exit3"))
 	require.NoError(t, err)
 
 	_, err = io.ReadAll(proc)
@@ -126,7 +168,7 @@ func TestSpawn_CloseSurfacesASelfInflictedBadExit(t *testing.T) {
 func TestSpawn_CtxCancellationTearsDownTheProcess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	proc, err := acpexec.Spawn(ctx, exec.Command("cat"), acpexec.WithKillGrace(200*time.Millisecond))
+	proc, err := acpexec.Spawn(ctx, fixture("echo"), acpexec.WithKillGrace(200*time.Millisecond))
 	require.NoError(t, err)
 
 	cancel()
@@ -157,7 +199,7 @@ func TestSpawn_StderrIsForwardedToConfiguredWriter(t *testing.T) {
 	defer cancel()
 
 	var stderr acpexec.LockedBuffer
-	proc, err := acpexec.Spawn(ctx, exec.Command("sh", "-c", "echo oops >&2"), acpexec.WithStderr(&stderr))
+	proc, err := acpexec.Spawn(ctx, fixture("stderr"), acpexec.WithStderr(&stderr))
 	require.NoError(t, err)
 
 	_, _ = io.ReadAll(proc)
@@ -170,7 +212,7 @@ func TestSpawn_PipeSetupFailureLeavesNothingToCleanUp(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.Command("cat")
+	cmd := fixture("echo")
 	r, w := io.Pipe()
 	defer func() { _ = r.Close(); _ = w.Close() }()
 	cmd.Stdin = r

@@ -86,6 +86,9 @@ func transportWithFakeAgent(a agentservice.Agent) (*Transport, libacp.SessionID,
 	tr := &Transport{
 		sessions:        make(map[libacp.SessionID]*sessionEntry),
 		contenoxToACPID: make(map[string]libacp.SessionID),
+		// A prompt runs a chain that interpolates {{var:model}}, so a default
+		// model is required even when the agent itself is a fake.
+		defaultModel: "test-model",
 	}
 	tr.deps.Engine = &enginesvc.Engine{Tracker: rt}
 	tr.deps.ChainRegistry = &ChainRegistry{defaultChain: &taskengine.TaskChainDefinition{}}

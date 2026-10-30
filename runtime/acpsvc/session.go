@@ -80,7 +80,7 @@ func (t *Transport) LoadSession(ctx context.Context, req libacp.LoadSessionReque
 		reportErr(err)
 		return libacp.LoadSessionResponse{}, err
 	}
-	if !filepath.IsAbs(req.Cwd) {
+	if !cwdIsUsable(req.Cwd) {
 		err := libacp.NewErrorf(libacp.ErrInvalidParams, "cwd must be an absolute path, got %q", req.Cwd)
 		reportErr(err)
 		return libacp.LoadSessionResponse{}, err
@@ -302,7 +302,57 @@ func toolCallUpdateFromResult(m taskengine.Message) libacp.SessionUpdate {
 			update.ToolContent = []libacp.ToolCallContent{*diff}
 		}
 	}
+	if text, failed := toolResultFailure(m); failed {
+		update.Status = libacp.ToolCallStatusFailed
+		block := libacp.NewTextContent(text)
+		update.ToolContent = append([]libacp.ToolCallContent{{
+			Type:    libacp.ToolCallContentRegular,
+			Content: &block,
+		}}, update.ToolContent...)
+		update.Meta = json.RawMessage(`{"error":` + jsonString(text) + `}`)
+	}
 	return update
+}
+
+func toolResultFailure(m taskengine.Message) (string, bool) {
+	if m.ToolResultError {
+		return toolResultErrorText(m.Content), true
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(m.Content), &object); err == nil && len(object) == 1 {
+		if raw, ok := object["error"]; ok {
+			var text string
+			if err := json.Unmarshal(raw, &text); err == nil && text != "" {
+				return text, true
+			}
+		}
+	}
+	if strings.HasPrefix(m.Content, "tool ") && strings.Contains(m.Content, " execution failed") {
+		return m.Content, true
+	}
+	if strings.HasPrefix(m.Content, "the arguments for tool ") && strings.Contains(m.Content, "never reached the runtime") {
+		return m.Content, true
+	}
+	return "", false
+}
+
+func toolResultErrorText(content string) string {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(content), &object); err == nil && len(object) == 1 {
+		if raw, ok := object["error"]; ok {
+			var text string
+			if err := json.Unmarshal(raw, &text); err == nil && text != "" {
+				return text
+			}
+		}
+	}
+	return content
+}
+
+func cwdIsUsable(cwd string) bool {
+	// "/" is the ACP sentinel for "the default workspace root", not a real
+	// path: on Windows it is not absolute, but it must still mean the same.
+	return cwd == "/" || filepath.IsAbs(cwd)
 }
 
 func errSetupRequired() error {
@@ -335,7 +385,9 @@ func (t *Transport) NewSession(ctx context.Context, req libacp.NewSessionRequest
 	reportErr, reportChange, end := t.tracker().Start(ctx, "new", "acp_session", "session_id", string(sessionID), "cwd", req.Cwd, "mcp_servers", len(req.McpServers))
 	defer end()
 
-	if !filepath.IsAbs(req.Cwd) {
+	// "/" is the ACP sentinel for "the default workspace root", not a real
+	// path: on Windows it is not absolute, but it must still mean the same.
+	if !cwdIsUsable(req.Cwd) {
 		err := libacp.NewErrorf(libacp.ErrInvalidParams, "cwd must be an absolute path, got %q", req.Cwd)
 		reportErr(err)
 		return libacp.NewSessionResponse{}, err
@@ -500,7 +552,7 @@ func (t *Transport) ResumeSession(ctx context.Context, req libacp.ResumeSessionR
 		reportErr(err)
 		return libacp.ResumeSessionResponse{}, err
 	}
-	if !filepath.IsAbs(req.Cwd) {
+	if !cwdIsUsable(req.Cwd) {
 		err := libacp.NewErrorf(libacp.ErrInvalidParams, "cwd must be an absolute path, got %q", req.Cwd)
 		reportErr(err)
 		return libacp.ResumeSessionResponse{}, err

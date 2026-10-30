@@ -159,6 +159,14 @@ func toolCallUpdateNotification(sid libacp.SessionID, ev taskengine.TaskEvent, t
 		update.ToolContent = []libacp.ToolCallContent{*diff}
 	}
 
+	if ev.Error != "" && len(update.ToolContent) == 0 {
+		block := libacp.NewTextContent(ev.Error)
+		update.ToolContent = []libacp.ToolCallContent{{
+			Type:    libacp.ToolCallContentRegular,
+			Content: &block,
+		}}
+	}
+
 	if locs := toolCallLocations(ev); len(locs) > 0 {
 		update.Locations = locs
 	}

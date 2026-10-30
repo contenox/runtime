@@ -47,6 +47,7 @@ func buildContenoxBin(t *testing.T) string {
 }
 
 func TestFleetService_E2E_MissionReportFromDispatchedUnit(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("e2e: builds the contenox binary and spawns a real ACP subprocess")
 	}

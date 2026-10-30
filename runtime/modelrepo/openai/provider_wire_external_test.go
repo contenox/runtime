@@ -152,7 +152,15 @@ func TestUnit_WireOpenAI_ChatSendsToolChoiceAndParallelCalls(t *testing.T) {
 	provider2 := openAIChatProvider(t, cs2, "gpt-4o", modelrepo.CapabilityConfig{})
 	_, err = chatOnce(t, provider2, modelrepo.WithToolChoice(modelrepo.ToolChoice{Mode: modelrepo.ToolChoiceNone}))
 	require.NoError(t, err)
-	require.Equal(t, "none", cs2.lastRequest(t).Body["tool_choice"])
+	if got, ok := cs2.lastRequest(t).Body["tool_choice"]; ok {
+		require.Failf(t, "tool_choice sent without tools", "got %v", got)
+	}
+
+	cs3 := newCaptureServer(t, scriptedReply{Body: `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`})
+	provider3 := openAIChatProvider(t, cs3, "gpt-4o", modelrepo.CapabilityConfig{})
+	_, err = chatOnce(t, provider3, modelrepo.WithTool(tool), modelrepo.WithToolChoice(modelrepo.ToolChoice{Mode: modelrepo.ToolChoiceNone}))
+	require.NoError(t, err)
+	require.Equal(t, "none", cs3.lastRequest(t).Body["tool_choice"])
 }
 
 func TestUnit_WireOpenAI_ChatSendsResponseFormat(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/statetype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,6 +27,14 @@ func TestUnit_LiveDefaultsFollowDBConfig(t *testing.T) {
 			}
 		},
 	}}
+	// The model option is grouped by connection, so the option can only name a
+	// value when a connection actually serves that model.
+	tr.statesFn = func() []statetype.BackendRuntimeState {
+		return []statetype.BackendRuntimeState{{
+			Backend:      runtimetypes.Backend{ID: "o1", Name: "openai", Type: "openai"},
+			PulledModels: []statetype.ModelPullStatus{{Model: "gpt-5", CanChat: true}},
+		}}
+	}
 	sess := &sessionEntry{driver: &nativeDriver{t: tr}}
 
 	// Nothing configured yet: the provider/model vars are absent.
@@ -54,7 +63,7 @@ func TestUnit_LiveDefaultsFollowDBConfig(t *testing.T) {
 	require.Equal(t, "2048", vars["max_tokens"])
 
 	// The ACP model config option reflects the live default.
-	require.Equal(t, modelConfigValue("openai", "gpt-5"), tr.modelConfigOption(ctx, sess).CurrentValue)
+	require.Equal(t, "connection:o1/gpt-5", tr.modelConfigOption(ctx, sess).CurrentValue)
 
 	// /model persists and updates immediately; it wins over the stale cache.
 	_, err := tr.handleModel(ctx, "gpt-5-nano")

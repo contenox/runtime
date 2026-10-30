@@ -293,13 +293,21 @@ func TestUnit_Build_NoStopSequencesOmitsTheStopMember(t *testing.T) {
 }
 
 func TestUnit_Build_ToolChoiceModeReachesTheWire(t *testing.T) {
+	tool := []modelrepo.Tool{{Type: "function", Function: &modelrepo.FunctionTool{Name: "fs.list"}}}
 	for _, mode := range []modelrepo.ToolChoiceMode{modelrepo.ToolChoiceAuto, modelrepo.ToolChoiceNone, modelrepo.ToolChoiceRequired} {
-		probe := wireRequest(t, &modelrepo.ChatConfig{ToolChoice: &modelrepo.ToolChoice{Mode: mode}})
+		probe := wireRequest(t, &modelrepo.ChatConfig{Tools: tool, ToolChoice: &modelrepo.ToolChoice{Mode: mode}})
 		var got string
 		if err := json.Unmarshal(probe["tool_choice"], &got); err != nil {
 			t.Fatalf("tool_choice is not a mode string: %v (%s)", err, probe["tool_choice"])
 		}
 		assert.Equal(t, string(mode), got)
+	}
+}
+
+func TestUnit_Build_ToolChoiceWithoutToolsIsOmitted(t *testing.T) {
+	probe := wireRequest(t, &modelrepo.ChatConfig{ToolChoice: &modelrepo.ToolChoice{Mode: modelrepo.ToolChoiceNone}})
+	if _, ok := probe["tool_choice"]; ok {
+		t.Fatalf("tool_choice must not be sent without tool definitions, got %s", probe["tool_choice"])
 	}
 }
 

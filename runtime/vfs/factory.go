@@ -144,6 +144,11 @@ func cwdRefusal(format string, args ...any) error {
 }
 
 func ResolveSessionCwd(f *Factory, cwd, fallback string) (string, error) {
+	if f != nil && cwd == "/" {
+		// With an allowlist, "/" is the ACP sentinel for "the default workspace
+		// root"; it is not an absolute path on Windows.
+		cwd = ""
+	}
 	if cwd != "" && !filepath.IsAbs(cwd) {
 		return "", cwdRefusal("cwd must be an absolute path, got %q", cwd)
 	}

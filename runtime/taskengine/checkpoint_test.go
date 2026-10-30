@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/contenox/runtime/runtime/modelrepo"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/contenox/runtime/runtime/modelrepo"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,8 +26,9 @@ func fullyPopulatedMessage() Message {
 		Audio: []AudioPart{
 			{Data: []byte{0x03, 0x04, 0xFE}, MimeType: "audio/wav"},
 		},
-		Thinking:   "thinking-1",
-		ToolCallID: "call-prev",
+		Thinking:        "thinking-1",
+		ToolCallID:      "call-prev",
+		ToolResultError: true,
 		CallTools: []ToolCall{
 			{
 				ID:   "call-1",
@@ -109,6 +111,9 @@ func requireNoZeroFields(t *testing.T, name string, v reflect.Value) {
 		for i := 0; i < v.NumField(); i++ {
 			f := v.Type().Field(i)
 			if !f.IsExported() {
+				continue
+			}
+			if tag, ok := f.Tag.Lookup("json"); ok && tag == "-" {
 				continue
 			}
 			requireNoZeroFields(t, name+"."+f.Name, v.Field(i))

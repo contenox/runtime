@@ -6,12 +6,14 @@ import (
 	"io"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	libacp "github.com/contenox/runtime/libacp"
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libsandbox"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/internal/clikv"
@@ -21,7 +23,11 @@ import (
 
 func buildStubAgentBin(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "acp-stub-agent")
+	binName := "acp-stub-agent"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	binPath := filepath.Join(t.TempDir(), binName)
 	cmd := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/libacp/cmd/acp-stub-agent")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -32,6 +38,9 @@ func buildStubAgentBin(t *testing.T) string {
 
 func registerStubAgentInDB(t *testing.T, db libdb.DBManager, name string, env map[string]string) string {
 	t.Helper()
+	if err := libsandbox.Preflight(); err != nil {
+		t.Skipf("external agents run only under OS-level confinement, which this host cannot provide: %v", err)
+	}
 	bin := buildStubAgentBin(t)
 	svc := agentregistryservice.New(db)
 	agent := &runtimetypes.Agent{Name: name, Enabled: true}

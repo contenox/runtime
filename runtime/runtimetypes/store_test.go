@@ -2,6 +2,7 @@ package runtimetypes_test
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -11,15 +12,12 @@ import (
 
 func TestUnit_Store_QueryingEmptyDB(t *testing.T) {
 	ctx := context.TODO()
-	connStr, _, cleanup, err := libdb.SetupLocalInstance(ctx, "test", "test", "test")
-	require.NoError(t, err)
-	dbManager, err := libdb.NewPostgresDBManager(ctx, connStr, runtimetypes.Schema)
+	// The store is SQL, not Postgres-specific; SQLite keeps this test runnable
+	// everywhere and is the database the desktop app ships.
+	dbManager, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "store.db"), runtimetypes.SchemaSQLite)
 	require.NoError(t, err)
 	_ = runtimetypes.New(dbManager.WithoutTransaction())
 	t.Cleanup(func() {
-		err := dbManager.Close()
-		require.NoError(t, err)
-
-		cleanup()
+		require.NoError(t, dbManager.Close())
 	})
 }

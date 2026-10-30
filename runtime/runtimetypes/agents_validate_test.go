@@ -74,7 +74,8 @@ func TestUnit_ExternalACPConfig_Validate(t *testing.T) {
 }
 
 func TestUnit_ChainConfig_Validate(t *testing.T) {
-	abs := filepath.Join(string(filepath.Separator), "home", "u", ".contenox", "agent-reviewer.json")
+	// A platform-absolute path: "\home\u\..." is not absolute on Windows.
+	abs := filepath.Join(t.TempDir(), ".contenox", "agent-reviewer.json")
 	tests := []struct {
 		name    string
 		cfg     runtimetypes.ChainConfig

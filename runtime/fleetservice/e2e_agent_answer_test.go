@@ -13,6 +13,7 @@ import (
 )
 
 func TestFleetE2E_AgentAnswerBounds(t *testing.T) {
+	requireFleetSandbox(t)
 	ctx := context.Background()
 	policyDir := t.TempDir()
 	db, err := libdb.NewSQLiteDBManager(ctx, t.TempDir()+"/agent-answer.db", runtimetypes.SchemaSQLite)

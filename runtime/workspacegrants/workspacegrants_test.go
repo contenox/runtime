@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -162,6 +163,10 @@ func TestUnit_Add_RefusesBroadParents(t *testing.T) {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	if runtime.GOOS == "windows" {
+		// os.UserHomeDir() reads USERPROFILE on Windows.
+		t.Setenv("USERPROFILE", home)
+	}
 	_, err := workspacegrants.Add(ctx, store, home)
 	require.ErrorIs(t, err, workspacegrants.ErrInvalidGrant, "the home directory must be refused")
 

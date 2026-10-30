@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 )
@@ -18,7 +19,17 @@ const sniffBinaryBytes = 512
 const binaryInvalidUTF8Fraction = 0.3
 
 func isExecutable(info os.FileInfo) bool {
-	return info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
+	if !info.Mode().IsRegular() {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		switch strings.ToLower(filepath.Ext(info.Name())) {
+		case ".exe", ".com", ".bat", ".cmd", ".ps1":
+			return true
+		}
+		return false
+	}
+	return info.Mode().Perm()&0111 != 0
 }
 
 func humanSize(n int64) string {

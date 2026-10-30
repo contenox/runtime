@@ -65,6 +65,7 @@ const missionRevisionChain = `{
 }`
 
 func TestFleetService_E2E_MissionRevisionLoop(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("e2e: builds the contenox binary and spawns a real ACP subprocess")
 	}

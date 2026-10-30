@@ -12,6 +12,7 @@ import (
 	"github.com/contenox/runtime/apiframework"
 	"github.com/contenox/runtime/libacp"
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libsandbox"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
@@ -24,6 +25,15 @@ import (
 type cancelCall struct {
 	instanceID string
 	sessionID  libacp.SessionID
+}
+
+// requireFleetSandbox skips fleet end-to-end cases on hosts that cannot run
+// the confined agent processes they dispatch.
+func requireFleetSandbox(t *testing.T) {
+	t.Helper()
+	if err := libsandbox.Preflight(); err != nil {
+		t.Skipf("fleet dispatch spawns confined agent processes, which this host cannot provide: %v", err)
+	}
 }
 
 type fakeManager struct {
@@ -552,6 +562,7 @@ func (m *cancelRecordingManager) cancels() []cancelCall {
 }
 
 func TestFleetService_Cancel_EmptySessionIDReachesSilentSession(t *testing.T) {
+	requireFleetSandbox(t)
 	ctx, db := setupRegistryDB(t)
 	agents := agentregistryservice.New(db)
 

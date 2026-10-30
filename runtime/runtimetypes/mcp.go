@@ -227,20 +227,21 @@ func (s *store) DeleteMCPServer(ctx context.Context, id string) error {
 }
 
 func (s *store) ListMCPServers(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*MCPServer, error) {
-	cursor := time.Now().UTC()
-	if createdAtCursor != nil {
-		cursor = *createdAtCursor
-	}
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
 
-	rows, err := s.Exec.QueryContext(ctx, `
-		SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, created_at, updated_at
-		FROM mcp_servers
-		WHERE created_at < $1
-		ORDER BY created_at DESC, id DESC
-		LIMIT $2`, cursor, limit)
+	const columns = `SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, created_at, updated_at
+		FROM mcp_servers`
+	const order = ` ORDER BY created_at DESC, id DESC`
+	query := columns + order + ` LIMIT $1`
+	args := []any{limit}
+	if createdAtCursor != nil {
+		query = columns + ` WHERE created_at < $1` + order + ` LIMIT $2`
+		args = []any{*createdAtCursor, limit}
+	}
+
+	rows, err := s.Exec.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("mcp: list query: %w", err)
 	}

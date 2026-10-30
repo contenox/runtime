@@ -130,7 +130,7 @@ func (h *LocalExecTools) Exec(ctx context.Context, startTime time.Time, input an
 	if tools.Args == nil {
 		tools.Args = make(map[string]string)
 	}
-	command, argsSlice, cwd, timeout, useShell, stdin, err := h.parseArgs(tools, input)
+	command, argsSlice, cwd, timeout, useShell, stdin, err := h.parseArgs(ctx, tools, input)
 	if err != nil {
 		return nil, taskengine.DataTypeAny, err
 	}
@@ -145,7 +145,7 @@ func (h *LocalExecTools) Exec(ctx context.Context, startTime time.Time, input an
 	return result, taskengine.DataTypeJSON, nil
 }
 
-func (h *LocalExecTools) parseArgs(tools *taskengine.ToolsCall, input any) (command string, argsSlice []string, cwd string, timeout time.Duration, useShell bool, stdin string, err error) {
+func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsCall, input any) (command string, argsSlice []string, cwd string, timeout time.Duration, useShell bool, stdin string, err error) {
 	timeout = h.defaultTimeout
 	get := func(k string) string { return tools.Args[k] }
 	if cmd := get("command"); cmd != "" {
@@ -212,9 +212,32 @@ func (h *LocalExecTools) parseArgs(tools *taskengine.ToolsCall, input any) (comm
 		}
 	}
 	if command == "" {
-		return "", nil, "", 0, false, "", errors.New("local_shell: command is required (tools.args.command or input)")
+		message := `local_shell: command is required; send either {"command": "git"} or {"command": "git", "args": ["status", "--short"]} (a plain input string is also accepted as the command)`
+		return "", nil, "", 0, false, "", argumentProblem(ctx, message, receivedShellArguments(tools, input))
 	}
 	return command, argsSlice, cwd, timeout, useShell, stdin, nil
+}
+
+func receivedShellArguments(tools *taskengine.ToolsCall, input any) map[string]any {
+	received := make(map[string]any)
+	if tools != nil {
+		for key, value := range tools.Args {
+			if value != "" {
+				received[key] = value
+			}
+		}
+	}
+	switch value := input.(type) {
+	case string:
+		if value != "" {
+			received["input"] = value
+		}
+	case map[string]any:
+		for key, item := range value {
+			received[key] = item
+		}
+	}
+	return received
 }
 
 func (h *LocalExecTools) checkAllowlist(command string, useShell bool, allowedCommands []string, allowedDir string, deniedCommands []string) error {
@@ -342,8 +365,8 @@ func (h *LocalExecTools) run(ctx context.Context, command string, argsSlice []st
 
 	stdoutPath := stdout.close()
 	stderrPath := stderr.close()
-	result.Stdout = strings.TrimRight(stdout.inlineOutput(), "\r\n")
-	result.Stderr = strings.TrimRight(stderr.inlineOutput(), "\r\n")
+	result.Stdout = normalizeShellOutput(stdout.inlineOutput())
+	result.Stderr = normalizeShellOutput(stderr.inlineOutput())
 
 	if stdout.truncated() || stderr.truncated() {
 		result.Success = false
@@ -371,6 +394,10 @@ func (h *LocalExecTools) run(ctx context.Context, command string, argsSlice []st
 		result.Error = fmt.Sprintf("command exited with status %d %s", exitCode, severityRecoverable)
 	}
 	return result, nil
+}
+
+func normalizeShellOutput(output string) string {
+	return strings.TrimRight(strings.ReplaceAll(output, "\r\n", "\n"), "\n")
 }
 
 func spoolNotice(stream string, w *spoolWriter, path string, budget int64) string {

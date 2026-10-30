@@ -27,6 +27,7 @@ type streamToolAcc struct {
 	typ          string
 	name         string
 	args         strings.Builder
+	argsFinal    bool
 	providerMeta map[string]string
 }
 
@@ -39,6 +40,7 @@ type StreamResult struct {
 	Refusal      string
 	StopSequence string
 	Usage        *TokenUsage
+	Violations   []string
 }
 
 func NewStreamAssembler(providerType, modelName string) *StreamAssembler {
@@ -116,7 +118,16 @@ func (a *StreamAssembler) consumeToolCall(d *ToolCallDelta) error {
 	if err := set(&acc.name, "name", d.Name); err != nil {
 		return err
 	}
-	acc.args.WriteString(d.ArgsFragment)
+	if d.ArgsReplace {
+		acc.args.Reset()
+		acc.argsFinal = true
+	}
+	if d.ArgsFragment != "" {
+		if acc.argsFinal && !d.ArgsReplace {
+			return nil
+		}
+		acc.args.WriteString(d.ArgsFragment)
+	}
 	for k, v := range d.ProviderMeta {
 		if acc.providerMeta == nil {
 			acc.providerMeta = map[string]string{}
@@ -150,6 +161,7 @@ func (a *StreamAssembler) Result() (StreamResult, error) {
 	sort.Ints(indexes)
 
 	var calls []ToolCall
+	var violations []string
 	for _, idx := range indexes {
 		acc := a.toolAcc[idx]
 		if acc.name == "" {
@@ -160,10 +172,13 @@ func (a *StreamAssembler) Result() (StreamResult, error) {
 			typ = "function"
 		}
 		args := acc.args.String()
-		if strings.TrimSpace(args) == "" {
+		argsMissing := strings.TrimSpace(args) == ""
+		if argsMissing {
 			args = "{}"
+			violations = append(violations,
+				a.violation("tool call %d (%s) arrived without arguments", idx, acc.name).Error())
 		}
-		tc := ToolCall{ID: acc.id, Type: typ, ProviderMeta: acc.providerMeta}
+		tc := ToolCall{ID: acc.id, Type: typ, ProviderMeta: acc.providerMeta, ArgsMissing: argsMissing}
 		tc.Function.Name = acc.name
 		tc.Function.Arguments = args
 		calls = append(calls, tc)
@@ -177,6 +192,7 @@ func (a *StreamAssembler) Result() (StreamResult, error) {
 		FinishReason: a.terminal.FinishReason,
 		Refusal:      a.terminal.Refusal,
 		StopSequence: a.terminal.StopSequence,
+		Violations:   violations,
 	}
 	if a.sawUsage {
 		u := a.usage

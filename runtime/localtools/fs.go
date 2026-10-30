@@ -335,7 +335,7 @@ func (h *LocalFSTools) resolveTarget(ctx context.Context, tool, path string) (ab
 func (h *LocalFSTools) readFile(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for read_file")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for read_file", args)
 	}
 
 	absPath, display, info, err := h.resolveTarget(ctx, "read_file", path)
@@ -401,7 +401,7 @@ func (h *LocalFSTools) readFile(ctx context.Context, args map[string]any) (any, 
 func (h *LocalFSTools) readFileRange(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for read_file_range")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for read_file_range", args)
 	}
 	start := 1
 	if v, ok := argInt(args, "start_line"); ok {
@@ -523,11 +523,11 @@ func (r FsSedResult) ToolDiff() (string, string, string, bool) {
 func (h *LocalFSTools) writeFile(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for write_file")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for write_file", args)
 	}
 	content, ok := argString(args, "content")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: content required for write_file")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: content required for write_file", args)
 	}
 
 	absPath, err := h.checkPath(ctx, path)
@@ -595,18 +595,18 @@ func occurrenceLines(text, pattern string, lineOffset, max int) []int {
 func (h *LocalFSTools) sed(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for sed")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for sed", args)
 	}
 	pattern, ok := argString(args, "pattern")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: pattern required for sed")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: pattern required for sed", args)
 	}
 	if pattern == "" {
 		return nil, taskengine.DataTypeAny, recoverablef("local_fs: sed: pattern must not be empty")
 	}
 	replacement, ok := argString(args, "replacement")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: replacement required for sed")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: replacement required for sed", args)
 	}
 	replaceAll, _ := argBool(args, "all")
 	expected, hasExpected := argInt(args, "expect_replacements")
@@ -949,11 +949,11 @@ func grepLineRange(args map[string]any, numLines int) (start, end int) {
 func (h *LocalFSTools) grep(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for grep")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for grep", args)
 	}
 	pattern, ok := argString(args, "pattern")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: pattern required for grep")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: pattern required for grep", args)
 	}
 	if len(pattern) > 8192 {
 		return nil, taskengine.DataTypeAny, recoverablef("local_fs: grep: pattern exceeds 8192 characters")
@@ -1060,7 +1060,7 @@ func (h *LocalFSTools) grep(ctx context.Context, args map[string]any) (any, task
 func (h *LocalFSTools) findFiles(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	pattern, ok := argString(args, "pattern")
 	if !ok || pattern == "" {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: pattern required for find_files")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: pattern required for find_files", args)
 	}
 	rootArg, _ := argString(args, "path")
 	if rootArg == "" {
@@ -1167,7 +1167,7 @@ func (h *LocalFSTools) findFiles(ctx context.Context, args map[string]any) (any,
 func (h *LocalFSTools) countStats(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for count_stats")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for count_stats", args)
 	}
 
 	absPath, display, info, err := h.resolveTarget(ctx, "count_stats", path)
@@ -1204,7 +1204,7 @@ func (h *LocalFSTools) countStats(ctx context.Context, args map[string]any) (any
 func (h *LocalFSTools) statFile(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
-		return nil, taskengine.DataTypeAny, errors.New("local_fs: path required for stat_file")
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for stat_file", args)
 	}
 
 	absPath, _, info, err := h.resolveTarget(ctx, "stat_file", path)

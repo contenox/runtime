@@ -92,6 +92,7 @@ const obPlannerChain = `{
 }`
 
 func TestFleetE2E_OvernightBatch(t *testing.T) {
+	requireFleetSandbox(t)
 	if testing.Short() {
 		t.Skip("skipping overnight-batch e2e: builds two binaries and boots several real contenox runtimes")
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -16,16 +17,33 @@ import (
 type MacroEnv struct {
 	inner         EnvExecutor
 	toolsProvider ToolsRepo
+	shellDescribe func() string
 }
 
-func NewMacroEnv(inner EnvExecutor, toolsProvider ToolsRepo) (EnvExecutor, error) {
+type MacroOption func(*MacroEnv)
+
+func WithPlatformShell(describe func() string) MacroOption {
+	return func(m *MacroEnv) {
+		if describe != nil {
+			m.shellDescribe = describe
+		}
+	}
+}
+
+func NewMacroEnv(inner EnvExecutor, toolsProvider ToolsRepo, opts ...MacroOption) (EnvExecutor, error) {
 	if inner == nil {
 		return nil, fmt.Errorf("NewMacroEnv: inner EnvExecutor is nil")
 	}
-	return &MacroEnv{
+	m := &MacroEnv{
 		inner:         inner,
 		toolsProvider: toolsProvider,
-	}, nil
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
+		}
+	}
+	return m, nil
 }
 
 func (m *MacroEnv) ExecEnv(
@@ -222,12 +240,33 @@ func (m *MacroEnv) expandOne(ctx context.Context, chain *TaskChainDefinition, al
 			return runtime.GOOS, nil
 		case "arch":
 			return runtime.GOARCH, nil
+		case "shell":
+			if m.shellDescribe != nil {
+				if description := strings.TrimSpace(m.shellDescribe()); description != "" {
+					return description, nil
+				}
+			}
+			return "unknown", nil
 		case "":
 			b, _ := json.Marshal(map[string]string{"os": runtime.GOOS, "arch": runtime.GOARCH})
 			return string(b), nil
 		default:
 			return original, nil
 		}
+	case "workspace":
+		if payload != "root" {
+			return original, nil
+		}
+		if vars, err := TemplateVarsFromContext(ctx); err == nil {
+			if cwd := strings.TrimSpace(vars["cwd"]); cwd != "" {
+				return cwd, nil
+			}
+		}
+		root, err := os.Getwd()
+		if err != nil || strings.TrimSpace(root) == "" {
+			return "unknown", nil
+		}
+		return root, nil
 	case "date":
 		layout := "2006-01-02"
 		if payload != "" {

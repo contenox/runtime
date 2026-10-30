@@ -87,7 +87,10 @@ func (s *store) DeleteModelRegistryEntry(ctx context.Context, id string) error {
 }
 
 func (s *store) ListModelRegistryEntries(ctx context.Context, cursor *time.Time, limit int) ([]*ModelRegistryEntry, error) {
-	t := time.Now().UTC()
+	// See the other List methods: the first page includes rows written in the
+	// same instant as the listing, which a strict "< now" comparison hides on
+	// second-precision clocks (SQLite).
+	t := time.Now().UTC().Add(time.Second)
 	if cursor != nil {
 		t = *cursor
 	}
