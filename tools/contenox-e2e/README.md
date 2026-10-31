@@ -1,6 +1,6 @@
 # contenox-e2e
 
-A black-box end-to-end suite that drives the shipped `contenox` binary from
+A black-box end-to-end suite that drives the shipped `contenox-runtime` binary from
 outside the Go module. It is a trimmed backport of the enterprise suite at
 `runtime/tools/contenox-e2e` (commit `bed1c421`, "Record the v1.3.6 source drop");
 only the cases that hold against this checkout's surface were kept.

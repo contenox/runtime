@@ -60,14 +60,14 @@ fn both_streams(out: &CmdOutput) -> String {
 }
 
 fn captured_units(cx: &Instance) -> Vec<Value> {
-    let requests = cx.state_requests().expect("contenox-cli state list");
+    let requests = cx.state_requests().expect("contenox-runtime state list");
     let [request] = requests.as_slice() else {
         panic!("expected one captured run, got {requests:?}");
     };
     let out = cx.run(["state", "show", request.as_str(), "--raw"]);
     serde_json::from_str(&out.stdout).unwrap_or_else(|err| {
         panic!(
-            "contenox-cli state show --raw is not JSON ({err}):\n{}",
+            "contenox-runtime state show --raw is not JSON ({err}):\n{}",
             out.render()
         )
     })

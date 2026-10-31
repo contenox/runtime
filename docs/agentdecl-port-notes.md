@@ -1,8 +1,9 @@
 # Agent declarations and envelopes: compatibility audit and port plan
 
-Status: B2 of `plans/2026-10-30-tool-fixes-agents-envelopes-pickers.md`, written after reading the enterprise package and the current runtime types. Nothing here is implemented.
+Status: ported. This audit was written before the port and is kept as the record of the
+compatibility decisions; the code now lives in `runtime/agentdecl/`.
 
-Source: `enterprise/runtime/internal/services/agentdecl/` (read-only material). Target: `runtime/runtime/`.
+Source: `enterprise/runtime/internal/services/agentdecl/` (read-only material). Target: `runtime/agentdecl/`.
 
 ## 1. Verdict
 
@@ -95,7 +96,8 @@ Port this with the same rule and keep `.generated` out of the user's editable tr
 
 ## 9. Port plan
 
-Ordered, each step shippable on its own. Nothing is committed; the owner reviews.
+Ordered, each step shippable on its own. The port landed incrementally; the steps below
+remain the review record.
 
 1. **Dependency and skeleton.** Add `github.com/pelletier/go-toml/v2`; copy `agentdecl` into `runtime/runtime/agentdecl` with imports rewritten; strip hosted-only code (`vfs` remote roots, tenancy); gofmt everything the rewrite touched. Gate: package builds, ported unit tests pass.
 2. **hitlservice additions.** `Version` + load-time version check, `TrustedBinaries` + `command_prefix_allowlist` (evaluator, vet/diagnostic text, tests ported from enterprise). Gate: existing policies load unchanged; new tests for each addition; a policy declaring an unknown version fails closed.

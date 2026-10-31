@@ -1,11 +1,19 @@
-from helpers import api_url, assert_status_code, unique_name
+import os
+import tempfile
+
+from helpers import (
+    api_url,
+    assert_status_code,
+    assert_status_in,
+    unique_name,
+)
 
 
 def _backend_payload(name: str) -> dict:
     return {
         "name": name,
-        "baseUrl": f"/tmp/contenox-apitest-models/{name}",
-        "type": "local",
+        "baseUrl": "http://127.0.0.1:11434",
+        "type": "ollama",
     }
 
 
@@ -25,7 +33,7 @@ def test_backend_crud(api, base_url):
         assert_status_code(response, 200)
         details = response.json()
         assert details["name"] == name
-        assert details["type"] == "local"
+        assert details["type"] == "ollama"
         assert "models" in details
         assert "pulledModels" in details
 
@@ -41,7 +49,40 @@ def test_backend_crud(api, base_url):
 def test_backend_validation_rejects_missing_base_url(api, base_url):
     response = api.post(
         api_url(base_url, "backends"),
-        json={"name": unique_name("apitest-backend"), "type": "local"},
+        json={"name": unique_name("apitest-backend"), "type": "ollama"},
         timeout=15,
     )
     assert response.status_code in (400, 422)
+
+
+def test_backend_rejects_unknown_type(api, base_url):
+    response = api.post(
+        api_url(base_url, "backends"),
+        json={
+            "name": unique_name("apitest-backend"),
+            "baseUrl": "http://127.0.0.1:11434",
+            "type": "local",
+        },
+        timeout=15,
+    )
+    assert_status_code(response, 422)
+    assert "Type must be" in response.text
+
+
+def test_backend_rejects_duplicate_connection(api, base_url):
+    payload = _backend_payload(unique_name("apitest-backend"))
+    first = api.post(api_url(base_url, "backends"), json=payload, timeout=15)
+    assert_status_code(first, 201)
+    backend_id = first.json()["id"]
+
+    try:
+        duplicate = api.post(
+            api_url(base_url, "backends"),
+            json={**payload, "name": unique_name("apitest-backend")},
+            timeout=15,
+        )
+        assert_status_code(duplicate, 409)
+    finally:
+        response = api.delete(api_url(base_url, "backends", backend_id), timeout=15)
+        assert_status_code(response, 200)
+

@@ -45,7 +45,7 @@ which is commented and yours to edit.
 ## Subagents
 
 Every agent here is also a **subagent**: `/plan` and the `mission_start` tool
-dispatch it as one, and `contenox-cli mission fire` fires it by name. `researcher.md`
+dispatch it as one, and `contenox-runtime mission fire` fires it by name. `researcher.md`
 is the worked example — it plans, reports, and finishes with a verdict, which is
 what a subagent has instead of a reply you can read.
 

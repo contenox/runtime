@@ -2,10 +2,14 @@ PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 .PHONY: help set-version bump-patch bump-minor bump-major
 
+ifeq ($(or $(MAKECMDGOALS),help),help)
+$(info Version file: runtime/version/version.txt)
+$(info   make -f Makefile.version set-version)
+$(info   make -f Makefile.version bump-patch | bump-minor | bump-major)
+endif
+
 help:
-	@echo "Version file: runtime/version/version.txt"
-	@echo "  make -f Makefile.version set-version"
-	@echo "  make -f Makefile.version bump-patch | bump-minor | bump-major"
+	@cd .
 
 set-version:
 	go run $(PROJECT_ROOT)tools/version/main.go set

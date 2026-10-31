@@ -76,7 +76,7 @@ impl Instance {
     pub fn missions(&self) -> Result<Vec<MissionRow>> {
         let out = self.run(["mission", "list"]);
         if !out.success() {
-            bail!("contenox-cli mission list failed\n{}", out.render());
+            bail!("contenox-runtime mission list failed\n{}", out.render());
         }
         let table = table_or_empty(&out.stdout, &["ID", "AGENT", "ENVELOPE", "STATUS", "AGE"])?;
         Ok(table
@@ -95,7 +95,7 @@ impl Instance {
     pub fn mission_show(&self, id: &str) -> Result<MissionShow> {
         let out = self.run(["mission", "show", id]);
         if !out.success() {
-            bail!("contenox-cli mission show {id} failed\n{}", out.render());
+            bail!("contenox-runtime mission show {id} failed\n{}", out.render());
         }
         Ok(MissionShow {
             fields: labelled_fields(&out.stdout),
@@ -110,7 +110,7 @@ impl Instance {
     pub fn approvals(&self) -> Result<Vec<ApprovalRow>> {
         let out = self.run(["approvals", "list"]);
         if !out.success() {
-            bail!("contenox-cli approvals list failed\n{}", out.render());
+            bail!("contenox-runtime approvals list failed\n{}", out.render());
         }
         let table = table_or_empty(
             &out.stdout,
@@ -147,7 +147,7 @@ impl Instance {
                 return Ok(row);
             }
             if Instant::now() >= deadline {
-                bail!("no ask reached 'contenox-cli approvals list' within {timeout:?}");
+                bail!("no ask reached 'contenox-runtime approvals list' within {timeout:?}");
             }
             std::thread::sleep(Duration::from_millis(250));
         }
@@ -174,9 +174,9 @@ impl Instance {
             .cmd(["session", "list"])
             .cwd(dir.as_ref())
             .output()
-            .with_context(|| format!("contenox-cli session list in {}", dir.as_ref().display()))?;
+            .with_context(|| format!("contenox-runtime session list in {}", dir.as_ref().display()))?;
         if !out.success() {
-            bail!("contenox-cli session list failed\n{}", out.render());
+            bail!("contenox-runtime session list failed\n{}", out.render());
         }
         if out.stdout.contains("No sessions yet.") {
             return Ok(Vec::new());
@@ -187,7 +187,7 @@ impl Instance {
     pub fn sessions_all(&self) -> Result<Vec<WorkspaceSessionRow>> {
         let out = self.run(["session", "list", "--all"]);
         if !out.success() {
-            bail!("contenox-cli session list --all failed\n{}", out.render());
+            bail!("contenox-runtime session list --all failed\n{}", out.render());
         }
         let table = table_or_empty(
             &out.stdout,
@@ -213,7 +213,7 @@ impl Instance {
     pub fn backends(&self) -> Result<Vec<BackendRow>> {
         let out = self.run(["backend", "list"]);
         if !out.success() {
-            bail!("contenox-cli backend list failed\n{}", out.render());
+            bail!("contenox-runtime backend list failed\n{}", out.render());
         }
         let table = table_or_empty(&out.stdout, &["NAME", "TYPE", "URL"])?;
         Ok(table
@@ -230,7 +230,7 @@ impl Instance {
     pub fn state_requests(&self) -> Result<Vec<String>> {
         let out = self.run(["state", "list"]);
         if !out.success() {
-            bail!("contenox-cli state list failed\n{}", out.render());
+            bail!("contenox-runtime state list failed\n{}", out.render());
         }
         if out.stdout.contains("(no captured state)") {
             return Ok(Vec::new());
@@ -247,7 +247,7 @@ impl Instance {
     pub fn state_steps(&self, request: &str) -> Result<Vec<StateStep>> {
         let out = self.run(["state", "show", request]);
         if !out.success() {
-            bail!("contenox-cli state show {request} failed\n{}", out.render());
+            bail!("contenox-runtime state show {request} failed\n{}", out.render());
         }
         let table = Table::parse(
             &out.stdout,
@@ -276,7 +276,7 @@ impl Instance {
         let requests = self.state_requests()?;
         match requests.as_slice() {
             [only] => self.state_steps(only),
-            [] => bail!("contenox-cli state list recorded nothing to read back"),
+            [] => bail!("contenox-runtime state list recorded nothing to read back"),
             many => bail!("expected one captured run, got {many:?}"),
         }
     }
@@ -289,12 +289,12 @@ impl Instance {
         let out = self.run(["state", "show", only, "--raw"]);
         if !out.success() {
             bail!(
-                "contenox-cli state show {only} --raw failed\n{}",
+                "contenox-runtime state show {only} --raw failed\n{}",
                 out.render()
             );
         }
         let captured: serde_json::Value = serde_json::from_str(&out.stdout)
-            .with_context(|| format!("contenox-cli state show --raw emitted\n{}", out.render()))?;
+            .with_context(|| format!("contenox-runtime state show --raw emitted\n{}", out.render()))?;
         let mut prompts = Vec::new();
         collect_system_prompts(&captured, &mut prompts);
         Ok(prompts)
@@ -307,7 +307,7 @@ impl Instance {
     pub fn doctor_json(&self) -> Result<serde_json::Value> {
         let out = self.run(["doctor", "--json"]);
         serde_json::from_str(&out.stdout)
-            .with_context(|| format!("contenox-cli doctor --json emitted\n{}", out.render()))
+            .with_context(|| format!("contenox-runtime doctor --json emitted\n{}", out.render()))
     }
 }
 

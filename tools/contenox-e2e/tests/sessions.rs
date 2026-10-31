@@ -36,7 +36,7 @@ fn marked_project(cx: &Instance, name: &str) -> PathBuf {
     cx.cmd(["init", "--project"])
         .cwd(&dir)
         .output()
-        .expect("contenox-cli init --project")
+        .expect("contenox-runtime init --project")
         .ok();
     dir
 }
@@ -56,7 +56,7 @@ fn chat(cx: &Instance, dir: &Path, message: &str) {
         .cwd(dir)
         .timeout(SLOW)
         .output()
-        .expect("contenox-cli chat")
+        .expect("contenox-runtime chat")
         .ok();
 }
 

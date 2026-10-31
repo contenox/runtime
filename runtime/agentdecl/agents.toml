@@ -26,7 +26,7 @@
 #   [agents.reviewer.tools_policies.local_shell]
 #   _allowed_commands = "git,go"
 #
-# The name is the one `contenox-cli agent list` shows. Agents read out of another
+# The name is the one `contenox-runtime agent list` shows. Agents read out of another
 # tool's directory carry that tool's prefix there, so theirs is
 # [agents.claude-code-reviewer]. A section naming no agent is reported, not
 # silently ignored.
@@ -79,7 +79,7 @@ rate_limit_min_wait = "10s"
 
 [routing]
 # Templates by default, so routing stays your configured default
-# (`contenox-cli config set default-provider`). An agent written against one vendor
+# (`contenox-runtime config set default-provider`). An agent written against one vendor
 # does not pin this machine to that vendor.
 model = "{{var:model}}"
 provider = "{{var:provider}}"
@@ -432,8 +432,8 @@ default_action = "approve"
 network.read = "allow"
 network.write = "approve"
 # A mission may start another mission, and its routine questions may be answered
-# by an agent — the firing session's own, or the oracle mounted by
-# `contenox-cli mission fire --oracle` — up to the count in [attention] below. The
+# by an agent — the firing session's own, or the oracle mounted for the mission —
+# up to the count in [attention] below. The
 # rest wait for a human, the count is durable per mission, and whatever the unit
 # then DOES stays gated by this same envelope.
 missions.fire = "allow"

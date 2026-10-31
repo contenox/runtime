@@ -102,15 +102,14 @@ func (acpStdio) Read(p []byte) (int, error)  { return os.Stdin.Read(p) }
 func (acpStdio) Write(p []byte) (int, error) { return os.Stdout.Write(p) }
 func (acpStdio) Close() error                { return os.Stdin.Close() }
 
-// acpDefaultPolicyName is the envelope file the app's chat runs under.
 const acpDefaultPolicyName = "hitl-policy-default.json"
 
+const acpBackendCycleBudget = 10 * time.Second
+
 type acpProfile struct {
-	hitlPolicy string
-	chainFile  string
-	chainEnv   string
-	// compiledChain names the chain the declaration catalog compiles to, when
-	// this profile serves one. Empty means the profile only knows chainFile.
+	hitlPolicy    string
+	chainFile     string
+	chainEnv      string
 	compiledChain string
 	seedChain     func(contenoxDir string) error
 	embedFleet    bool
@@ -134,13 +133,10 @@ var acpProfileACPX = acpProfile{
 func runACP(cmd *cobra.Command, _ []string) error  { return runACPProfile(cmd, acpProfileACP) }
 func runACPX(cmd *cobra.Command, _ []string) error { return runACPProfile(cmd, acpProfileACPX) }
 
-// seedAgentDeclarations preseed the home before reading its config, so a shipped
-// default this release changed applies on this run rather than the next one.
 func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	// One compiler per home: several project runtimes share it.
 	release, lockErr := agentdecl.CompileLock(contenoxDir)
 	if lockErr != nil {
 		return lockErr
@@ -193,7 +189,7 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 
 func defaultChainFor(contenoxDir string, profile acpProfile) (*acpsvc.ChainRegistry, error) {
 	if env := os.Getenv(profile.chainEnv); env != "" {
-		return acpsvc.LoadChainRegistryPath(env)
+		return acpsvc.LoadChainRegistryFrom(profile.chainFile, profile.chainEnv)
 	}
 	if profile.compiledChain == "" {
 		return acpsvc.LoadChainRegistryFrom(profile.chainFile, profile.chainEnv)
@@ -389,6 +385,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			Tracker:            tracker,
 			WorkspaceID:        workspaceID,
 			Bus:                bus,
+			BackendCycleBudget: acpBackendCycleBudget,
 		}
 		if enableHITL {
 			cfg.EnableHITL = true

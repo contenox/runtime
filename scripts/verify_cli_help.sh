@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# verify_cli_help.sh — smoke test that the contenox binary exposes the expected
-# top-level subcommands and exits cleanly. Invoked by `make test-contenox-help`.
-#
-# Usage:
-#   CONTENOX_BIN=./bin/contenox-runtime ./scripts/verify_cli_help.sh
-#
-# The Makefile sets CONTENOX_BIN before calling this script.
 set -euo pipefail
 
 BIN="${CONTENOX_BIN:-./bin/contenox-runtime}"
@@ -17,19 +10,14 @@ fi
 
 echo "==> CLI help smoke: $BIN"
 
-# 1. --help must exit 0.
 HELP_OUTPUT="$("$BIN" --help 2>&1)"
 echo "$HELP_OUTPUT" | head -5
 
-# 2. Version string must be present.
 if ! echo "$HELP_OUTPUT" | grep -q "Version:"; then
   echo "FAIL: 'Version:' not found in --help output" >&2
   exit 1
 fi
 
-# 3. Every top-level subcommand must appear in the help output. Keep this list
-# in lockstep with the registrations in runtime/contenoxcli/cli.go — a command
-# added there but not here is invisible to this gate, and vice versa.
 EXPECTED_CMDS=(
   "acp"
   "acpx"
@@ -46,9 +34,11 @@ EXPECTED_CMDS=(
   "mission"
   "model"
   "run"
+  "sandbox"
   "serve"
   "session"
   "setup"
+  "shell-env"
   "state"
   "tools"
   "update"
@@ -68,7 +58,6 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
   exit 1
 fi
 
-# 4. `contenox version` must exit 0 and print a version string.
 VERSION_OUTPUT="$("$BIN" version 2>&1)"
 if ! echo "$VERSION_OUTPUT" | grep -qE "v[0-9]+\.[0-9]+\.[0-9]+"; then
   echo "FAIL: 'contenox version' did not print a semver string" >&2

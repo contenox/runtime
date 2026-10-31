@@ -245,7 +245,7 @@ fn plant_flat_chain(cx: &Instance, at: std::path::PathBuf) -> std::path::PathBuf
 }
 
 fn ran_the_flat_chain(cx: &Instance) {
-    let steps = cx.executed_tasks().expect("contenox-cli state show");
+    let steps = cx.executed_tasks().expect("contenox-runtime state show");
     assert_eq!(
         steps[0].task, "chain-acpx-agent",
         "the planted chain is the one that ran, got {steps:?}"
@@ -260,7 +260,7 @@ fn a_named_chain_path_that_is_missing_is_a_hard_error() {
         .stdin("")
         .timeout(Duration::from_secs(60))
         .output()
-        .expect("contenox-cli acp")
+        .expect("contenox-runtime acp")
         .expect_code(1)
         .expect_stderr("nowhere.json\" not found")
         .expect_stderr("CONTENOX_ACP_CHAIN_PATH");
@@ -280,7 +280,7 @@ fn an_editor_session_transcript_is_readable_from_the_cli_afterwards() {
     acp.close()
         .expect("the agent exits when its client hangs up");
 
-    let rows = cx.sessions_all().expect("contenox-cli session list --all");
+    let rows = cx.sessions_all().expect("contenox-runtime session list --all");
     let row = rows
         .iter()
         .find(|row| row.name == session)

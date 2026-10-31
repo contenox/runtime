@@ -1,7 +1,7 @@
 {
   "id": "qa-ollama",
   "debug": true,
-  "description": "Single prompt with Ollama (for contenox-cli)",
+  "description": "Single prompt with Ollama (for contenox-runtime)",
   "tasks": [
     {
       "id": "generate_response",

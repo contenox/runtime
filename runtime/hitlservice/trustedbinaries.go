@@ -34,7 +34,7 @@ const (
 	trustRefusalUnresolved  = "command %q does not resolve to an executable on this host — allow refused"
 	trustRefusalRelative    = "command %q is a relative path the policy cannot resolve — allow refused; name the command or give it an absolute path"
 	trustRefusalOutsideDirs = "binary at %s is not under any trusted_binaries.dirs entry — allow refused; declare its directory after verifying what it is"
-	trustRefusalUndeclared  = "binary at %s has no declared hash — allow refused; declare it with `contenox-cli hitl trust %s`"
+	trustRefusalUndeclared  = "binary at %s has no declared hash — allow refused; add its sha256 to the policy's trusted_binaries.hashes after verifying what it is"
 	trustRefusalUnreadable  = "binary at %s could not be read for hashing (%v) — allow refused"
 	trustRefusalMismatch    = "binary at %s does not match the declared hash — re-declare after verifying the upgrade, or investigate"
 )
@@ -61,7 +61,7 @@ func (tb *TrustedBinaries) verifyCommand(name string) string {
 	}
 	want, ok := lookupDeclaredHash(tb.Hashes, real)
 	if !ok {
-		return fmt.Sprintf(trustRefusalUndeclared, real, real)
+		return fmt.Sprintf(trustRefusalUndeclared, real)
 	}
 	got, err := binarySHA256(real)
 	if err != nil {

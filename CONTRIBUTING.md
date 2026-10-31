@@ -54,18 +54,21 @@ Run `make test-unit`, `make lint` and `gofmt` before opening a pull request.
 Behavior changes need tests in the package that owns the behavior; unit tests are
 named `TestUnit_...` so the fast path picks them up.
 
-Some suites assume Linux (POSIX paths, the Linux-only agent sandbox, containers) and
-are expected to fail on a native Windows checkout:
+Changing a shipped declaration under `runtime/agentdecl/preseed/` or
+`runtime/agentdecl/agents.toml` changes its hash. Run
+`go run ./tools/preseed-hashes` and commit the regenerated
+`runtime/agentdecl/preseed_blessed.go`, or the preseed history test fails.
+
+Some suites use Linux-only facilities, and container-backed tests need a healthy Docker
+provider. The sandbox and local-tool packages also have Windows implementations, so
+`make test-unit` is expected to pass on a native Windows checkout as well as on Linux; use
+WSL or CI for the full suite when a change touches Linux-only behavior.
 
 - Tests that start containers (several services use a containerised database via
   testcontainers) need Docker; on Windows they fail with "rootless Docker is not
   supported" or are skipped when no healthy provider is found.
-- Sandbox and local-tool tests (`libsandbox`, `runtime/localtools`, `runtime/vfs`,
-  agent hosting) use Linux paths and isolation and fail on Windows.
-
-So on Windows `make test-unit` reports failures in those packages; they are not caused by
-your change. Run `go test` for the packages you touched, and use WSL, Linux or CI for the
-full suite.
+- The Rust end-to-end suite (`make rust-e2e`) builds Unix PTY helpers and does not
+  compile on native Windows. Run it from WSL, Linux or macOS.
 
 ### Targets that need a Unix shell
 
@@ -92,7 +95,7 @@ runtime/           AI workflow packages (CLI, task engine, services, local tools
 lib*/              infrastructure libraries with no LLM dependency
 apitests/          Python API tests
 scripts/           bash helpers behind the Unix-only targets
-tools/             dev helpers (devtool), ACP validator, Rust e2e suite
+tools/             dev helpers (devtool, preseed-hashes, version), ACP validator, Rust e2e suite
 ```
 
 ## Pull request guidelines

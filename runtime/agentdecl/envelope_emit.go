@@ -131,7 +131,7 @@ func (env Envelope) transpile(opts transpileOptions) (TranspiledEnvelope, error)
 func (env Envelope) notes() []string {
 	var out []string
 	if env.DefaultAction.bounds() {
-		out = append(out, fmt.Sprintf("default_action = %q states %s, and the policy schema has no field to carry it: default_action is one action, and only a rule holds timeout_s/on_timeout. A call that matches no rule keeps waiting on the operator's approval ceiling (`contenox-cli config set approval-ceiling`). Bound the wait on the axis or tools pattern that emits the ask.",
+		out = append(out, fmt.Sprintf("default_action = %q states %s, and the policy schema has no field to carry it: default_action is one action, and only a rule holds timeout_s/on_timeout. A call that matches no rule keeps waiting on the operator's approval policy. Bound the wait on the axis or tools pattern that emits the ask.",
 			env.DefaultAction.Grant, waitPhrase(env.DefaultAction)))
 	}
 	for _, axis := range []string{AxisNetworkRead, AxisNetworkWrite} {

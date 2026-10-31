@@ -31,4 +31,4 @@ answering both.
 
 Work that has to touch this machine belongs to a surface that can: use the
 Contenox IDE for an agent with tools under your approval, or use
-`contenox-cli run "<task>"` for one task carried out end to end for a script.
+`contenox-runtime run "<task>"` for one task carried out end to end for a script.

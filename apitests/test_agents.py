@@ -1,7 +1,10 @@
 
+import os
+import tempfile
+
 import pytest
 
-from helpers import api_url, assert_status_code, assert_status_in
+from helpers import api_url, assert_status_code, unique_name
 
 
 FIXTURE_AGENT = "agent-apitest-noop"
@@ -70,18 +73,75 @@ def test_agents_get_by_id_unknown_is_404(api, base_url):
     assert_status_code(response, 404)
 
 
-def test_agents_registry_is_read_only(api, base_url):
-    created = api.post(api_url(base_url, "agents"), json={"name": "x"}, timeout=15)
-    assert_status_in(created, (404, 405))
+def test_agents_write_endpoints_lifecycle(api, base_url):
+    name = unique_name("apitest-agent")
+    chain_path = os.path.join(tempfile.gettempdir(), f"{name}.json")
+    payload = {
+        "name": name,
+        "kind": "chain",
+        "enabled": True,
+        "configJson": {"path": chain_path},
+    }
 
-    updated = api.put(
-        api_url(base_url, "agents", "00000000-0000-0000-0000-000000000000"),
-        json={"name": "x"},
+    created = api.post(api_url(base_url, "agents"), json=payload, timeout=15)
+    assert_status_code(created, 201)
+    agent = created.json()
+    agent_id = agent["id"]
+    assert agent["name"] == name
+    assert agent["kind"] == "chain"
+
+    try:
+        updated = api.put(
+            api_url(base_url, "agents", agent_id),
+            json={**payload, "enabled": False},
+            timeout=15,
+        )
+        assert_status_code(updated, 200)
+        assert updated.json()["enabled"] is False
+    finally:
+        deleted = api.delete(api_url(base_url, "agents", agent_id), timeout=15)
+        assert_status_code(deleted, 200)
+
+    missing = api.get(api_url(base_url, "agents", agent_id), timeout=15)
+    assert_status_code(missing, 404)
+
+
+def test_agents_create_requires_kind(api, base_url):
+    response = api.post(
+        api_url(base_url, "agents"),
+        json={"name": unique_name("apitest-agent")},
         timeout=15,
     )
-    assert_status_in(updated, (404, 405))
+    assert_status_code(response, 422)
+    assert "kind" in response.text
 
-    deleted = api.delete(
-        api_url(base_url, "agents", "00000000-0000-0000-0000-000000000000"), timeout=15
+
+def test_agents_create_rejects_unknown_kind(api, base_url):
+    name = unique_name("apitest-agent")
+    response = api.post(
+        api_url(base_url, "agents"),
+        json={
+            "name": name,
+            "kind": "bogus",
+            "configJson": {"path": os.path.join(tempfile.gettempdir(), f"{name}.json")},
+        },
+        timeout=15,
     )
-    assert_status_in(deleted, (404, 405))
+    assert_status_code(response, 422)
+    assert "unknown agent kind" in response.text
+
+
+def test_agents_update_unknown_is_404(api, base_url):
+    name = unique_name("apitest-agent")
+    response = api.put(
+        api_url(base_url, "agents", "00000000-0000-0000-0000-000000000000"),
+        json={
+            "name": name,
+            "kind": "chain",
+            "enabled": True,
+            "configJson": {"path": os.path.join(tempfile.gettempdir(), f"{name}.json")},
+        },
+        timeout=15,
+    )
+    assert_status_code(response, 404)
+

@@ -1,24 +1,16 @@
 PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-# Read with make itself (no tr / shell redirects) so these work from PowerShell and cmd too.
 VERSION := $(strip $(file < $(PROJECT_ROOT)runtime/version/version.txt))
 COMMIT ?= $(or $(shell git -C $(PROJECT_ROOT) rev-parse --verify --quiet HEAD),unknown)
 DIST := $(PROJECT_ROOT)dist/$(VERSION)
 RUNTIME_S3_URI ?=
 
-# Native binaries need .exe on Windows hosts.
 ifeq ($(OS),Windows_NT)
 EXE := .exe
 endif
 BIN := $(PROJECT_ROOT)bin/contenox-runtime$(EXE)
 
-# Developer targets (help, build, build-windows, test, test-unit, lint, clean, dev-install,
-# dev-uninstall) avoid inline VAR=value prefixes and shell builtins, so they run under cmd.exe
-# (make from PowerShell) as well as sh. The integration and release targets are bash scripts:
-# run them from a Unix shell (Git Bash, WSL, Linux, macOS).
-
 .PHONY: help build build-windows test test-unit test-contenox-help test-api acp-conformance rust-e2e lint release-assets release-check release clean dev-install dev-uninstall
 
-# $(info) prints the same in every shell (no echo quoting); the recipe is a silent no-op in both.
 ifeq ($(or $(MAKECMDGOALS),help),help)
 $(info Developer targets (PowerShell, cmd and Unix shells):)
 $(info   build              build bin/contenox-runtime (.exe on Windows))
@@ -65,9 +57,9 @@ test-contenox-help: build
 	@CONTENOX_BIN=$(BIN) $(PROJECT_ROOT)scripts/verify_cli_help.sh
 
 test-api: build
-	@bash $(PROJECT_ROOT)scripts/run_apitests.sh
+	@CONTENOX_BIN=$(BIN) bash $(PROJECT_ROOT)scripts/run_apitests.sh $(PYTEST_ARGS)
 
-ACP_VALIDATOR_BIN ?= $(wildcard $(PROJECT_ROOT)tools/acp-validator/target/debug/acp-validator)
+ACP_VALIDATOR_BIN ?= $(wildcard $(PROJECT_ROOT)tools/acp-validator/target/debug/acp-validator$(EXE))
 
 acp-conformance: build
 	@test -n "$(ACP_VALIDATOR_BIN)" || { echo "set ACP_VALIDATOR_BIN=/path/to/acp-validator"; exit 1; }
@@ -111,13 +103,9 @@ release:
 		cd "$$tmp" && sha256sum -c SHA256SUMS; \
 		echo "released $(VERSION) to $(RUNTIME_S3_URI)/$(VERSION)/"
 
-# The helper removes paths portably (rm -rf does not exist in cmd.exe).
 clean:
 	go run -C $(PROJECT_ROOT) ./tools/devtool clean $(PROJECT_ROOT)bin $(PROJECT_ROOT)dist
 
-# Install a development build where local tools (e.g. the desktop harness) look for
-# contenox-runtime: the per-user bin directory on PATH. Portable via a small Go helper, so it
-# works the same from PowerShell, cmd and Unix shells.
 dev-install:
 	go run -C $(PROJECT_ROOT) ./tools/devtool install
 

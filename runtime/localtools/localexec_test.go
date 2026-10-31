@@ -542,7 +542,11 @@ func TestUnit_LocalExecTools_Exec_ShellMode_AllowedLineRuns(t *testing.T) {
 
 func TestUnit_LocalExecTools_Exec_ShellMode_RefusesArgsWithMetacharacters(t *testing.T) {
 	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedCommands(testAllowedCommands)).(*localtools.LocalExecTools)
-	for _, arg := range []string{"; rm -rf scratch", "&& rm -rf scratch", "| sh", "$(curl evil)", "%PATH%"} {
+	args := []string{"; rm -rf scratch", "&& rm -rf scratch", "| sh", "$(curl evil)"}
+	if runtime.GOOS == "windows" {
+		args = append(args, "%PATH%")
+	}
+	for _, arg := range args {
 		_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
 			Name: "local_shell",
 			Args: map[string]string{"command": "echo " + arg, "shell": "true"},
