@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/contenox/runtime/runtime/modelrepo"
@@ -97,10 +99,6 @@ func TestUnit_VertexWire_QuotaProjectFollowsTheCredentialKind(t *testing.T) {
 	project, err = vertex.QuotaProjectFor(context.Background(), serviceAccount, baseURL)
 	require.NoError(t, err)
 	assert.Empty(t, project, "a service account is billed to its own project")
-
-	project, err = vertex.QuotaProjectFor(context.Background(), "", baseURL)
-	require.NoError(t, err)
-	assert.Empty(t, project, "an ambient credential names its quota project in the ADC setup")
 
 	project, err = vertex.QuotaProjectFor(context.Background(), "express-key", baseURL)
 	require.NoError(t, err)
@@ -349,4 +347,23 @@ func TestUnit_VertexWire_StreamedSignatureAndThoughtOnlyTurn(t *testing.T) {
 	assert.Equal(t, "thinking", result.Thinking)
 	assert.Equal(t, "STOP", result.FinishReason)
 	require.NotNil(t, result.Continuation, "the streamed parts are kept for replay")
+}
+
+func TestUnit_VertexWire_AmbientUserLoginIsBilledToTheURLProject(t *testing.T) {
+	const baseURL = "https://us-central1-aiplatform.googleapis.com/v1/projects/billing-project/locations/us-central1"
+	dir := t.TempDir()
+
+	userADC := filepath.Join(dir, "user.json")
+	require.NoError(t, os.WriteFile(userADC, []byte(`{"type":"authorized_user","client_id":"id","client_secret":"secret","refresh_token":"token"}`), 0o600))
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", userADC)
+	project, err := vertex.QuotaProjectFor(context.Background(), "", baseURL)
+	require.NoError(t, err)
+	assert.Equal(t, "billing-project", project, "gcloud auth application-default login needs a quota project, and nothing else would send one")
+
+	saADC := filepath.Join(dir, "sa.json")
+	require.NoError(t, os.WriteFile(saADC, []byte(`{"type":"service_account","project_id":"sa-project","private_key_id":"k","private_key":"-----BEGIN PRIVATE KEY-----\nMIIB\n-----END PRIVATE KEY-----\n","client_email":"sa@example.test"}`), 0o600))
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", saADC)
+	project, err = vertex.QuotaProjectFor(context.Background(), "", baseURL)
+	require.NoError(t, err)
+	assert.Empty(t, project, "an ambient service account is billed to its own project")
 }

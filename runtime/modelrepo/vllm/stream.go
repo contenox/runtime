@@ -124,6 +124,7 @@ func (c *VLLMStreamClient) Stream(ctx context.Context, messages []modelrepo.Mess
 
 	go func() {
 		defer close(streamCh)
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "vllm")
 		defer resp.Body.Close()
 		defer end()
 

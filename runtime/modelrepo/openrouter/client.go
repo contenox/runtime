@@ -133,6 +133,7 @@ func (c *orStreamClient) Stream(ctx context.Context, messages []modelrepo.Messag
 	parcels := make(chan *modelrepo.StreamParcel)
 	go func() {
 		defer close(parcels)
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "openrouter")
 		defer resp.Body.Close()
 		defer end()
 		sc := bufio.NewScanner(resp.Body)

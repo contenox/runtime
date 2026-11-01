@@ -142,6 +142,13 @@ func (m *Manager) ClearSession(ctx context.Context, tx libdb.Exec, sessionID str
 	return nil
 }
 
+func (m *Manager) DeleteMessage(ctx context.Context, tx libdb.Exec, sessionID string, messageID string) error {
+	if err := messagestore.New(tx, m.workspaceID).DeleteMessage(ctx, sessionID, messageID); err != nil {
+		return fmt.Errorf("failed to delete session message: %w", err)
+	}
+	return nil
+}
+
 func (m *Manager) RenameSession(ctx context.Context, tx libdb.Exec, sessionID string, name string) error {
 	return messagestore.New(tx, m.workspaceID).RenameSession(ctx, sessionID, name)
 }

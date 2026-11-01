@@ -571,8 +571,46 @@ func commandLineUnsafe(line string) bool {
 	return false
 }
 
+var packageManagerPrograms = map[string]bool{"npm": true, "pnpm": true, "yarn": true, "bun": true}
+
+var packageManagerValueFlags = map[string]bool{
+	"--prefix": true, "--workspace": true, "-C": true, "--dir": true, "--cwd": true,
+	"--registry": true, "--cache": true, "--userconfig": true, "--filter": true,
+}
+
+func stripPackageManagerGlobalFlags(tokens []string) []string {
+	if len(tokens) == 0 || !packageManagerPrograms[path.Base(tokens[0])] {
+		return tokens
+	}
+	i := 1
+	for i < len(tokens) {
+		tok := tokens[i]
+		if tok == "--" {
+			break
+		}
+		if eq := strings.IndexByte(tok, '='); eq > 0 && packageManagerValueFlags[tok[:eq]] {
+			i++
+			continue
+		}
+		if packageManagerValueFlags[tok] {
+			if i+1 >= len(tokens) {
+				break
+			}
+			i += 2
+			continue
+		}
+		break
+	}
+	if i <= 1 {
+		return tokens
+	}
+	out := make([]string, 0, len(tokens)-i+1)
+	out = append(out, tokens[0])
+	return append(out, tokens[i:]...)
+}
+
 func hasCommandPrefix(line, prefix string) bool {
-	lineTokens := strings.Fields(line)
+	lineTokens := stripPackageManagerGlobalFlags(strings.Fields(line))
 	prefixTokens := strings.Fields(prefix)
 	if len(prefixTokens) == 0 || len(lineTokens) < len(prefixTokens) {
 		return false
@@ -866,6 +904,7 @@ func allowlistProgramWord(word string) string {
 }
 
 func prefixListMatchesTokens(tokens []string, prefixList string) bool {
+	tokens = stripPackageManagerGlobalFlags(tokens)
 	for _, entry := range strings.Split(prefixList, ",") {
 		want := strings.Fields(entry)
 		if len(want) == 0 || len(want) > len(tokens) {

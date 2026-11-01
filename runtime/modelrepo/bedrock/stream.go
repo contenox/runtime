@@ -17,7 +17,7 @@ import (
 type bedrockStreamClient struct{ bedrockClient }
 
 func (c *bedrockStreamClient) Stream(ctx context.Context, messages []modelrepo.Message, args ...modelrepo.ChatArgument) (<-chan *modelrepo.StreamParcel, error) {
-	in, toOriginal, err := buildConverseInput(c.model, messages, chatConfigFromArgs(args))
+	in, toOriginal, err := buildConverseInput(c.effectiveModel(), messages, chatConfigFromArgs(args))
 	if err != nil {
 		return nil, err
 	}
@@ -25,6 +25,14 @@ func (c *bedrockStreamClient) Stream(ctx context.Context, messages []modelrepo.M
 
 	reportErr, reportChange, end := c.tracker.Start(ctx, "stream", "bedrock", "model", c.model.name)
 	out, err := c.api.ConverseStream(ctx, streamIn)
+	if c.learnOutputCeiling(err) {
+		if in, toOriginal, err = buildConverseInput(c.effectiveModel(), messages, chatConfigFromArgs(args)); err != nil {
+			reportErr(err)
+			end()
+			return nil, err
+		}
+		out, err = c.api.ConverseStream(ctx, converseStreamInput(in))
+	}
 	if err != nil {
 		err = classifyBedrockError(fmt.Errorf("bedrock converse-stream (model=%s): %w", c.model.name, err))
 		reportErr(err)

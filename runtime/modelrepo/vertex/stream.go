@@ -100,6 +100,7 @@ func (c *vertexStreamClient) Stream(ctx context.Context, messages []modelrepo.Me
 			send(&modelrepo.StreamParcel{Error: err})
 			return
 		}
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "vertex")
 		defer resp.Body.Close()
 
 		reportChange("vertex_stream_response", map[string]any{

@@ -15,10 +15,6 @@
         "pass_clients_tools": false,
         "tools": ["*"],
         "tools_policies": {
-          "local_shell": {
-            "_allowed_commands": "ls,cat,echo,pwd,which,find,grep,git,go,python3,node,npm,make,cargo,curl,wget,jq",
-            "_denied_commands": "sudo,su,dd,mkfs,fdisk,parted,shred"
-          },
           "local_fs": {
             "_allowed_dir": ".",
             "_max_read_bytes": "262144",
@@ -73,10 +69,6 @@
       "execute_config": {
         "tools": ["*"],
         "tools_policies": {
-          "local_shell": {
-            "_allowed_commands": "ls,cat,echo,pwd,which,find,grep,git,go,python3,node,npm,make,cargo,curl,wget,jq",
-            "_denied_commands": "sudo,su,dd,mkfs,fdisk,parted,shred"
-          },
           "local_fs": {
             "_allowed_dir": ".",
             "_max_read_bytes": "262144",
@@ -118,10 +110,6 @@
         "pass_clients_tools": false,
         "tools": ["*"],
         "tools_policies": {
-          "local_shell": {
-            "_allowed_commands": "ls,cat,echo,pwd,which,find,grep,git,go,python3,node,npm,make,cargo,curl,wget,jq",
-            "_denied_commands": "sudo,su,dd,mkfs,fdisk,parted,shred"
-          },
           "local_fs": {
             "_allowed_dir": ".",
             "_max_read_bytes": "262144",
@@ -176,10 +164,6 @@
       "execute_config": {
         "tools": ["*"],
         "tools_policies": {
-          "local_shell": {
-            "_allowed_commands": "ls,cat,echo,pwd,which,find,grep,git,go,python3,node,npm,make,cargo,curl,wget,jq",
-            "_denied_commands": "sudo,su,dd,mkfs,fdisk,parted,shred"
-          },
           "local_fs": {
             "_allowed_dir": ".",
             "_max_read_bytes": "262144",

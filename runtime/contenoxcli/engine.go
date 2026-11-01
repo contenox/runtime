@@ -56,14 +56,21 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 		),
 	}
 	if opts.EffectiveEnableLocalExec {
-		execOpts := []localtools.LocalExecOption{}
+		gate := localtools.GateRequireAllowlist
+		if opts.EffectiveHITL {
+			gate = localtools.GatePolicy
+		}
+		execOpts := []localtools.LocalExecOption{
+			localtools.WithLocalExecTracker(tracker),
+			localtools.WithLocalExecGate(gate),
+		}
 		if opts.EffectiveLocalExecAllowedDir != "" {
 			execOpts = append(execOpts, localtools.WithLocalExecAllowedDir(opts.EffectiveLocalExecAllowedDir))
 		}
 		tools["local_shell"] = localtools.NewLocalExecTools(execOpts...)
 
-		if !opts.EffectiveHITL && opts.EffectiveLocalExecAllowedDir == "" {
-			slog.Warn("local_shell is enabled with no HITL and no allowed-dir; chain-level tools_policies is the only safety gate")
+		if !opts.EffectiveHITL {
+			slog.Warn("local_shell runs without HITL; it refuses every command unless the chain's tools_policies names _allowed_commands")
 		}
 	}
 

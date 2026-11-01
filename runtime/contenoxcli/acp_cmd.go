@@ -353,6 +353,8 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		),
 		"local_shell": localtools.NewLocalExecToolsWith(
 			acpsvc.NewACPCommandRunner(func() *acpsvc.Transport { return transport }),
+			localtools.WithLocalExecTracker(tracker),
+			localtools.WithLocalExecGate(acpLocalExecGate(enableHITL)),
 		),
 		missiontools.ToolsProviderName: missiontools.New(missions, missionAttentionAsker{
 			hitl:     acpHITL,
@@ -715,4 +717,11 @@ func acpUpdateBanner(ctx context.Context, db libdb.DBManager, contenoxDir string
 	case <-time.After(500 * time.Millisecond):
 		return ""
 	}
+}
+
+func acpLocalExecGate(enableHITL bool) localtools.LocalExecGate {
+	if enableHITL {
+		return localtools.GatePolicy
+	}
+	return localtools.GateRequireAllowlist
 }

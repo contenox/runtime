@@ -24,6 +24,28 @@ func (b bigOutputRunner) Run(_ context.Context, _ localtools.CommandSpec, stdout
 	return 0, nil
 }
 
+type stubRunner struct{ out string }
+
+func (s stubRunner) Run(_ context.Context, _ localtools.CommandSpec, stdout, _ io.Writer) (int, error) {
+	_, _ = io.WriteString(stdout, s.out)
+	return 0, nil
+}
+
+type captureTracker struct {
+	changes map[string]any
+	lastErr error
+}
+
+func (c *captureTracker) Start(
+	_ context.Context,
+	_, _ string,
+	_ ...any,
+) (reportErr func(error), reportChange func(string, any), end func()) {
+	return func(err error) { c.lastErr = err },
+		func(id string, data any) { c.changes[id] = data },
+		func() {}
+}
+
 func TestUnit_LocalExecTools_CapWriterAppliesRegardlessOfRunner(t *testing.T) {
 	h := localtools.NewLocalExecToolsWith(bigOutputRunner{n: 100}).(*localtools.LocalExecTools)
 	ctx := context.WithValue(context.Background(), taskengine.ContextKeyOutputByteLimit, int64(10))
@@ -178,7 +200,7 @@ func TestUnit_LocalExecTools_Exec_ContextPolicy_Enforced(t *testing.T) {
 	}
 	_, _, err := h.Exec(ctx, time.Now().UTC(), nil, false, toolsCall)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not in allowlist")
+	assert.Contains(t, err.Error(), "command_not_allowlisted")
 }
 
 func TestUnit_LocalExecTools_Exec_ContextPolicy_Allows(t *testing.T) {
@@ -379,21 +401,224 @@ func TestUnit_LocalExecTools_Exec_AllowlistReject(t *testing.T) {
 	}
 	_, _, err := h.Exec(ctx, start, nil, false, toolsCall)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not in allowlist")
+	assert.Contains(t, err.Error(), "command_not_allowlisted")
 }
 
-func TestUnit_LocalExecTools_Exec_AllowlistDirReject(t *testing.T) {
-	dir := t.TempDir()
-	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedDir(dir)).(*localtools.LocalExecTools)
+func TestUnit_LocalExecTools_Exec_PolicyGateIgnoresTheAllowlist(t *testing.T) {
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "policy"},
+		localtools.WithLocalExecGate(localtools.GatePolicy),
+		localtools.WithLocalExecAllowedCommands([]string{"ls"}),
+	).(*localtools.LocalExecTools)
+
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "anything"}})
+	require.NoError(t, err, "the HITL policy is the only gate in this mode")
+	res, ok := out.(*localtools.LocalExecResult)
+	require.True(t, ok)
+	assert.True(t, res.Success)
+	assert.Equal(t, "policy", res.Stdout)
+}
+
+func TestUnit_LocalExecTools_Exec_PolicyGateStillAppliesTheDenylist(t *testing.T) {
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "ran"},
+		localtools.WithLocalExecGate(localtools.GatePolicy),
+		localtools.WithLocalExecDeniedCommands([]string{"sudo"}),
+	).(*localtools.LocalExecTools)
+
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "sudo", "args": "true"}})
+	require.Error(t, err, "HITL approves calls; it does not lift an operator's denylist")
+	var refusal *localtools.PolicyRefusal
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, localtools.RefusalDenied, refusal.Code)
+}
+
+func TestUnit_LocalExecTools_Exec_PolicyGateStillAppliesTheAllowedDir(t *testing.T) {
+	project := t.TempDir()
+	planted := filepath.Join(t.TempDir(), "planted-tool")
+	require.NoError(t, os.WriteFile(planted, []byte("not a real program"), 0o755))
+
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "ran"},
+		localtools.WithLocalExecGate(localtools.GatePolicy),
+		localtools.WithLocalExecAllowedDir(project),
+	).(*localtools.LocalExecTools)
+
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": planted}})
+	require.Error(t, err, "HITL approves calls; it does not lift the directory rule")
+	var refusal *localtools.PolicyRefusal
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, localtools.RefusalOutsideProject, refusal.Code)
+}
+
+func TestUnit_LocalExecTools_Exec_PolicyGateRunsAShellLineWithoutAnAllowlist(t *testing.T) {
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "piped"},
+		localtools.WithLocalExecGate(localtools.GatePolicy),
+		localtools.WithLocalExecDeniedCommands([]string{"sudo"}),
+	).(*localtools.LocalExecTools)
+
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "anything | wc -l", "shell": "true"}})
+	require.NoError(t, err, "the HITL policy judges the whole line")
+	res, ok := out.(*localtools.LocalExecResult)
+	require.True(t, ok)
+	assert.Equal(t, "piped", res.Stdout)
+}
+
+func TestUnit_LocalExecTools_Exec_PolicyGateDeniesAShellLineOpenedByADeniedProgram(t *testing.T) {
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "ran"},
+		localtools.WithLocalExecGate(localtools.GatePolicy),
+		localtools.WithLocalExecDeniedCommands([]string{"sudo"}),
+	).(*localtools.LocalExecTools)
+
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "sudo rm -rf /tmp/x", "shell": "true"}})
+	require.Error(t, err)
+	var refusal *localtools.PolicyRefusal
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, localtools.RefusalDenied, refusal.Code)
+}
+
+func TestUnit_LocalExecTools_Exec_RequireAllowlistRefusesWithoutOne(t *testing.T) {
+	h := localtools.NewLocalExecTools(
+		localtools.WithLocalExecGate(localtools.GateRequireAllowlist),
+	).(*localtools.LocalExecTools)
+
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "echo", "args": "x"}})
+	require.Error(t, err, "with no policy and no allowlist there is nothing gating the call")
+	var refusal *localtools.PolicyRefusal
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, localtools.RefusalUngated, refusal.Code)
+}
+
+func TestUnit_LocalExecTools_Exec_RequireAllowlistRunsWhenConfigured(t *testing.T) {
+	h := localtools.NewLocalExecToolsWith(stubRunner{out: "gated"},
+		localtools.WithLocalExecGate(localtools.GateRequireAllowlist),
+		localtools.WithLocalExecAllowedCommands([]string{"anything"}),
+	).(*localtools.LocalExecTools)
+
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false,
+		&taskengine.ToolsCall{Name: "local_shell", Args: map[string]string{"command": "anything"}})
+	require.NoError(t, err)
+	res, ok := out.(*localtools.LocalExecResult)
+	require.True(t, ok)
+	assert.True(t, res.Success)
+	assert.Equal(t, "gated", res.Stdout)
+}
+func TestUnit_LocalExecTools_Exec_RefusesBinaryOutsideProjectAndToolchain(t *testing.T) {
+	project := t.TempDir()
+	planted := filepath.Join(t.TempDir(), "planted-tool")
+	require.NoError(t, os.WriteFile(planted, []byte("not a real program"), 0o755))
+
+	h := localtools.NewLocalExecTools(localtools.WithLocalExecAllowedDir(project)).(*localtools.LocalExecTools)
 	ctx := context.Background()
 	start := time.Now().UTC()
 	toolsCall := &taskengine.ToolsCall{
 		Name: "local_shell",
-		Args: map[string]string{"command": "echo", "args": "x"},
+		Args: map[string]string{"command": planted},
 	}
 	_, _, err := h.Exec(ctx, start, nil, false, toolsCall)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not under allowed dir")
+
+	var refusal *localtools.PolicyRefusal
+	require.ErrorAs(t, err, &refusal)
+	assert.Equal(t, localtools.RefusalOutsideProject, refusal.Code)
+	assert.Equal(t, planted, refusal.Resolved)
+	assert.Contains(t, err.Error(), "reason:  command_outside_project")
+	assert.Contains(t, err.Error(), "fix:")
+	assert.Contains(t, err.Error(), "fatal: refused by configuration",
+		"a refusal the model cannot fix must not look retryable")
+}
+
+func TestUnit_LocalExecTools_Exec_RefusalIsReportedToTheTracker(t *testing.T) {
+	project := t.TempDir()
+	planted := filepath.Join(t.TempDir(), "planted-tool")
+	require.NoError(t, os.WriteFile(planted, []byte("not a real program"), 0o755))
+
+	tracker := &captureTracker{changes: map[string]any{}}
+	h := localtools.NewLocalExecTools(
+		localtools.WithLocalExecAllowedDir(project),
+		localtools.WithLocalExecTracker(tracker),
+	).(*localtools.LocalExecTools)
+
+	toolsCall := &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": planted},
+	}
+	_, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, toolsCall)
+	require.Error(t, err)
+	require.Error(t, tracker.lastErr, "the refusal must reach telemetry as an error")
+
+	refused, ok := tracker.changes["refused"].(map[string]any)
+	require.True(t, ok, "the refusal must be reported as structured change data")
+	assert.Equal(t, localtools.RefusalOutsideProject, refused["code"])
+	assert.Equal(t, planted, refused["resolved"])
+	assert.Equal(t, project, refused["project"])
+	require.NotEmpty(t, refused["fix"])
+}
+
+func TestUnit_LocalExecTools_Exec_ReportsAFailedLookup(t *testing.T) {
+	tracker := &captureTracker{changes: map[string]any{}}
+	h := localtools.NewLocalExecTools(
+		localtools.WithLocalExecAllowedCommands([]string{"definitely-not-installed-tool"}),
+		localtools.WithLocalExecAllowedDir(t.TempDir()),
+		localtools.WithLocalExecTracker(tracker),
+	).(*localtools.LocalExecTools)
+
+	out, _, err := h.Exec(context.Background(), time.Now().UTC(), nil, false, &taskengine.ToolsCall{
+		Name: "local_shell",
+		Args: map[string]string{"command": "definitely-not-installed-tool"},
+	})
+	require.NoError(t, err, "a missing binary is reported in the result, not as an infrastructure error")
+	res, ok := out.(*localtools.LocalExecResult)
+	require.True(t, ok)
+	assert.False(t, res.Success)
+	assert.NotEmpty(t, res.Error)
+
+	unresolved, ok := tracker.changes["unresolved"].(map[string]any)
+	require.True(t, ok, "a lookup failure must be recorded, not swallowed")
+	assert.Equal(t, "definitely-not-installed-tool", unresolved["command"])
+	require.NotEmpty(t, unresolved["error"])
+}
+func TestUnit_CommandLocationAllowed(t *testing.T) {
+	project := t.TempDir()
+	roots := localtools.ToolchainRoots()
+	require.NotEmpty(t, roots)
+
+	assert.True(t, localtools.CommandLocationAllowed(filepath.Join(project, "tools", "run"), project, nil),
+		"a binary inside the project is allowed")
+	assert.True(t, localtools.CommandLocationAllowed(filepath.Join(roots[0], "run"), project, nil),
+		"a binary in a known toolchain root is allowed")
+	assert.False(t, localtools.CommandLocationAllowed("npm", project, nil),
+		"a name that is not an absolute path cannot be located; the caller reports the lookup error instead of guessing")
+	extra := t.TempDir()
+	assert.True(t, localtools.CommandLocationAllowed(filepath.Join(extra, "run"), project, []string{extra}),
+		"_allowed_tool_dirs extends the install roots")
+	assert.False(t, localtools.CommandLocationAllowed(filepath.Join(t.TempDir(), "run"), project, nil),
+		"a binary in neither the project nor a toolchain root is refused")
+}
+
+func TestUnit_PolicyRefusal_MessageNamesReasonAndRemedy(t *testing.T) {
+	refusal := &localtools.PolicyRefusal{
+		Code:            localtools.RefusalNotAllowlisted,
+		Command:         "npm",
+		Resolved:        `C:\Program Files\nodejs\npm.cmd`,
+		Project:         `D:\work\project`,
+		AllowedCommands: []string{"git", "go"},
+		Hint:            "name it in _allowed_commands",
+	}
+	message := refusal.Error()
+	for _, want := range []string{
+		`"npm"`, `C:\Program Files\nodejs\npm.cmd`, "command_not_allowlisted",
+		`D:\work\project`, "git, go", "name it in _allowed_commands", "fatal",
+	} {
+		assert.Contains(t, message, want)
+	}
+	data := refusal.Telemetry()
+	assert.Equal(t, localtools.RefusalNotAllowlisted, data["code"])
+	assert.Equal(t, "npm", data["command"])
+	assert.Equal(t, []string{"git", "go"}, data["allowed_commands"])
 }
 
 func TestUnit_LocalExecTools_Exec_AllowlistDirAllow(t *testing.T) {
@@ -566,7 +791,8 @@ func TestUnit_LocalExecTools_Exec_ShellMode_RefusesADeniedProgram(t *testing.T) 
 		Args: map[string]string{"command": "sudo whoami", "shell": "true"},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "denied by policy")
+	assert.Contains(t, err.Error(), "command_denied_by_policy")
+	assert.Contains(t, err.Error(), "_denied_commands")
 }
 
 func TestUnit_LocalExecTools_Exec_ShellMode_RunsAWindowsBuiltin(t *testing.T) {

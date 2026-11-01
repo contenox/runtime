@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/modelrepo"
@@ -443,4 +444,51 @@ func TestUnit_WireOpenAI_StreamedErrorFrameFailsTheTurn(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "injected mid-stream error")
 	require.Empty(t, result.Content)
+}
+
+func TestUnit_WireOpenAI_ResponsesCancelledIsAnError(t *testing.T) {
+	t.Parallel()
+	cs := newCaptureServer(t, scriptedReply{Body: "data: {\"type\":\"response.output_text.delta\",\"delta\":\"par\"}\n\ndata: {\"type\":\"response.cancelled\",\"response\":{\"status\":\"cancelled\"}}\n\n"})
+	provider := openAIChatProvider(t, cs, "gpt-6-astra", modelrepo.CapabilityConfig{CanThink: true})
+
+	_, err := streamParcels(t, provider)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "response.cancelled")
+}
+
+func TestUnit_WireOpenAI_ResponsesUnknownEventDoesNotBreakTheStream(t *testing.T) {
+	t.Parallel()
+	cs := newCaptureServer(t, scriptedReply{Body: "data: {\"type\":\"response.some_future_event\"}\n\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"})
+	provider := openAIChatProvider(t, cs, "gpt-6-astra", modelrepo.CapabilityConfig{CanThink: true})
+
+	result, err := streamParcels(t, provider)
+	require.NoError(t, err)
+	require.Equal(t, "ok", result.Content)
+}
+
+func TestUnit_WireOpenAI_StalledResponsesStreamFailsInsteadOfHanging(t *testing.T) {
+	prev := modelrepo.StreamIdleTimeout
+	modelrepo.StreamIdleTimeout = 150 * time.Millisecond
+	defer func() { modelrepo.StreamIdleTimeout = prev }()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"thinking about it\"}\n\n")
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	provider := openAIChatProvider(t, &captureServer{Server: srv}, "gpt-6-astra", modelrepo.CapabilityConfig{CanThink: true})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := streamParcels(t, provider)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, modelrepo.ErrStreamIdle)
+	case <-time.After(5 * time.Second):
+		t.Fatal("a provider that stops sending mid-turn must fail the turn, not hang it")
+	}
 }

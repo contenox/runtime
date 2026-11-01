@@ -135,15 +135,13 @@ func printLiveModels(ctx context.Context, db libdb.DBManager, out, errW io.Write
 	sort.Slice(entries, func(i, j int) bool { return entries[i].backendName < entries[j].backendName })
 
 	any := false
+	var unreachable []modelListEntryError
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "BACKEND\tMODEL\tCHAT\tEMBED\tPROMPT\tTHINK\tVISION\tCTX")
 	for _, e := range entries {
 		if e.backendErr != "" {
-			errMsg := e.backendErr
-			if len(errMsg) > 80 {
-				errMsg = errMsg[:80] + "..."
-			}
-			fmt.Fprintf(w, "%s\t(unreachable: %s)\t\t\t\t\t\t\n", e.backendName, errMsg)
+			unreachable = append(unreachable, modelListEntryError{backend: e.backendName, reason: e.backendErr})
+			fmt.Fprintf(w, "%s\t(unreachable, reason below)\t\t\t\t\t\t\n", e.backendName)
 			continue
 		}
 		if len(e.pulled) == 0 {
@@ -169,6 +167,9 @@ func printLiveModels(ctx context.Context, db libdb.DBManager, out, errW io.Write
 	}
 	if err := w.Flush(); err != nil {
 		return err
+	}
+	for _, u := range unreachable {
+		fmt.Fprintf(out, "\n%s is unreachable: %s\n", u.backend, u.reason)
 	}
 	if !any {
 		fmt.Fprintln(out, "\nNo loadable models found on any live backend. For installed local artifacts, run: contenox model local")
@@ -286,4 +287,9 @@ func init() {
 	modelCmd.AddCommand(modelListCmd)
 	modelCmd.AddCommand(modelSetContextCmd)
 
+}
+
+type modelListEntryError struct {
+	backend string
+	reason  string
 }

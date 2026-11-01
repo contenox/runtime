@@ -96,6 +96,7 @@ func (c *GeminiStreamClient) Stream(ctx context.Context, messages []modelrepo.Me
 			send(&modelrepo.StreamParcel{Error: err})
 			return
 		}
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "gemini")
 		defer resp.Body.Close()
 
 		reportChange("gemini_stream_response", map[string]any{

@@ -35,6 +35,7 @@ type Store interface {
 
 	AppendMessages(ctx context.Context, messages ...*Message) error
 	DeleteMessages(ctx context.Context, stream string) error
+	DeleteMessage(ctx context.Context, stream string, id string) error
 	ListMessages(ctx context.Context, stream string) ([]*Message, error)
 	LastMessage(ctx context.Context, stream string) (*Message, error)
 	CountMessages(ctx context.Context, stream string) (int, error)

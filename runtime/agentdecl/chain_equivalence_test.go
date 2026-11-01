@@ -120,7 +120,7 @@ func TestUnit_ChainEquivalence_CompiledACPTreeMatchesTheHandWrittenChain(t *test
 
 	coding := equivalenceTaskByID(compiled, "chain-acp-coding-agent")
 	require.NotNil(t, coding)
-	assert.Contains(t, coding.ExecuteConfig.ToolsPolicies, "local_shell")
+	assert.NotContains(t, coding.ExecuteConfig.ToolsPolicies, "local_shell")
 	assert.Contains(t, coding.ExecuteConfig.ToolsPolicies, "local_fs")
 }
 

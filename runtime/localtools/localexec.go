@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -33,14 +34,25 @@ type LocalExecResult struct {
 	OS              string  `json:"os,omitempty"`
 }
 
+type LocalExecGate int
+
+const (
+	GateAllowlist LocalExecGate = iota
+	GatePolicy
+	GateRequireAllowlist
+)
+
 type LocalExecTools struct {
+	gate            LocalExecGate
 	defaultTimeout  time.Duration
 	allowedDir      string
 	allowedCommands []string
 	deniedCommands  []string
+	toolDirs        []string
 	runner          CommandRunner
 	shell           PlatformShell
 	scrubEnv        func([]string) []string
+	tracker         libtracker.ActivityTracker
 }
 
 type LocalExecOption func(*LocalExecTools)
@@ -81,6 +93,24 @@ func WithLocalExecScrubEnv(scrub func([]string) []string) LocalExecOption {
 	}
 }
 
+func WithLocalExecGate(gate LocalExecGate) LocalExecOption {
+	return func(h *LocalExecTools) { h.gate = gate }
+}
+
+func WithLocalExecTracker(tracker libtracker.ActivityTracker) LocalExecOption {
+	return func(h *LocalExecTools) {
+		if tracker != nil {
+			h.tracker = tracker
+		}
+	}
+}
+
+func WithLocalExecToolDirs(dirs []string) LocalExecOption {
+	return func(h *LocalExecTools) {
+		h.toolDirs = append(h.toolDirs, dirs...)
+	}
+}
+
 func NewLocalExecTools(opts ...LocalExecOption) taskengine.ToolsRepo {
 	return NewLocalExecToolsWith(nil, opts...)
 }
@@ -89,6 +119,7 @@ func NewLocalExecToolsWith(runner CommandRunner, opts ...LocalExecOption) tasken
 	h := &LocalExecTools{
 		defaultTimeout: 60 * time.Second,
 		shell:          DetectPlatformShell(),
+		tracker:        libtracker.NoopTracker{},
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -100,7 +131,7 @@ func NewLocalExecToolsWith(runner CommandRunner, opts ...LocalExecOption) tasken
 	return h
 }
 
-func (h *LocalExecTools) resolvePolicy(ctx context.Context) (allowedCommands []string, allowedDir string, deniedCommands []string) {
+func (h *LocalExecTools) resolvePolicy(ctx context.Context) (allowedCommands []string, allowedDir string, deniedCommands []string, toolDirs []string) {
 	if args := taskengine.ToolsArgsFromContext(ctx, localExecToolsName); len(args) > 0 {
 		if v := args["_allowed_commands"]; v != "" {
 			allowedCommands = splitTrimmed(v)
@@ -111,9 +142,12 @@ func (h *LocalExecTools) resolvePolicy(ctx context.Context) (allowedCommands []s
 		if v := args["_denied_commands"]; v != "" {
 			deniedCommands = splitTrimmed(v)
 		}
-		return
+		if v := args["_allowed_tool_dirs"]; v != "" {
+			toolDirs = splitToolDirs(v)
+		}
+		return allowedCommands, allowedDir, deniedCommands, toolDirs
 	}
-	return h.allowedCommands, h.allowedDir, h.deniedCommands
+	return h.allowedCommands, h.allowedDir, h.deniedCommands, h.toolDirs
 }
 
 func splitTrimmed(s string) []string {
@@ -138,13 +172,30 @@ func (h *LocalExecTools) Exec(ctx context.Context, startTime time.Time, input an
 	if err != nil {
 		return nil, taskengine.DataTypeAny, err
 	}
-	allowedCommands, allowedDir, deniedCommands := h.resolvePolicy(ctx)
-	if err := h.checkAllowlist(command, argsSlice, useShell, allowedCommands, allowedDir, deniedCommands); err != nil {
-		return nil, taskengine.DataTypeAny, err
+	allowedCommands, allowedDir, deniedCommands, toolDirs := h.resolvePolicy(ctx)
+	reportErr, reportChange, end := h.tracker.Start(ctx, "local_shell", "exec",
+		"command", command, "cwd", cwd, "shell", useShell)
+	defer end()
+
+	resolution, refusalErr := h.checkAllowlist(command, argsSlice, useShell, allowedCommands, allowedDir, deniedCommands, toolDirs)
+	if resolution.LookupErr != nil {
+		logUnresolved(ctx, resolution, !useShell)
+		reportChange("unresolved", map[string]any{
+			"command": resolution.Command,
+			"error":   resolution.LookupErr.Error(),
+		})
 	}
-	result, err := h.run(ctx, command, argsSlice, cwd, timeout, useShell, stdin)
-	if err != nil {
-		return nil, taskengine.DataTypeAny, err
+	if refusalErr != nil {
+		if refusal := asPolicyRefusal(refusalErr); refusal != nil {
+			logRefusal(ctx, refusal)
+			reportChange("refused", refusal.Telemetry())
+		}
+		reportErr(refusalErr)
+		return nil, taskengine.DataTypeAny, refusalErr
+	}
+	result, runErr := h.run(ctx, command, argsSlice, cwd, timeout, useShell, stdin)
+	if runErr != nil {
+		reportErr(runErr)
 	}
 	return result, taskengine.DataTypeJSON, nil
 }
@@ -160,14 +211,18 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 	}
 	if d := get("cwd"); d != "" {
 		cwd = filepath.Clean(d)
-		if absCwd, err := filepath.Abs(cwd); err == nil {
-			cwd = absCwd
+		absCwd, err := filepath.Abs(cwd)
+		if err != nil {
+			return "", nil, "", 0, false, "", fmt.Errorf("local_shell: cwd %q cannot be made absolute: %w", d, err)
 		}
+		cwd = absCwd
 	}
 	if t := get("timeout"); t != "" {
-		if d, e := time.ParseDuration(t); e == nil {
-			timeout = d
+		d, err := time.ParseDuration(t)
+		if err != nil {
+			return "", nil, "", 0, false, "", recoverablef("local_shell: timeout %q is not a duration (write it as 30s, 2m, 1h): %v", t, err)
 		}
+		timeout = d
 	}
 	if s := get("shell"); s != "" {
 		useShell = strings.EqualFold(s, "true") || s == "1"
@@ -205,12 +260,18 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 		}
 		if d, ok := v["cwd"].(string); ok && cwd == "" {
 			cwd = filepath.Clean(d)
-			if absCwd, err := filepath.Abs(cwd); err == nil {
-				cwd = absCwd
+			absCwd, err := filepath.Abs(cwd)
+			if err != nil {
+				return "", nil, "", 0, false, "", fmt.Errorf("local_shell: cwd %q cannot be made absolute: %w", d, err)
 			}
+			cwd = absCwd
 		}
 		if t, ok := v["timeout"].(string); ok {
-			if d, e := time.ParseDuration(t); e == nil && timeout == h.defaultTimeout {
+			d, err := time.ParseDuration(t)
+			if err != nil {
+				return "", nil, "", 0, false, "", recoverablef("local_shell: timeout %q is not a duration (write it as 30s, 2m, 1h): %v", t, err)
+			}
+			if timeout == h.defaultTimeout {
 				timeout = d
 			}
 		}
@@ -244,76 +305,161 @@ func receivedShellArguments(tools *taskengine.ToolsCall, input any) map[string]a
 	return received
 }
 
-func (h *LocalExecTools) checkAllowlist(command string, argsSlice []string, useShell bool, allowedCommands []string, allowedDir string, deniedCommands []string) error {
+type commandResolution struct {
+	Command   string
+	Path      string
+	LookupErr error
+}
+
+func resolveCommand(command string) commandResolution {
+	res := commandResolution{Command: command}
+	if filepath.IsAbs(command) {
+		res.Path = filepath.Clean(command)
+		return res
+	}
+	path, err := exec.LookPath(command)
+	if err != nil {
+		res.LookupErr = err
+		res.Path = filepath.Clean(command)
+		return res
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		res.LookupErr = err
+		res.Path = filepath.Clean(path)
+		return res
+	}
+	res.Path = abs
+	return res
+}
+
+func commandEntryMatches(entry, command, resolved string) bool {
+	clean := filepath.Clean(entry)
+	if clean == resolved || clean == command {
+		return true
+	}
+	found := resolveCommand(entry)
+	return found.LookupErr == nil && found.Path == resolved
+}
+
+func (h *LocalExecTools) checkAllowlist(command string, argsSlice []string, useShell bool, allowedCommands []string, allowedDir string, deniedCommands []string, toolDirs []string) (commandResolution, error) {
+	if h.gate == GatePolicy {
+		allowedCommands = nil
+	}
+	if h.gate == GateRequireAllowlist {
+		if len(allowedCommands) == 0 {
+			return resolveCommand(command), &PolicyRefusal{
+				Code:           RefusalUngated,
+				Command:        command,
+				Project:        allowedDir,
+				DeniedCommands: deniedCommands,
+				ToolDirs:       toolDirs,
+				Hint:           "enable HITL for this session, or configure _allowed_commands for the local_shell tools policy",
+			}
+		}
+	}
 	if useShell && (len(allowedCommands) > 0 || len(deniedCommands) > 0 || allowedDir != "") {
 		// Check the line the shell will actually run — command plus argv — not
 		// just the program name, or an argument could carry a second command.
 		script := strings.TrimSpace(command + " " + strings.Join(argsSlice, " "))
+		resolution := resolveCommand(command)
 		if len(allowedCommands) == 0 {
-			return fmt.Errorf("local_shell: 'shell: true' needs _allowed_commands; name the programs the line may start with")
+			if h.gate != GatePolicy {
+				return resolution, &PolicyRefusal{
+					Code:     RefusalShellNeedsAllowlist,
+					Command:  command,
+					Project:  allowedDir,
+					Hint:     "set shell:false and pass the program in \"command\" with its arguments in \"args\", or name the programs this line may start with in _allowed_commands",
+					ToolDirs: toolDirs,
+				}
+			}
+		} else if !hitlservice.CommandLineAllowedByPrefix(script, strings.Join(allowedCommands, ",")) {
+			return resolution, fmt.Errorf("local_shell: %q is not one of the allowed commands, or it carries a character the shell would evaluate (a pipe, redirect, substitution or separator); run it without shell:true or name it in _allowed_commands. This is a call-shape problem, not a permission one: a line with shell syntax is never allowlisted", script)
 		}
-		if !hitlservice.CommandLineAllowedByPrefix(script, strings.Join(allowedCommands, ",")) {
-			return fmt.Errorf("local_shell: %q is not one of the allowed commands, or it carries a character the shell would evaluate; run it without shell:true or name it in _allowed_commands", script)
-		}
-		// The gate refuses every metacharacter, so the line holds one program:
-		// the denylist and the directory rule apply to it below.
 		if fields := strings.Fields(script); len(fields) > 0 {
 			command = fields[0]
 		}
 	}
 
-	resolved := command
-	if !filepath.IsAbs(command) {
-		if path, err := exec.LookPath(command); err == nil {
-			resolved = path
-		} else {
-			resolved = filepath.Clean(command)
-		}
-	} else {
-		resolved = filepath.Clean(command)
-	}
+	resolution := resolveCommand(command)
+	resolved := resolution.Path
+
 	if len(deniedCommands) > 0 {
 		base := filepath.Base(resolved)
 		for _, d := range deniedCommands {
 			dClean := filepath.Clean(d)
 			if dClean == resolved || dClean == command || filepath.Base(dClean) == base || dClean == base {
-				return fmt.Errorf("local_shell: command %s is denied by policy", command)
+				return resolution, &PolicyRefusal{
+					Code:            RefusalDenied,
+					Command:         command,
+					Resolved:        resolved,
+					DeniedCommands:  deniedCommands,
+					AllowedCommands: allowedCommands,
+					Project:         allowedDir,
+					Hint:            "this program is on _denied_commands; ask the user to remove it from the local_shell policy if the work needs it",
+					ToolDirs:        toolDirs,
+				}
 			}
 		}
 	}
-	if allowedDir != "" {
+	if allowedDir != "" && resolution.LookupErr == nil {
 		absDir, err := filepath.Abs(allowedDir)
 		if err != nil {
-			return fmt.Errorf("local_shell: allowed dir invalid: %w", err)
+			return resolution, fmt.Errorf("local_shell: allowed dir invalid: %w", err)
 		}
-		absCmd, err := filepath.Abs(resolved)
-		if err != nil {
-			return fmt.Errorf("local_shell: command path invalid: %w", err)
-		}
-		rel, err := filepath.Rel(absDir, absCmd)
-		if err != nil || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("local_shell: command %s is not under allowed dir %s", command, allowedDir)
+		if !CommandLocationAllowed(resolved, absDir, toolDirs) {
+			return resolution, &PolicyRefusal{
+				Code:            RefusalOutsideProject,
+				Command:         command,
+				Resolved:        resolved,
+				Project:         absDir,
+				AllowedCommands: allowedCommands,
+				DeniedCommands:  deniedCommands,
+				ToolDirs:        toolDirs,
+				Hint: fmt.Sprintf("add %q to _allowed_tool_dirs under [tools_policies.local_shell], install the tool inside the project, or set _allowed_dir to the session workspace rather than a fixed path",
+					filepath.Dir(resolved)),
+			}
 		}
 	}
 	if len(allowedCommands) > 0 {
 		allowed := false
 		for _, c := range allowedCommands {
-			cClean := filepath.Clean(c)
-			if cClean == resolved || cClean == command {
-				allowed = true
-				break
-			}
-			if path, err := exec.LookPath(c); err == nil && path == resolved {
+			if commandEntryMatches(c, command, resolved) {
 				allowed = true
 				break
 			}
 		}
 		if !allowed {
 			if strings.ContainsAny(command, " \t") {
-				return fmt.Errorf("local_shell: command %q is not in allowlist — put the program alone in \"command\" (for example \"git\") and its arguments in \"args\"", command)
+				return resolution, fmt.Errorf("local_shell: command %q is not in allowlist — put the program alone in \"command\" (for example \"git\") and its arguments in \"args\"", command)
 			}
-			return fmt.Errorf("local_shell: command %q is not in allowlist", command)
+			return resolution, &PolicyRefusal{
+				Code:            RefusalNotAllowlisted,
+				Command:         command,
+				Resolved:        resolved,
+				Project:         allowedDir,
+				AllowedCommands: allowedCommands,
+				DeniedCommands:  deniedCommands,
+				LookupErr:       errorText(resolution.LookupErr),
+				ToolDirs:        toolDirs,
+				Hint:            "the policy enumerates the programs it permits; name this one in _allowed_commands, or use a program it already allows",
+			}
 		}
+	}
+	return resolution, nil
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func asPolicyRefusal(err error) *PolicyRefusal {
+	var refusal *PolicyRefusal
+	if errors.As(err, &refusal) {
+		return refusal
 	}
 	return nil
 }
@@ -404,7 +550,7 @@ func (h *LocalExecTools) run(ctx context.Context, command string, argsSlice []st
 		result.Error = runErr.Error() + " " + severityRecoverable
 		result.Success = false
 		result.ExitCode = exitCode
-		return result, nil
+		return result, fmt.Errorf("local_shell: run %q: %w", command, runErr)
 	}
 	result.ExitCode = exitCode
 	result.Success = exitCode == 0
@@ -535,14 +681,14 @@ func (h *LocalExecTools) GetToolsForToolsByName(ctx context.Context, name string
 	if name != localExecToolsName {
 		return nil, fmt.Errorf("unknown tools: %s", name)
 	}
-	allowedCommands, allowedDir, deniedCommands := h.resolvePolicy(ctx)
+	allowedCommands, allowedDir, deniedCommands, _ := h.resolvePolicy(ctx)
 	shellDesc := h.shell.ShellModeDescription()
 	desc := "Run a terminal command on the local host. Returns {stdout, stderr, exitCode, success, durationSeconds}. Output is capped at the remaining context budget; when it exceeds the cap the FULL output is spooled to a file and stdout/stderr instead carry a 20%-head/80%-tail slice (errors cluster at the tail) with an inline pointer, while the error field names the spool concretely ('full output: <path> (N KiB)') so nothing is lost silently. Errors carry a severity marker you can key on: '(recoverable: adjust parameters and retry)' for anything a corrected call fixes (output too large, bad command, denied path), and '(fatal: <reason>)' only when the environment is broken (disk full, spool unwritable) and retrying will not help. For file operations prefer local_fs.* tools: read_file, write_file, sed, find_files. They enforce sandbox boundaries, size limits, and a read-before-write contract that local_shell does not. Use local_shell for operations with no dedicated tool: running tests, builds, git commands, environment inspection. " + shellDesc
 	if len(allowedCommands) > 0 {
 		desc += " Allowed commands: " + strings.Join(allowedCommands, ", ") + "."
 	}
 	if allowedDir != "" {
-		desc += " Commands must reside under: " + allowedDir + "."
+		desc += " Commands must resolve to a binary inside " + allowedDir + ", or inside a standard toolchain location (node, go, python, rust and similar installs, and anything the runtime's PATH resolves)."
 	}
 	if len(deniedCommands) > 0 {
 		desc += " Denied commands: " + strings.Join(deniedCommands, ", ") + "."

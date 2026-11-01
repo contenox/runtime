@@ -116,6 +116,7 @@ func (c *ollamaHTTPClient) stream(ctx context.Context, method, endpoint string, 
 	if err != nil {
 		return err
 	}
+	resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "ollama")
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= http.StatusBadRequest {

@@ -96,6 +96,7 @@ func (c *OpenAIStreamClient) Stream(ctx context.Context, messages []modelrepo.Me
 
 	go func() {
 		defer close(streamCh)
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, c.vendorLabel())
 		defer resp.Body.Close()
 		defer end()
 
@@ -367,6 +368,7 @@ func streamResponsesSSE(
 	}
 
 	calls := newResponsesCallTracker(nameMap)
+	seenUnknown := map[string]bool{}
 
 	for sc.Scan() {
 		line := sc.Text()
@@ -515,11 +517,17 @@ func streamResponsesSSE(
 			send(&modelrepo.StreamParcel{Error: err})
 			return
 
-		case "response.failed":
+		case "response.failed", "response.cancelled":
 			err := modelrepo.ClassifyProviderError(fmt.Errorf("responses stream %s %s", ev.Type, ev.errorText()), 0, ev.errorText(), ev.errorText())
 			reportErr(err)
 			send(&modelrepo.StreamParcel{Error: err})
 			return
+
+		default:
+			if ev.Type != "" && !seenUnknown[ev.Type] {
+				seenUnknown[ev.Type] = true
+				reportChange("stream_event_ignored", map[string]any{"path": "responses", "type": ev.Type})
+			}
 		}
 	}
 

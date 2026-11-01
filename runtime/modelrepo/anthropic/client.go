@@ -360,6 +360,7 @@ func (c *anthropicStreamClient) Stream(ctx context.Context, messages []modelrepo
 	parcels := make(chan *modelrepo.StreamParcel)
 	go func() {
 		defer close(parcels)
+		resp.Body = modelrepo.WithIdleTimeout(resp.Body, modelrepo.StreamIdleTimeout, "anthropic")
 		defer resp.Body.Close()
 		defer end()
 

@@ -181,7 +181,7 @@ func listVertexPublisherModelNames(ctx context.Context, vertexLocationBaseURL, p
 			return nil, err
 		}
 		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("vertex publisher list returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			return nil, fmt.Errorf("vertex publisher list returned %d: %s", resp.StatusCode, googleErrorMessage(body))
 		}
 
 		var payload struct {
@@ -213,4 +213,20 @@ func listVertexPublisherModelNames(ctx context.Context, vertexLocationBaseURL, p
 
 func (p *googleCatalogProvider) ProviderFor(model modelrepo.ObservedModel) modelrepo.Provider {
 	return NewVertexProvider("google", model.Name, []string{p.spec.BaseURL}, model.CapabilityConfig, p.spec.APIKey, p.httpClient, p.tracker)
+}
+
+func googleErrorMessage(body []byte) string {
+	var payload struct {
+		Error struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &payload); err == nil && payload.Error.Message != "" {
+		if payload.Error.Status != "" {
+			return payload.Error.Status + ": " + payload.Error.Message
+		}
+		return payload.Error.Message
+	}
+	return strings.TrimSpace(string(body))
 }

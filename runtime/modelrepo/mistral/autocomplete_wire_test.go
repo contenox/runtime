@@ -82,3 +82,23 @@ func TestUnit_MistralFIMHonorsCallerCancellation(t *testing.T) {
 	_, err = client.Autocomplete(ctx, modelrepo.AutocompleteRequest{Prefix: "x", MaxTokens: 1, TopP: 1, SessionKey: "session"})
 	require.ErrorIs(t, err, context.Canceled)
 }
+
+func TestUnit_MistralCatalogTakesAudioAndReasoningFromTheModelCard(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"id":"voxtral-small-latest","capabilities":{"completion_chat":true,"audio":true,"reasoning":false,"vision":false}},{"id":"mistral-small-latest","capabilities":{"completion_chat":true,"audio":false,"reasoning":true,"vision":true}}]}`))
+	}))
+	defer server.Close()
+	catalog, err := modelrepo.NewCatalogProvider(modelrepo.BackendSpec{Type: "mistral", BaseURL: server.URL, APIKey: "secret"})
+	require.NoError(t, err)
+	models, err := catalog.ListModels(context.Background())
+	require.NoError(t, err)
+	require.Len(t, models, 2)
+
+	require.True(t, models[0].CanAudio, "Voxtral advertises audio input")
+	require.False(t, models[0].CanThink)
+	require.True(t, catalog.ProviderFor(models[0]).CanAudio())
+
+	require.False(t, models[1].CanAudio)
+	require.True(t, models[1].CanThink, "the card advertises reasoning")
+	require.True(t, models[1].CanVision)
+}

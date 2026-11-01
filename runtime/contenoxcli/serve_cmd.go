@@ -331,7 +331,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 		})
 	}
 	if opts.EffectiveEnableLocalExec {
-		execOpts := []localtools.LocalExecOption{}
+		execOpts := []localtools.LocalExecOption{
+			localtools.WithLocalExecTracker(tracker),
+			localtools.WithLocalExecGate(localtools.GatePolicy),
+		}
 		if opts.EffectiveLocalExecAllowedDir != "" {
 			execOpts = append(execOpts, localtools.WithLocalExecAllowedDir(opts.EffectiveLocalExecAllowedDir))
 		}

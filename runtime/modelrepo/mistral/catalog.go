@@ -49,6 +49,8 @@ type modelCard struct {
 		FIM             bool `json:"completion_fim"`
 		FunctionCalling bool `json:"function_calling"`
 		Vision          bool `json:"vision"`
+		Audio           bool `json:"audio"`
+		Reasoning       bool `json:"reasoning"`
 		Classification  bool `json:"classification"`
 		Moderation      bool `json:"moderation"`
 	} `json:"capabilities"`
@@ -104,6 +106,8 @@ func capabilityFor(item modelCard) modelrepo.CapabilityConfig {
 		CompletionMode:  completionMode(item.Capabilities.FIM),
 		FIMFormat:       fimFormat(item.Capabilities.FIM),
 		CanVision:       item.Capabilities.Vision,
+		CanAudio:        item.Capabilities.Audio,
+		CanThink:        item.Capabilities.Reasoning,
 	}
 }
 

@@ -175,6 +175,11 @@ func (a *agent) Prompt(ctx context.Context, req PromptRequest) (*PromptResponse,
 		ctx = context.WithValue(ctx, runtimetypes.SessionIDContextKey, req.SessionID)
 	}
 
+	var earlyUserMessageID string
+	if req.SessionID != "" && req.InputValue == nil {
+		earlyUserMessageID = a.persistUserTurn(ctx, req.SessionID, inputVal, req.ChainRef)
+	}
+
 	if req.Observer != nil {
 		if _, isNoop := req.Observer.(NoopObserver); !isNoop {
 			stopObs := a.startObserving(ctx, req.Observer)
@@ -193,7 +198,9 @@ func (a *agent) Prompt(ctx context.Context, req PromptRequest) (*PromptResponse,
 			}
 		}
 
-		if !isPoisonPill {
+		if isPoisonPill {
+			a.forgetUserTurn(ctx, req.SessionID, earlyUserMessageID)
+		} else {
 			a.persistHistory(ctx, req.SessionID, inputVal, stateUnits, execErr, req.ChainRef)
 		}
 	}
@@ -359,6 +366,42 @@ func (a *agent) persistHistory(ctx context.Context, sessionID string, input any,
 	}
 
 	persistReportChange(sessionID, len(synthesized))
+}
+
+func (a *agent) persistUserTurn(ctx context.Context, sessionID string, input any, chainRef string) string {
+	chatInput, ok := input.(taskengine.ChatHistory)
+	if !ok || len(chatInput.Messages) == 0 {
+		return ""
+	}
+	msgs := append([]taskengine.Message(nil), chatInput.Messages...)
+	last := msgs[len(msgs)-1]
+	if last.Role != "user" || last.ID == "" {
+		return ""
+	}
+	if requestID, ok := ctx.Value(libtracker.ContextKeyRequestID).(string); ok && requestID != "" {
+		stampTurnProvenance(msgs[len(msgs)-1:], requestID, chainRef)
+	}
+	cleanCtx := context.WithoutCancel(ctx)
+	reportErr, reportChange, end := a.tracker().Start(cleanCtx, "persist", "user_turn", "sessionID", sessionID)
+	defer end()
+	if err := a.chatMgr().PersistDiff(cleanCtx, a.deps.DB.WithoutTransaction(), sessionID, msgs); err != nil {
+		reportErr(fmt.Errorf("persist user turn: %w", err))
+		return ""
+	}
+	reportChange(sessionID, last.ID)
+	return last.ID
+}
+
+func (a *agent) forgetUserTurn(ctx context.Context, sessionID, messageID string) {
+	if messageID == "" {
+		return
+	}
+	cleanCtx := context.WithoutCancel(ctx)
+	reportErr, _, end := a.tracker().Start(cleanCtx, "forget", "user_turn", "sessionID", sessionID)
+	defer end()
+	if err := a.chatMgr().DeleteMessage(cleanCtx, a.deps.DB.WithoutTransaction(), sessionID, messageID); err != nil {
+		reportErr(err)
+	}
 }
 
 func AgentsMDMessage(content, path string) taskengine.Message {

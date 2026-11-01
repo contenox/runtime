@@ -13,12 +13,19 @@ func (c *bedrockChatClient) Chat(ctx context.Context, messages []modelrepo.Messa
 	reportErr, reportChange, end := c.tracker.Start(ctx, "chat", "bedrock", "model", c.model.name)
 	defer end()
 
-	in, toOriginal, err := buildConverseInput(c.model, messages, chatConfigFromArgs(args))
+	in, toOriginal, err := buildConverseInput(c.effectiveModel(), messages, chatConfigFromArgs(args))
 	if err != nil {
 		reportErr(err)
 		return modelrepo.ChatResult{}, err
 	}
 	out, err := c.api.Converse(ctx, in)
+	if c.learnOutputCeiling(err) {
+		if in, toOriginal, err = buildConverseInput(c.effectiveModel(), messages, chatConfigFromArgs(args)); err != nil {
+			reportErr(err)
+			return modelrepo.ChatResult{}, err
+		}
+		out, err = c.api.Converse(ctx, in)
+	}
 	if err != nil {
 		err = classifyBedrockError(fmt.Errorf("bedrock converse (model=%s): %w", c.model.name, err))
 		reportErr(err)

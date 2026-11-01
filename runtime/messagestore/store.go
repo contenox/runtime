@@ -258,6 +258,17 @@ func (s *store) DeleteMessages(ctx context.Context, stream string) error {
 	return checkRowsAffected(result)
 }
 
+func (s *store) DeleteMessage(ctx context.Context, stream string, id string) error {
+	if _, err := s.Exec.ExecContext(ctx, `
+		DELETE FROM messages
+		WHERE idx_id = $1 AND id = $2`,
+		stream, id,
+	); err != nil {
+		return fmt.Errorf("failed to delete message: %w", err)
+	}
+	return nil
+}
+
 func (s *store) ListMessages(ctx context.Context, stream string) ([]*Message, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
 		SELECT id, idx_id, payload, added_at, seq

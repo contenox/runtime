@@ -57,9 +57,6 @@ func buildConverseInput(m converseModel, messages []modelrepo.Message, cfg *mode
 	if err := cfg.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("bedrock model %s: %w", m.name, err)
 	}
-	if cfg != nil && cfg.Shift != nil {
-		return nil, nil, fmt.Errorf("bedrock model %s cannot shift its context window: the Converse API defines no overflow control", m.name)
-	}
 	if cfg != nil && cfg.Truncate != nil {
 		return nil, nil, fmt.Errorf("bedrock model %s cannot truncate its context window: the Converse API defines no overflow control", m.name)
 	}
@@ -147,7 +144,7 @@ func buildConverseInput(m converseModel, messages []modelrepo.Message, cfg *mode
 			for _, img := range msg.Images {
 				format, ok := imageFormatFromMime(img.MimeType)
 				if !ok {
-					continue
+					return nil, nil, fmt.Errorf("bedrock model %s: image type %q is not supported; Bedrock accepts image/png, image/jpeg, image/gif and image/webp", m.name, img.MimeType)
 				}
 				blocks = append(blocks, &types.ContentBlockMemberImage{Value: types.ImageBlock{
 					Format: format,

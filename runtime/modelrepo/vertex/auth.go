@@ -95,7 +95,11 @@ func IsExpressAPIKey(secret string) bool {
 
 func UsesUserCredential(ctx context.Context, credJSON string) (bool, error) {
 	if strings.TrimSpace(credJSON) == "" {
-		return false, nil
+		ambient, err := google.FindDefaultCredentials(ctx, cloudPlatformScope)
+		if err != nil || ambient == nil {
+			return false, nil
+		}
+		return isUserCredentialDocument(ambient.JSON), nil
 	}
 	creds, err := credentialDocument(ctx, credJSON)
 	if err != nil {

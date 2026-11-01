@@ -346,7 +346,7 @@ func TestUnit_BedrockConverseRequest_ImageBlocksAndUnknownMime(t *testing.T) {
 		})
 	}
 
-	t.Run("unknown mime is skipped rather than sent as an invalid format", func(t *testing.T) {
+	t.Run("unknown mime is refused instead of silently dropped", func(t *testing.T) {
 		transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
 		provider := newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true}, transport)
 		_, err := chatOnce(t, provider, []modelrepo.Message{{
@@ -354,23 +354,19 @@ func TestUnit_BedrockConverseRequest_ImageBlocksAndUnknownMime(t *testing.T) {
 			Content: "hi",
 			Images:  []modelrepo.ImagePart{{Data: []byte{1}, MimeType: "image/tiff"}},
 		}})
-		require.NoError(t, err)
-		_, body := transport.request()
-		content := body["messages"].([]any)[0].(map[string]any)["content"].([]any)
-		require.Len(t, content, 1)
-		require.Equal(t, "hi", content[0].(map[string]any)["text"])
+		require.ErrorContains(t, err, `image type "image/tiff" is not supported`)
+		require.Zero(t, transport.requests, "the model must not answer as if it had seen the image")
 	})
 
-	t.Run("image-only message with an unknown mime produces no message", func(t *testing.T) {
+	t.Run("image-only message with an unknown mime is refused", func(t *testing.T) {
 		transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
 		provider := newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true}, transport)
 		_, err := chatOnce(t, provider, []modelrepo.Message{{
 			Role:   "user",
 			Images: []modelrepo.ImagePart{{Data: []byte{1}, MimeType: "application/pdf"}},
 		}})
-		require.NoError(t, err)
-		_, body := transport.request()
-		require.Empty(t, body["messages"])
+		require.ErrorContains(t, err, `image type "application/pdf" is not supported`)
+		require.Zero(t, transport.requests)
 	})
 }
 
@@ -598,22 +594,21 @@ func TestUnit_BedrockConverseRequest_ResponseFormat(t *testing.T) {
 	})
 }
 
-func TestUnit_BedrockConverseRequest_RefusesContextOverflowControls(t *testing.T) {
-	for _, c := range []struct {
-		name string
-		arg  modelrepo.ChatArgument
-	}{
-		{"shift", modelrepo.WithShift{}},
-		{"truncate", withTruncate()},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
-			provider := newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true}, transport)
-			_, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}}, c.arg)
-			require.ErrorContains(t, err, "Converse API defines no overflow control")
-			require.Zero(t, transport.requests)
-		})
-	}
+func TestUnit_BedrockConverseRequest_RefusesTruncation(t *testing.T) {
+	transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
+	provider := newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true}, transport)
+	_, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}}, withTruncate())
+	require.ErrorContains(t, err, "Converse API defines no overflow control")
+	require.Zero(t, transport.requests)
+}
+
+func TestUnit_BedrockConverseRequest_TreatsShiftAsAHintLikeOtherHostedAPIs(t *testing.T) {
+	transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
+	provider := newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true}, transport)
+	result, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}}, modelrepo.WithShift{})
+	require.NoError(t, err, "every shipped chain asks for shift; refusing it made Bedrock unusable in all of them")
+	require.Equal(t, "ok", result.Message.Content)
+	require.Equal(t, 1, transport.requests)
 }
 
 type truncateArgument struct{}
@@ -1157,4 +1152,30 @@ func TestUnit_BedrockConverseStream_MetadataCarriesCacheUsage(t *testing.T) {
 	require.Equal(t, 3, result.Usage.CompletionTokens)
 	require.Equal(t, 60, result.Usage.CacheReadTokens)
 	require.Equal(t, 15, result.Usage.CacheWriteTokens)
+}
+
+func TestUnit_BedrockConverse_LearnsTheOutputLimitFromTheRefusalAndRetries(t *testing.T) {
+	var seen []float64
+	transport := &wireTransport{}
+	transport.handler = func(request *http.Request, body []byte) *http.Response {
+		var payload map[string]any
+		_ = json.Unmarshal(body, &payload)
+		cfg, _ := payload["inferenceConfig"].(map[string]any)
+		max, _ := cfg["maxTokens"].(float64)
+		seen = append(seen, max)
+		if max > 10000 {
+			return errorResponse(request, http.StatusBadRequest, "ValidationException", "The maximum tokens you requested exceeds the model limit of 10000. Try again with a maximum tokens value that is lower than 10000.")
+		}
+		return jsonResponse(request, http.StatusOK, textOut("ok", "end_turn"))
+	}
+	provider := newWireProvider("amazon.nova-learns-v1:0", modelrepo.CapabilityConfig{CanChat: true}, transport)
+
+	result, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}}, modelrepo.WithMaxTokens(32000))
+	require.NoError(t, err, "the refusal states the limit, so the request is retried within it")
+	require.Equal(t, "ok", result.Message.Content)
+	require.Equal(t, []float64{32000, 10000}, seen)
+
+	_, err = chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "again"}}, modelrepo.WithMaxTokens(32000))
+	require.NoError(t, err)
+	require.Equal(t, []float64{32000, 10000, 10000}, seen, "the learned limit applies to later requests without another refusal")
 }

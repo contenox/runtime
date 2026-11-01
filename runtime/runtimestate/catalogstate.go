@@ -122,7 +122,7 @@ func loadProviderAPIKey(ctx context.Context, store runtimetypes.Store, backend *
 
 func optionalCredential(backendType string) bool {
 	switch modelrepo.CanonicalBackendType(backendType) {
-	case "ollama", "local", "modeld", "vllm":
+	case "ollama", "local", "modeld", "vllm", "bedrock", "vertex-google":
 		return true
 	}
 	return false

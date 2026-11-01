@@ -3,6 +3,7 @@ package acpsvc
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -176,15 +177,29 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 		messageID := fmt.Sprintf("replay-%d", i)
 		switch m.Role {
 		case "user":
-			if m.Content == "" {
+			if m.Content == "" && len(m.Images) == 0 && len(m.Audio) == 0 {
 				continue
 			}
-			update := libacp.NewUserMessageChunk(m.Content)
-			update.MessageID = messageID
-			t.sendUpdate(ctx, libacp.SessionNotification{
-				SessionID: sessionID,
-				Update:    update,
-			})
+			if m.Content != "" {
+				update := libacp.NewUserMessageChunk(m.Content)
+				update.MessageID = messageID
+				t.sendUpdate(ctx, libacp.SessionNotification{
+					SessionID: sessionID,
+					Update:    update,
+				})
+			}
+			for _, img := range m.Images {
+				t.sendUpdate(ctx, libacp.SessionNotification{
+					SessionID: sessionID,
+					Update:    userAttachmentChunk(messageID, libacp.NewImageContent(base64.StdEncoding.EncodeToString(img.Data), img.MimeType)),
+				})
+			}
+			for _, clip := range m.Audio {
+				t.sendUpdate(ctx, libacp.SessionNotification{
+					SessionID: sessionID,
+					Update:    userAttachmentChunk(messageID, libacp.NewAudioContent(base64.StdEncoding.EncodeToString(clip.Data), clip.MimeType)),
+				})
+			}
 			users++
 		case "assistant":
 			if m.Thinking != "" {
@@ -1194,4 +1209,8 @@ func parseDBTimeString(s string) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+func userAttachmentChunk(messageID string, content libacp.ContentBlock) libacp.SessionUpdate {
+	return libacp.SessionUpdate{SessionUpdate: libacp.SessionUpdateUserMessageChunk, Content: &content, MessageID: messageID}
 }
