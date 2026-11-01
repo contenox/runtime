@@ -317,13 +317,30 @@ func TestUnit_GitTools_DiffRefusesSymlinkOutsideRepository(t *testing.T) {
 	outside := t.TempDir()
 	secret := filepath.Join(outside, "secret.txt")
 	require.NoError(t, os.WriteFile(secret, []byte("outside-secret\n"), 0o644))
-	if err := os.Symlink(secret, filepath.Join(dir, "leak.txt")); err != nil {
+
+	// Stage a link whose target stays inside the repository: vfs.Contain
+	// follows the leaf, so our git_add refuses a link that already points out.
+	link := filepath.Join(dir, "leak.txt")
+	if err := os.Symlink("a.txt", link); err != nil {
 		t.Skipf("symlinks are unavailable here: %v", err)
 	}
-	tools := localtools.NewGitTools(dir)
-	_, _, err := execGitTool(t, tools, "git_add", map[string]any{"paths": "leak.txt"})
+	repo, err := git.PlainOpen(dir)
+	require.NoError(t, err)
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Add("leak.txt")
+	require.NoError(t, err)
+	_, err = wt.Commit("track a link", &git.CommitOptions{Author: gitSignature()})
 	require.NoError(t, err)
 
+	// Retarget the tracked link outside the repository. git_diff must refuse to
+	// follow it when it reads the changed worktree file.
+	require.NoError(t, os.Remove(link))
+	if err := os.Symlink(secret, link); err != nil {
+		t.Skipf("symlinks are unavailable here: %v", err)
+	}
+
+	tools := localtools.NewGitTools(dir)
 	res, _, err := execGitTool(t, tools, "git_diff", nil)
 	require.Error(t, err)
 	assert.Nil(t, res)
