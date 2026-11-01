@@ -40,6 +40,9 @@ type ApprovalRequest struct {
 	// Detail explains the match to the person being asked: which condition
 	// fired, or why a trusted-binary gate withheld an automatic allow.
 	Detail string
+	// ReadPaths names the files a multi-file read would print, so the approval
+	// card can list them instead of asking about an opaque call.
+	ReadPaths []string
 
 	InstanceID string
 	SessionID  string

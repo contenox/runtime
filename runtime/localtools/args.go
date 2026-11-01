@@ -51,3 +51,14 @@ func stringSliceArg(toolName, key string, raw any) ([]string, error) {
 		return nil, fmt.Errorf("%s: %s must be a string or array of strings, got %T", toolName, key, raw)
 	}
 }
+
+func pathListArg(toolName, key string, raw any) ([]string, error) {
+	if s, ok := raw.(string); ok {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return nil, nil
+		}
+		return []string{s}, nil
+	}
+	return stringSliceArg(toolName, key, raw)
+}

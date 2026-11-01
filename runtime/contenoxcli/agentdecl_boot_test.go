@@ -33,6 +33,35 @@ func TestUnit_SeedAgentDeclarations_WritesTheCatalogAndGeneratedChains(t *testin
 	assert.NotEmpty(t, compiled, "the declarations compile into .generated")
 }
 
+func TestUnit_SeedAgentDeclarations_RefreshesShippedPolicies(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, seedAgentDeclarations(context.Background(), home))
+
+	for _, preset := range HITLPolicyPresets {
+		body, err := os.ReadFile(filepath.Join(home, preset.Name))
+		require.NoError(t, err, preset.Name)
+		assert.Equal(t, preset.Content, string(body), preset.Name)
+	}
+	agents, err := os.ReadFile(filepath.Join(home, "agents.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(agents), `"native-git.git_status" = "allow"`)
+	assert.Contains(t, string(agents), `"native-git.git_commit" = "deny"`)
+	assert.Contains(t, string(agents), `"git status", "git diff"`)
+
+	generated, err := os.ReadFile(filepath.Join(home, ".generated", "hitl-policy-chat.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(generated), `"native-git"`, "the generated envelope must carry the git rules")
+
+	// An operator edit to a seeded policy survives the next boot.
+	editedPath := filepath.Join(home, "hitl-policy-dev.json")
+	edited := []byte("{\n  \"default_action\": \"deny\",\n  \"rules\": []\n}\n")
+	require.NoError(t, os.WriteFile(editedPath, edited, 0o644))
+	require.NoError(t, seedAgentDeclarations(context.Background(), home))
+	body, err := os.ReadFile(editedPath)
+	require.NoError(t, err)
+	assert.Equal(t, edited, body)
+}
+
 func TestUnit_SeedAgentDeclarations_IsIdempotent(t *testing.T) {
 	home := t.TempDir()
 	require.NoError(t, seedAgentDeclarations(context.Background(), home))

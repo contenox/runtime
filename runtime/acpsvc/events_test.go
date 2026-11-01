@@ -342,3 +342,24 @@ func toolErrorContentForTest(text string) string {
 	}
 	return string(payload)
 }
+
+func TestUnit_ToolKindFor_NativeGit(t *testing.T) {
+	t.Parallel()
+	cases := map[string]libacp.ToolKind{
+		"native-git.git_status":          libacp.ToolKindRead,
+		"native-git_git_diff":            libacp.ToolKindRead,
+		"native-git.git_log":             libacp.ToolKindRead,
+		"native-git_git_show":            libacp.ToolKindRead,
+		"native-git.git_branch_list":     libacp.ToolKindRead,
+		"native-git_git_blame":           libacp.ToolKindRead,
+		"native-git.git_add":             libacp.ToolKindEdit,
+		"native-git_git_commit":          libacp.ToolKindEdit,
+		"native-git.git_checkout_branch": libacp.ToolKindEdit,
+		"native-git_git_restore":         libacp.ToolKindDelete,
+	}
+	for name, want := range cases {
+		if got := toolKindFor(name); got != want {
+			t.Errorf("toolKindFor(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

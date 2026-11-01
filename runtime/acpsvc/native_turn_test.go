@@ -52,6 +52,34 @@ func TestUnit_NativeEventTranslator_EmitsExpected(t *testing.T) {
 	require.Equal(t, "grep#2", got[4].Update.ToolCallID, "a second invocation is a distinct card")
 }
 
+func TestUnit_NativeEventTranslator_RouteDecisionIsVisible(t *testing.T) {
+	var got []libacp.SessionNotification
+	tr := newNativeEventTranslator(
+		func(_ context.Context, n libacp.SessionNotification) { got = append(got, n) },
+		func() int { return 200 },
+	)
+	const sid = libacp.SessionID("s")
+	raw, err := json.Marshal(taskengine.TaskEvent{
+		Kind:        taskengine.TaskEventStepCompleted,
+		TaskID:      "chain-acp-route",
+		TaskHandler: string(taskengine.HandleRoute),
+		Transition:  "coding",
+		Timestamp:   time.Unix(0, 123),
+	})
+	require.NoError(t, err)
+	tr.publish(context.Background(), sid, raw)
+
+	require.Len(t, got, 1)
+	update := got[0].Update
+	// A route decision is a card of its own, not an update to an existing tool
+	// call: the ACP schema defines tool_call_update as an update to one that was
+	// already announced.
+	require.Equal(t, libacp.SessionUpdateToolCall, update.SessionUpdate)
+	require.Equal(t, libacp.ToolCallStatusCompleted, update.Status)
+	require.Equal(t, "Routed to coding", update.Title)
+	require.NotEmpty(t, update.ToolCallID)
+}
+
 func TestUnit_PermissionPendingGuard(t *testing.T) {
 	tr := &Transport{}
 	const sid = libacp.SessionID("s")

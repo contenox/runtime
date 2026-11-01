@@ -3,6 +3,7 @@ package acpsvc
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/contenox/runtime/libacp"
@@ -113,6 +114,17 @@ func toolCallNotification(sid libacp.SessionID, ev taskengine.TaskEvent, status 
 	}
 	if ev.Error != "" {
 		update.Meta = json.RawMessage(`{"error":` + jsonString(ev.Error) + `}`)
+	}
+	return libacp.SessionNotification{SessionID: sid, Update: update}
+}
+
+func routeNotification(sid libacp.SessionID, ev taskengine.TaskEvent) libacp.SessionNotification {
+	update := libacp.SessionUpdate{
+		SessionUpdate: libacp.SessionUpdateToolCall,
+		ToolCallID:    ev.TaskID + "-" + strconv.FormatInt(ev.Timestamp.UnixNano(), 10),
+		Title:         "Routed to " + ev.Transition,
+		Kind:          libacp.ToolKindOther,
+		Status:        libacp.ToolCallStatusCompleted,
 	}
 	return libacp.SessionNotification{SessionID: sid, Update: update}
 }
@@ -309,6 +321,12 @@ func toolKindFor(toolName string) libacp.ToolKind {
 	if idx := strings.Index(toolName, "."); idx >= 0 {
 		base = toolName[idx+1:]
 	}
+	// The ACP tool names are flattened to native-git_git_diff; the dotted form
+	// is what the approval path uses.
+	base = strings.TrimPrefix(base, "native-git_")
+	if kind, ok := gitToolKind(base); ok {
+		return kind
+	}
 	switch {
 	case strings.HasPrefix(base, "read"), strings.HasPrefix(base, "stat"), strings.HasPrefix(base, "list"), strings.HasPrefix(base, "grep"):
 		return libacp.ToolKindRead
@@ -324,6 +342,23 @@ func toolKindFor(toolName string) libacp.ToolKind {
 		return libacp.ToolKindExecute
 	}
 	return libacp.ToolKindOther
+}
+
+// gitToolKind classifies the native git toolset by what the call does to the
+// repository: inspection is a read, index/history changes are edits, a branch
+// switch is a mode switch, and discarding working-tree changes is a delete.
+func gitToolKind(name string) (libacp.ToolKind, bool) {
+	switch name {
+	case "git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame":
+		return libacp.ToolKindRead, true
+	case "git_add", "git_commit":
+		return libacp.ToolKindEdit, true
+	case "git_checkout_branch":
+		return libacp.ToolKindEdit, true
+	case "git_restore":
+		return libacp.ToolKindDelete, true
+	}
+	return libacp.ToolKindOther, false
 }
 
 func toolCallLocations(ev taskengine.TaskEvent) []libacp.ToolCallLocation {

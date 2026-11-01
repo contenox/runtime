@@ -7,6 +7,56 @@
   "default_action": "deny",
   "rules": [
     {
+      "tools": "native-git",
+      "tool": "git_status",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_diff",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_log",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_show",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_branch_list",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_blame",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_add",
+      "action": "deny"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_commit",
+      "action": "deny"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_checkout_branch",
+      "action": "deny"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_restore",
+      "action": "deny"
+    },
+    {
       "tools": "local_fs",
       "tool": "*",
       "action": "deny",

@@ -309,7 +309,10 @@ func (h *LocalExecTools) checkAllowlist(command string, argsSlice []string, useS
 			}
 		}
 		if !allowed {
-			return fmt.Errorf("local_shell: command %s is not in allowlist", command)
+			if strings.ContainsAny(command, " \t") {
+				return fmt.Errorf("local_shell: command %q is not in allowlist — put the program alone in \"command\" (for example \"git\") and its arguments in \"args\"", command)
+			}
+			return fmt.Errorf("local_shell: command %q is not in allowlist", command)
 		}
 	}
 	return nil

@@ -13,6 +13,9 @@ import (
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/getkin/kin-openapi/openapi3"
+	git "github.com/go-git/go-git/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockPolicyEval struct {
@@ -440,4 +443,82 @@ func TestUnit_HITLWrapper_DiffReadError_ApprovalStillShown(t *testing.T) {
 	if capturedReq.ToolsName != "local_fs" {
 		t.Errorf("approval request was not sent, got toolsName=%q", capturedReq.ToolsName)
 	}
+}
+
+type scriptedPolicyEval struct {
+	fn func(ctx context.Context, toolsName, toolName string, args map[string]any) hitlservice.EvaluationResult
+}
+
+func (s scriptedPolicyEval) Evaluate(ctx context.Context, toolsName, toolName string, args map[string]any) (hitlservice.EvaluationResult, error) {
+	return s.fn(ctx, toolsName, toolName, args), nil
+}
+
+// A single git_diff prints many files. The read rules that guard
+// local_fs.read_file must apply to each of them, or a changed .env is dumped
+// with no approval while reading the same file through local_fs would ask.
+func TestUnit_HITLWrapper_GatesEveryFileAGitToolWouldPrint(t *testing.T) {
+	t.Parallel()
+	dir := gitInitRepo(t)
+	gitWriteFile(t, dir, ".env", "SECRET=one\n")
+	repo, err := git.PlainOpen(dir)
+	require.NoError(t, err)
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Add(".env")
+	require.NoError(t, err)
+	_, err = wt.Commit("env", &git.CommitOptions{Author: gitSignature()})
+	require.NoError(t, err)
+	gitWriteFile(t, dir, ".env", "SECRET=two\n")
+
+	tools := localtools.NewGitTools(dir)
+	provider, ok := tools.(localtools.ReadPathProvider)
+	require.True(t, ok, "GitTools must expose the files it would print")
+
+	readAction := hitlservice.ActionApprove
+	policy := scriptedPolicyEval{fn: func(_ context.Context, toolsName, toolName string, args map[string]any) hitlservice.EvaluationResult {
+		if toolsName == "local_fs" && toolName == "read_file" {
+			if path, _ := args["path"].(string); path == ".env" {
+				return hitlservice.EvaluationResult{Action: readAction, Reason: "fixture"}
+			}
+			return hitlservice.EvaluationResult{Action: hitlservice.ActionAllow}
+		}
+		return hitlservice.EvaluationResult{Action: hitlservice.ActionAllow}
+	}}
+	var asked []hitlservice.ApprovalRequest
+	ask := func(_ context.Context, req hitlservice.ApprovalRequest) (bool, error) {
+		asked = append(asked, req)
+		return true, nil
+	}
+	w := localtools.NewHITLWrapper(tools, ask, policy, nil).WithReadPaths(
+		func(ctx context.Context, call *taskengine.ToolsCall, args map[string]any) ([]string, error) {
+			return provider.ReadPaths(ctx, call, args)
+		},
+	)
+	diff := func() (any, error) {
+		res, _, err := w.Exec(context.Background(), time.Now(), map[string]any{}, false,
+			&taskengine.ToolsCall{Name: localtools.GitToolsName, ToolName: "git_diff"})
+		return res, err
+	}
+
+	res, err := diff()
+	require.NoError(t, err)
+	require.Len(t, asked, 1, "the .env in the diff must ask before the content is printed")
+	assert.Contains(t, asked[0].Detail, ".env")
+	assert.Contains(t, asked[0].ReadPaths, ".env", "the approval card must name the file it would read")
+	assert.Contains(t, fmt.Sprint(res), "SECRET=two")
+
+	readAction = hitlservice.ActionDeny
+	asked = nil
+	res, err = diff()
+	require.Error(t, err)
+	assert.Empty(t, res)
+	assert.Contains(t, err.Error(), "would read .env")
+	assert.Empty(t, asked, "a hard deny must not be downgraded to an approval")
+
+	readAction = hitlservice.ActionAllow
+	asked = nil
+	res, err = diff()
+	require.NoError(t, err)
+	assert.Empty(t, asked)
+	assert.Contains(t, fmt.Sprint(res), "SECRET=two")
 }

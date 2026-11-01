@@ -143,3 +143,84 @@ func TestUnit_InteractivePoliciesRequireApprovalForPlainShellFallback(t *testing
 		})
 	}
 }
+
+// The git toolset is served in every session. A preset that does not name it
+// leaves reads to default_action (asking for git_status) and, on a read_only
+// posture, offers to approve a commit that is supposed to be impossible.
+func TestUnit_SeededPolicies_GateGitTools(t *testing.T) {
+	t.Parallel()
+	reads := []string{"git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame"}
+	writes := []string{"git_commit", "git_checkout_branch", "git_restore"}
+	for _, tc := range []struct {
+		name    string
+		content string
+		read    hitlservice.Action
+		add     hitlservice.Action
+		write   hitlservice.Action
+		secret  hitlservice.Action
+	}{
+		{"hitl-policy-default.json", hitlPolicyDefault, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-acp.json", hitlPolicyACP, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-strict.json", hitlPolicyStrict, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-acpx.json", hitlPolicyACPX, hitlservice.ActionAllow, hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"hitl-policy-dev.json", hitlPolicyDev, hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionAllow},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			svc := seededPolicyService(t, tc.name, tc.content)
+			ctx := context.Background()
+			for _, tool := range reads {
+				r, err := svc.Evaluate(ctx, "native-git", tool, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.read, r.Action, "%s: native-git.%s", tc.name, tool)
+			}
+			r, err := svc.Evaluate(ctx, "native-git", "git_add", nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.add, r.Action, "%s: native-git.git_add", tc.name)
+			for _, tool := range writes {
+				r, err := svc.Evaluate(ctx, "native-git", tool, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.write, r.Action, "%s: native-git.%s", tc.name, tool)
+			}
+			// The multi-file read gate evaluates a diff's files as
+			// local_fs.read_file, so a repo-root .env must not be auto-allowed
+			// on an interactive preset.
+			r, err = svc.Evaluate(ctx, "local_fs", "read_file", map[string]any{"path": ".env"})
+			require.NoError(t, err)
+			assert.Equal(t, tc.secret, r.Action, "%s: reading .env", tc.name)
+		})
+	}
+}
+
+// Safe repository inspection through the shell is a read and runs without a
+// prompt; changing the index, worktree or history still asks. A line carrying a
+// metacharacter must not ride an allowlisted prefix.
+func TestUnit_SeededPolicies_AllowSafeGitShellReads(t *testing.T) {
+	t.Parallel()
+	for name, content := range map[string]string{
+		"hitl-policy-default.json": hitlPolicyDefault,
+		"hitl-policy-acp.json":     hitlPolicyACP,
+		"hitl-policy-dev.json":     hitlPolicyDev,
+	} {
+		name, content := name, content
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			svc := seededPolicyService(t, name, content)
+			ctx := context.Background()
+			for _, line := range []string{"status --short", "diff --stat", "log -1 --oneline", "show --stat HEAD"} {
+				r, err := svc.Evaluate(ctx, "local_shell", "local_shell", map[string]any{"command": "git", "args": line})
+				require.NoError(t, err)
+				assert.Equal(t, hitlservice.ActionAllow, r.Action, "%s: git %s", name, line)
+			}
+			for _, line := range []string{"commit -m live", "checkout main", "restore a.txt", "branch -D main"} {
+				r, err := svc.Evaluate(ctx, "local_shell", "local_shell", map[string]any{"command": "git", "args": line})
+				require.NoError(t, err)
+				assert.Equal(t, hitlservice.ActionApprove, r.Action, "%s: git %s must ask", name, line)
+			}
+			r, err := svc.Evaluate(ctx, "local_shell", "local_shell", map[string]any{"command": "git", "args": "status; rm -rf ."})
+			require.NoError(t, err)
+			assert.NotEqual(t, hitlservice.ActionAllow, r.Action, "%s: a metacharacter must not ride the git prefix", name)
+		})
+	}
+}

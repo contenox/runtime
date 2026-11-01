@@ -7,6 +7,56 @@
   "default_action": "approve",
   "rules": [
     {
+      "tools": "native-git",
+      "tool": "git_status",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_diff",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_log",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_show",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_branch_list",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_blame",
+      "action": "allow"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_add",
+      "action": "approve"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_commit",
+      "action": "approve"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_checkout_branch",
+      "action": "approve"
+    },
+    {
+      "tools": "native-git",
+      "tool": "git_restore",
+      "action": "approve"
+    },
+    {
       "tools": "local_fs",
       "tool": "write_file",
       "action": "deny",
@@ -405,6 +455,18 @@
           "key": "command",
           "op": "command_blacklist",
           "value": "mkfs,mke2fs,fdisk,shred,wipefs"
+        }
+      ]
+    },
+    {
+      "tools": "local_shell",
+      "tool": "local_shell",
+      "action": "allow",
+      "when": [
+        {
+          "key": "command",
+          "op": "command_prefix_allowlist",
+          "value": "git status,git diff,git log,git show,git branch --list,git branch -a,git branch -v,git rev-parse,git ls-files,git describe,git rev-list,git merge-base,git blame,git grep,git remote -v"
         }
       ]
     },

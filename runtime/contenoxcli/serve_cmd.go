@@ -316,6 +316,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 			"", db, nil, "local_fs",
 			acpsvc.NewServeCwdResolver(db, workspaceFactory),
 		),
+		localtools.GitToolsName: localtools.NewGitToolsWith(
+			"", localtools.GitToolsName,
+			acpsvc.NewServeCwdResolver(db, workspaceFactory),
+		),
 		missiontools.ToolsProviderName: missiontools.New(missions, nil, missiontools.WithSupervision(
 			missionSupervision{missions: missions, hitl: hitlSvc},
 			missionSupervision{missions: missions, hitl: hitlSvc},

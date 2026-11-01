@@ -252,8 +252,19 @@ func buildTools(engineCtx context.Context, cfg Config, db libdbexec.DBManager, t
 			hitlSvc = hitlservice.NewWithDefaultPolicy(cfg.HITLPolicySource, hitlTenant, store, tracker, cfg.HITLDefaultPolicyName)
 		}
 		raw := toolsRepo
+		wrapper := localtools.NewHITLWrapper(toolsRepo, cfg.AskApproval, hitlSvc, tracker, cfg.TaskEventSink)
+		wrapper.WithReadPaths(func(ctx context.Context, call *taskengine.ToolsCall, args map[string]any) ([]string, error) {
+			if call == nil {
+				return nil, nil
+			}
+			provider, ok := cfg.LocalTools[call.Name].(localtools.ReadPathProvider)
+			if !ok {
+				return nil, nil
+			}
+			return provider.ReadPaths(ctx, call, args)
+		})
 		toolsRepo = hitlExemptProviders(
-			localtools.NewHITLWrapper(toolsRepo, cfg.AskApproval, hitlSvc, tracker, cfg.TaskEventSink),
+			wrapper,
 			raw,
 			missiontools.ToolsProviderName,
 		)

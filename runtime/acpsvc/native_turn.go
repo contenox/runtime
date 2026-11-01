@@ -77,6 +77,10 @@ func (tr *nativeEventTranslator) publish(ctx context.Context, sid libacp.Session
 		}
 		tr.emit(ctx, toolCallNotification(sid, ev, libacp.ToolCallStatusInProgress))
 	case taskengine.TaskEventStepCompleted:
+		if taskengine.TaskHandler(ev.TaskHandler) == taskengine.HandleRoute && ev.Transition != "" {
+			tr.emit(ctx, routeNotification(sid, ev))
+			return
+		}
 		if taskengine.IsToolBearingHandler(ev.TaskHandler) {
 			return
 		}

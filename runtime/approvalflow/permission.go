@@ -54,6 +54,10 @@ func BuildRequest(req hitlservice.ApprovalRequest, opts BuildOptions) libacp.Req
 		DiffOld:    req.DiffOld,
 		DiffNew:    req.DiffNew,
 	})
+	locations := make([]libacp.ToolCallLocation, 0, len(req.ReadPaths))
+	for _, path := range req.ReadPaths {
+		locations = append(locations, libacp.ToolCallLocation{Path: path})
+	}
 
 	return libacp.RequestPermissionRequest{
 		SessionID: opts.SessionID,
@@ -64,6 +68,7 @@ func BuildRequest(req hitlservice.ApprovalRequest, opts BuildOptions) libacp.Req
 			Status:     libacp.ToolCallStatusPending,
 			RawInput:   MarshalArgs(req.Args),
 			Content:    content,
+			Locations:  locations,
 			Meta:       meta,
 		},
 		Options: []libacp.PermissionOption{
@@ -108,6 +113,17 @@ func Title(req hitlservice.ApprovalRequest) string {
 }
 
 func ToolKindFor(toolsName, toolName string) libacp.ToolKind {
+	base := toolName
+	if idx := strings.Index(base, "."); idx >= 0 {
+		base = base[idx+1:]
+	}
+	base = strings.TrimPrefix(base, "native-git_")
+	if strings.HasPrefix(toolsName, "native-git") {
+		if kind, ok := nativeGitToolKind(base); ok {
+			return kind
+		}
+	}
+
 	switch toolsName {
 	case "local_shell":
 		return libacp.ToolKindExecute
@@ -117,10 +133,6 @@ func ToolKindFor(toolsName, toolName string) libacp.ToolKind {
 		return libacp.ToolKindFetch
 	}
 
-	base := toolName
-	if idx := strings.Index(base, "."); idx >= 0 {
-		base = base[idx+1:]
-	}
 	switch {
 	case strings.HasPrefix(base, "read"), strings.HasPrefix(base, "stat"), strings.HasPrefix(base, "list"), strings.HasPrefix(base, "grep"), strings.HasPrefix(base, "find"):
 		return libacp.ToolKindRead
@@ -136,6 +148,20 @@ func ToolKindFor(toolsName, toolName string) libacp.ToolKind {
 		return libacp.ToolKindExecute
 	}
 	return libacp.ToolKindOther
+}
+
+func nativeGitToolKind(name string) (libacp.ToolKind, bool) {
+	switch name {
+	case "git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame":
+		return libacp.ToolKindRead, true
+	case "git_add", "git_commit":
+		return libacp.ToolKindEdit, true
+	case "git_checkout_branch":
+		return libacp.ToolKindEdit, true
+	case "git_restore":
+		return libacp.ToolKindDelete, true
+	}
+	return libacp.ToolKindOther, false
 }
 
 func localFSKind(toolName string) libacp.ToolKind {

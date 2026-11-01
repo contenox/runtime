@@ -58,3 +58,37 @@ func TestUnit_BuildRequest_CarriesSedInputAndDiffForApprovalCard(t *testing.T) {
 func TestUnit_DiffContent_BlankOldAndNewYieldsNil(t *testing.T) {
 	require.Nil(t, DiffContent("README.md", "", ""))
 }
+
+func TestUnit_BuildRequest_ReadPathsBecomeToolCallLocations(t *testing.T) {
+	req := BuildRequest(hitlservice.ApprovalRequest{
+		ToolCallID: "call-2",
+		ToolsName:  "native-git",
+		ToolName:   "git_diff",
+		ReadPaths:  []string{".env", "src/main.go"},
+	}, BuildOptions{SessionID: "session-1"})
+
+	require.Len(t, req.ToolCall.Locations, 2)
+	require.Equal(t, ".env", req.ToolCall.Locations[0].Path)
+	require.Equal(t, "src/main.go", req.ToolCall.Locations[1].Path)
+}
+
+func TestUnit_ToolKindFor_NativeGit(t *testing.T) {
+	t.Parallel()
+	cases := map[string]libacp.ToolKind{
+		"git_status":          libacp.ToolKindRead,
+		"git_diff":            libacp.ToolKindRead,
+		"git_log":             libacp.ToolKindRead,
+		"git_show":            libacp.ToolKindRead,
+		"git_branch_list":     libacp.ToolKindRead,
+		"git_blame":           libacp.ToolKindRead,
+		"git_add":             libacp.ToolKindEdit,
+		"git_commit":          libacp.ToolKindEdit,
+		"git_checkout_branch": libacp.ToolKindEdit,
+		"git_restore":         libacp.ToolKindDelete,
+	}
+	for name, want := range cases {
+		if got := ToolKindFor("native-git", name); got != want {
+			t.Errorf("ToolKindFor(native-git, %q) = %q, want %q", name, got, want)
+		}
+	}
+}

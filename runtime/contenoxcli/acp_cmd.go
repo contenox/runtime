@@ -157,6 +157,11 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 			slog.Info("agent declarations: shipped files refreshed",
 				"created", len(preseeded.Created), "updated", len(preseeded.Updated), "edited", len(preseeded.Edited))
 		}
+		if refreshed, refreshErr := refreshEmbeddedHITLPolicies(contenoxDir); refreshErr != nil {
+			return refreshErr
+		} else if len(refreshed) > 0 {
+			slog.Info("agent declarations: shipped HITL policies refreshed", "updated", refreshed)
+		}
 		configRoots = append(configRoots, homeRoot)
 	}
 	project, _ := os.Getwd()
@@ -339,6 +344,11 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			db,
 			acpsvc.NewACPFileIO(func() *acpsvc.Transport { return transport }),
 			"local_fs",
+			acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport }),
+		),
+		localtools.GitToolsName: localtools.NewGitToolsWith(
+			"",
+			localtools.GitToolsName,
 			acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport }),
 		),
 		"local_shell": localtools.NewLocalExecToolsWith(

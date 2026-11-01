@@ -268,6 +268,19 @@ shell = "deny"
 
 [envelopes.read_only.tools]
 "@client-mcp.*" = "approve"
+# Git reads are workspace reads, so they inherit this posture's reading half.
+# Git writes change the index, the worktree or the branch, which a posture that
+# promises to change nothing refuses rather than offers for approval.
+"native-git.git_status" = "allow"
+"native-git.git_diff" = "allow"
+"native-git.git_log" = "allow"
+"native-git.git_show" = "allow"
+"native-git.git_branch_list" = "allow"
+"native-git.git_blame" = "allow"
+"native-git.git_add" = "deny"
+"native-git.git_commit" = "deny"
+"native-git.git_checkout_branch" = "deny"
+"native-git.git_restore" = "deny"
 
 # Cloud credentials, SSH and GPG key material.
 [[envelopes.read_only.always_deny]]
@@ -364,7 +377,20 @@ when_value = "**/{id_rsa,id_dsa,id_ecdsa,id_ed25519}*"
 [envelopes.ask_always]
 extends = "read_only"
 description = "Read freely, ask before changing anything."
-shell = "approve"
+
+# Repository inspection through the shell is a read, so the usual git readers
+# run without a prompt. The native git tools are still preferred: they are
+# in-process and cannot execute repository-local git config, while a git
+# subprocess can. Anything that mutates the index, the worktree or history is
+# not on this list and keeps the approve floor.
+[envelopes.ask_always.shell]
+grant = "approve"
+prefix_allowlist = [
+  "git status", "git diff", "git log", "git show",
+  "git branch --list", "git branch -a", "git branch -v",
+  "git rev-parse", "git ls-files", "git describe", "git rev-list",
+  "git merge-base", "git blame", "git grep", "git remote -v",
+]
 
 # Sometimes the work is the .env file itself, so reading one asks rather than
 # silently allowing or denying it.
@@ -389,6 +415,14 @@ deny_paths = [
   # Config keys and hooks under .git are commands, not project files.
   "{**/.git/**,.git/**}",
 ]
+
+# Changing the worktree is the same step up this posture already makes for file
+# writes: ask, then do it. The reads keep the allow they inherit from read_only.
+[envelopes.ask_always.tools]
+"native-git.git_add" = "approve"
+"native-git.git_commit" = "approve"
+"native-git.git_checkout_branch" = "approve"
+"native-git.git_restore" = "approve"
 
 # Edits land without asking; the shell still asks. auto_edit means edits, not
 # execution, and nothing here grants more than the posture above.
@@ -462,8 +496,9 @@ deny_paths = [
 # program actually being run, so a path or a pipeline cannot smuggle one past.
 # `prefix_allowlist` matches a whole line by its opening words and refuses to fire
 # if the line carries a redirect or a metacharacter, since an allowlisted reader
-# with a `>` on it is a writer. Every git verb is deliberately off it: a git
-# subprocess can execute repository-local config even on a read.
+# with a `>` on it is a writer. Safe git readers are on it; mutating git verbs
+# are not. Prefer the native git tools where they are served: a git subprocess
+# can execute repository-local config even on a read, and they cannot.
 [envelopes.default.shell]
 grant = "approve"
 blacklist = ["mkfs", "mke2fs", "fdisk", "shred", "wipefs"]
@@ -476,6 +511,12 @@ prefix_allowlist = [
   "npm test", "npm ls", "tsc --noEmit", "eslint", "vitest run", "jest",
   "pytest", "python -m pytest", "python3 -m pytest", "ruff check", "mypy",
   "pip list", "pip show",
+  # Git inspection. `git branch` alone can delete, so only its listing forms
+  # are here; commits, checkouts and restores keep asking.
+  "git status", "git diff", "git log", "git show",
+  "git branch --list", "git branch -a", "git branch -v",
+  "git rev-parse", "git ls-files", "git describe", "git rev-list",
+  "git merge-base", "git blame", "git grep", "git remote -v",
   # PowerShell and cmd readers; the same rule as above — reading is not changing.
   "Get-ChildItem", "Get-Content", "Get-Location", "Select-String", "Test-Path",
   "where", "dir", "type", "findstr",

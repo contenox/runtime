@@ -3,6 +3,7 @@ package agentdecl_test
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/contenox/runtime/runtime/agentdecl"
@@ -204,5 +205,99 @@ func TestUnit_AlwaysAllowGrantsAConnectedToolWithoutReachingCredentials(t *testi
 	}
 	if len(p.Rules) == 0 || p.Rules[0].Action != hitlservice.ActionDeny {
 		t.Fatalf("rule 0 is %+v, want the credential deny", p.Rules[0])
+	}
+}
+
+// The preseeded coding and review prompts tell the agent that git reads run
+// without asking and that git writes ask first. That is only true if the
+// posture envelopes say so; a served toolset with no rule falls to
+// default_action and asks for everything.
+func TestUnit_EmittedPolicy_GatesGitToolsUnderEveryPosture(t *testing.T) {
+	t.Parallel()
+	reads := []string{"git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame"}
+	writes := []string{"git_add", "git_commit", "git_checkout_branch", "git_restore"}
+	for _, tc := range []struct {
+		posture agentdecl.Posture
+		write   hitlservice.Action
+	}{
+		{agentdecl.PostureReadOnly, hitlservice.ActionDeny},
+		{agentdecl.PostureAskAlways, hitlservice.ActionApprove},
+		{agentdecl.PostureAutoEdit, hitlservice.ActionApprove},
+	} {
+		tc := tc
+		t.Run(string(tc.posture), func(t *testing.T) {
+			t.Parallel()
+			p, err := agentdecl.EmitPolicy(irWithPosture(t, tc.posture, []string{"*"}), mustConfig(t))
+			if err != nil {
+				t.Fatalf("emit: %v", err)
+			}
+			for _, name := range reads {
+				r, ok := ruleFor(p, "native-git", name)
+				if !ok {
+					t.Errorf("posture %s has no rule for native-git.%s, so it falls to default_action %q", tc.posture, name, p.DefaultAction)
+					continue
+				}
+				if r.Action != hitlservice.ActionAllow {
+					t.Errorf("posture %s: native-git.%s is %s, want allow (a read)", tc.posture, name, r.Action)
+				}
+			}
+			for _, name := range writes {
+				r, ok := ruleFor(p, "native-git", name)
+				if !ok {
+					t.Errorf("posture %s has no rule for native-git.%s, so it falls to default_action %q", tc.posture, name, p.DefaultAction)
+					continue
+				}
+				if r.Action != tc.write {
+					t.Errorf("posture %s: native-git.%s is %s, want %s", tc.posture, name, r.Action, tc.write)
+				}
+			}
+		})
+	}
+}
+
+func shellAllowsGitReads(rules []hitlservice.Rule) bool {
+	for _, r := range rules {
+		if r.Tools != "local_shell" || r.Tool != "local_shell" || r.Action != hitlservice.ActionAllow {
+			continue
+		}
+		for _, c := range r.When {
+			if c.Op == hitlservice.OpCommandPrefixAllowlist && strings.Contains(c.Value, "git status") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestUnit_EmittedPolicy_AllowsSafeGitShellReads(t *testing.T) {
+	t.Parallel()
+	for _, posture := range []agentdecl.Posture{agentdecl.PostureAskAlways, agentdecl.PostureAutoEdit} {
+		posture := posture
+		t.Run(string(posture), func(t *testing.T) {
+			t.Parallel()
+			p, err := agentdecl.EmitPolicy(irWithPosture(t, posture, []string{"*"}), mustConfig(t))
+			if err != nil {
+				t.Fatalf("emit: %v", err)
+			}
+			if !shellAllowsGitReads(p.Rules) {
+				t.Errorf("posture %s does not allow safe git shell reads", posture)
+			}
+		})
+	}
+}
+
+func TestUnit_DefaultEnvelope_AllowsSafeGitShellReads(t *testing.T) {
+	t.Parallel()
+	cfg := mustConfig(t)
+	env, err := cfg.ResolveEnvelope("default")
+	if err != nil {
+		t.Fatalf("resolve default envelope: %v", err)
+	}
+	out, err := agentdecl.TranspileEnvelope(env)
+	if err != nil {
+		t.Fatalf("transpile: %v", err)
+	}
+	if !shellAllowsGitReads(out.Policy.Rules) {
+		t.Fatal("the default envelope does not allow safe git shell reads")
 	}
 }

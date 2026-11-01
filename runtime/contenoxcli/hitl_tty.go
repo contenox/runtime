@@ -117,6 +117,13 @@ func renderApprovalRequest(w io.Writer, req hitlservice.ApprovalRequest) {
 		}
 	}
 
+	if len(req.ReadPaths) > 0 {
+		fmt.Fprintln(w, "  Reads :")
+		for _, path := range req.ReadPaths {
+			fmt.Fprintf(w, "    %s\n", path)
+		}
+	}
+
 	if req.Diff != "" {
 		fmt.Fprintln(w, "  Diff  :")
 		lines := strings.Split(req.Diff, "\n")

@@ -51,6 +51,9 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 		"print":    localtools.NewPrint(tracker),
 		"webtools": localtools.NewWebCaller(tracker),
 		"local_fs": localtools.NewLocalFSTools(opts.EffectiveLocalExecAllowedDir, db),
+		localtools.GitToolsName: localtools.NewGitToolsWith(
+			opts.EffectiveLocalExecAllowedDir, localtools.GitToolsName, nil,
+		),
 	}
 	if opts.EffectiveEnableLocalExec {
 		execOpts := []localtools.LocalExecOption{}
