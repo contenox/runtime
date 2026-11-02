@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -39,12 +41,17 @@ func newTestManager(ctx context.Context, t *testing.T, bus *libbus.InMem) *mcpwo
 	return mgr
 }
 
-func fakeMCPServer(name string) *runtimetypes.MCPServer {
+func fakeMCPServer(t *testing.T, name string) *runtimetypes.MCPServer {
+	t.Helper()
+	unavailable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "no MCP server here", http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(unavailable.Close)
 	return &runtimetypes.MCPServer{
 		ID:        "00000000-0000-0000-0000-000000000001",
 		Name:      name,
 		Transport: "sse",
-		URL:       "http://127.0.0.1:19999/sse",
+		URL:       unavailable.URL + "/sse",
 	}
 }
 
@@ -53,7 +60,7 @@ func TestUnit_MCPWorker_StartStop(t *testing.T) {
 	bus := libbus.NewInMem()
 	mgr := newTestManager(ctx, t, bus)
 
-	srv := fakeMCPServer("unit-test-server")
+	srv := fakeMCPServer(t, "unit-test-server")
 
 	_, err := bus.Request(ctx, mcpworker.SubjectExecute(srv.Name), []byte(`{}`))
 	require.ErrorIs(t, err, libbus.ErrRequestTimeout, "expected no handler before StartWorker")
@@ -90,7 +97,7 @@ func TestUnit_MCPWorker_WatchCreated(t *testing.T) {
 	mgr := newTestManager(ctx, t, bus)
 	require.NoError(t, mgr.WatchEvents(ctx))
 
-	srv := fakeMCPServer("watch-created-server")
+	srv := fakeMCPServer(t, "watch-created-server")
 
 	data, err := json.Marshal(srv)
 	require.NoError(t, err)
@@ -109,7 +116,7 @@ func TestUnit_MCPWorker_WatchDeleted(t *testing.T) {
 	mgr := newTestManager(ctx, t, bus)
 	require.NoError(t, mgr.WatchEvents(ctx))
 
-	srv := fakeMCPServer("watch-deleted-server")
+	srv := fakeMCPServer(t, "watch-deleted-server")
 
 	require.NoError(t, mgr.StartWorker(ctx, srv))
 	require.Contains(t, mgr.ActiveWorkers(), srv.Name)
@@ -131,7 +138,7 @@ func TestUnit_MCPWorker_IdempotentStart(t *testing.T) {
 	bus := libbus.NewInMem()
 	mgr := newTestManager(ctx, t, bus)
 
-	srv := fakeMCPServer("idempotent-server")
+	srv := fakeMCPServer(t, "idempotent-server")
 
 	require.NoError(t, mgr.StartWorker(ctx, srv))
 	require.NoError(t, mgr.StartWorker(ctx, srv))
@@ -159,7 +166,7 @@ func TestUnit_MCPWorker_ListToolsFailureCooldownSkipsImmediateRetry(t *testing.T
 	ctx := t.Context()
 	bus := libbus.NewInMem()
 	mgr := newTestManager(ctx, t, bus)
-	srv := fakeMCPServer("cooldown-server")
+	srv := fakeMCPServer(t, "cooldown-server")
 	require.NoError(t, mgr.StartWorker(ctx, srv))
 
 	replyData, err := bus.Request(ctx, mcpworker.SubjectListTools(srv.Name), nil)
@@ -192,9 +199,9 @@ func TestUnit_MCPWorker_BootLoadsFromDB(t *testing.T) {
 	bus := libbus.NewInMem()
 
 	preloaded := []*runtimetypes.MCPServer{
-		fakeMCPServer("boot-server-a"),
-		fakeMCPServer("boot-server-b"),
-		fakeMCPServer("acp-stale"),
+		fakeMCPServer(t, "boot-server-a"),
+		fakeMCPServer(t, "boot-server-b"),
+		fakeMCPServer(t, "acp-stale"),
 	}
 	preloaded[1].ID = "00000000-0000-0000-0000-000000000002"
 	preloaded[2].ID = "00000000-0000-0000-0000-000000000003"

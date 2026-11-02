@@ -19,9 +19,8 @@ import (
 const AgentChainFilePrefix = "agent-"
 
 var shippedAgentChains = map[string]bool{
-	"chain-contenox": true,
-	"chain-acp":      true,
-	"chain-acpx":     true,
+	"chain-acp":  true,
+	"chain-acpx": true,
 }
 
 type Result struct {

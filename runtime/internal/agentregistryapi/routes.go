@@ -5,6 +5,7 @@ import (
 
 	apiframework "github.com/contenox/runtime/apiframework"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
+	"github.com/contenox/runtime/runtime/chainagents"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -37,7 +38,7 @@ func (h *agentHandler) list(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.ListOperation)
 		return
 	}
-	_ = apiframework.Encode(w, r, http.StatusOK, items)
+	_ = apiframework.Encode(w, r, http.StatusOK, chainagents.WithMissionCapability(items))
 }
 
 func (h *agentHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +49,7 @@ func (h *agentHandler) get(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
 		return
 	}
+	agent.MissionCapable = chainagents.MissionCapable(agent)
 	_ = apiframework.Encode(w, r, http.StatusOK, agent)
 }
 
@@ -59,6 +61,7 @@ func (h *agentHandler) getByName(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
 		return
 	}
+	agent.MissionCapable = chainagents.MissionCapable(agent)
 	_ = apiframework.Encode(w, r, http.StatusOK, agent)
 }
 
@@ -72,6 +75,7 @@ func (h *agentHandler) create(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
+	agent.MissionCapable = chainagents.MissionCapable(&agent)
 	_ = apiframework.Encode(w, r, http.StatusCreated, agent)
 }
 
@@ -87,6 +91,7 @@ func (h *agentHandler) update(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
 		return
 	}
+	agent.MissionCapable = chainagents.MissionCapable(&agent)
 	_ = apiframework.Encode(w, r, http.StatusOK, agent)
 }
 

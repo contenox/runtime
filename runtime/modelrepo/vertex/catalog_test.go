@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/contenox/runtime/runtime/modelrepo"
@@ -12,13 +14,18 @@ import (
 )
 
 func TestUnit_GoogleCatalog_ListModels(t *testing.T) {
-	t.Parallel()
+	adc := filepath.Join(t.TempDir(), "sa.json")
+	require.NoError(t, os.WriteFile(adc, []byte(`{"type":"service_account","project_id":"sa-project","private_key_id":"k","private_key":"-----BEGIN PRIVATE KEY-----
+MIIB
+-----END PRIVATE KEY-----
+","client_email":"sa@example.test"}`), 0o600))
+	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", adc)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.NotEmpty(t, r.Header.Get("Authorization"), "expected ADC bearer token")
 		require.Empty(t, r.Header.Get("x-goog-user-project"),
-			"an ambient credential names its own quota project in the ADC setup; the endpoint's project segment does not override it")
+			"an ambient service account is billed to its own project; only a user login borrows the endpoint's project")
 		require.Equal(t, "/v1beta1/publishers/google/models", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{

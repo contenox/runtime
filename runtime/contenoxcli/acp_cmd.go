@@ -251,7 +251,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	defer db.Close()
 	reportChange("phase", "open_db")
 
-	contenoxDir, err := globalContenoxDir()
+	contenoxDir, err := acpContenoxDir(cmd)
 	if err != nil {
 		reportErr(err)
 		return fmt.Errorf("resolve contenox dir: %w", err)
@@ -298,10 +298,11 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		}
 	}
 
-	defaultModel := configValueWithEnv(ctx, db, "default-model", envDefaultModel)
-	defaultProvider := configValueWithEnv(ctx, db, "default-provider", envDefaultProvider)
-	defaultAltModel := configValueWithEnv(ctx, db, "default-alt-model", envDefaultAltModel)
-	defaultAltProvider := configValueWithEnv(ctx, db, "default-alt-provider", envDefaultAltProvider)
+	pinned := pinnedModelFlags(cmd)
+	defaultModel := firstNonEmptyStr(pinned.Model, configValueWithEnv(ctx, db, "default-model", envDefaultModel))
+	defaultProvider := firstNonEmptyStr(pinned.Provider, configValueWithEnv(ctx, db, "default-provider", envDefaultProvider))
+	defaultAltModel := firstNonEmptyStr(pinned.AltModel, configValueWithEnv(ctx, db, "default-alt-model", envDefaultAltModel))
+	defaultAltProvider := firstNonEmptyStr(pinned.AltProvider, configValueWithEnv(ctx, db, "default-alt-provider", envDefaultAltProvider))
 	defaultMaxTokens, err := normalizeMaxTokensConfig(configValueWithEnv(ctx, db, "default-max-tokens", envDefaultMaxTokens))
 	if err != nil {
 		return err
@@ -326,7 +327,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	defer bus.Close()
 	missions := missionservice.New(db, missionservice.WithEventPublisher(bus))
 
-	acpHITL := hitlservice.NewWithDefaultPolicy(acpPolicySource(), runtimetypes.LocalTenantID, runtimetypes.New(db.WithoutTransaction()), tracker, profile.hitlPolicy)
+	acpHITL := hitlservice.NewWithDefaultPolicy(acpPolicySource(contenoxDir), runtimetypes.LocalTenantID, runtimetypes.New(db.WithoutTransaction()), tracker, profile.hitlPolicy)
 
 	oracleStore := runtimetypes.New(db.WithoutTransaction())
 	oracleCfg := resolveOracleConfig(ctx, oracleStore, cmd)
@@ -402,7 +403,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		if enableHITL {
 			cfg.EnableHITL = true
 			cfg.AskApproval = askApproval
-			cfg.HITLPolicySource = acpPolicySource()
+			cfg.HITLPolicySource = acpPolicySource(contenoxDir)
 			cfg.HITLDefaultPolicyName = profile.hitlPolicy
 		}
 
@@ -469,6 +470,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			bus:         bus,
 			missions:    missions,
 			contenoxDir: contenoxDir,
+			chainArgs:   chainUnitArgs(dbPath, contenoxDir, pinned),
 			tracker:     tracker,
 			transport:   func() *acpsvc.Transport { return transport },
 			hitl:        acpHITL,
@@ -493,10 +495,11 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		DefaultAltProvider:    defaultAltProvider,
 		DefaultMaxTokens:      defaultMaxTokens,
 		DefaultThink:          defaultThink,
-		LiveDefaults:          liveDefaultsResolver(db, true, acpsvc.LiveDefaults{}),
+		LiveDefaults:          liveDefaultsResolver(db, true, pinned),
 		WorkspaceID:           workspaceID,
 		ContenoxDir:           contenoxDir,
 		KnownPolicies:         embeddedPolicyNames(),
+		MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,
 		DecisionRecorder:      decisionRecorderOf(acpHITL),
@@ -539,6 +542,7 @@ type inProcessFleetDeps struct {
 	bus         libbus.Messenger
 	missions    missionservice.Service
 	contenoxDir string
+	chainArgs   []string
 	tracker     libtracker.ActivityTracker
 	transport   func() *acpsvc.Transport
 	hitl        hitlservice.Service
@@ -549,7 +553,7 @@ func buildInProcessFleet(ctx context.Context, deps inProcessFleetDeps) (fleetser
 
 	discoverChainAgents(ctx, agents, deps.contenoxDir)
 
-	kernel := agentinstance.New(agents, agentinstance.WithStderr(os.Stderr))
+	kernel := agentinstance.New(agents, agentinstance.WithStderr(os.Stderr), agentinstance.WithChainArgs(deps.chainArgs...))
 
 	operatorInbox := operatorinbox.New(deps.db)
 
@@ -678,12 +682,29 @@ func (p transportPrompter) PromptContenoxSession(ctx context.Context, contenoxSe
 	return t.PromptContenoxSession(ctx, contenoxSessionID, text)
 }
 
-func acpPolicySource() hitlservice.PolicySource {
-	dir, err := homedir.Dir()
-	if err != nil {
-		return hitlservice.NewFSPolicySource()
+func acpPolicySource(contenoxDir string) hitlservice.PolicySource {
+	return hitlservice.NewFSPolicySource(acpPolicyDirs(contenoxDir)...)
+}
+
+func acpPolicyDirs(contenoxDir string) []string {
+	var dirs []string
+	seen := map[string]bool{}
+	add := func(dir string) {
+		if strings.TrimSpace(dir) == "" {
+			return
+		}
+		clean := filepath.Clean(dir)
+		if seen[clean] {
+			return
+		}
+		seen[clean] = true
+		dirs = append(dirs, filepath.Join(clean, agentdecl.GeneratedDirName), clean)
 	}
-	return hitlservice.NewFSPolicySource(filepath.Join(dir, agentdecl.GeneratedDirName), dir)
+	add(contenoxDir)
+	if home, err := homedir.Dir(); err == nil {
+		add(home)
+	}
+	return dirs
 }
 
 func acpUpdateBanner(ctx context.Context, db libdb.DBManager, contenoxDir string) string {

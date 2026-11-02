@@ -220,10 +220,16 @@ func TestUnit_HandleMission_UnavailableWithoutFleet(t *testing.T) {
 }
 
 func TestUnit_HandleMission_EmptyArgsShowsUsage(t *testing.T) {
-	tr, _ := newMissionTestTransport(t, &fakeDispatcher{}, &fakeResolver{})
-	_, err := tr.handleMission(context.Background(), &sessionEntry{}, "   ")
-	if err == nil || !strings.Contains(err.Error(), "usage") {
-		t.Fatalf("want usage error, got %v", err)
+	tr, db := newMissionTestTransport(t, &fakeDispatcher{}, &fakeResolver{})
+	setMissionConfig(t, db, "default-mission-agent", "agent-reviewer")
+	out, err := tr.handleMission(context.Background(), &sessionEntry{}, "   ")
+	if err != nil {
+		t.Fatalf("/mission alone must print the defaults, got %v", err)
+	}
+	for _, want := range []string{"/mission <intent>", "--policy <envelope>", "Default agent:    agent-reviewer", "Default envelope: (none)", "/mission-agent <name>", "/mission-envelope <name>", "Settings → Missions", "contenox-runtime config set default-mission-agent"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("/mission status missing %q: %q", want, out)
+		}
 	}
 }
 
@@ -272,15 +278,20 @@ func TestUnit_AcpCommands_WithoutMissionCapability_ExcludesMission(t *testing.T)
 	if containsCommand(cmds, planCommandName) {
 		t.Fatalf("/plan advertised without capability: %v", commandNames(cmds))
 	}
+	for _, name := range []string{"mission-agent", "mission-envelope"} {
+		if containsCommand(cmds, name) {
+			t.Fatalf("/%s advertised without capability: %v", name, commandNames(cmds))
+		}
+	}
 	for _, c := range allACPCommands() {
-		if c.Name == "mission" || c.Name == planCommandName {
+		if missionCommandNames[c.Name] || c.Name == planCommandName {
 			continue
 		}
 		if !containsCommand(cmds, c.Name) {
 			t.Fatalf("advertised commands missing %q: %v", c.Name, commandNames(cmds))
 		}
 	}
-	if want := len(allACPCommands()) - 2; len(cmds) != want {
+	if want := len(allACPCommands()) - 4; len(cmds) != want {
 		t.Fatalf("advertised %d commands, want %d (full set minus mission): %v", len(cmds), want, commandNames(cmds))
 	}
 }

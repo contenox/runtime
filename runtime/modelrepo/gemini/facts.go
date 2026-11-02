@@ -200,6 +200,25 @@ type ThinkingControl struct {
 	IncludeThoughts bool
 }
 
+func ThinkingControlForTurn(model string, think *string, messages []modelrepo.Message) (*ThinkingControl, error) {
+	if latestUserTurnHasAudio(messages) {
+		if fact, ok := ModelFactsFor(model); ok && fact.ThinkingBudget && fact.DisableThinking {
+			off := 0
+			return &ThinkingControl{Budget: &off}, nil
+		}
+	}
+	return ThinkingControlFor(model, think)
+}
+
+func latestUserTurnHasAudio(messages []modelrepo.Message) bool {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			return len(messages[i].Audio) > 0
+		}
+	}
+	return false
+}
+
 func ThinkingControlFor(model string, think *string) (*ThinkingControl, error) {
 	if think == nil {
 		return nil, nil

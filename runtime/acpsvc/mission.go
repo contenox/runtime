@@ -44,36 +44,43 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 					target = "the serve at " + u
 				}
 			}
-			return "", fmt.Errorf("mission dispatch is unavailable: %s stopped answering — restart it or run `contenox serve`, then try /mission again", target)
+			return "", fmt.Errorf("mission dispatch is unavailable: %s stopped answering — restart it or run `contenox-runtime serve`, then try /mission again", target)
 		}
 	} else if !t.hasMissionCapability() {
-		return "", fmt.Errorf("mission dispatch is unavailable in this session: /mission needs a configured model and the in-process fleet. Configure a model with `contenox config set default-model …` and fire /mission from your editor session, or set CONTENOX_SERVER_URL to fire onto a running serve.")
-	}
-	args = strings.TrimSpace(args)
-	if args == "" {
-		return "", fmt.Errorf("usage: /mission <intent>   or   /mission <agent-name> <intent>")
+		return "", fmt.Errorf("mission dispatch is unavailable in this session: /mission needs a configured model and the in-process fleet. Configure a model with `contenox-runtime config set default-model …` and fire /mission from your editor session, or set CONTENOX_SERVER_URL to fire onto a running serve.")
 	}
 
 	store := runtimetypes.New(t.deps.DB.WithoutTransaction())
+	if strings.TrimSpace(args) == "" {
+		return t.missionStatus(ctx, store), nil
+	}
 
-	agentName, intent, named := t.resolveMissionAgentAndIntent(ctx, store, args)
+	flags, rest, err := parseMissionFlags(args)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(rest) == "" {
+		return "", fmt.Errorf("%s — /mission with no arguments lists the defaults, the mission agents and the envelopes", missionUsageLine)
+	}
+
+	agentName, intent, named := t.resolveMissionAgentAndIntent(ctx, store, rest)
+	if named && strings.TrimSpace(intent) == "" {
+		return "", fmt.Errorf("describe what %s should do: /mission %s <intent>. No mission was dispatched", agentName, agentName)
+	}
 	if strings.TrimSpace(agentName) == "" {
-		return "", fmt.Errorf("no mission agent: name one as `/mission <agent-name> <intent>`, or set a default under Settings → Missions (or `contenox config set default-mission-agent <name>`)")
+		return "", fmt.Errorf("no mission agent: name one as `/mission <agent-name> <intent>`, or set a default. %s", missionFixHint(missionAgentCommand, missionAgentConfigKey, "<name>", t.missionAgentNames(ctx)))
 	}
-	policy := strings.TrimSpace(clikv.Read(ctx, store, "default-mission-policy"))
-	if policy == "" {
-		// No setting: a mission naming a declared agent runs under that agent's
-		// own posture, whose policy the declaration compiler already rendered.
-		policy = t.declaredAgentPolicy(ctx, agentName)
-	}
-	if policy == "" {
-		return "", fmt.Errorf("no mission envelope: set one under Settings → Missions (or `contenox config set default-mission-policy <policy>`) — a mission must name the HITL policy that bounds it")
+
+	policy, err := t.resolveMissionPolicy(ctx, store, flags.policy, agentName)
+	if err != nil {
+		return "", err
 	}
 
 	res, err := t.deps.Fleet.Dispatch(ctx, fleetservice.DispatchRequest{
 		AgentName:       agentName,
 		Intent:          intent,
 		HITLPolicyName:  policy,
+		Cwd:             sess.Cwd,
 		ParentSessionID: sess.InternalSessionID,
 	})
 	if err != nil {
@@ -94,7 +101,7 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 	}
 	tail := "Reports arrive live in this session as the mission runs; if this session has ended when one lands, it waits in the operator inbox."
 	if t.deps.MissionForwarded != nil {
-		tail = "Reports land in the operator inbox on that serve (read them with `contenox approvals`, or `contenox mission show`); live delivery back into this editor session is a named follow-up."
+		tail = "Reports land in the operator inbox on that serve (read them with `contenox-runtime approvals`, or `contenox-runtime mission show`); live delivery back into this editor session is a named follow-up."
 	}
 	return fmt.Sprintf(
 		"Mission fired at %s %q under envelope %q.\nIntent: %s\nMission %s (instance %s, session %s). %s",
@@ -102,14 +109,32 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 	), nil
 }
 
+func (t *Transport) resolveMissionPolicy(ctx context.Context, store runtimetypes.Store, flag, agentName string) (string, error) {
+	envelopes := t.missionEnvelopeNames()
+	if name := strings.TrimSpace(flag); name != "" {
+		resolved, ok := matchEnvelope(envelopes, name)
+		if !ok {
+			return "", fmt.Errorf("unknown mission envelope %q for --policy. %s", name, missionChoices(envelopes))
+		}
+		return resolved, nil
+	}
+	if policy := strings.TrimSpace(clikv.Read(ctx, store, missionPolicyConfigKey)); policy != "" {
+		return policy, nil
+	}
+	if policy := t.declaredAgentPolicy(ctx, agentName); policy != "" {
+		return policy, nil
+	}
+	return "", fmt.Errorf("no mission envelope: a mission must name the HITL policy that bounds it. Name one as `/mission --policy <envelope> <intent>`, or set a default. %s", missionFixHint(missionEnvelopeCommand, missionPolicyConfigKey, "<envelope>", envelopes))
+}
+
 func (t *Transport) resolveMissionAgentAndIntent(ctx context.Context, store runtimetypes.Store, args string) (agentName, intent string, named bool) {
 	first, rest := splitFirstToken(args)
-	if rest != "" && t.deps.Agents != nil {
+	if t.deps.Agents != nil {
 		if a, err := t.deps.Agents.GetByName(ctx, first); err == nil && a != nil {
 			return a.Name, rest, true
 		}
 	}
-	return strings.TrimSpace(clikv.Read(ctx, store, "default-mission-agent")), args, false
+	return strings.TrimSpace(clikv.Read(ctx, store, missionAgentConfigKey)), args, false
 }
 
 func (t *Transport) DeliverToContenoxSession(ctx context.Context, contenoxSessionID string, n libacp.SessionNotification) error {

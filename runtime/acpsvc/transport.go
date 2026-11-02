@@ -48,6 +48,8 @@ type Deps struct {
 	KnownPolicies         []string
 	HITLDefaultPolicyName string
 
+	MissionPolicyDirs []string
+
 	UpdateBanner string
 
 	EnvSetup *EnvSetupSpec

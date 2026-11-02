@@ -114,7 +114,7 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 	if s.policyValidator != nil {
 		if err := s.policyValidator.ValidatePolicy(ctx, req.HITLPolicyName); err != nil {
 			return DispatchResult{}, apiframework.InvalidParameterValue("hitlPolicyName",
-				fmt.Sprintf("hitl policy %q could not be loaded: it must name an existing policy (see `contenox config` / the .contenox policy files)", strings.TrimSpace(req.HITLPolicyName)))
+				fmt.Sprintf("hitl policy %q could not be loaded: it must name an existing envelope. Choose one in chat with `/mission-envelope <name>`, under Settings → Missions, or with `contenox-runtime config set default-mission-policy <name>`", strings.TrimSpace(req.HITLPolicyName)))
 		}
 	}
 	cwd, err := s.resolveCwd(req.Cwd)
@@ -122,7 +122,7 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 		return DispatchResult{}, err
 	}
 
-	agent, err := agentregistryservice.ResolveForSpawn(ctx, s.agents, req.AgentName)
+	agent, err := agentregistryservice.ResolveForSpawn(ctx, s.agents, strings.TrimSpace(req.AgentName))
 	if err != nil {
 		if errors.Is(err, agentregistryservice.ErrAgentDisabled) {
 			return DispatchResult{}, apiframework.Conflict(err.Error())
@@ -139,7 +139,7 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 
 	sessionID, err := s.instances.OpenSession(ctx, instanceID, agentinstance.SessionSpec{
 		Cwd:  cwd,
-		Meta: missionservice.MarshalMissionMeta(missionID),
+		Meta: missionservice.MarshalMissionMetaWithIntent(missionID, req.Intent),
 	})
 	if err != nil {
 		_ = s.instances.Stop(instanceID)
@@ -151,8 +151,9 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 	m := &missionservice.Mission{
 		ID:              missionID,
 		Intent:          req.Intent,
-		AgentName:       req.AgentName,
+		AgentName:       agent.Name,
 		HITLPolicyName:  req.HITLPolicyName,
+		Cwd:             cwd,
 		ParentSessionID: req.ParentSessionID,
 	}
 	if err := s.missions.Create(ctx, m); err != nil {
@@ -170,7 +171,7 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 		instanceID: instanceID,
 		sessionID:  sessionID,
 		missionID:  m.ID,
-		agentName:  req.AgentName,
+		agentName:  agent.Name,
 		intent:     req.Intent,
 	})
 
@@ -198,10 +199,13 @@ func (s *service) driveUnattendedMission(ctx context.Context, run missionRun) {
 	}
 	stop, err := s.promptTurn(ctx, run, firstTurn)
 	if err != nil {
-		reportErr(err)
+		s.failTurn(ctx, run, err, reportErr, reportChange)
 		return
 	}
 	reportChange(string(run.sessionID), string(stop))
+	if stop == libacp.StopReasonCancelled {
+		return
+	}
 	if s.missionReached(ctx, run.missionID) {
 		return
 	}
@@ -215,10 +219,13 @@ func (s *service) driveUnattendedMission(ctx context.Context, run missionRun) {
 	}
 	stop, err = s.promptTurn(ctx, run, []libacp.ContentBlock{libacp.NewTextContent(missionNudge)})
 	if err != nil {
-		reportErr(err)
+		s.failTurn(ctx, run, err, reportErr, reportChange)
 		return
 	}
 	reportChange(string(run.sessionID), string(stop))
+	if stop == libacp.StopReasonCancelled {
+		return
+	}
 	if s.missionReached(ctx, run.missionID) {
 		return
 	}
@@ -283,11 +290,50 @@ func (s *service) sessionJournal(run missionRun) ([]libacp.SessionNotification, 
 func (s *service) promptTurn(ctx context.Context, run missionRun, blocks []libacp.ContentBlock) (libacp.StopReason, error) {
 	stop, err := s.instances.Prompt(ctx, run.instanceID, run.sessionID, blocks)
 	if err != nil {
-		_, _ = s.missions.Heartbeat(ctx, run.missionID, err.Error())
 		return "", err
 	}
 	_, _ = s.missions.Heartbeat(ctx, run.missionID, "")
 	return stop, nil
+}
+
+func (s *service) failTurn(ctx context.Context, run missionRun, turnErr error, reportErr func(error), reportChange func(string, any)) {
+	reportErr(turnErr)
+	defer func() {
+		if err := s.instances.Stop(run.instanceID); err != nil {
+			reportChange("turn_error_stop_error", err.Error())
+		}
+	}()
+
+	if m, err := s.missions.Get(ctx, run.missionID); err == nil && m != nil && m.Status != missionservice.StatusOpen {
+		reportChange("turn_error", fmt.Sprintf("mission already at rest as %s; unit reaped", m.Status))
+		return
+	}
+
+	reason := turnErrorLine(turnErr)
+	reportChange("turn_error", reason)
+	if err := s.missions.AddReport(ctx, run.missionID, &missionservice.Report{
+		Kind:    missionservice.ReportKindBlocker,
+		Summary: reason,
+		Detail:  turnErrorDetail(turnErr, string(run.sessionID)),
+	}); err != nil {
+		reportChange("turn_error_report_error", err.Error())
+	}
+	if _, err := s.missions.Finish(ctx, run.missionID, missionservice.StatusDerailed, reason); err != nil {
+		reportChange("turn_error_finish_error", err.Error())
+	}
+}
+
+const turnErrorBlockerLead = "unit turn failed"
+
+func turnErrorLine(turnErr error) string {
+	return singleLineExcerpt(fmt.Sprintf("%s: %v", turnErrorBlockerLead, turnErr), 240)
+}
+
+func turnErrorDetail(turnErr error, sessionID string) string {
+	return fmt.Sprintf(
+		"The unit's turn on session %s returned an error, and the drive loop is the only thing prompting a dispatched unit:\n\n%v\n\n"+
+			"The mission was finished %s and the unit stopped, so it no longer holds fleet width. Re-dispatch once the cause is addressed.",
+		sessionID, turnErr, missionservice.StatusDerailed)
 }
 
 func (s *service) missionReached(ctx context.Context, missionID string) bool {
@@ -373,9 +419,26 @@ func singleLineExcerpt(s string, max int) string {
 	return strings.TrimSpace(string(r[:max])) + "…"
 }
 
+const StoppedByOperatorReason = "stopped by operator"
+
 func (s *service) Stop(ctx context.Context, instanceID string) error {
-	_ = ctx
+	s.abandonMissionOf(ctx, instanceID)
 	return s.instances.Stop(instanceID)
+}
+
+func (s *service) abandonMissionOf(ctx context.Context, instanceID string) {
+	if s.missions == nil || strings.TrimSpace(instanceID) == "" {
+		return
+	}
+	m, err := s.missions.GetByInstance(ctx, instanceID)
+	if err != nil || m == nil || m.Status != missionservice.StatusOpen {
+		return
+	}
+	if _, err := s.missions.Finish(ctx, m.ID, missionservice.StatusAbandoned, StoppedByOperatorReason); err != nil {
+		reportErr, _, end := s.tracker.Start(ctx, "stop", "fleet_mission_abandon", "instance_id", instanceID, "mission_id", m.ID)
+		reportErr(err)
+		end()
+	}
 }
 
 func (s *service) Cancel(ctx context.Context, instanceID, sessionID string) error {

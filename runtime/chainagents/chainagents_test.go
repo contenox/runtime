@@ -81,9 +81,9 @@ func TestUnit_Discover_ShippedAgenticChainsAreEligibleByID(t *testing.T) {
 
 	res, err := chainagents.Discover(ctx, agents, dir)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"chain-contenox", "chain-acp", "chain-acpx"}, res.Created)
+	require.ElementsMatch(t, []string{"chain-acp", "chain-acpx"}, res.Created)
 
-	for _, utility := range []string{"chain-compact", "chain-fim", "chain-run"} {
+	for _, utility := range []string{"chain-contenox", "chain-compact", "chain-fim", "chain-run"} {
 		_, err := agents.GetByName(ctx, utility)
 		require.ErrorIsf(t, err, libdb.ErrNotFound, "%s is a utility chain, not an agent template", utility)
 	}

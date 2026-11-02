@@ -80,3 +80,38 @@ func (t *Transport) setProvisionalTitle(ctx context.Context, sid libacp.SessionI
 		},
 	})
 }
+
+const missionTitleKVPrefix = "acp:session_mission_title:"
+
+func missionTitle(intent string) string {
+	return truncateSessionListTitle(strings.Join(strings.Fields(intent), " "))
+}
+
+func (t *Transport) persistMissionTitle(ctx context.Context, store runtimetypes.Store, internalSessionID, intent string) string {
+	title := missionTitle(intent)
+	if title == "" || internalSessionID == "" || store == nil {
+		return ""
+	}
+	data, err := json.Marshal(title)
+	if err != nil {
+		return ""
+	}
+	if err := store.SetKV(ctx, missionTitleKVPrefix+internalSessionID, data); err != nil {
+		reportErr, _, end := t.tracker().Start(ctx, "persist_mission_title", "acp_session", "session_id", internalSessionID)
+		reportErr(err)
+		end()
+		return ""
+	}
+	return title
+}
+
+func readMissionTitle(ctx context.Context, exec libdb.Exec, internalSessionID string) string {
+	if exec == nil || internalSessionID == "" {
+		return ""
+	}
+	var title string
+	if err := runtimetypes.New(exec).GetKV(ctx, missionTitleKVPrefix+internalSessionID, &title); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(title)
+}

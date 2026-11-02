@@ -514,7 +514,8 @@ func (t *Transport) NewSession(ctx context.Context, req libacp.NewSessionRequest
 		return libacp.NewSessionResponse{}, wrapped
 	}
 
-	missionID, _ := missionservice.ParseMissionMeta(req.Meta)
+	missionMeta, _ := missionservice.ParseMissionMetaFull(req.Meta)
+	missionID := missionMeta.MissionID
 
 	entry := &sessionEntry{
 		WorkspaceID:       workspaceID,
@@ -534,11 +535,22 @@ func (t *Transport) NewSession(ctx context.Context, req libacp.NewSessionRequest
 	t.sessionMu.Unlock()
 	t.persistSessionCwd(ctx, store, sessionID, sessionCwd)
 	t.persistSessionMission(ctx, store, sessionID, missionID)
+	missionTitle := t.persistMissionTitle(ctx, store, contenoxSessionID, missionMeta.Intent)
 	t.clearToolCallState(sessionID)
 	t.subscribeTerminal(sessionID, contenoxSessionID)
 
 	libacp.AfterResponse(ctx, func() {
 		t.sendAvailableCommands(ctx, sessionID)
+		if missionTitle != "" {
+			t.sendUpdate(ctx, libacp.SessionNotification{
+				SessionID: sessionID,
+				Update: libacp.SessionUpdate{
+					SessionUpdate: libacp.SessionUpdateSessionInfo,
+					Title:         missionTitle,
+					UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
+				},
+			})
+		}
 		if banner := t.takeBanner(); banner != "" {
 			t.sendUpdate(ctx, libacp.SessionNotification{
 				SessionID: sessionID,
@@ -1108,6 +1120,9 @@ func sessionUnderRequestedCwd(storedRoot, requested string) bool {
 }
 
 func (t *Transport) sessionListTitle(ctx context.Context, mgr *chatservice.Manager, exec libdb.Exec, internalSessionID, fallback string) string {
+	if title := readMissionTitle(ctx, exec, internalSessionID); title != "" {
+		return title
+	}
 	if title := firstUserMessageTitle(ctx, mgr, exec, internalSessionID); title != "" {
 		return title
 	}
@@ -1136,6 +1151,9 @@ func (t *Transport) sessionInfoTitle(ctx context.Context, internalSessionID stri
 	}
 	mgr := chatservice.NewManager(t.workspaceID())
 	exec := t.deps.DB.WithoutTransaction()
+	if title := readMissionTitle(ctx, exec, internalSessionID); title != "" {
+		return title
+	}
 	if title := firstUserMessageTitle(ctx, mgr, exec, internalSessionID); title != "" {
 		return title
 	}

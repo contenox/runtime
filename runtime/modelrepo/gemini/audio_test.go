@@ -59,3 +59,41 @@ func TestUnit_BuildGeminiRequest_AudioRefusals(t *testing.T) {
 	_, err = buildGeminiRequest("gemini-2.5-flash", tooLarge, nil)
 	require.ErrorIs(t, err, modelrepo.ErrAudioTooLarge)
 }
+
+func TestUnit_BuildGeminiRequest_AudioTurnTurnsThinkingOffWhereTheModelAllowsIt(t *testing.T) {
+	t.Parallel()
+
+	clip := []modelrepo.AudioPart{{Data: []byte("fake-wav"), MimeType: "audio/wav"}}
+	call := modelrepo.ToolCall{ID: "c1", Type: "function"}
+	call.Function.Name = "list_dir"
+	call.Function.Arguments = "{}"
+	audioTurn := []modelrepo.Message{
+		{Role: "user", Content: "what is the secret word?", Audio: clip},
+		{Role: "assistant", ToolCalls: []modelrepo.ToolCall{call}},
+		{Role: "tool", Content: "[]", ToolCallID: "c1"},
+	}
+
+	for _, think := range []string{"high", "auto"} {
+		req, err := buildGeminiRequest("gemini-2.5-flash", audioTurn, []modelrepo.ChatArgument{modelrepo.WithThink(think)})
+		require.NoError(t, err)
+		require.NotNil(t, req.GenerationConfig.ThinkingConfig, think)
+		require.NotNil(t, req.GenerationConfig.ThinkingConfig.ThinkingBudget, think)
+		require.Equal(t, 0, *req.GenerationConfig.ThinkingConfig.ThinkingBudget, think)
+		require.False(t, req.GenerationConfig.ThinkingConfig.IncludeThoughts, think)
+	}
+
+	req, err := buildGeminiRequest("gemini-2.5-pro", audioTurn, []modelrepo.ChatArgument{modelrepo.WithThink("high")})
+	require.NoError(t, err)
+	require.NotNil(t, req.GenerationConfig.ThinkingConfig)
+	require.NotEqual(t, 0, *req.GenerationConfig.ThinkingConfig.ThinkingBudget, "2.5 Pro cannot turn thinking off")
+
+	laterTurn := append(append([]modelrepo.Message{}, audioTurn...),
+		modelrepo.Message{Role: "assistant", Content: "banana"},
+		modelrepo.Message{Role: "user", Content: "now explain the code"},
+	)
+	req, err = buildGeminiRequest("gemini-2.5-flash", laterTurn, []modelrepo.ChatArgument{modelrepo.WithThink("high")})
+	require.NoError(t, err)
+	require.NotNil(t, req.GenerationConfig.ThinkingConfig)
+	require.NotEqual(t, 0, *req.GenerationConfig.ThinkingConfig.ThinkingBudget, "the operator's think level returns once the newest user message has no audio")
+	require.True(t, req.GenerationConfig.ThinkingConfig.IncludeThoughts)
+}

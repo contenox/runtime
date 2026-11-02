@@ -206,7 +206,7 @@ func buildGeminiRequest(modelName string, messages []modelrepo.Message, args []m
 	applyGeminiResponseFormat(req.GenerationConfig, cfg.Format)
 
 	if thinkingAllowed(canThink) {
-		control, err := ThinkingControlFor(modelName, cfg.Think)
+		control, err := ThinkingControlForTurn(modelName, cfg.Think, messages)
 		if err != nil {
 			return geminiGenerateContentRequest{}, err
 		}

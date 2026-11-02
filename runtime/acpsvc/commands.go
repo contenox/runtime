@@ -34,20 +34,25 @@ func allACPCommands() []libacp.AvailableCommand {
 		{Name: "think", Description: "Show or set this session's reasoning level: /think <level|off|auto>.", Input: &libacp.AvailableCommandInput{Hint: "[level|off|auto]"}},
 		{Name: "capability", Description: "Show or set persistent provider/model capability overrides.", Input: &libacp.AvailableCommandInput{Hint: "set|show|unset <provider> <model> [--think true|false]"}},
 		{Name: "policy", Description: "Show the active HITL policy, or switch it: /policy <name>.", Input: &libacp.AvailableCommandInput{Hint: "[policy-name]"}},
-		{Name: "mission", Description: "Fire a mission from this session: /mission [agent-name] <intent>.", Input: &libacp.AvailableCommandInput{Hint: "[agent-name] <intent>"}},
+		{Name: "mission", Description: "Fire a mission from this session: /mission [--policy <envelope>] [agent-name] <intent>. /mission alone shows the defaults.", Input: &libacp.AvailableCommandInput{Hint: "[--policy <envelope>] [agent-name] <intent>"}},
+		{Name: "mission-agent", Description: "Show or set the default mission agent: /mission-agent <name>.", Input: &libacp.AvailableCommandInput{Hint: "[agent-name]"}},
+		{Name: "mission-envelope", Description: "Show or set the default mission envelope: /mission-envelope <envelope>.", Input: &libacp.AvailableCommandInput{Hint: "[envelope]"}},
 		{Name: planCommandName, Description: "Plan a piece of work, then run each step as a subagent.", Input: &libacp.AvailableCommandInput{Hint: "<what you want done>"}},
 	}
 }
 
 func (t *Transport) acpCommands() []libacp.AvailableCommand {
 	all := allACPCommands()
-	if t.hasMissionCapability() {
-		return all
-	}
-	out := make([]libacp.AvailableCommand, 0, len(all)-2)
+	capable := t.hasMissionCapability()
+	out := make([]libacp.AvailableCommand, 0, len(all))
 	for _, c := range all {
-		if c.Name == "mission" || c.Name == planCommandName {
-			continue
+		if missionCommandNames[c.Name] || c.Name == planCommandName {
+			if !capable {
+				continue
+			}
+			if meta := t.missionCompletionMeta(context.Background(), c.Name); meta != nil {
+				c.Meta = meta
+			}
 		}
 		out = append(out, c)
 	}
@@ -106,6 +111,10 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 		out, err = t.handlePolicy(ctx, args)
 	case "mission":
 		out, err = t.handleMission(ctx, sess, args)
+	case missionAgentCommand:
+		out, err = t.handleMissionAgent(ctx, args)
+	case missionEnvelopeCommand:
+		out, err = t.handleMissionEnvelope(ctx, args)
 	case "clear":
 		out, err = t.handleClear(ctx, sid, sess)
 	case "compact":

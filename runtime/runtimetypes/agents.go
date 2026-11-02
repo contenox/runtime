@@ -96,6 +96,8 @@ type Agent struct {
 	RegistryID      *string `json:"registryId,omitempty"`
 	RegistryVersion *string `json:"registryVersion,omitempty"`
 
+	MissionCapable bool `json:"missionCapable" example:"true"`
+
 	CreatedAt time.Time `json:"createdAt" example:"2024-01-15T10:00:00Z"`
 	UpdatedAt time.Time `json:"updatedAt" example:"2024-01-15T10:00:00Z"`
 }

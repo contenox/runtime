@@ -103,13 +103,18 @@ func CompileShippedTree(cfg Config) (*taskengine.TaskChainDefinition, error) {
 // the app shares the home folder, so two saves must not rewrite .generated at
 // the same time; a lock older than the stale window is assumed to be a runtime
 // that died and is taken over.
+var (
+	compileLockStale = 30 * time.Second
+	compileLockWait  = 35 * time.Second
+)
+
 func CompileLock(home string) (release func(), err error) {
 	dir := filepath.Join(home, GeneratedDirName)
 	if mkErr := os.MkdirAll(dir, 0o750); mkErr != nil {
 		return nil, mkErr
 	}
 	path := filepath.Join(dir, ".compile.lock")
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(compileLockWait)
 	for {
 		lock, openErr := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if openErr == nil {
@@ -119,12 +124,12 @@ func CompileLock(home string) (release func(), err error) {
 		if !os.IsExist(openErr) {
 			return nil, openErr
 		}
-		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > 30*time.Second {
+		if info, statErr := os.Stat(path); statErr == nil && time.Since(info.ModTime()) > compileLockStale {
 			_ = os.Remove(path)
 			continue
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("agentdecl: compile lock %s held longer than 10s", path)
+			return nil, fmt.Errorf("agentdecl: compile lock %s held longer than %s", path, compileLockWait)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

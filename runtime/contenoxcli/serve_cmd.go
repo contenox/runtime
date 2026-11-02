@@ -457,6 +457,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	instances := agentinstance.New(
 		agentRegistry,
+		agentinstance.WithChainArgs(chainUnitArgs(dbPath, contenoxDir, servePinnedDefaults(cmd, opts))...),
 		agentinstance.WithEventSink(newInstanceEventSink(tracker)),
 		agentinstance.WithPermissionFallback(fleetservice.NewUnattendedPermissionAnswerer(
 			fleetservice.UnattendedPermissionDeps{
@@ -485,10 +486,30 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	stopAgentWatch := watchAgentDeclarations(ctx, contenoxDir)
 	defer stopAgentWatch()
+	if created, seedErr := seedMissionAgentChains(contenoxDir); seedErr != nil {
+		slog.Warn("contenox-runtime serve: could not seed the shipped mission agents", "dir", contenoxDir, "error", seedErr)
+	} else if len(created) > 0 {
+		slog.Info("contenox-runtime serve: seeded the shipped mission agents", "files", created)
+	}
 	discoverChainAgents(ctx, agentRegistry, contenoxDir)
 
+	policyValidator := hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")
+	if seeded, seedErr := seedMissionDefaults(ctx, store, missionDefaultCheck{
+		agent: func(ctx context.Context, name string) bool {
+			a, err := agentRegistry.GetByName(ctx, name)
+			return err == nil && a != nil && a.Enabled
+		},
+		policy: func(ctx context.Context, name string) bool {
+			return policyValidator.ValidatePolicy(ctx, name) == nil
+		},
+	}); seedErr != nil {
+		slog.Warn("contenox-runtime serve: could not set the default mission agent and envelope", "error", seedErr)
+	} else if len(seeded) > 0 {
+		slog.Info("contenox-runtime serve: set mission defaults", "values", seeded)
+	}
+
 	fleet := fleetservice.New(instances, agentRegistry, missions, workspaceFactory, workspaceRoot, tracker,
-		fleetservice.WithPolicyValidator(hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")))
+		fleetservice.WithPolicyValidator(policyValidator))
 	fleetRef.set(fleet)
 
 	operatorInbox := operatorinbox.New(db)
@@ -542,6 +563,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Fleet:                 fleet,
 			Agents:                agentRegistry,
 			KnownPolicies:         embeddedPolicyNames(),
+			MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
 			HITLDefaultPolicyName: acpDefaultPolicyName,
 		})
 	}

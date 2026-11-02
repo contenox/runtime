@@ -1,0 +1,235 @@
+{
+  "id": "agent-reviewer",
+  "description": "Mission reviewer. Reviews the working-tree changes in the unit's folder with read-only file and git tools, and reports its findings through the mission tools. It never edits files and has no shell.",
+  "tasks": [
+    {
+      "id": "review_loop",
+      "description": "The reviewer's turn: inspect the working-tree changes, then report findings and finish through the mission tools.",
+      "handler": "chat_completion",
+      "system_instruction": "Current date: {{date}}.\n\nENVIRONMENT: OS: {{host:os}} ({{host:arch}}). Folder under review: {{workspace:root}}.\n\nYou are the REVIEWER for a mission. Your one job is to review the changes in the working tree of the folder you were started in and report what should change. You run UNATTENDED: no human is reading this conversation, so prose reaches no one. You reach your operator ONLY through your mission tools.\n\nYOU NEVER EDIT FILES. You have read-only tools: native-git.git_status, native-git.git_diff, native-git.git_log, native-git.git_show, native-git.git_branch_list and native-git.git_blame for the repository, and the local_fs read tools (read_file, read_file_range, list_dir, grep, find_files, stat_file, count_stats) for the files. You have no shell and no write tool. Do not try to stage, commit, restore or change anything.\n\nHOW TO REVIEW:\n1. Run native-git.git_status, then native-git.git_diff (unstaged and staged) to see what changed. If the intent names files, a commit or a range, review that instead.\n2. Read the changed files and enough surrounding code to judge each change. Ground every claim in tool output from this mission; if a tool fails or the folder is not a git repository, say so.\n3. Look for correctness bugs, regressions, security problems, missing tests, and changes that contradict the code around them. Skip style nits unless they hide a bug.\n\nHOW TO REPORT:\n- File ONE mission.mission_report with kind `result` once the review is done. Its summary is one line: how many findings and the worst severity, or that the changes look correct. Its detail lists every finding as: `path:line` - severity (critical, high, medium, low) - what is wrong - what to change. Put the reviewed file paths in `refs`.\n- If you cannot review (no changes, not a repository, files unreadable), file a mission.mission_report with kind `blocker` that says exactly why.\n- Use mission.mission_ask_attention only for a question you cannot answer from the files.\n\nHOW TO END: call mission.mission_finish exactly once. `landed` after the result report. `stuck` with a reason when you cannot get past something unattended. `derailed` with a reason when the review itself failed.",
+      "execute_config": {
+        "model": "{{var:model}}",
+        "provider": "{{var:provider}}",
+        "think": "{{var:think}}",
+        "shift": true,
+        "pass_clients_tools": false,
+        "tools": [
+          "mission",
+          "local_fs",
+          "native-git"
+        ],
+        "hide_tools": [
+          "write_file",
+          "sed",
+          "git_add",
+          "git_commit",
+          "git_checkout_branch",
+          "git_restore",
+          "local_fs.write_file",
+          "local_fs.sed",
+          "native-git.git_add",
+          "native-git.git_commit",
+          "native-git.git_checkout_branch",
+          "native-git.git_restore"
+        ],
+        "tools_policies": {
+          "local_fs": {
+            "_allowed_dir": ".",
+            "_max_read_bytes": "262144",
+            "_max_output_bytes": "131072",
+            "_max_list_depth": "5",
+            "_max_grep_matches": "1000",
+            "_denied_path_substrings": "node_modules,.git/,dist/,/.next/,/out/,package-lock.json",
+            "_skip_dir_names": ".git,node_modules,.venv,__pycache__,.next,dist,.cache,vendor,target,.idea,.vscode,out"
+          }
+        },
+        "max_tokens": "{{var:max_tokens|16384}}",
+        "retry_policy": {
+          "max_attempts": 4,
+          "initial_backoff": "1s",
+          "max_backoff": "30s",
+          "jitter": 0.25,
+          "rate_limit_min_wait": "10s"
+        }
+      },
+      "transition": {
+        "on_failure": "review_recovery",
+        "branches": [
+          {
+            "operator": "edge_traversed_at_least",
+            "edge": "review_loop->review_tools",
+            "when": "24",
+            "goto": "review_recovery"
+          },
+          {
+            "operator": "equals",
+            "when": "tool_call",
+            "goto": "review_tools"
+          },
+          {
+            "operator": "default",
+            "when": "",
+            "goto": "end"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review_tools",
+      "description": "Execute the reviewer's read-only tool calls and append their results to the conversation.",
+      "handler": "execute_tool_calls",
+      "input_var": "review_loop",
+      "execute_config": {
+        "tools": [
+          "mission",
+          "local_fs",
+          "native-git"
+        ],
+        "hide_tools": [
+          "local_fs.write_file",
+          "local_fs.sed",
+          "native-git.git_add",
+          "native-git.git_commit",
+          "native-git.git_checkout_branch",
+          "native-git.git_restore"
+        ],
+        "tools_policies": {
+          "local_fs": {
+            "_allowed_dir": ".",
+            "_max_read_bytes": "262144",
+            "_max_output_bytes": "131072",
+            "_max_list_depth": "5",
+            "_max_grep_matches": "1000",
+            "_denied_path_substrings": "node_modules,.git/,dist/,/.next/,/out/,package-lock.json",
+            "_skip_dir_names": ".git,node_modules,.venv,__pycache__,.next,dist,.cache,vendor,target,.idea,.vscode,out"
+          }
+        }
+      },
+      "transition": {
+        "on_failure": "",
+        "branches": [
+          {
+            "operator": "default",
+            "when": "",
+            "goto": "review_loop"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review_recovery",
+      "description": "Recovery loop reached when the main review loop fails or spends its tool budget: continue from the real history, do not restart.",
+      "handler": "chat_completion",
+      "input_var": "review_loop",
+      "system_instruction": "Current date: {{date}}.\n\nYou are the mission REVIEWER. The main review loop failed or spent its tool-call budget. Continue from the actual history above; do not restart the review. You still NEVER EDIT FILES. Take the most direct remaining step: file the mission.mission_report with kind `result` listing the findings you have (path:line - severity - what to change), or a `blocker` saying why you cannot finish, then call mission.mission_finish (`landed`, `stuck` or `derailed` with a reason). No human is reading this, so reach the operator through your mission tools, not through prose.\n\nBUDGET: you have already used {{edge_count:review_loop->review_tools}} of 24 main and {{edge_count:review_recovery->review_recovery_tools}} of 6 recovery tool-call rounds this turn.",
+      "execute_config": {
+        "model": "{{var:alt_model|var:model}}",
+        "provider": "{{var:alt_provider|var:provider}}",
+        "think": "{{var:think}}",
+        "shift": true,
+        "pass_clients_tools": false,
+        "tools": [
+          "mission",
+          "local_fs",
+          "native-git"
+        ],
+        "hide_tools": [
+          "write_file",
+          "sed",
+          "git_add",
+          "git_commit",
+          "git_checkout_branch",
+          "git_restore",
+          "local_fs.write_file",
+          "local_fs.sed",
+          "native-git.git_add",
+          "native-git.git_commit",
+          "native-git.git_checkout_branch",
+          "native-git.git_restore"
+        ],
+        "tools_policies": {
+          "local_fs": {
+            "_allowed_dir": ".",
+            "_max_read_bytes": "262144",
+            "_max_output_bytes": "131072",
+            "_max_list_depth": "5",
+            "_max_grep_matches": "1000",
+            "_denied_path_substrings": "node_modules,.git/,dist/,/.next/,/out/,package-lock.json",
+            "_skip_dir_names": ".git,node_modules,.venv,__pycache__,.next,dist,.cache,vendor,target,.idea,.vscode,out"
+          }
+        },
+        "max_tokens": "{{var:max_tokens|16384}}",
+        "retry_policy": {
+          "max_attempts": 3,
+          "initial_backoff": "1s",
+          "max_backoff": "10s",
+          "jitter": 0.25
+        }
+      },
+      "transition": {
+        "on_failure": "",
+        "branches": [
+          {
+            "operator": "edge_traversed_at_least",
+            "edge": "review_recovery->review_recovery_tools",
+            "when": "6",
+            "goto": "end"
+          },
+          {
+            "operator": "equals",
+            "when": "tool_call",
+            "goto": "review_recovery_tools"
+          },
+          {
+            "operator": "default",
+            "when": "",
+            "goto": "end"
+          }
+        ]
+      }
+    },
+    {
+      "id": "review_recovery_tools",
+      "description": "Execute recovery-loop read-only tool calls and append their results.",
+      "handler": "execute_tool_calls",
+      "input_var": "review_recovery",
+      "execute_config": {
+        "tools": [
+          "mission",
+          "local_fs",
+          "native-git"
+        ],
+        "hide_tools": [
+          "local_fs.write_file",
+          "local_fs.sed",
+          "native-git.git_add",
+          "native-git.git_commit",
+          "native-git.git_checkout_branch",
+          "native-git.git_restore"
+        ],
+        "tools_policies": {
+          "local_fs": {
+            "_allowed_dir": ".",
+            "_max_read_bytes": "262144",
+            "_max_output_bytes": "131072",
+            "_max_list_depth": "5",
+            "_max_grep_matches": "1000",
+            "_denied_path_substrings": "node_modules,.git/,dist/,/.next/,/out/,package-lock.json",
+            "_skip_dir_names": ".git,node_modules,.venv,__pycache__,.next,dist,.cache,vendor,target,.idea,.vscode,out"
+          }
+        }
+      },
+      "transition": {
+        "on_failure": "",
+        "branches": [
+          {
+            "operator": "default",
+            "when": "",
+            "goto": "review_recovery"
+          }
+        ]
+      }
+    }
+  ],
+  "token_limit": 131072
+}

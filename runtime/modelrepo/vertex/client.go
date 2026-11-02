@@ -200,7 +200,7 @@ func buildVertexRequest(modelName string, messages []modelrepo.Message, args []m
 	applyVertexResponseFormat(req.GenerationConfig, cfg.Format)
 
 	if vertexThinkingAllowed(canThink) {
-		control, err := gemini.ThinkingControlFor(modelName, cfg.Think)
+		control, err := gemini.ThinkingControlForTurn(modelName, cfg.Think, messages)
 		if err != nil {
 			return vertexRequest{}, err
 		}

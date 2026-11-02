@@ -126,6 +126,10 @@ func WithSelfExecutable(path string) Option {
 	return func(m *manager) { m.selfExecutable = path }
 }
 
+func WithChainArgs(args ...string) Option {
+	return func(m *manager) { m.chainArgs = append([]string(nil), args...) }
+}
+
 type manager struct {
 	agents      agentregistryservice.Service
 	stderr      io.Writer
@@ -133,6 +137,7 @@ type manager struct {
 	journalSize int
 
 	selfExecutable string
+	chainArgs      []string
 
 	restartEnabled     bool
 	restartLimit       int
@@ -233,7 +238,7 @@ func (m *manager) chainSpawner(agent *runtimetypes.Agent, cwd string) (agenthost
 		Config: runtimetypes.ExternalACPConfig{
 			Transport: runtimetypes.ExternalACPTransportStdio,
 			Command:   self,
-			Args:      []string{ChainACPSubcommand},
+			Args:      append([]string{ChainACPSubcommand}, m.chainArgs...),
 			Cwd:       cwd,
 			Env:       map[string]string{ChainPathEnvVar: cfg.Path},
 		},
@@ -455,6 +460,9 @@ func (m *manager) List(ctx context.Context) ([]FleetEntry, error) {
 	entries := make([]FleetEntry, 0, len(declared))
 	seen := make(map[string]bool, len(declared))
 	for _, a := range declared {
+		if !a.Enabled && len(byAgent[a.ID]) == 0 {
+			continue
+		}
 		seen[a.ID] = true
 		entries = append(entries, FleetEntry{
 			AgentID:   a.ID,

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	libacp "github.com/contenox/runtime/libacp"
 	"github.com/contenox/runtime/runtime/agentinstance"
 	"github.com/contenox/runtime/runtime/agentservice"
+	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -186,10 +188,21 @@ func (t *Transport) newAdoptedSession(
 	t.persistSessionInstance(ctx, sessionID, ref.InstanceID)
 	t.persistSessionDownstream(ctx, sessionID, downstreamID)
 	t.clearToolCallState(sessionID)
+	adoptedTitle := t.persistAdoptedMissionTitle(ctx, store, contenoxSessionID, ref.InstanceID)
 
 	libacp.AfterResponse(ctx, func() {
 		bridge.releaseRelay(ctx)
 		bridge.markBound(ctx)
+		if adoptedTitle != "" {
+			t.sendUpdate(ctx, libacp.SessionNotification{
+				SessionID: sessionID,
+				Update: libacp.SessionUpdate{
+					SessionUpdate: libacp.SessionUpdateSessionInfo,
+					Title:         adoptedTitle,
+					UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
+				},
+			})
+		}
 	})
 
 	reportChange(string(sessionID), map[string]any{
@@ -205,4 +218,15 @@ func (t *Transport) newAdoptedSession(
 		ConfigOptions: t.sessionConfigOptions(ctx, entry),
 		Meta:          adoptedSessionMetaJSON(agentName, ref.InstanceID, downstreamID, granted),
 	}, nil
+}
+
+func (t *Transport) persistAdoptedMissionTitle(ctx context.Context, store runtimetypes.Store, internalSessionID, instanceID string) string {
+	if t.deps.DB == nil || strings.TrimSpace(instanceID) == "" {
+		return ""
+	}
+	mission, err := missionservice.New(t.deps.DB).GetByInstance(ctx, instanceID)
+	if err != nil || mission == nil {
+		return ""
+	}
+	return t.persistMissionTitle(ctx, store, internalSessionID, mission.Intent)
 }

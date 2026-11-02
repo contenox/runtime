@@ -46,6 +46,9 @@ var initFIMChain string
 //go:embed agent-planner.json
 var initPlannerChain string
 
+//go:embed agent-reviewer.json
+var initReviewerChain string
+
 //go:embed chain-oracle-default.json
 var initOracleChain string
 
@@ -213,6 +216,9 @@ func RunGlobalInit(out io.Writer) error {
 	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
 		return err
 	}
+	if err := writeFile(filepath.Join(homeDir, reviewerChainFilename), initReviewerChain); err != nil {
+		return err
+	}
 	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
 		return err
 	}
@@ -222,6 +228,7 @@ func RunGlobalInit(out io.Writer) error {
 	if err := seedAgentDeclarations(context.Background(), homeDir); err != nil {
 		return err
 	}
+	seedGlobalMissionDefaults(out)
 	pruneLegacyLocalBackendsFromHome(out)
 	return nil
 }
@@ -325,6 +332,9 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
 		return err
 	}
+	if err := writeFile(filepath.Join(homeDir, reviewerChainFilename), initReviewerChain); err != nil {
+		return err
+	}
 	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
 		return err
 	}
@@ -335,6 +345,7 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		return err
 	}
 
+	seedGlobalMissionDefaults(out)
 	pruneLegacyLocalBackendsFromHome(out)
 
 	fmt.Fprintln(out, "Done.")

@@ -102,6 +102,7 @@ type Mission struct {
 	Intent          string                `json:"intent"`
 	AgentName       string                `json:"agentName"`
 	HITLPolicyName  string                `json:"hitlPolicyName"`
+	Cwd             string                `json:"cwd"`
 	SessionID       string                `json:"sessionId,omitempty"`
 	InstanceID      string                `json:"instanceId,omitempty"`
 	ParentSessionID string                `json:"parentSessionId,omitempty"`

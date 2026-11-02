@@ -122,9 +122,13 @@ func readinessDefaults(opts chatOpts) (model, provider string) {
 }
 
 func hitlPolicySource(primaryDir string) hitlservice.PolicySource {
+	return hitlservice.NewFSPolicySource(hitlPolicyDirs(primaryDir)...)
+}
+
+func hitlPolicyDirs(primaryDir string) []string {
 	dirs := []string{filepath.Join(primaryDir, agentdecl.GeneratedDirName), primaryDir}
 	if dir, err := homedir.Dir(); err == nil {
 		dirs = append(dirs, dir)
 	}
-	return hitlservice.NewFSPolicySource(dirs...)
+	return dirs
 }

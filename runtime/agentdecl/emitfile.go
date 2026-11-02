@@ -17,7 +17,8 @@ const (
 )
 
 var ReservedNames = map[string]bool{
-	"agent-planner": true,
+	"agent-planner":  true,
+	"agent-reviewer": true,
 }
 
 func marshalWithSchema(v any, schemaURL string) ([]byte, error) {
