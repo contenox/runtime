@@ -42,6 +42,10 @@ func allACPCommands() []libacp.AvailableCommand {
 }
 
 func (t *Transport) acpCommands() []libacp.AvailableCommand {
+	return t.acpCommandsFor("")
+}
+
+func (t *Transport) acpCommandsFor(workspaceID string) []libacp.AvailableCommand {
 	all := allACPCommands()
 	capable := t.hasMissionCapability()
 	out := make([]libacp.AvailableCommand, 0, len(all))
@@ -50,7 +54,7 @@ func (t *Transport) acpCommands() []libacp.AvailableCommand {
 			if !capable {
 				continue
 			}
-			if meta := t.missionCompletionMeta(context.Background(), c.Name); meta != nil {
+			if meta := t.missionCompletionMeta(context.Background(), c.Name, workspaceID); meta != nil {
 				c.Meta = meta
 			}
 		}
@@ -108,13 +112,13 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 	case "capability":
 		out, err = t.handleCapability(ctx, args)
 	case "policy":
-		out, err = t.handlePolicy(ctx, args)
+		out, err = t.handlePolicy(ctx, sess, args)
 	case "mission":
 		out, err = t.handleMission(ctx, sess, args)
 	case missionAgentCommand:
 		out, err = t.handleMissionAgent(ctx, args)
 	case missionEnvelopeCommand:
-		out, err = t.handleMissionEnvelope(ctx, args)
+		out, err = t.handleMissionEnvelope(ctx, sess, args)
 	case "clear":
 		out, err = t.handleClear(ctx, sid, sess)
 	case "compact":
@@ -202,11 +206,15 @@ func commandUpdatesConfigOptions(name string) bool {
 }
 
 func (t *Transport) sendAvailableCommands(ctx context.Context, sid libacp.SessionID) {
+	workspaceID := ""
+	if sess, ok := t.sessionFor(sid); ok {
+		workspaceID = t.sessionWorkspaceID(sess)
+	}
 	t.sendUpdate(ctx, libacp.SessionNotification{
 		SessionID: sid,
 		Update: libacp.SessionUpdate{
 			SessionUpdate:     libacp.SessionUpdateAvailableCommands,
-			AvailableCommands: t.acpCommands(),
+			AvailableCommands: t.acpCommandsFor(workspaceID),
 		},
 	})
 }
@@ -472,11 +480,11 @@ func parseCapabilitySetArgs(fields []string) (string, string, bool, error) {
 	return provider, model, canThink, nil
 }
 
-func (t *Transport) handlePolicy(ctx context.Context, args string) (string, error) {
+func (t *Transport) handlePolicy(ctx context.Context, sess *sessionEntry, args string) (string, error) {
 	store := runtimetypes.New(t.deps.DB.WithoutTransaction())
 	value := strings.TrimSpace(args)
 	if value == "" {
-		return t.policyStatus(clikv.ReadHITLPolicy(ctx, store)), nil
+		return t.policyStatus(clikv.ReadHITLPolicy(ctx, store), t.sessionWorkspaceID(sess)), nil
 	}
 	cfgCtx := libtracker.WithNewRequestID(ctx)
 	if err := clikv.SetHITLPolicy(cfgCtx, store, value); err != nil {
@@ -485,7 +493,7 @@ func (t *Transport) handlePolicy(ctx context.Context, args string) (string, erro
 	return fmt.Sprintf("HITL policy set to %s. Applies to the next gated tool call.", value), nil
 }
 
-func (t *Transport) policyStatus(active string) string {
+func (t *Transport) policyStatus(active, workspaceID string) string {
 	effective := active
 	if effective == "" {
 		effective = t.deps.HITLDefaultPolicyName
@@ -496,9 +504,9 @@ func (t *Transport) policyStatus(active string) string {
 	} else {
 		fmt.Fprintf(&b, "Active HITL policy: %s\n", effective)
 	}
-	if len(t.deps.KnownPolicies) > 0 {
+	if len(t.knownPolicies(workspaceID)) > 0 {
 		b.WriteString("Presets:\n")
-		for _, name := range t.deps.KnownPolicies {
+		for _, name := range t.knownPolicies(workspaceID) {
 			marker := "  "
 			if name == effective {
 				marker = "* "

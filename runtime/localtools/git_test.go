@@ -384,7 +384,7 @@ func TestUnit_GitTools_Declarations(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{
 		"git_status", "git_diff", "git_log", "git_show", "git_branch_list",
-		"git_blame", "git_add", "git_commit", "git_checkout_branch", "git_restore",
+		"git_blame", "git_add", "git_commit", "git_push", "git_checkout_branch", "git_restore",
 	}, names)
 
 	one, err := tools.GetToolsForToolsByName(context.Background(), "git_blame")

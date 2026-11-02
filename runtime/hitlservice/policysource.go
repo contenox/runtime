@@ -21,6 +21,9 @@ func NewFSPolicySource(dirs ...string) PolicySource {
 
 func (f *fsPolicySource) ReadPolicy(_ context.Context, _, name string) ([]byte, error) {
 	name = policyFileName(name)
+	if strings.Contains(name, "..") {
+		return nil, fmt.Errorf("hitl policy %q is not a valid name", name)
+	}
 	var lastErr error = os.ErrNotExist
 	for _, dir := range f.dirs {
 		if dir == "" {

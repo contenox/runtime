@@ -53,9 +53,13 @@ func BootstrapFor(ctx context.Context, home, project string, cfg Config) (Presee
 	problems := problemsFrom(results)
 	defer func() { recordProblems(problems) }()
 
+	envelopeCfg := cfg
+	if homeOnly, loadErr := Load(ctx, homeRoot); loadErr == nil {
+		envelopeCfg = homeOnly
+	}
 	var firstErr error
-	for _, name := range cfg.EnvelopeNames() {
-		if _, _, rErr := SyncEnvelopePolicy(ctx, cfg, name, generated, ConfigFilename); rErr != nil {
+	for _, name := range envelopeCfg.EnvelopeNames() {
+		if _, _, rErr := SyncEnvelopePolicy(ctx, envelopeCfg, name, generated, ConfigFilename); rErr != nil {
 			problems = append(problems, Problem{Source: EnvelopeSection + "." + name, Action: string(ActionRefused), Reason: rErr.Error()})
 			if firstErr == nil {
 				firstErr = fmt.Errorf("agentdecl: render envelope %q: %w", name, rErr)

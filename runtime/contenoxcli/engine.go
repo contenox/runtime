@@ -49,6 +49,7 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 		"local_fs": localtools.NewLocalFSTools(opts.EffectiveLocalExecAllowedDir, db),
 		localtools.GitToolsName: localtools.NewGitToolsWith(
 			opts.EffectiveLocalExecAllowedDir, localtools.GitToolsName, nil,
+			agentGitIdentity(db),
 		),
 	}
 	if opts.EffectiveEnableLocalExec {

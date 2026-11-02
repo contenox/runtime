@@ -259,7 +259,7 @@ func (t *Transport) hitlPolicyConfigValues(sess *sessionEntry) libacp.SessionCon
 		seen[name] = struct{}{}
 		values = append(values, libacp.SessionConfigValue{Value: name, Name: hitlPolicyDisplayName(name)})
 	}
-	for _, name := range t.deps.KnownPolicies {
+	for _, name := range t.knownPolicies(t.sessionWorkspaceID(sess)) {
 		add(name)
 	}
 	add(sess.hitlPolicy())
@@ -269,9 +269,12 @@ func (t *Transport) hitlPolicyConfigValues(sess *sessionEntry) libacp.SessionCon
 func (t *Transport) resolveSessionHITLPolicy(sess *sessionEntry) string {
 	name := sess.hitlPolicy()
 	if name == "" || name == hitlPolicyDefaultValue {
-		return strings.TrimSpace(t.deps.HITLDefaultPolicyName)
+		name = strings.TrimSpace(t.deps.HITLDefaultPolicyName)
 	}
-	return name
+	if name == "" {
+		return ""
+	}
+	return t.scopedPolicy(t.sessionWorkspaceID(sess), name)
 }
 
 func (t *Transport) runtimeStates(ctx context.Context) []statetype.BackendRuntimeState {

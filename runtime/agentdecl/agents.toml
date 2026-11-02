@@ -258,6 +258,7 @@ shell = "deny"
 "native-git.git_commit" = "deny"
 "native-git.git_checkout_branch" = "deny"
 "native-git.git_restore" = "deny"
+"native-git.git_push" = "deny"
 
 # Cloud credentials, SSH and GPG key material.
 [[envelopes.read_only.always_deny]]
@@ -400,6 +401,7 @@ deny_paths = [
 "native-git.git_commit" = "approve"
 "native-git.git_checkout_branch" = "approve"
 "native-git.git_restore" = "approve"
+"native-git.git_push" = "approve"
 
 # Edits land without asking; the shell still asks. auto_edit means edits, not
 # execution, and nothing here grants more than the posture above.

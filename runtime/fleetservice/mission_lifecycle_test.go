@@ -3,12 +3,15 @@ package fleetservice
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/missionservice"
+	"github.com/contenox/runtime/runtime/project"
 	"github.com/stretchr/testify/require"
 )
 
@@ -151,4 +154,39 @@ func TestFleetService_Dispatch_RecordsCwdResolvedAgentAndIntentMeta(t *testing.T
 	require.True(t, ok)
 	require.Equal(t, res.MissionID, meta.MissionID)
 	require.Equal(t, "review the working tree", meta.Intent)
+}
+
+func TestFleetService_Dispatch_ResolvesTheEnvelopeToTheWorkspacesOwn(t *testing.T) {
+	ctx, db := setupRegistryDB(t)
+	agents := agentregistryservice.New(db)
+	registerAgent(t, ctx, agents, "runner", true)
+	missions := missionservice.New(db)
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".contenox"), 0o755))
+	require.NoError(t, os.WriteFile(project.LayerConfigPath(root), []byte("[envelopes.strict]\n"), 0o644))
+	key := project.LayerKey(root)
+
+	man := &fakeManager{startID: "inst-w", openID: "sess-w"}
+	man.onPrompt = func(call int) {
+		if ms, _ := missions.List(context.Background(), nil, 10); len(ms) == 1 {
+			_ = missions.AddReport(context.Background(), ms[0].ID, &missionservice.Report{Kind: missionservice.ReportKindResult, Summary: "ok"})
+		}
+	}
+	var asked []string
+	svc := New(man, agents, missions, nil, root, libtracker.NoopTracker{},
+		WithPolicyResolver(func(workspaceID, name string) string {
+			asked = append(asked, workspaceID+":"+name)
+			if name == "strict" {
+				return "workspaces/" + workspaceID + "/hitl-policy-strict.json"
+			}
+			return name
+		}))
+
+	res, err := svc.Dispatch(ctx, DispatchRequest{AgentName: "runner", Intent: "go", HITLPolicyName: " strict "})
+	require.NoError(t, err)
+	waitMissionSettled(t, missions, res.MissionID)
+	m, err := missions.Get(ctx, res.MissionID)
+	require.NoError(t, err)
+	require.Equal(t, "workspaces/"+key+"/hitl-policy-strict.json", m.HITLPolicyName, "the mission runs under this workspace's strict, whatever the global one says")
+	require.Equal(t, []string{key + ":strict"}, asked)
 }

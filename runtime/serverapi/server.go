@@ -13,12 +13,14 @@ import (
 	libbus "github.com/contenox/runtime/libbus"
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/agentidentity"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/accessapi"
+	"github.com/contenox/runtime/runtime/internal/agentidentityapi"
 	"github.com/contenox/runtime/runtime/internal/agentregistryapi"
 	"github.com/contenox/runtime/runtime/internal/approvalapi"
 	"github.com/contenox/runtime/runtime/internal/backendapi"
@@ -204,8 +206,11 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 			chains = taskchainservice.NewLocal(chainFiles)
 		}
 		taskchainapi.AddTaskChainRoutes(mux, chains)
-		hitlpolicyapi.AddRoutes(mux, chainFiles)
-		envelopeapi.AddRoutes(mux, deps.ContenoxDir)
+		hitlpolicyapi.AddRoutes(mux, chainFiles, deps.HITLPolicySource)
+		envelopeapi.AddRoutes(mux, deps.ContenoxDir, deps.HITLPolicySource)
+	}
+	if deps.DB != nil {
+		agentidentityapi.AddRoutes(mux, runtimetypes.New(deps.DB.WithoutTransaction()), agentidentity.DefaultKeySource())
 	}
 
 	if deps.Agent != nil {

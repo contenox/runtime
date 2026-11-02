@@ -319,6 +319,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		localtools.GitToolsName: localtools.NewGitToolsWith(
 			"", localtools.GitToolsName,
 			acpsvc.NewServeCwdResolver(db, workspaceFactory),
+			agentGitIdentity(db),
 		),
 		missiontools.ToolsProviderName: missiontools.New(missions, nil, missiontools.WithSupervision(
 			missionSupervision{missions: missions, hitl: hitlSvc},
@@ -486,6 +487,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	stopAgentWatch := watchAgentDeclarations(ctx, contenoxDir)
 	defer stopAgentWatch()
+	stopWorkspaceWatch := watchWorkspaceEnvelopes(ctx, contenoxDir, workspaceFactory.Roots)
+	defer stopWorkspaceWatch()
 	retireDirs := []string{contenoxDir}
 	if home, homeErr := globalContenoxDir(); homeErr == nil && home != contenoxDir {
 		retireDirs = append(retireDirs, home)
@@ -520,7 +523,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	fleet := fleetservice.New(instances, agentRegistry, missions, workspaceFactory, workspaceRoot, tracker,
-		fleetservice.WithPolicyValidator(policyValidator))
+		fleetservice.WithPolicyValidator(policyValidator),
+		fleetservice.WithPolicyResolver(policyResolver(contenoxDir)))
 	fleetRef.set(fleet)
 
 	operatorInbox := operatorinbox.New(db)
@@ -573,8 +577,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 			NativeTurns:           nativeTurns,
 			Fleet:                 fleet,
 			Agents:                agentRegistry,
-			KnownPolicies:         knownPolicyNames(contenoxDir),
-			MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
+			PolicyCatalog:         policyCatalog(contenoxDir),
+			PolicyResolver:        policyResolver(contenoxDir),
 			HITLDefaultPolicyName: acpDefaultPolicyName,
 		})
 	}

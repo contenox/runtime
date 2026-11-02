@@ -1,7 +1,6 @@
 package contenoxcli
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -12,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/contenox/runtime/runtime/agentdecl"
+	"github.com/contenox/runtime/runtime/hitlservice"
 )
 
 var retiredHITLPolicyHashes = map[string][]string{
@@ -96,25 +96,16 @@ func envelopeNameOf(path string) string {
 	return name
 }
 
-func knownPolicyNames(contenoxDir string) []string {
-	cfg, err := agentdecl.Shipped()
-	if err != nil {
-		return nil
+func policyCatalog(contenoxDir string) func(workspaceID string) []string {
+	src := acpPolicySource(contenoxDir)
+	return func(workspaceID string) []string {
+		return hitlservice.ChoiceFiles(hitlservice.ChoicesFor(src, workspaceID))
 	}
-	if root, rootErr := agentdecl.LocalRoot(contenoxDir); rootErr == nil {
-		if layered, loadErr := agentdecl.Load(context.Background(), root); loadErr == nil {
-			cfg = layered
-		}
+}
+
+func policyResolver(contenoxDir string) func(workspaceID, name string) string {
+	src := acpPolicySource(contenoxDir)
+	return func(workspaceID, name string) string {
+		return hitlservice.ResolveForWorkspace(src, workspaceID, name)
 	}
-	names := make([]string, 0, len(cfg.Envelopes))
-	for name := range cfg.Envelopes {
-		if name != "default" {
-			names = append(names, agentdecl.EnvelopePolicyFile(name))
-		}
-	}
-	sort.Strings(names)
-	if _, ok := cfg.Envelopes["default"]; ok {
-		names = append([]string{agentdecl.EnvelopePolicyFile("default")}, names...)
-	}
-	return names
 }

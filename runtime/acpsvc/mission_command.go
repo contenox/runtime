@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -103,34 +102,8 @@ func (t *Transport) missionAgentNames(ctx context.Context) []string {
 	return names
 }
 
-func (t *Transport) missionEnvelopeNames() []string {
-	seen := map[string]bool{}
-	var names []string
-	for _, dir := range t.deps.MissionPolicyDirs {
-		if strings.TrimSpace(dir) == "" {
-			continue
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			name := e.Name()
-			if e.IsDir() || !strings.HasPrefix(name, "hitl-policy-") || !strings.HasSuffix(name, ".json") || seen[name] {
-				continue
-			}
-			seen[name] = true
-			names = append(names, name)
-		}
-	}
-	if len(names) == 0 {
-		for _, name := range t.deps.KnownPolicies {
-			if !seen[name] {
-				seen[name] = true
-				names = append(names, name)
-			}
-		}
-	}
+func (t *Transport) missionEnvelopeNames(workspaceID string) []string {
+	names := append([]string{}, t.knownPolicies(workspaceID)...)
 	sort.Strings(names)
 	return names
 }
@@ -157,7 +130,7 @@ func matchEnvelope(envelopes []string, name string) (string, bool) {
 	return "", false
 }
 
-func (t *Transport) missionCompletionMeta(ctx context.Context, name string) json.RawMessage {
+func (t *Transport) missionCompletionMeta(ctx context.Context, name, workspaceID string) json.RawMessage {
 	completions := map[string]libacp.CommandCompletion{}
 	switch name {
 	case missionCommand:
@@ -166,7 +139,7 @@ func (t *Transport) missionCompletionMeta(ctx context.Context, name string) json
 			Hint:   "Choose a mission agent, then type the intent; or type an intent for the default agent. Choosing never dispatches.",
 		}
 		completions["--policy"] = libacp.CommandCompletion{
-			Values: t.missionEnvelopeNames(),
+			Values: t.missionEnvelopeNames(workspaceID),
 			Hint:   "Choose the envelope that bounds this one mission, then an agent and the intent.",
 		}
 	case missionAgentCommand:
@@ -176,7 +149,7 @@ func (t *Transport) missionCompletionMeta(ctx context.Context, name string) json
 		}
 	case missionEnvelopeCommand:
 		completions[""] = libacp.CommandCompletion{
-			Values: t.missionEnvelopeNames(),
+			Values: t.missionEnvelopeNames(workspaceID),
 			Hint:   "Choose the default envelope for /mission. Without a name, shows the current default.",
 		}
 	default:
@@ -189,7 +162,7 @@ func (t *Transport) missionCompletionMeta(ctx context.Context, name string) json
 	return raw
 }
 
-func (t *Transport) missionStatus(ctx context.Context, store runtimetypes.Store) string {
+func (t *Transport) missionStatus(ctx context.Context, store runtimetypes.Store, workspaceID string) string {
 	var b strings.Builder
 	b.WriteString("Fire a mission from this session:\n")
 	b.WriteString("  /mission <intent>                              the default agent under the default envelope\n")
@@ -221,7 +194,7 @@ func (t *Transport) missionStatus(ctx context.Context, store runtimetypes.Store)
 		}
 	}
 	writeList("Mission agents", t.missionAgentNames(ctx), agent)
-	writeList("Envelopes (--policy <name>)", t.missionEnvelopeNames(), envelope)
+	writeList("Envelopes (--policy <name>)", t.missionEnvelopeNames(workspaceID), envelope)
 
 	b.WriteString("\nChange the defaults with /mission-agent <name> and /mission-envelope <name>, under Settings → Missions, or with `contenox-runtime config set default-mission-agent <name>` / `contenox-runtime config set default-mission-policy <envelope>`.")
 	return b.String()
@@ -268,12 +241,12 @@ func (t *Transport) handleMissionAgent(ctx context.Context, args string) (string
 	return fmt.Sprintf("Default mission agent set to %s. /mission <intent> now fires it.", name), nil
 }
 
-func (t *Transport) handleMissionEnvelope(ctx context.Context, args string) (string, error) {
+func (t *Transport) handleMissionEnvelope(ctx context.Context, sess *sessionEntry, args string) (string, error) {
 	if err := t.requireMissionCapability(missionEnvelopeCommand); err != nil {
 		return "", err
 	}
 	store := runtimetypes.New(t.deps.DB.WithoutTransaction())
-	envelopes := t.missionEnvelopeNames()
+	envelopes := t.missionEnvelopeNames(t.sessionWorkspaceID(sess))
 	name := strings.TrimSpace(args)
 	if name == "" {
 		current := clikv.Read(ctx, store, missionPolicyConfigKey)

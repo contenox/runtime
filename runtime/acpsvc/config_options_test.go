@@ -2,6 +2,8 @@ package acpsvc
 
 import (
 	"context"
+	"github.com/contenox/runtime/runtime/project"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,7 +31,7 @@ func TestUnit_SessionConfigOptionsExposeModelPolicyAndThink(t *testing.T) {
 	tr := &Transport{
 		deps: Deps{
 			DB:                    db,
-			KnownPolicies:         []string{"strict", "dev"},
+			PolicyCatalog:         func(string) []string { return []string{"strict", "dev"} },
 			HITLDefaultPolicyName: "strict",
 		},
 		defaultProvider:    "openai",
@@ -94,7 +96,7 @@ func TestUnit_SetSessionConfigOptionUpdatesSessionAndPolicyConfig(t *testing.T) 
 	tr := &Transport{
 		deps: Deps{
 			DB:                    db,
-			KnownPolicies:         []string{"strict", "dev"},
+			PolicyCatalog:         func(string) []string { return []string{"strict", "dev"} },
 			HITLDefaultPolicyName: "strict",
 		},
 		sessions:           map[libacp.SessionID]*sessionEntry{sid: sess},
@@ -164,7 +166,7 @@ func TestUnit_HITLPolicyIsPerSessionIndependent(t *testing.T) {
 	tr := &Transport{
 		deps: Deps{
 			DB:                    db,
-			KnownPolicies:         []string{"strict", "dev"},
+			PolicyCatalog:         func(string) []string { return []string{"strict", "dev"} },
 			HITLDefaultPolicyName: "strict",
 		},
 		sessions:        map[libacp.SessionID]*sessionEntry{sidA: sessA, sidB: sessB},
@@ -232,7 +234,7 @@ func TestUnit_WorkspaceConfigOptionsMirrorFreshSession(t *testing.T) {
 	tr := &Transport{
 		deps: Deps{
 			DB:                    db,
-			KnownPolicies:         []string{"strict", "dev"},
+			PolicyCatalog:         func(string) []string { return []string{"strict", "dev"} },
 			HITLDefaultPolicyName: "strict",
 		},
 		defaultProvider:    "openai",
@@ -280,4 +282,46 @@ func twoConnectionStates() []statetype.BackendRuntimeState {
 		{Backend: runtimetypes.Backend{ID: "o1", Name: "openai", Type: "openai"}, PulledModels: []statetype.ModelPullStatus{{Model: "gpt-5-mini", CanChat: true}}},
 		{Backend: runtimetypes.Backend{ID: "a1", Name: "anthropic", Type: "anthropic"}, PulledModels: []statetype.ModelPullStatus{{Model: "claude-sonnet-4", CanChat: true}}},
 	}
+}
+
+func TestUnit_SessionPolicy_ListsAndUsesTheWorkspacesOwnEnvelopes(t *testing.T) {
+	ctx, db := setupConfigOptionsDB(t)
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".contenox"), 0o755))
+	require.NoError(t, os.WriteFile(project.LayerConfigPath(root), []byte("[envelopes.local]\n"), 0o644))
+	key := project.LayerKey(root)
+	sub := filepath.Join(root, "pkg", "deep")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+
+	tr := &Transport{
+		deps: Deps{
+			DB: db,
+			PolicyCatalog: func(workspaceID string) []string {
+				if workspaceID == key {
+					return []string{"strict", "dev", "local"}
+				}
+				return []string{"strict", "dev"}
+			},
+			PolicyResolver: func(workspaceID, name string) string {
+				if workspaceID == key && name == "strict" {
+					return "workspaces/" + workspaceID + "/hitl-policy-strict.json"
+				}
+				return name
+			},
+			HITLDefaultPolicyName: "strict",
+		},
+		defaultProvider: "openai",
+		defaultModel:    "gpt-5-mini",
+		statesFn:        twoConnectionStates,
+	}
+	inside := &sessionEntry{Cwd: sub, driver: &nativeDriver{t: tr}}
+	outside := &sessionEntry{Cwd: t.TempDir(), driver: &nativeDriver{t: tr}}
+
+	require.True(t, configOptionHasValue(optionByID(t, tr.sessionConfigOptions(ctx, inside), configIDHITLPolicy), "local"), "a session deep inside the workspace sees its envelope")
+	require.False(t, configOptionHasValue(optionByID(t, tr.sessionConfigOptions(ctx, outside), configIDHITLPolicy), "local"), "a session elsewhere does not")
+
+	require.Equal(t, "workspaces/"+key+"/hitl-policy-strict.json", tr.resolveSessionHITLPolicy(inside), "the default envelope resolves to the workspace's own strict")
+	require.Equal(t, "strict", tr.resolveSessionHITLPolicy(outside))
+	inside.HITLPolicy = "dev"
+	require.Equal(t, "dev", tr.resolveSessionHITLPolicy(inside))
 }

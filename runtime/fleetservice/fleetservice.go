@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/project"
 	"strings"
 
 	apiframework "github.com/contenox/runtime/apiframework"
@@ -54,12 +55,17 @@ type service struct {
 	tracker         libtracker.ActivityTracker
 	computeBounds   hitlservice.ComputeBoundsReader
 	policyValidator hitlservice.PolicyValidator
+	policyResolver  func(workspaceID, name string) string
 }
 
 type Option func(*service)
 
 func WithPolicyValidator(v hitlservice.PolicyValidator) Option {
 	return func(s *service) { s.policyValidator = v }
+}
+
+func WithPolicyResolver(resolve func(workspaceID, name string) string) Option {
+	return func(s *service) { s.policyResolver = resolve }
 }
 
 func WithComputeBounds(r hitlservice.ComputeBoundsReader) Option {
@@ -111,17 +117,21 @@ func (s *service) Dispatch(ctx context.Context, req DispatchRequest) (DispatchRe
 	if strings.TrimSpace(req.HITLPolicyName) == "" {
 		return DispatchResult{}, apiframework.MissingParameter("hitlPolicyName", "hitlPolicyName is required: a mission must name its envelope")
 	}
+	cwd, err := s.resolveCwd(req.Cwd)
+	if err != nil {
+		return DispatchResult{}, err
+	}
+	if s.policyResolver != nil {
+		if key := project.LayerKeyOf(cwd); key != "" {
+			req.HITLPolicyName = s.policyResolver(key, strings.TrimSpace(req.HITLPolicyName))
+		}
+	}
 	if s.policyValidator != nil {
 		if err := s.policyValidator.ValidatePolicy(ctx, req.HITLPolicyName); err != nil {
 			return DispatchResult{}, apiframework.InvalidParameterValue("hitlPolicyName",
 				fmt.Sprintf("hitl policy %q could not be loaded: it must name an existing envelope. Choose one in chat with `/mission-envelope <name>`, under Settings → Missions, or with `contenox-runtime config set default-mission-policy <name>`", strings.TrimSpace(req.HITLPolicyName)))
 		}
 	}
-	cwd, err := s.resolveCwd(req.Cwd)
-	if err != nil {
-		return DispatchResult{}, err
-	}
-
 	agent, err := agentregistryservice.ResolveForSpawn(ctx, s.agents, strings.TrimSpace(req.AgentName))
 	if err != nil {
 		if errors.Is(err, agentregistryservice.ErrAgentDisabled) {

@@ -2,6 +2,7 @@ package acpsvc
 
 import (
 	"context"
+	"github.com/contenox/runtime/runtime/project"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,10 +46,9 @@ type Deps struct {
 
 	ShellSessions shellsession.Manager
 
-	KnownPolicies         []string
+	PolicyCatalog         func(workspaceID string) []string
+	PolicyResolver        func(workspaceID, name string) string
 	HITLDefaultPolicyName string
-
-	MissionPolicyDirs []string
 
 	UpdateBanner string
 
@@ -785,4 +785,32 @@ func (t *Transport) sendInitialUsageUpdate(ctx context.Context, sid libacp.Sessi
 			}
 		}
 	}
+}
+
+func (t *Transport) knownPolicies(workspaceID string) []string {
+	if t.deps.PolicyCatalog == nil {
+		return nil
+	}
+	return t.deps.PolicyCatalog(workspaceID)
+}
+
+func (t *Transport) scopedPolicy(workspaceID, name string) string {
+	if t.deps.PolicyResolver == nil || workspaceID == "" {
+		return name
+	}
+	return t.deps.PolicyResolver(workspaceID, name)
+}
+
+func workspaceIDOf(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+	return project.LayerKeyOf(cwd)
+}
+
+func (t *Transport) sessionWorkspaceID(sess *sessionEntry) string {
+	if sess == nil {
+		return ""
+	}
+	return workspaceIDOf(sess.Cwd)
 }

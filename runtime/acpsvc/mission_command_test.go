@@ -3,6 +3,7 @@ package acpsvc
 import (
 	"context"
 	"encoding/json"
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,10 +43,11 @@ func missionCommandTransport(t *testing.T, disp *fakeDispatcher) (*Transport, li
 	registerChainAgent(t, db, "agent-planner", true, `["mission"]`)
 	registerChainAgent(t, db, "agent-shell", true, `["local_shell"]`)
 	registerChainAgent(t, db, "agent-off", false, `["mission"]`)
-	tr.deps.MissionPolicyDirs = []string{
+	policies := hitlservice.NewFSPolicySource(
 		missionPolicyDir(t, "hitl-policy-read_only.json", "hitl-policy-default.json", "notes.json"),
 		missionPolicyDir(t, "hitl-policy-read_only.json", "hitl-policy-strict.json"),
-	}
+	)
+	tr.deps.PolicyCatalog = func(string) []string { return hitlservice.ChoiceFiles(hitlservice.Choices(policies)) }
 	return tr, db
 }
 
@@ -209,15 +211,15 @@ func TestUnit_HandleMissionEnvelope_ShowSetAndRefuse(t *testing.T) {
 	tr, db := missionCommandTransport(t, &fakeDispatcher{})
 	store := runtimetypes.New(db.WithoutTransaction())
 
-	out, err := tr.handleMissionEnvelope(context.Background(), "")
+	out, err := tr.handleMissionEnvelope(context.Background(), nil, "")
 	require.NoError(t, err)
 	require.Contains(t, out, "Default mission envelope: (none)")
 
-	_, err = tr.handleMissionEnvelope(context.Background(), "read_only")
+	_, err = tr.handleMissionEnvelope(context.Background(), nil, "read_only")
 	require.NoError(t, err)
 	require.Equal(t, "hitl-policy-read_only.json", clikv.Read(context.Background(), store, "default-mission-policy"))
 
-	_, err = tr.handleMissionEnvelope(context.Background(), "notes.json")
+	_, err = tr.handleMissionEnvelope(context.Background(), nil, "notes.json")
 	require.Error(t, err)
 	requireOrdered(t, err.Error(), "/mission-envelope hitl-policy-default.json", "Available:", "Settings → Missions", "contenox-runtime config set default-mission-policy")
 	require.Equal(t, "hitl-policy-read_only.json", clikv.Read(context.Background(), store, "default-mission-policy"))
@@ -227,7 +229,7 @@ func TestUnit_MissionDefaultCommandsUnavailableWithoutFleet(t *testing.T) {
 	tr, _ := newMissionTestTransport(t, nil, nil)
 	_, err := tr.handleMissionAgent(context.Background(), "agent-reviewer")
 	require.ErrorContains(t, err, "unavailable")
-	_, err = tr.handleMissionEnvelope(context.Background(), "")
+	_, err = tr.handleMissionEnvelope(context.Background(), nil, "")
 	require.ErrorContains(t, err, "unavailable")
 
 	name, args, ok := parseCommand("/mission-agent agent-reviewer")

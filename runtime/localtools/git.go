@@ -34,13 +34,14 @@ type GitTools struct {
 	allowedDir  string
 	name        string
 	cwdResolver func(context.Context) string
+	identity    GitIdentityResolver
 }
 
 func NewGitTools(allowedDir string) taskengine.ToolsRepo {
 	return NewGitToolsWith(allowedDir, GitToolsName, nil)
 }
 
-func NewGitToolsWith(allowedDir, name string, cwdResolver func(context.Context) string) taskengine.ToolsRepo {
+func NewGitToolsWith(allowedDir, name string, cwdResolver func(context.Context) string, opts ...GitOption) taskengine.ToolsRepo {
 	cleaned := allowedDir
 	if cleaned != "" {
 		cleaned = filepath.Clean(cleaned)
@@ -48,7 +49,11 @@ func NewGitToolsWith(allowedDir, name string, cwdResolver func(context.Context) 
 	if name == "" {
 		name = GitToolsName
 	}
-	return &GitTools{allowedDir: cleaned, name: name, cwdResolver: cwdResolver}
+	tools := &GitTools{allowedDir: cleaned, name: name, cwdResolver: cwdResolver}
+	for _, opt := range opts {
+		opt(tools)
+	}
+	return tools
 }
 
 func (h *GitTools) Exec(ctx context.Context, startTime time.Time, input any, debug bool, toolsCall *taskengine.ToolsCall) (any, taskengine.DataType, error) {
@@ -119,6 +124,11 @@ func (h *GitTools) execDispatch(ctx context.Context, input any, toolsCall *taske
 			return nil, taskengine.DataTypeAny, err
 		}
 		return h.commit(ctx, args)
+	case "git_push":
+		if err := rejectUnknownArgs(toolName, args, "remote", "branch"); err != nil {
+			return nil, taskengine.DataTypeAny, err
+		}
+		return h.push(ctx, args)
 	case "git_checkout_branch":
 		if err := rejectUnknownArgs(toolName, args, "branch", "create"); err != nil {
 			return nil, taskengine.DataTypeAny, err
@@ -972,7 +982,7 @@ func (h *GitTools) commit(ctx context.Context, args map[string]any) (any, tasken
 	if !ok || strings.TrimSpace(message) == "" {
 		return nil, taskengine.DataTypeAny, recoverablef("%s: message is required", tool)
 	}
-	repo, _, err := h.openRepo(ctx, tool)
+	repo, root, err := h.openRepo(ctx, tool)
 	if err != nil {
 		return nil, taskengine.DataTypeAny, err
 	}
@@ -994,7 +1004,15 @@ func (h *GitTools) commit(ctx context.Context, args map[string]any) (any, tasken
 		return nil, taskengine.DataTypeAny, recoverablef("%s: nothing is staged — call git_add with the paths to include, then commit", tool)
 	}
 
-	hash, err := wt.Commit(strings.TrimSpace(message), &git.CommitOptions{})
+	identity, err := h.resolveIdentity(ctx, tool, root)
+	if err != nil {
+		return nil, taskengine.DataTypeAny, err
+	}
+	defer identity.release()
+	if identity != nil {
+		message = withTrailer(message, identity.Trailer)
+	}
+	hash, err := wt.Commit(strings.TrimSpace(message), commitOptionsFor(identity, time.Now()))
 	if err != nil {
 		if errors.Is(err, git.ErrMissingAuthor) {
 			return nil, taskengine.DataTypeAny, recoverablef("%s: this repository has no commit identity — set user.name and user.email in its git config first", tool)
@@ -1005,8 +1023,8 @@ func (h *GitTools) commit(ctx context.Context, args map[string]any) (any, tasken
 	if err != nil {
 		return nil, taskengine.DataTypeAny, recoverablef("%s: %v", tool, err)
 	}
-	return fmt.Sprintf("committed %s on %s: %s (%d file(s) staged)\n",
-		shortHash(hash), branch, subjectOf(message), staged), taskengine.DataTypeString, nil
+	return fmt.Sprintf("committed %s on %s%s: %s (%d file(s) staged)\n",
+		shortHash(hash), branch, commitAttribution(identity), subjectOf(message), staged), taskengine.DataTypeString, nil
 }
 
 func (h *GitTools) checkoutBranch(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
@@ -1122,9 +1140,14 @@ func (h *GitTools) GetToolsForToolsByName(ctx context.Context, name string) ([]t
 			"paths": gitPathsProp(),
 		}, "paths"),
 
-		fsTool("git_commit", "Commit what is staged. Refuses when nothing is staged; the author comes from the repository's own git config.", map[string]any{
+		fsTool("git_commit", "Commit what is staged. Refuses when nothing is staged. The author is the agent identity set in Settings, or the repository's own git config when none is set.", map[string]any{
 			"message": fsProp("string", "Commit message; the first line is the subject"),
 		}, "message"),
+
+		fsTool("git_push", "Push a branch to a remote with the agent's SSH key. Never force-pushes: if the remote has commits the branch lacks, it refuses.", map[string]any{
+			"remote": fsProp("string", "Remote name; defaults to origin"),
+			"branch": fsProp("string", "Branch to push; defaults to the current branch"),
+		}),
 
 		fsTool("git_checkout_branch", "Switch to a branch, or create it first with create=true.", map[string]any{
 			"branch": fsProp("string", "Branch name"),

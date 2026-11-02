@@ -3,6 +3,7 @@ package hitlpolicyapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/contenox/runtime/runtime/project"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -12,8 +13,8 @@ import (
 	"github.com/contenox/runtime/runtime/localfileservice"
 )
 
-func AddRoutes(mux *http.ServeMux, files localfileservice.Service) {
-	h := &handler{files: files}
+func AddRoutes(mux *http.ServeMux, files localfileservice.Service, policies hitlservice.PolicySource) {
+	h := &handler{files: files, policies: policies}
 	mux.HandleFunc("GET /hitl-policies/list", h.listPolicies)
 	mux.HandleFunc("GET /hitl-policies", h.getPolicy)
 	mux.HandleFunc("POST /hitl-policies", h.createPolicy)
@@ -22,7 +23,8 @@ func AddRoutes(mux *http.ServeMux, files localfileservice.Service) {
 }
 
 type handler struct {
-	files localfileservice.Service
+	files    localfileservice.Service
+	policies hitlservice.PolicySource
 }
 
 func normalizePolicyName(raw string) (string, error) {
@@ -41,6 +43,10 @@ func normalizePolicyName(raw string) (string, error) {
 }
 
 func (h *handler) listPolicies(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.policies.(hitlservice.PolicyLister); ok {
+		_ = apiframework.Encode(w, r, http.StatusOK, hitlservice.ChoiceFiles(hitlservice.ChoicesFor(h.policies, workspaceIDFromRequest(r))))
+		return
+	}
 	files, err := h.files.List(r.Context(), ".")
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.ListOperation)
@@ -65,7 +71,7 @@ func (h *handler) getPolicy(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
 		return
 	}
-	data, _, err := h.files.Read(r.Context(), name)
+	data, err := h.readPolicy(r, name)
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
 		return
@@ -141,4 +147,22 @@ func decodePolicy(r *http.Request) (hitlservice.Policy, []byte, error) {
 		return hitlservice.Policy{}, nil, err
 	}
 	return policy, data, nil
+}
+
+func (h *handler) readPolicy(r *http.Request, name string) ([]byte, error) {
+	if h.policies != nil {
+		if data, err := h.policies.ReadPolicy(r.Context(), "", hitlservice.ResolveForWorkspace(h.policies, workspaceIDFromRequest(r), filepath.ToSlash(name))); err == nil {
+			return data, nil
+		}
+	}
+	data, _, err := h.files.Read(r.Context(), name)
+	return data, err
+}
+
+func workspaceIDFromRequest(r *http.Request) string {
+	path := strings.TrimSpace(r.URL.Query().Get("workspace"))
+	if path == "" {
+		return ""
+	}
+	return project.LayerKeyOf(path)
 }

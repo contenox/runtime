@@ -183,6 +183,9 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 	slog.Info("contenox-runtime serve: agent declarations synced",
 		"created", len(preseeded.Created), "updated", len(preseeded.Updated),
 		"edited", len(preseeded.Edited), "declarations", len(results))
+	if project != "" {
+		renderWorkspaceEnvelopes(ctx, contenoxDir, []string{project})
+	}
 	return nil
 }
 
@@ -339,6 +342,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			"",
 			localtools.GitToolsName,
 			acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport }),
+			agentGitIdentity(db),
 		),
 		"local_shell": localtools.NewLocalExecToolsWith(
 			acpsvc.NewACPCommandRunner(func() *acpsvc.Transport { return transport }),
@@ -486,8 +490,8 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		LiveDefaults:          liveDefaultsResolver(db, true, pinned),
 		WorkspaceID:           workspaceID,
 		ContenoxDir:           contenoxDir,
-		KnownPolicies:         knownPolicyNames(contenoxDir),
-		MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
+		PolicyCatalog:         policyCatalog(contenoxDir),
+		PolicyResolver:        policyResolver(contenoxDir),
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,
 		DecisionRecorder:      decisionRecorderOf(acpHITL),

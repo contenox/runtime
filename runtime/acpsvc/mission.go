@@ -52,7 +52,7 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 
 	store := runtimetypes.New(t.deps.DB.WithoutTransaction())
 	if strings.TrimSpace(args) == "" {
-		return t.missionStatus(ctx, store), nil
+		return t.missionStatus(ctx, store, t.sessionWorkspaceID(sess)), nil
 	}
 
 	flags, rest, err := parseMissionFlags(args)
@@ -71,7 +71,7 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 		return "", fmt.Errorf("no mission agent: name one as `/mission <agent-name> <intent>`, or set a default. %s", missionFixHint(missionAgentCommand, missionAgentConfigKey, "<name>", t.missionAgentNames(ctx)))
 	}
 
-	policy, err := t.resolveMissionPolicy(ctx, store, flags.policy, agentName)
+	policy, err := t.resolveMissionPolicy(ctx, store, flags.policy, agentName, t.sessionWorkspaceID(sess))
 	if err != nil {
 		return "", err
 	}
@@ -109,8 +109,8 @@ func (t *Transport) handleMission(ctx context.Context, sess *sessionEntry, args 
 	), nil
 }
 
-func (t *Transport) resolveMissionPolicy(ctx context.Context, store runtimetypes.Store, flag, agentName string) (string, error) {
-	envelopes := t.missionEnvelopeNames()
+func (t *Transport) resolveMissionPolicy(ctx context.Context, store runtimetypes.Store, flag, agentName, workspaceID string) (string, error) {
+	envelopes := t.missionEnvelopeNames(workspaceID)
 	if name := strings.TrimSpace(flag); name != "" {
 		resolved, ok := matchEnvelope(envelopes, name)
 		if !ok {

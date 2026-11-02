@@ -1165,7 +1165,7 @@ func TestLoopback_NativeSession_NoSyntheticModelOption(t *testing.T) {
 
 func TestLoopback_ExternalAgent_HITLPolicyPickerRoundTripsNativelyAndPersists(t *testing.T) {
 	h := newLoopbackHarness(t)
-	h.tr.deps.KnownPolicies = []string{"strict", "dev"}
+	h.tr.deps.PolicyCatalog = func(string) []string { return []string{"strict", "dev"} }
 	h.tr.deps.HITLDefaultPolicyName = "strict"
 	ctx := context.Background()
 	agentName := registerStubAgentInDB(t, h.tr.deps.DB, "claude-stub-hitl",

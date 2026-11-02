@@ -12,11 +12,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/contenox/runtime/runtime/vfs"
 )
 
-const GeneratedDirName = ".generated"
+const GeneratedDirName = hitlservice.GeneratedPolicyDir
 
 const SyncStateFilename = ".sync-state.json"
 
