@@ -41,7 +41,7 @@ func conditionText(rule hitlservice.Rule) string {
 }
 
 func TestUnit_SeededPoliciesQuarantineCredentialsBeforeAnyAllow(t *testing.T) {
-	for _, preset := range HITLPolicyPresets {
+	for _, preset := range shippedHITLPolicies(t) {
 		if preset.Name == "hitl-policy-dev.json" || preset.Name == "hitl-policy-oracle.json" {
 			continue
 		}
@@ -73,7 +73,7 @@ func TestUnit_SeededPoliciesDenyWritesUnderGit(t *testing.T) {
 	} {
 		var policy hitlservice.Policy
 		found := false
-		for _, preset := range HITLPolicyPresets {
+		for _, preset := range shippedHITLPolicies(t) {
 			if preset.Name != name {
 				continue
 			}
@@ -100,7 +100,7 @@ func TestUnit_SeededPoliciesDenyWritesUnderGit(t *testing.T) {
 }
 
 func TestUnit_SeededPoliciesBoundCompute(t *testing.T) {
-	for _, preset := range HITLPolicyPresets {
+	for _, preset := range shippedHITLPolicies(t) {
 		policy := decodePreset(t, preset.Name, preset.Content)
 		require.NotNil(t, policy.Compute, "%s must carry compute bounds", preset.Name)
 		require.Equal(t, hitlservice.OnExhaustedFinishStuck, policy.Compute.OnExhausted, "%s onExhausted", preset.Name)
@@ -117,7 +117,7 @@ func TestUnit_SeededDefaultPolicyRefusesCredentialAndGitWrites(t *testing.T) {
 		Name    string
 		Content string
 	}
-	for _, candidate := range HITLPolicyPresets {
+	for _, candidate := range shippedHITLPolicies(t) {
 		if candidate.Name == "hitl-policy-default.json" {
 			preset.Name, preset.Content = candidate.Name, candidate.Content
 			break

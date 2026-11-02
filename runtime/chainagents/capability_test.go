@@ -26,7 +26,8 @@ func chainWithTools(tools ...[]string) *taskengine.TaskChainDefinition {
 func TestUnit_ChainGrantsMissionTools(t *testing.T) {
 	require.True(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"mission"})))
 	require.True(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"local_fs"}, []string{"mission", "native-git"})))
-	require.True(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"*"})))
+	require.True(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"*", "mission"})))
+	require.False(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"*"})), "a chat agent that inherits every toolset is not a mission agent; a declaration names mission to be one")
 	require.False(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"*", "!mission"})))
 	require.False(t, chainagents.ChainGrantsMissionTools(chainWithTools([]string{"local_fs"})))
 	require.False(t, chainagents.ChainGrantsMissionTools(chainWithTools()))
@@ -61,7 +62,7 @@ func TestUnit_MissionCapable_ShippedChatChainsAreNotMissionAgents(t *testing.T) 
 		return agent
 	}
 
-	require.False(t, chainagents.MissionCapable(write("chain-agent-acp.json", "chain-acp")), "the chat chain carries mission tools to fire missions, not to run as one")
-	require.False(t, chainagents.MissionCapable(write("chain-agent-acpx.json", "chain-acpx")))
+	require.False(t, chainagents.MissionCapable(write("agent-acp.json", "chain-acp")), "the chat chain carries mission tools to fire missions, not to run as one")
+	require.False(t, chainagents.MissionCapable(write("agent-acpx.json", "chain-acpx")))
 	require.True(t, chainagents.MissionCapable(write("agent-reviewer.json", "agent-reviewer")))
 }

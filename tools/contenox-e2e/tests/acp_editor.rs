@@ -235,7 +235,7 @@ fn the_hardened_profile_never_offers_mission() {
 
 
 fn plant_flat_chain(cx: &Instance, at: std::path::PathBuf) -> std::path::PathBuf {
-    let source = cx.home_file(".generated/chain-agent-acpx.json");
+    let source = cx.home_file(".generated/agent-acpx.json");
     if let Some(parent) = at.parent() {
         std::fs::create_dir_all(parent).expect("the destination directory");
     }

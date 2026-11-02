@@ -10,17 +10,22 @@ import (
 	"strings"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/localfileservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskchainservice"
 )
 
-const AgentChainFilePrefix = "agent-"
+const AgentChainFilePrefix = agentdecl.CompiledChainPrefix
 
 var shippedAgentChains = map[string]bool{
 	"chain-acp":  true,
 	"chain-acpx": true,
+}
+
+var utilityChains = map[string]bool{
+	"chain-contenox": true,
 }
 
 type Result struct {
@@ -122,6 +127,9 @@ func scan(ctx context.Context, roots []string) ([]candidate, error) {
 }
 
 func eligible(base, chainID string) bool {
+	if utilityChains[chainID] {
+		return false
+	}
 	if shippedAgentChains[chainID] {
 		return true
 	}

@@ -18,6 +18,7 @@ var blessedPreseedHashes = map[string][]string{
 		"eee7032c4295191bbc6927f7060559c22fe488a081d46b3b0ac6f664cb8f1141",
 		"c870b49dbf2c0dcab45ed3dc141317478434efbffb86d098f3f42e00d41b50ec",
 		"97c02212f91c2d54924643387c99e55adbfb3a017d64ef2f8cc8a026635b123f",
+		"3e7e7e3c657dd4607796ae757f36948d48226431196d545f9cb2dd77f4ad7741",
 	},
 	"agents/README.md": {
 		"8a5b92e9acf242f8adc01e9a1f271e01653943aa404a93ae6121ee945772692e",
@@ -90,15 +91,38 @@ var blessedPreseedHashes = map[string][]string{
 		"4706bc96ed07bd3bfdef59729a3e342155bc7fe713063828727f8530e197771b",
 		"6cea996fb8c58312e5d574d6dec67cf1ef70babf3e78c24327a5041e93dff50a",
 	},
+	"agents/contenox/agent.md": {
+		"073b4d0bf412ec6fe4d021c6a2be80c83df460c61c762fbdfe608a5136c44600",
+	},
+	"agents/contenox/coding/agent.md": {
+		"c4246e52e89c8196e7917bec81c6438a5dbfea60ddca3b54be22ab1684877b0f",
+	},
+	"agents/contenox/coding/recovery.md": {
+		"5c52d6be22d902286127f01746e6d4a9d872edd5b7aa7676ca8336d6bfcb6f04",
+	},
+	"agents/contenox/failure.md": {
+		"2972ba4cc7b281034a8ddf37a0f91bd7d78b1fbdf509628bc21b0a8620ce4957",
+	},
+	"agents/contenox/general/agent.md": {
+		"781c6647c6ad7df267cb4fff9c3ec67f9f93591a5d8458caf4c52fcbe854be76",
+	},
+	"agents/contenox/general/recovery.md": {
+		"28535f6981083e4f6235ac29b3bda192cff01079eb5cdc966e36c524ba5673ca",
+	},
+	"agents/planner.md": {
+		"85a3ce2b81de427b2232f7cf49cc68d5e6492c8fb658af46f5432e70745c73f3",
+	},
 	"agents/researcher.md": {
 		"35c1002c7c86c8509ad974312dfa43b8bae44fc446c28d1ec8bc8fb793f1a11c",
 	},
 	"agents/reviewer.md": {
 		"0aa955fa9ec4f9350ff080d247ad72903a1a078c2561626da8882728ffdc0694",
+		"cedee05565bcfc34ff2eb470a4026cd6be1747ff96fad58a491c0592abfb2ae5",
 	},
 	"agents/run.md": {
 		"73d4dec4896d783d1d43a29d9f9b222d8c19837a6cb9c4c8cbb3e0f40bbe5d94",
 		"5dfe1b0309ec6a26e46bfadf6bdb8c013993c02b5b1da3ad5d17813858c58003",
+		"4bbac2b1e3cb68e34a5afc5c36d03b16fea6ac655bb1b8cefbad31fef704cbfe",
 	},
 	"agents/triage/agent.md": {
 		"0d337ef8d1f22eca62741bab7783b0d758d10c5e64b403724171e1c6af85c6b0",

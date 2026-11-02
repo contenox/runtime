@@ -3,6 +3,7 @@ package chainagents
 import (
 	"encoding/json"
 	"os"
+	"slices"
 
 	"github.com/contenox/runtime/runtime/missiontools"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -39,7 +40,7 @@ func ChainGrantsMissionTools(chain *taskengine.TaskChainDefinition) bool {
 		if task.ExecuteConfig == nil || len(task.ExecuteConfig.Tools) == 0 {
 			continue
 		}
-		if len(taskengine.ExportedApplyAllowlist(task.ExecuteConfig.Tools, []string{missiontools.ToolsProviderName})) > 0 {
+		if slices.Contains(task.ExecuteConfig.Tools, missiontools.ToolsProviderName) {
 			return true
 		}
 	}

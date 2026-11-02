@@ -518,7 +518,7 @@ on_exhausted = "finish_stuck"
 
 [envelopes.default.attention]
 allow_agent_answers = true
-max_agent_answers = 3
+max_agent_answers = 2
 
 # Attended default only. Introspection reads and sandboxed eval were observed
 # asking hundreds of times and never vetoed; they elevate to allow so the ask
@@ -639,6 +639,46 @@ missions.answer = "deny"
 
 [envelopes.oracle.compute]
 on_exhausted = "finish_stuck"
+
+[envelopes.acp]
+extends = "default"
+description = "The editor session: the default envelope under the name editors select."
+
+[envelopes.acp.attention]
+allow_agent_answers = true
+max_agent_answers = 3
+
+[envelopes.dev]
+extends = "default"
+description = "Your own machine: allow what is not named, keep asking before risky commands and history changes."
+default_action = "allow"
+
+[envelopes.dev.files.read]
+grant = "allow"
+
+[envelopes.dev.files.write]
+grant = "allow"
+deny_paths = [
+  "**/{.ssh,.gnupg}/**",
+  "**/{.config/autostart,.config/systemd/user,Library/LaunchAgents,Library/LaunchDaemons}/**",
+  "**/{.bashrc,.zshrc,.profile,.bash_profile,.zprofile,.bash_login,.zshenv,.kshrc,crontab,.crontab}",
+  "**/.config/fish/config.fish",
+  "/{etc,usr,bin,sbin,boot,lib,lib64,opt,System}/**",
+  "**/hitl-policy*.json",
+  "{**/.git/**,.git/**}",
+]
+
+[envelopes.dev.compute]
+max_tool_calls = 500
+max_tokens = 4000000
+on_exhausted = "finish_stuck"
+
+[envelopes.dev.attention]
+allow_agent_answers = true
+max_agent_answers = 5
+
+[envelopes.dev.tools]
+"native-git.git_add" = "allow"
 
 [naming]
 # Prefix an agent read from another tool's directory with that tool's name, so

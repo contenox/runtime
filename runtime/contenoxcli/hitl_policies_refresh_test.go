@@ -5,70 +5,49 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_RefreshEmbeddedHITLPolicies_CreatesMissing(t *testing.T) {
-	t.Parallel()
+func TestUnit_RetireShippedHITLPolicies_RemovesUntouchedCopiesAndKeepsEdits(t *testing.T) {
 	dir := t.TempDir()
-
-	written, err := refreshEmbeddedHITLPolicies(dir)
+	shipped, err := os.ReadFile(filepath.Join("testdata", "retired-hitl-policy-oracle.json"))
 	require.NoError(t, err)
-	require.Len(t, written, len(HITLPolicyPresets))
+	oracle := filepath.Join(dir, "hitl-policy-oracle.json")
+	strict := filepath.Join(dir, "hitl-policy-strict.json")
+	mine := filepath.Join(dir, "hitl-policy-mine.json")
+	require.NoError(t, os.WriteFile(oracle, shipped, 0o600))
+	require.NoError(t, os.WriteFile(strict, []byte(`{"default_action":"deny"}`), 0o600))
+	require.NoError(t, os.WriteFile(mine, []byte(`{"default_action":"approve"}`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, retiredHITLPolicyStateFilename), []byte(`{}`), 0o600))
 
-	for _, preset := range HITLPolicyPresets {
-		body, err := os.ReadFile(filepath.Join(dir, preset.Name))
-		require.NoError(t, err)
-		assert.Equal(t, preset.Content, string(body), preset.Name)
-	}
-	state := readHITLPolicyState(filepath.Join(dir, hitlPolicyStateFilename))
-	for _, preset := range HITLPolicyPresets {
-		assert.Equal(t, digestPolicy([]byte(preset.Content)), state.Hashes[preset.Name], preset.Name)
-	}
-}
-
-func TestUnit_RefreshEmbeddedHITLPolicies_UpdatesUntouchedOldShippedCopy(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	const name = "hitl-policy-dev.json"
-	old := []byte("{\n  \"default_action\": \"allow\",\n  \"rules\": []\n}\n")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, name), old, 0o644))
-	state := `{"hashes":{"` + name + `":"` + digestPolicy(old) + `"}}`
-	require.NoError(t, os.WriteFile(filepath.Join(dir, hitlPolicyStateFilename), []byte(state), 0o644))
-
-	written, err := refreshEmbeddedHITLPolicies(dir)
+	removed, kept, err := retireShippedHITLPolicies(dir)
 	require.NoError(t, err)
-	assert.Contains(t, written, name)
-
-	body, err := os.ReadFile(filepath.Join(dir, name))
-	require.NoError(t, err)
-	for _, preset := range HITLPolicyPresets {
-		if preset.Name == name {
-			assert.Equal(t, preset.Content, string(body))
-		}
+	require.Equal(t, []string{oracle}, removed, "an untouched shipped copy gives way to its envelope")
+	require.Equal(t, []string{strict}, kept, "an edited copy is the operator's, so it is kept and reported")
+	for _, path := range []string{strict, mine, filepath.Join(dir, retiredHITLPolicyStateFilename)} {
+		_, statErr := os.Stat(path)
+		require.NoErrorf(t, statErr, "%s stays", path)
 	}
 }
 
-func TestUnit_RefreshEmbeddedHITLPolicies_KeepsOperatorEdit(t *testing.T) {
-	t.Parallel()
+func TestUnit_RetireShippedHITLPolicies_DropsTheStateFileOnceNothingIsLeft(t *testing.T) {
 	dir := t.TempDir()
-	const name = "hitl-policy-default.json"
-	edited := []byte("{\n  \"default_action\": \"deny\",\n  \"rules\": []\n}\n")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, name), edited, 0o644))
+	state := filepath.Join(dir, retiredHITLPolicyStateFilename)
+	require.NoError(t, os.WriteFile(state, []byte(`{}`), 0o600))
 
-	written, err := refreshEmbeddedHITLPolicies(dir)
+	removed, kept, err := retireShippedHITLPolicies(dir)
 	require.NoError(t, err)
-	assert.NotContains(t, written, name)
-	body, err := os.ReadFile(filepath.Join(dir, name))
-	require.NoError(t, err)
-	assert.Equal(t, string(edited), string(body), "an operator edit must survive a shipped-policy refresh")
+	require.Empty(t, removed)
+	require.Empty(t, kept)
+	_, statErr := os.Stat(state)
+	require.True(t, os.IsNotExist(statErr))
+}
 
-	// A second run must keep it too: the recorded hash is ours, not the edit's.
-	written, err = refreshEmbeddedHITLPolicies(dir)
-	require.NoError(t, err)
-	assert.NotContains(t, written, name)
-	body, err = os.ReadFile(filepath.Join(dir, name))
-	require.NoError(t, err)
-	assert.Equal(t, string(edited), string(body))
+func TestUnit_KnownPolicyNames_ListsEveryEnvelopeWithDefaultFirst(t *testing.T) {
+	names := knownPolicyNames(t.TempDir())
+	require.NotEmpty(t, names)
+	require.Equal(t, "hitl-policy-default.json", names[0])
+	for _, want := range []string{"hitl-policy-strict.json", "hitl-policy-dev.json", "hitl-policy-acp.json", "hitl-policy-acpx.json", "hitl-policy-oracle.json", "hitl-policy-read_only.json"} {
+		require.Contains(t, names, want)
+	}
 }

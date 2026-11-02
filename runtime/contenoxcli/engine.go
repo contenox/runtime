@@ -5,13 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
-
-	"github.com/contenox/runtime/runtime/homedir"
 
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
-	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
@@ -126,9 +122,5 @@ func hitlPolicySource(primaryDir string) hitlservice.PolicySource {
 }
 
 func hitlPolicyDirs(primaryDir string) []string {
-	dirs := []string{filepath.Join(primaryDir, agentdecl.GeneratedDirName), primaryDir}
-	if dir, err := homedir.Dir(); err == nil {
-		dirs = append(dirs, dir)
-	}
-	return dirs
+	return acpPolicyDirs(primaryDir)
 }

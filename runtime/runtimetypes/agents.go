@@ -66,9 +66,9 @@ func (c ExternalACPConfig) Validate() error {
 }
 
 type ChainConfig struct {
-	Path string `json:"path" example:"/home/user/.contenox/agent-reviewer.json"`
+	Path string `json:"path" example:"/home/user/.contenox-harness/.generated/agent-reviewer.json"`
 
-	ChainID string `json:"chainId,omitempty" example:"agent-reviewer"`
+	ChainID string `json:"chainId,omitempty" example:"reviewer"`
 
 	Refused string `json:"refused,omitempty" example:"/home/user/.contenox/agents/reviewer.md has no YAML frontmatter block"`
 }

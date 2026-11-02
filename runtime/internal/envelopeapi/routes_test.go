@@ -29,5 +29,5 @@ func TestUnit_EnvelopesList_ReportsTheShippedCatalog(t *testing.T) {
 		require.NotEmpty(t, envelope.Description, "%s carries its description", envelope.Name)
 		names = append(names, envelope.Name)
 	}
-	require.ElementsMatch(t, []string{"read_only", "ask_always", "auto_edit", "default", "strict", "acpx", "oracle"}, names)
+	require.ElementsMatch(t, []string{"read_only", "ask_always", "auto_edit", "default", "strict", "acp", "dev", "acpx", "oracle"}, names)
 }

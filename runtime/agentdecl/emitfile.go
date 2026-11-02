@@ -16,10 +16,7 @@ const (
 	ActionIgnored   WriteAction = "ignored"
 )
 
-var ReservedNames = map[string]bool{
-	"agent-planner":  true,
-	"agent-reviewer": true,
-}
+var ReservedNames = map[string]bool{}
 
 func marshalWithSchema(v any, schemaURL string) ([]byte, error) {
 	body, err := json.MarshalIndent(v, "", "  ")

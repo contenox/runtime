@@ -62,6 +62,16 @@ func buildTemplateVars(chain *taskengine.TaskChainDefinition, defaults stateserv
 	if chainUsesVar(chain, "provider") && defaults.Provider != "" {
 		vars["provider"] = defaults.Provider
 	}
+	if chainUsesVar(chain, "default_model") {
+		if defaults.Model != "" {
+			vars["default_model"] = defaults.Model
+		} else if strings.TrimSpace(model) != "" {
+			vars["default_model"] = strings.TrimSpace(model)
+		}
+	}
+	if chainUsesVar(chain, "default_provider") && defaults.Provider != "" {
+		vars["default_provider"] = defaults.Provider
+	}
 	if chainUsesVar(chain, "alt_model") && defaults.AltModel != "" {
 		vars["alt_model"] = defaults.AltModel
 	}

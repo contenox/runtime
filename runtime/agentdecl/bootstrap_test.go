@@ -85,7 +85,7 @@ func TestUnit_Bootstrap_KeepsTheLastGoodChainWhenADeclarationBreaks(t *testing.T
 	_, _, err = agentdecl.Bootstrap(context.Background(), home, cfg)
 	require.NoError(t, err)
 
-	compiled := filepath.Join(home, agentdecl.GeneratedDirName, "chain-agent-acp.json")
+	compiled := filepath.Join(home, agentdecl.GeneratedDirName, "agent-acp.json")
 	before, err := os.ReadFile(compiled)
 	require.NoError(t, err)
 
@@ -160,7 +160,7 @@ func TestUnit_BootstrapFor_CompilesAProjectDeclaration(t *testing.T) {
 	_, _, err = agentdecl.BootstrapFor(context.Background(), home, project, cfg)
 	require.NoError(t, err)
 
-	_, statErr := os.Stat(filepath.Join(home, agentdecl.GeneratedDirName, "chain-agent-project-agent.json"))
+	_, statErr := os.Stat(filepath.Join(home, agentdecl.GeneratedDirName, "agent-project-agent.json"))
 	assert.NoError(t, statErr, "a project declaration compiles beside the home's")
 }
 
@@ -218,6 +218,6 @@ func TestUnit_CompileLock_SerializesConcurrentSeeds(t *testing.T) {
 	for err := range errs {
 		require.NoError(t, err)
 	}
-	_, statErr := os.Stat(filepath.Join(home, agentdecl.GeneratedDirName, "chain-agent-acp.json"))
+	_, statErr := os.Stat(filepath.Join(home, agentdecl.GeneratedDirName, "agent-acp.json"))
 	assert.NoError(t, statErr, "both passes leave a complete chain behind")
 }

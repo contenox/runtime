@@ -33,14 +33,16 @@ func TestUnit_SeedAgentDeclarations_WritesTheCatalogAndGeneratedChains(t *testin
 	assert.NotEmpty(t, compiled, "the declarations compile into .generated")
 }
 
-func TestUnit_SeedAgentDeclarations_RefreshesShippedPolicies(t *testing.T) {
+func TestUnit_SeedAgentDeclarations_RendersEveryShippedPolicyFromItsEnvelope(t *testing.T) {
 	home := t.TempDir()
 	require.NoError(t, seedAgentDeclarations(context.Background(), home))
 
-	for _, preset := range HITLPolicyPresets {
-		body, err := os.ReadFile(filepath.Join(home, preset.Name))
+	for _, preset := range shippedHITLPolicies(t) {
+		body, err := os.ReadFile(filepath.Join(home, agentdecl.GeneratedDirName, preset.Name))
 		require.NoError(t, err, preset.Name)
-		assert.Equal(t, preset.Content, string(body), preset.Name)
+		assert.JSONEq(t, preset.Content, string(body), preset.Name)
+		_, statErr := os.Stat(filepath.Join(home, preset.Name))
+		assert.Truef(t, os.IsNotExist(statErr), "%s is no longer seeded as a raw JSON preset", preset.Name)
 	}
 	agents, err := os.ReadFile(filepath.Join(home, "agents.toml"))
 	require.NoError(t, err)
@@ -52,14 +54,13 @@ func TestUnit_SeedAgentDeclarations_RefreshesShippedPolicies(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(generated), `"native-git"`, "the generated envelope must carry the git rules")
 
-	// An operator edit to a seeded policy survives the next boot.
 	editedPath := filepath.Join(home, "hitl-policy-dev.json")
-	edited := []byte("{\n  \"default_action\": \"deny\",\n  \"rules\": []\n}\n")
+	edited := []byte(`{"default_action": "deny", "rules": []}`)
 	require.NoError(t, os.WriteFile(editedPath, edited, 0o644))
 	require.NoError(t, seedAgentDeclarations(context.Background(), home))
 	body, err := os.ReadFile(editedPath)
 	require.NoError(t, err)
-	assert.Equal(t, edited, body)
+	assert.Equal(t, edited, body, "an operator's edited policy file is never deleted")
 }
 
 func TestUnit_SeedAgentDeclarations_IsIdempotent(t *testing.T) {
@@ -83,7 +84,7 @@ func TestUnit_DefaultChain_PrefersTheCompiledTreeForAnUntouchedHome(t *testing.T
 	registry, err := defaultChainFor(home, acpProfileACP)
 	require.NoError(t, err)
 	assert.Equal(t, "chain-acp", registry.Default().ID)
-	assert.Contains(t, filepath.ToSlash(registry.Source()), ".generated/chain-agent-acp.json")
+	assert.Contains(t, filepath.ToSlash(registry.Source()), ".generated/agent-acp.json")
 }
 
 func TestUnit_HITLPolicySource_PrefersTheRenderedEnvelope(t *testing.T) {
@@ -110,7 +111,7 @@ func TestUnit_DefaultChain_IgnoresTheOldJSONPreset(t *testing.T) {
 	registry, err := defaultChainFor(home, acpProfileACP)
 	require.NoError(t, err)
 	assert.Equal(t, "chain-acp", registry.Default().ID, "the compiled tree is the chain; the old JSON is not read")
-	assert.Contains(t, filepath.ToSlash(registry.Source()), ".generated/chain-agent-acp.json")
+	assert.Contains(t, filepath.ToSlash(registry.Source()), ".generated/agent-acp.json")
 }
 
 func TestUnit_SeedAgentDeclarations_UsesTheUsersAgentsToml(t *testing.T) {
@@ -120,7 +121,7 @@ func TestUnit_SeedAgentDeclarations_UsesTheUsersAgentsToml(t *testing.T) {
 
 	require.NoError(t, seedAgentDeclarations(context.Background(), home))
 
-	raw, err := os.ReadFile(filepath.Join(home, ".generated", "chain-agent-acp.json"))
+	raw, err := os.ReadFile(filepath.Join(home, ".generated", "agent-acp.json"))
 	require.NoError(t, err)
 	var chain taskengine.TaskChainDefinition
 	require.NoError(t, json.Unmarshal(raw, &chain))
@@ -141,7 +142,7 @@ func TestUnit_DefaultChain_BootsWithABrokenHomeDeclaration(t *testing.T) {
 	require.NoError(t, seedAgentDeclarations(context.Background(), home))
 	broken := filepath.Join(home, "agents", "acp", "agent.md")
 	require.NoError(t, os.WriteFile(broken, []byte("---\nname: [unclosed\n---\n"), 0o644))
-	require.NoError(t, os.Remove(filepath.Join(home, ".generated", "chain-agent-acp.json")))
+	require.NoError(t, os.Remove(filepath.Join(home, ".generated", "agent-acp.json")))
 
 	registry, err := defaultChainFor(home, acpProfileACP)
 	require.NoError(t, err, "a broken user declaration must not stop the runtime")

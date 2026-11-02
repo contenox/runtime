@@ -486,12 +486,23 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	stopAgentWatch := watchAgentDeclarations(ctx, contenoxDir)
 	defer stopAgentWatch()
-	if created, seedErr := seedMissionAgentChains(contenoxDir); seedErr != nil {
-		slog.Warn("contenox-runtime serve: could not seed the shipped mission agents", "dir", contenoxDir, "error", seedErr)
-	} else if len(created) > 0 {
-		slog.Info("contenox-runtime serve: seeded the shipped mission agents", "files", created)
+	retireDirs := []string{contenoxDir}
+	if home, homeErr := globalContenoxDir(); homeErr == nil && home != contenoxDir {
+		retireDirs = append(retireDirs, home)
+	}
+	for _, dir := range retireDirs {
+		if removed, retireErr := retireSeededAgentChains(dir); retireErr != nil {
+			slog.Warn("contenox-runtime serve: could not retire the old JSON mission agents", "dir", dir, "error", retireErr)
+		} else if len(removed) > 0 {
+			slog.Info("contenox-runtime serve: retired the old JSON mission agents; their declarations ship as agents/*.md", "files", removed)
+		}
 	}
 	discoverChainAgents(ctx, agentRegistry, contenoxDir)
+	if migrated, migrateErr := migrateRetiredMissionAgent(ctx, store); migrateErr != nil {
+		slog.Warn("contenox-runtime serve: could not move the default mission agent off a retired name", "error", migrateErr)
+	} else if migrated != "" {
+		slog.Info("contenox-runtime serve: moved the default mission agent off a retired name", "value", migrated)
+	}
 
 	policyValidator := hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")
 	if seeded, seedErr := seedMissionDefaults(ctx, store, missionDefaultCheck{
@@ -562,14 +573,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 			NativeTurns:           nativeTurns,
 			Fleet:                 fleet,
 			Agents:                agentRegistry,
-			KnownPolicies:         embeddedPolicyNames(),
+			KnownPolicies:         knownPolicyNames(contenoxDir),
 			MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
 			HITLDefaultPolicyName: acpDefaultPolicyName,
 		})
 	}
 
 	runtimeDefaults := stateservice.RuntimeDefaults{
-		ChainRef:    firstNonEmptyStr(opts.EffectiveChain, "default-chain.json"),
+		ChainRef:    firstNonEmptyStr(opts.EffectiveChain, compiledAgentChainRef(chatAgentChainID)),
 		Model:       opts.EffectiveDefaultModel,
 		Provider:    opts.EffectiveDefaultProvider,
 		AltModel:    opts.EffectiveAltDefaultModel,

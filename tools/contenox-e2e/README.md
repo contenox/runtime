@@ -43,7 +43,7 @@ Deleted entirely: `envelopes.rs` (asserts the declared-envelope compiler and its
 queue this CLI exposes only through a running `contenox-runtime serve`).
 
 Dropped from the kept files (also present in the enterprise source): the
-chain-router leaf and preseed cases (`.generated/chain-agent-acp.json`), the
+chain-router leaf and preseed cases (`.generated/agent-acp.json`), the
 autocomplete-role cases, the `answer` command-menu cases, the envelope `_meta`
 cases, and the fs-capability gating cases. Those describe the enterprise ACP
 generation; the v1 `acpsvc` in this tree does not implement them, and they were

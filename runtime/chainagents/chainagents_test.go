@@ -89,6 +89,19 @@ func TestUnit_Discover_ShippedAgenticChainsAreEligibleByID(t *testing.T) {
 	}
 }
 
+func TestUnit_Discover_CompiledUtilityChainStaysOutOfTheFleet(t *testing.T) {
+	ctx, agents := setupRegistry(t)
+	dir := t.TempDir()
+	writeChain(t, dir, "agent-contenox.json", "chain-contenox")
+	writeChain(t, dir, "agent-reviewer.json", "reviewer")
+
+	res, err := chainagents.Discover(ctx, agents, dir)
+	require.NoError(t, err)
+	require.Equal(t, []string{"reviewer"}, res.Created)
+	_, err = agents.GetByName(ctx, "chain-contenox")
+	require.ErrorIs(t, err, libdb.ErrNotFound, "the CLI chat chain compiles like an agent but is not one")
+}
+
 func TestUnit_Discover_IsIdempotent(t *testing.T) {
 	ctx, agents := setupRegistry(t)
 	dir := t.TempDir()

@@ -31,7 +31,7 @@ func TestUnit_EnvelopesList_ReportsTheShippedCatalog(t *testing.T) {
 		names = append(names, env.Name)
 		assert.NotEmpty(t, env.Description, "%s carries its description", env.Name)
 	}
-	assert.ElementsMatch(t, []string{"read_only", "ask_always", "auto_edit", "default", "strict", "acpx", "oracle"}, names)
+	assert.ElementsMatch(t, []string{"read_only", "ask_always", "auto_edit", "default", "strict", "acp", "dev", "acpx", "oracle"}, names)
 }
 
 func TestUnit_AgentProblems_ReturnsTheLastSyncProblems(t *testing.T) {

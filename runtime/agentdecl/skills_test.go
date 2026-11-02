@@ -84,7 +84,7 @@ You help with recurring work.
 	)
 	require.NoError(t, err)
 
-	raw, err := os.ReadFile(filepath.Join(gen, "chain-agent-assistant.json"))
+	raw, err := os.ReadFile(filepath.Join(gen, "agent-assistant.json"))
 	require.NoError(t, err)
 	body := string(raw)
 
@@ -124,7 +124,7 @@ Just a prompt.
 	)
 	require.NoError(t, err)
 
-	raw, err := os.ReadFile(filepath.Join(gen, "chain-agent-plain.json"))
+	raw, err := os.ReadFile(filepath.Join(gen, "agent-plain.json"))
 	require.NoError(t, err)
 	require.NotContains(t, string(raw), "timesheet",
 		"a declaration that never asks for the inventory does not get one")
@@ -165,7 +165,7 @@ description: Does repeated office work
 	require.True(t, ok)
 	require.Equal(t, agentdecl.ActionUpdated, r.Action, "a new skill changes the prompt, so the chain is rewritten")
 
-	raw, err := os.ReadFile(filepath.Join(gen, "chain-agent-assistant.json"))
+	raw, err := os.ReadFile(filepath.Join(gen, "agent-assistant.json"))
 	require.NoError(t, err)
 	require.Contains(t, string(raw), "timesheet")
 }

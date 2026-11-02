@@ -21,33 +21,11 @@ import (
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
-//go:embed chain-contenox.json
-var initChain string
-
-//go:embed chain-run.json
-var initRunChain string
-
 //go:embed chain-compact.json
 var initCompactChain string
 
-// chain-acp.json is the equivalence fixture: the compiled `acp` tree is
-// compared against it by agentdecl/chain_equivalence_test.go. Nothing reads or
-// writes it at boot, and `init` no longer seeds it — edit agents/acp/ instead.
-//
-//go:embed chain-acp.json
-var initACPChain string
-
-//go:embed chain-acpx.json
-var initACPXChain string
-
 //go:embed chain-fim.json
 var initFIMChain string
-
-//go:embed agent-planner.json
-var initPlannerChain string
-
-//go:embed agent-reviewer.json
-var initReviewerChain string
 
 //go:embed chain-oracle-default.json
 var initOracleChain string
@@ -57,17 +35,6 @@ var blessedChainHashes = map[string][]string{}
 const headlessACPChainFilename = "headless-acp-chain.json"
 
 const chainOracleDefaultFilename = "chain-oracle-default.json"
-
-func seedHeadlessACPChainIfMissing(contenoxDir string) error {
-	dst := filepath.Join(contenoxDir, headlessACPChainFilename)
-	if _, err := os.Stat(dst); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(contenoxDir, 0750); err != nil {
-		return err
-	}
-	return os.WriteFile(dst, []byte(initACPXChain), 0644)
-}
 
 type providerConfig struct {
 	name         string
@@ -200,29 +167,10 @@ func RunGlobalInit(out io.Writer) error {
 		fmt.Fprintf(out, "  Created %s\n", path)
 		return nil
 	}
-	if err := writeFile(filepath.Join(homeDir, "default-chain.json"), initChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, "default-run-chain.json"), initRunChain); err != nil {
-		return err
-	}
 	if err := writeFile(filepath.Join(homeDir, "chain-compact.json"), initCompactChain); err != nil {
 		return err
 	}
-
-	if err := writeFile(filepath.Join(homeDir, headlessACPChainFilename), initACPXChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, reviewerChainFilename), initReviewerChain); err != nil {
-		return err
-	}
 	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
-		return err
-	}
-	if err := writeEmbeddedHITLPolicies(homeDir, false); err != nil {
 		return err
 	}
 	if err := seedAgentDeclarations(context.Background(), homeDir); err != nil {
@@ -316,29 +264,10 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	if hdErr != nil {
 		return fmt.Errorf("could not resolve ~/.contenox-harness: %w", hdErr)
 	}
-	if err := writeFile(filepath.Join(homeDir, "default-chain.json"), initChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, "default-run-chain.json"), initRunChain); err != nil {
-		return err
-	}
 	if err := writeFile(filepath.Join(homeDir, "chain-compact.json"), initCompactChain); err != nil {
 		return err
 	}
-
-	if err := writeFile(filepath.Join(homeDir, headlessACPChainFilename), initACPXChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, "agent-planner.json"), initPlannerChain); err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(homeDir, reviewerChainFilename), initReviewerChain); err != nil {
-		return err
-	}
 	if err := writeFile(filepath.Join(homeDir, "chain-oracle-default.json"), initOracleChain); err != nil {
-		return err
-	}
-	if err := writeEmbeddedHITLPolicies(homeDir, force); err != nil {
 		return err
 	}
 	if err := seedAgentDeclarations(context.Background(), homeDir); err != nil {

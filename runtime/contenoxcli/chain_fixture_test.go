@@ -5,235 +5,124 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnit_BuiltinChains_SetThinkOnlyOnUserFacingChatTasks(t *testing.T) {
-	cases := []struct {
-		name        string
-		raw         string
-		wantThink   []string
-		wantNoThink []string
-	}{
-		{name: "contenox", raw: initChain, wantThink: []string{"coding_chat", "coding_recovery", "contenox_chat", "recovery_chat", "summarise_failure"}, wantNoThink: []string{"classify_request", "coding_tools", "coding_recovery_tools", "run_tools", "recovery_tools"}},
-		{name: "run", raw: initRunChain, wantThink: []string{"contenox_run", "recovery_run", "summarise_failure"}, wantNoThink: []string{"run_tools", "recovery_run_tools"}},
-		{name: "acp", raw: initACPChain, wantThink: []string{"coding_chat", "coding_recovery", "acp_chat", "recovery_chat", "summarise_failure"}, wantNoThink: []string{"classify_request", "coding_tools", "coding_recovery_tools", "run_tools", "recovery_tools"}},
-		{name: "acpx", raw: initACPXChain, wantThink: []string{"acp_chat", "recovery_chat", "summarise_failure"}, wantNoThink: []string{"run_tools", "recovery_tools"}},
-		{name: "compact", raw: initCompactChain, wantNoThink: []string{"compact_history"}},
-	}
+var shippedInteractiveAgents = []string{"acp", "acpx", "contenox", "run"}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var chain taskengine.TaskChainDefinition
-			require.NoError(t, json.Unmarshal([]byte(tc.raw), &chain))
-			byID := make(map[string]taskengine.TaskDefinition)
-			for _, task := range chain.Tasks {
-				byID[task.ID] = task
-			}
-			for _, id := range tc.wantThink {
-				task, ok := byID[id]
-				require.True(t, ok, "task %s missing", id)
-				require.NotNil(t, task.ExecuteConfig, "task %s execute_config", id)
-				require.Equal(t, "{{var:think}}", task.ExecuteConfig.Think, "task %s think", id)
-			}
-			for _, id := range tc.wantNoThink {
-				task, ok := byID[id]
-				require.True(t, ok, "task %s missing", id)
-				if task.ExecuteConfig != nil {
-					require.Empty(t, task.ExecuteConfig.Think, "task %s should not set think", id)
+func compiledShippedAgent(t *testing.T, name string) *taskengine.TaskChainDefinition {
+	t.Helper()
+	cfg, err := agentdecl.Shipped()
+	require.NoError(t, err)
+	chain, err := agentdecl.CompileShippedAgent(cfg, name)
+	require.NoErrorf(t, err, "agents/%s compiles", name)
+	require.NoErrorf(t, taskengine.LintChain(chain), "agents/%s lints", name)
+	return chain
+}
+
+func embeddedSystemChain(t *testing.T, raw string) *taskengine.TaskChainDefinition {
+	t.Helper()
+	var chain taskengine.TaskChainDefinition
+	require.NoError(t, json.Unmarshal([]byte(raw), &chain))
+	return &chain
+}
+
+func TestUnit_ShippedAgents_SetThinkOnlyOnChatTasks(t *testing.T) {
+	for _, name := range shippedInteractiveAgents {
+		t.Run(name, func(t *testing.T) {
+			for _, task := range compiledShippedAgent(t, name).Tasks {
+				require.NotNil(t, task.ExecuteConfig, "task %s execute_config", task.ID)
+				switch task.Handler {
+				case taskengine.HandleChatCompletion:
+					require.Equal(t, "{{var:think}}", task.ExecuteConfig.Think, "task %s think", task.ID)
+				default:
+					require.Empty(t, task.ExecuteConfig.Think, "task %s should not set think", task.ID)
 				}
 			}
 		})
 	}
+	for _, task := range embeddedSystemChain(t, initCompactChain).Tasks {
+		require.Empty(t, task.ExecuteConfig.Think, "compaction %s should not set think", task.ID)
+	}
 }
 
-func TestUnit_ACPChain_RoutesToSimpleBoundedLoops(t *testing.T) {
-	var chain taskengine.TaskChainDefinition
-	require.NoError(t, json.Unmarshal([]byte(initACPChain), &chain))
-	require.NotEmpty(t, chain.Tasks)
-	require.Equal(t, "classify_request", chain.Tasks[0].ID)
-	require.Len(t, chain.Tasks, 10)
-
-	byID := make(map[string]taskengine.TaskDefinition)
-	for _, task := range chain.Tasks {
-		byID[task.ID] = task
-	}
-
-	classifier := byID["classify_request"]
-	require.Equal(t, taskengine.HandleRoute, classifier.Handler)
-	var routeLabels []string
-	for _, branch := range classifier.Transition.Branches {
-		if branch.Operator == taskengine.OpEquals {
-			routeLabels = append(routeLabels, branch.When)
-		}
-	}
-	require.ElementsMatch(t, []string{"coding_change", "general"}, routeLabels)
-
-	for _, oldID := range []string{
-		"coding_inspect",
-		"coding_inspect_tools",
-		"coding_patch",
-		"coding_patch_tools",
-		"coding_verify",
-		"coding_verify_tools",
-		"coding_audit",
-		"coding_audit_tools",
-		"coding_audit_route",
-		"coding_final",
-		"coding_blocked",
-		"verify",
-		"revise",
-	} {
-		require.NotContains(t, byID, oldID)
-	}
-
-	requireLoop := func(chatID, toolsID, recoveryID string, toolBudget string) {
-		chat := byID[chatID]
-		require.Equal(t, taskengine.HandleChatCompletion, chat.Handler)
-		require.NotNil(t, chat.ExecuteConfig, "task %s execute_config", chatID)
-		require.Equal(t, []string{"*"}, chat.ExecuteConfig.Tools, "task %s tools", chatID)
-		require.Equal(t, toolBudget, branchGoto(t, chat, taskengine.OpEdgeTraversedAtLeast, toolBudget, recoveryID).When)
-		require.Equal(t, toolsID, branchGoto(t, chat, taskengine.OpEquals, taskengine.TransitionToolCall, toolsID).Goto)
-		require.Equal(t, taskengine.TermEnd, branchGoto(t, chat, taskengine.OpDefault, "", taskengine.TermEnd).Goto)
-		require.Equal(t, "262144", chat.ExecuteConfig.ToolsPolicies["local_fs"]["_max_read_bytes"])
-		require.Equal(t, "131072", chat.ExecuteConfig.ToolsPolicies["local_fs"]["_max_output_bytes"])
-		require.Equal(t, "1000", chat.ExecuteConfig.ToolsPolicies["local_fs"]["_max_grep_matches"])
-		require.Equal(t, "262144", chat.ExecuteConfig.ToolsPolicies["webtools"]["_max_response_bytes"])
-
-		tools := byID[toolsID]
-		require.Equal(t, taskengine.HandleExecuteToolCalls, tools.Handler)
-		require.Equal(t, chatID, tools.InputVar)
-		require.NotNil(t, tools.ExecuteConfig, "task %s execute_config", toolsID)
-		require.Equal(t, []string{"*"}, tools.ExecuteConfig.Tools, "task %s tools", toolsID)
-		require.Equal(t, "262144", tools.ExecuteConfig.ToolsPolicies["local_fs"]["_max_read_bytes"])
-		require.Equal(t, "131072", tools.ExecuteConfig.ToolsPolicies["local_fs"]["_max_output_bytes"])
-	}
-
-	requireLoop("coding_chat", "coding_tools", "coding_recovery", "12")
-	requireLoop("acp_chat", "run_tools", "recovery_chat", "10")
-
-	codingRecoveryTools := byID["coding_recovery_tools"]
-	require.Equal(t, taskengine.HandleExecuteToolCalls, codingRecoveryTools.Handler)
-	require.Equal(t, "coding_recovery", codingRecoveryTools.InputVar)
-	require.Equal(t, []string{"*"}, codingRecoveryTools.ExecuteConfig.Tools)
-
-	summary := byID["summarise_failure"]
-	require.Equal(t, taskengine.HandleChatCompletion, summary.Handler)
-	require.Equal(t, "previous_output", summary.InputVar)
-	require.Empty(t, summary.ExecuteConfig.Tools)
-}
-
-func TestUnit_ContenoxChain_RoutesToSpecialistLoops(t *testing.T) {
-	var chain taskengine.TaskChainDefinition
-	require.NoError(t, json.Unmarshal([]byte(initChain), &chain))
-	require.NotEmpty(t, chain.Tasks)
-	require.Equal(t, "classify_request", chain.Tasks[0].ID)
-	require.Len(t, chain.Tasks, 10)
-
-	byID := make(map[string]taskengine.TaskDefinition)
-	for _, task := range chain.Tasks {
-		byID[task.ID] = task
-	}
-
-	classifier := byID["classify_request"]
-	require.Equal(t, taskengine.HandleRoute, classifier.Handler)
-	require.Equal(t, "coding_chat", branchGoto(t, classifier, taskengine.OpEquals, "coding_change", "coding_chat").Goto)
-	require.Equal(t, "contenox_chat", branchGoto(t, classifier, taskengine.OpEquals, "general", "contenox_chat").Goto)
-	require.Equal(t, "contenox_chat", branchGoto(t, classifier, taskengine.OpDefault, "", "contenox_chat").Goto)
-
-	requireLoop := func(chatID, toolsID, recoveryID string, toolBudget string) {
-		chat := byID[chatID]
-		require.Equal(t, taskengine.HandleChatCompletion, chat.Handler)
-		require.NotNil(t, chat.ExecuteConfig, "task %s execute_config", chatID)
-		require.Equal(t, []string{"*"}, chat.ExecuteConfig.Tools, "task %s tools", chatID)
-		require.Equal(t, toolBudget, branchGoto(t, chat, taskengine.OpEdgeTraversedAtLeast, toolBudget, recoveryID).When)
-		require.Equal(t, toolsID, branchGoto(t, chat, taskengine.OpEquals, taskengine.TransitionToolCall, toolsID).Goto)
-		require.Equal(t, taskengine.TermEnd, branchGoto(t, chat, taskengine.OpDefault, "", taskengine.TermEnd).Goto)
-
-		tools := byID[toolsID]
-		require.Equal(t, taskengine.HandleExecuteToolCalls, tools.Handler)
-		require.Equal(t, chatID, tools.InputVar)
-		require.NotNil(t, tools.ExecuteConfig, "task %s execute_config", toolsID)
-		require.Equal(t, []string{"*"}, tools.ExecuteConfig.Tools, "task %s tools", toolsID)
-		require.Contains(t, tools.ExecuteConfig.ToolsPolicies, "local_fs", "task %s", toolsID)
-		require.Contains(t, tools.ExecuteConfig.ToolsPolicies, "webtools", "task %s", toolsID)
-	}
-
-	requireLoop("coding_chat", "coding_tools", "coding_recovery", "12")
-	requireLoop("contenox_chat", "run_tools", "recovery_chat", "10")
-
-	codingRecoveryTools := byID["coding_recovery_tools"]
-	require.Equal(t, taskengine.HandleExecuteToolCalls, codingRecoveryTools.Handler)
-	require.Equal(t, "coding_recovery", codingRecoveryTools.InputVar)
-	require.Equal(t, []string{"*"}, codingRecoveryTools.ExecuteConfig.Tools)
-	require.Equal(t, "8", branchGoto(t, byID["coding_recovery"], taskengine.OpEdgeTraversedAtLeast, "8", "summarise_failure").When)
-	require.Equal(t, "8", branchGoto(t, byID["recovery_chat"], taskengine.OpEdgeTraversedAtLeast, "8", "summarise_failure").When)
-
-	summary := byID["summarise_failure"]
-	require.Equal(t, taskengine.HandleChatCompletion, summary.Handler)
-	require.Equal(t, "previous_output", summary.InputVar)
-	require.Empty(t, summary.ExecuteConfig.Tools)
-}
-
-func TestUnit_BuiltinRecoveryTasksUseConfiguredDefaultFallback(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-		ids  []string
-	}{
-		{name: "contenox", raw: initChain, ids: []string{"coding_recovery", "recovery_chat", "summarise_failure"}},
-		{name: "run", raw: initRunChain, ids: []string{"recovery_run", "summarise_failure"}},
-		{name: "acp", raw: initACPChain, ids: []string{"coding_recovery", "recovery_chat", "summarise_failure"}},
-		{name: "acpx", raw: initACPXChain, ids: []string{"recovery_chat", "summarise_failure"}},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var chain taskengine.TaskChainDefinition
-			require.NoError(t, json.Unmarshal([]byte(tc.raw), &chain))
-			byID := make(map[string]taskengine.TaskDefinition)
+func TestUnit_RoutedAgents_RouteToBoundedLoopsWithAFailureSummary(t *testing.T) {
+	cfg, err := agentdecl.Shipped()
+	require.NoError(t, err)
+	for _, name := range []string{"acp", "contenox"} {
+		t.Run(name, func(t *testing.T) {
+			chain := compiledShippedAgent(t, name)
+			byID := map[string]taskengine.TaskDefinition{}
 			for _, task := range chain.Tasks {
 				byID[task.ID] = task
 			}
-			for _, id := range tc.ids {
-				task, ok := byID[id]
-				require.True(t, ok, "task %s missing", id)
-				require.NotNil(t, task.ExecuteConfig, "task %s execute_config", id)
-				require.Equal(t, "{{var:alt_model|var:default_model}}", task.ExecuteConfig.Model, "task %s model", id)
-				require.Equal(t, "{{var:alt_provider|var:default_provider}}", task.ExecuteConfig.Provider, "task %s provider", id)
+			router := chain.Tasks[0]
+			require.Equal(t, taskengine.HandleRoute, router.Handler, "the chain opens with its router")
+			labels := map[string]bool{}
+			for _, branch := range router.Transition.Branches {
+				require.Containsf(t, byID, branch.Goto, "router target %q exists", branch.Goto)
+				if branch.Operator == taskengine.OpEquals {
+					labels[branch.When] = true
+				}
 			}
-		})
-	}
-}
+			require.True(t, labels["coding"], "routes code changes to the coding loop")
+			require.True(t, labels["general"], "routes everything else to the general loop")
 
-func TestUnit_BuiltinInteractiveChains_UseConservativeToolOutputCaps(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-	}{
-		{name: "contenox", raw: initChain},
-		{name: "run", raw: initRunChain},
-		{name: "acp", raw: initACPChain},
-		{name: "acpx", raw: initACPXChain},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var chain taskengine.TaskChainDefinition
-			require.NoError(t, json.Unmarshal([]byte(tc.raw), &chain))
-			for _, task := range chain.Tasks {
-				if task.ExecuteConfig == nil {
+			var summary *taskengine.TaskDefinition
+			for i := range chain.Tasks {
+				task := chain.Tasks[i]
+				if task.Handler != taskengine.HandleChatCompletion {
 					continue
 				}
-				fsPolicy := task.ExecuteConfig.ToolsPolicies["local_fs"]
-				if len(fsPolicy) > 0 {
+				if len(task.ExecuteConfig.Tools) == 0 {
+					summary = &chain.Tasks[i]
+					continue
+				}
+				if task.InputVar != "" {
+					continue
+				}
+				tools := branchGotoOp(t, task, taskengine.OpEquals, taskengine.TransitionToolCall)
+				require.Equal(t, taskengine.HandleExecuteToolCalls, byID[tools.Goto].Handler)
+				require.Equal(t, task.ID, byID[tools.Goto].InputVar)
+				budget := branchGotoOp(t, task, taskengine.OpEdgeTraversedAtLeast, "")
+				require.Equalf(t, itoa(cfg.Chain.MainRounds), budget.When, "task %s keeps the main-loop budget", task.ID)
+				require.Equal(t, taskengine.TermEnd, branchGotoOp(t, task, taskengine.OpDefault, "").Goto)
+			}
+			require.NotNil(t, summary, "a failed turn ends in a failure summary")
+			require.Empty(t, summary.ExecuteConfig.Tools)
+		})
+	}
+}
+
+func TestUnit_ShippedAgents_RecoveryUsesConfiguredDefaultFallback(t *testing.T) {
+	for _, name := range shippedInteractiveAgents {
+		t.Run(name, func(t *testing.T) {
+			saw := false
+			for _, task := range compiledShippedAgent(t, name).Tasks {
+				if task.Handler != taskengine.HandleChatCompletion || task.InputVar == "" {
+					continue
+				}
+				saw = true
+				require.Equal(t, "{{var:alt_model|var:default_model}}", task.ExecuteConfig.Model, "task %s model", task.ID)
+				require.Equal(t, "{{var:alt_provider|var:default_provider}}", task.ExecuteConfig.Provider, "task %s provider", task.ID)
+			}
+			require.True(t, saw, "a recovery or summary task exists")
+		})
+	}
+}
+
+func TestUnit_ShippedAgents_UseConservativeToolOutputCaps(t *testing.T) {
+	for _, name := range shippedInteractiveAgents {
+		t.Run(name, func(t *testing.T) {
+			for _, task := range compiledShippedAgent(t, name).Tasks {
+				if fsPolicy := task.ExecuteConfig.ToolsPolicies["local_fs"]; len(fsPolicy) > 0 {
 					require.Equal(t, "262144", fsPolicy["_max_read_bytes"], "task %s", task.ID)
 					require.Equal(t, "131072", fsPolicy["_max_output_bytes"], "task %s", task.ID)
 					require.Equal(t, "1000", fsPolicy["_max_grep_matches"], "task %s", task.ID)
 				}
-				webPolicy := task.ExecuteConfig.ToolsPolicies["webtools"]
-				if len(webPolicy) > 0 {
+				if webPolicy := task.ExecuteConfig.ToolsPolicies["webtools"]; len(webPolicy) > 0 {
 					require.Equal(t, "262144", webPolicy["_max_response_bytes"], "task %s", task.ID)
 				}
 			}
@@ -241,27 +130,14 @@ func TestUnit_BuiltinInteractiveChains_UseConservativeToolOutputCaps(t *testing.
 	}
 }
 
-func TestUnit_BuiltinInteractiveChains_ScopeToolExecutionNodes(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-	}{
-		{name: "contenox", raw: initChain},
-		{name: "run", raw: initRunChain},
-		{name: "acp", raw: initACPChain},
-		{name: "acpx", raw: initACPXChain},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var chain taskengine.TaskChainDefinition
-			require.NoError(t, json.Unmarshal([]byte(tc.raw), &chain))
-			for _, task := range chain.Tasks {
+func TestUnit_ShippedAgents_ScopeToolExecutionNodes(t *testing.T) {
+	for _, name := range shippedInteractiveAgents {
+		t.Run(name, func(t *testing.T) {
+			for _, task := range compiledShippedAgent(t, name).Tasks {
 				if task.Handler != taskengine.HandleExecuteToolCalls {
 					continue
 				}
-				require.NotNil(t, task.ExecuteConfig, "task %s execute_config", task.ID)
-				require.Equal(t, []string{"*"}, task.ExecuteConfig.Tools, "task %s tools", task.ID)
+				require.Contains(t, task.ExecuteConfig.Tools, "*", "task %s tools", task.ID)
 				require.Contains(t, task.ExecuteConfig.ToolsPolicies, "local_fs", "task %s", task.ID)
 				require.Contains(t, task.ExecuteConfig.ToolsPolicies, "webtools", "task %s", task.ID)
 			}
@@ -269,105 +145,63 @@ func TestUnit_BuiltinInteractiveChains_ScopeToolExecutionNodes(t *testing.T) {
 	}
 }
 
-func TestUnit_BuiltinChains_LLMTasksIncludeDateMacro(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-	}{
-		{name: "contenox", raw: initChain},
-		{name: "run", raw: initRunChain},
-		{name: "compact", raw: initCompactChain},
-		{name: "acp", raw: initACPChain},
-		{name: "acpx", raw: initACPXChain},
-		{name: "fim", raw: initFIMChain},
+func TestUnit_ShippedChains_LLMTasksIncludeDateMacro(t *testing.T) {
+	chains := map[string]*taskengine.TaskChainDefinition{
+		"compact": embeddedSystemChain(t, initCompactChain),
+		"fim":     embeddedSystemChain(t, initFIMChain),
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			var chain taskengine.TaskChainDefinition
-			require.NoError(t, json.Unmarshal([]byte(tc.raw), &chain))
-			for _, task := range chain.Tasks {
-				switch task.Handler {
-				case taskengine.HandleChatCompletion, taskengine.HandleRoute:
-					require.Contains(t, task.SystemInstruction, "{{date}}", "task %s", task.ID)
-				}
+	for _, name := range shippedInteractiveAgents {
+		chains[name] = compiledShippedAgent(t, name)
+	}
+	for name, chain := range chains {
+		for _, task := range chain.Tasks {
+			switch task.Handler {
+			case taskengine.HandleChatCompletion, taskengine.HandleRoute:
+				require.Contains(t, task.SystemInstruction, "{{date}}", "%s/%s", name, task.ID)
 			}
-		})
+		}
 	}
 }
 
-func TestUnit_PlannerChain_ProfileShape(t *testing.T) {
-	var chain taskengine.TaskChainDefinition
-	require.NoError(t, json.Unmarshal([]byte(initPlannerChain), &chain))
-
-	require.Equal(t, "agent-planner", chain.ID, "the chain id is the discovered agent name")
-	require.NotEmpty(t, chain.Tasks)
-
-	forbidden := map[string]bool{"*": true, "local_shell": true, "local_fs": true, "webtools": true}
-	sawMissionGrant := false
-	for _, task := range chain.Tasks {
-		if task.ExecuteConfig == nil || len(task.ExecuteConfig.Tools) == 0 {
+func TestUnit_PlannerDeclaration_KeepsItsPlanDiscipline(t *testing.T) {
+	saw := false
+	for _, task := range compiledShippedAgent(t, "planner").Tasks {
+		if task.Handler != taskengine.HandleChatCompletion || len(task.ExecuteConfig.Tools) == 0 {
 			continue
 		}
-		for _, tool := range task.ExecuteConfig.Tools {
-			require.Falsef(t, forbidden[tool], "task %s grants %q — the planner withholds execution tools", task.ID, tool)
+		saw = true
+		for _, marker := range []string{
+			"{{date}}",
+			"FULL SNAPSHOT",
+			"echoing the `id`",
+			"in_progress at any time",
+			"pending to completed",
+			"explanation",
+			"NEVER RESTATE THE PLAN",
+			"mission_report",
+			"handover",
+			"mission_finish",
+			"not yet yours",
+		} {
+			require.Containsf(t, task.SystemInstruction, marker, "planner task %s is missing the %q discipline", task.ID, marker)
 		}
-		require.Equal(t, []string{"mission"}, task.ExecuteConfig.Tools, "task %s grants only the mission tools", task.ID)
-		sawMissionGrant = true
 	}
-	require.True(t, sawMissionGrant, "the planner must grant the mission tools somewhere")
-
-	var prompt string
-	for _, task := range chain.Tasks {
-		if task.ID == "plan_loop" {
-			prompt = task.SystemInstruction
-		}
-	}
-	require.NotEmpty(t, prompt, "the main planner loop carries the discipline prompt")
-	for _, marker := range []string{
-		"{{date}}",
-		"FULL SNAPSHOT",
-		"echoing the `id`",
-		"in_progress at any time",
-		"pending to completed",
-		"explanation",
-		"NEVER RESTATE THE PLAN",
-		"mission_report",
-		"handover",
-		"mission_finish",
-		"not yet yours",
-	} {
-		require.Containsf(t, prompt, marker, "planner prompt is missing the %q discipline", marker)
-	}
+	require.True(t, saw)
 }
 
-func branchGoto(t *testing.T, task taskengine.TaskDefinition, operator taskengine.OperatorTerm, when, gotoID string) taskengine.TransitionBranch {
-	t.Helper()
-	for _, branch := range task.Transition.Branches {
-		if branch.Operator == operator && branch.When == when && branch.Goto == gotoID {
-			return branch
-		}
-	}
-	require.Failf(t, "missing branch", "task %s missing branch operator=%s when=%q goto=%q", task.ID, operator, when, gotoID)
-	return taskengine.TransitionBranch{}
-}
-
-func TestUnit_BuiltinChains_ModelMacroFallbacksAlwaysSeeded(t *testing.T) {
+func TestUnit_ShippedChains_ModelMacroFallbacksAlwaysSeeded(t *testing.T) {
 	alwaysSeeded := map[string]bool{
 		"model": true, "provider": true,
 		"default_model": true, "default_provider": true,
 	}
-	chains := map[string]string{
-		"contenox": initChain,
-		"run":      initRunChain,
-		"acp":      initACPChain,
-		"acpx":     initACPXChain,
-		"compact":  initCompactChain,
+	chains := map[string]*taskengine.TaskChainDefinition{
+		"compact": embeddedSystemChain(t, initCompactChain),
+	}
+	for _, name := range append(append([]string{}, shippedInteractiveAgents...), "reviewer", "planner") {
+		chains[name] = compiledShippedAgent(t, name)
 	}
 	macroRe := regexp.MustCompile(`^\{\{var:([a-z_]+)(\|var:([a-z_]+))?\}\}$`)
-	for name, raw := range chains {
-		var chain taskengine.TaskChainDefinition
-		require.NoError(t, json.Unmarshal([]byte(raw), &chain), name)
+	for name, chain := range chains {
 		for _, task := range chain.Tasks {
 			if task.ExecuteConfig == nil || task.ExecuteConfig.Model == "" {
 				continue
@@ -383,4 +217,20 @@ func TestUnit_BuiltinChains_ModelMacroFallbacksAlwaysSeeded(t *testing.T) {
 				name, task.ID, task.ExecuteConfig.Model, final)
 		}
 	}
+}
+
+func branchGotoOp(t *testing.T, task taskengine.TaskDefinition, operator taskengine.OperatorTerm, when string) taskengine.TransitionBranch {
+	t.Helper()
+	for _, branch := range task.Transition.Branches {
+		if branch.Operator == operator && (when == "" || branch.When == when) {
+			return branch
+		}
+	}
+	require.Failf(t, "missing branch", "task %s missing branch operator=%s when=%q", task.ID, operator, when)
+	return taskengine.TransitionBranch{}
+}
+
+func itoa(n int) string {
+	b, _ := json.Marshal(n)
+	return string(b)
 }

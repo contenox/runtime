@@ -242,7 +242,7 @@ func TestUnit_Tree_SyncEmitsOneChainForTheWholeTree(t *testing.T) {
 	require.False(t, names["coding-recovery"], "a recovery prompt is not an agent of its own")
 	require.Len(t, results, 2, "one tree + one flat file = two agents")
 
-	chains, err := filepath.Glob(filepath.Join(generated, "chain-agent-acp*.json"))
+	chains, err := filepath.Glob(filepath.Join(generated, "agent-acp*.json"))
 	require.NoError(t, err)
 	require.Len(t, chains, 1)
 	raw, err := os.ReadFile(chains[0])

@@ -15,7 +15,7 @@ import (
 
 func loadCurrentACPChain(t *testing.T) *taskengine.TaskChainDefinition {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "contenoxcli", "chain-acp.json"))
+	data, err := os.ReadFile(filepath.Join("testdata", "chain-acp.json"))
 	require.NoError(t, err)
 	var chain taskengine.TaskChainDefinition
 	require.NoError(t, json.Unmarshal(data, &chain))

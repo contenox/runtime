@@ -65,7 +65,7 @@ func TestUnit_Sync_NativeDeclarationNeedsNoDetection(t *testing.T) {
 	if r.Name != "triage" {
 		t.Errorf("name = %q; a declaration you wrote yourself is not scoped by a vendor", r.Name)
 	}
-	if _, err := os.Stat(filepath.Join(gen, "chain-agent-triage.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(gen, "agent-triage.json")); err != nil {
 		t.Errorf("no chain emitted: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(gen, "hitl-policy-triage.json")); err != nil {
@@ -140,7 +140,7 @@ func TestUnit_Sync_EditingTheDeclarationRegenerates(t *testing.T) {
 	if r.Action != agentdecl.ActionUpdated {
 		t.Fatalf("action = %q, want updated", r.Action)
 	}
-	raw, err := os.ReadFile(filepath.Join(gen, "chain-agent-triage.json"))
+	raw, err := os.ReadFile(filepath.Join(gen, "agent-triage.json"))
 	if err != nil {
 		t.Fatalf("read chain: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestUnit_Sync_RemovingTheDeclarationRetiresTheAgent(t *testing.T) {
 	if _, err := syncAt(t, context.Background(), agentdecl.DiscoverSourceDirs(context.Background(), rootsOf(t, root), nil), gen, cfg); err != nil {
 		t.Fatalf("second sync: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(gen, "chain-agent-triage.json")); err == nil {
+	if _, err := os.Stat(filepath.Join(gen, "agent-triage.json")); err == nil {
 		t.Error("the chain outlived its declaration")
 	}
 }

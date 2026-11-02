@@ -84,19 +84,19 @@ func assertSeededSecretInvariant(t *testing.T, name, content string) {
 
 func TestUnit_SeededACPPolicy_SecretInvariant(t *testing.T) {
 	t.Parallel()
-	assertSeededSecretInvariant(t, "hitl-policy-acp.json", hitlPolicyACP)
+	assertSeededSecretInvariant(t, "hitl-policy-acp.json", shippedHITLPolicy(t, "acp"))
 }
 
 func TestUnit_SeededStrictPolicy_SecretInvariant(t *testing.T) {
 	t.Parallel()
-	assertSeededSecretInvariant(t, "hitl-policy-strict.json", hitlPolicyStrict)
+	assertSeededSecretInvariant(t, "hitl-policy-strict.json", shippedHITLPolicy(t, "strict"))
 }
 
 func TestUnit_SeededACPXPolicy_SecretInvariantAndHeavyDeltas(t *testing.T) {
 	t.Parallel()
-	assertSeededSecretInvariant(t, "hitl-policy-acpx.json", hitlPolicyACPX)
+	assertSeededSecretInvariant(t, "hitl-policy-acpx.json", shippedHITLPolicy(t, "acpx"))
 
-	svc := seededPolicyService(t, "hitl-policy-acpx.json", hitlPolicyACPX)
+	svc := seededPolicyService(t, "hitl-policy-acpx.json", shippedHITLPolicy(t, "acpx"))
 	ctx := context.Background()
 
 	deny := map[string][2]string{
@@ -128,10 +128,10 @@ func TestUnit_SeededACPXPolicy_SecretInvariantAndHeavyDeltas(t *testing.T) {
 func TestUnit_InteractivePoliciesRequireApprovalForPlainShellFallback(t *testing.T) {
 	t.Parallel()
 	for name, content := range map[string]string{
-		"hitl-policy-default.json": hitlPolicyDefault,
-		"hitl-policy-dev.json":     hitlPolicyDev,
-		"hitl-policy-acp.json":     hitlPolicyACP,
-		"hitl-policy-strict.json":  hitlPolicyStrict,
+		"hitl-policy-default.json": shippedHITLPolicy(t, "default"),
+		"hitl-policy-dev.json":     shippedHITLPolicy(t, "dev"),
+		"hitl-policy-acp.json":     shippedHITLPolicy(t, "acp"),
+		"hitl-policy-strict.json":  shippedHITLPolicy(t, "strict"),
 	} {
 		name, content := name, content
 		t.Run(name, func(t *testing.T) {
@@ -159,11 +159,11 @@ func TestUnit_SeededPolicies_GateGitTools(t *testing.T) {
 		write   hitlservice.Action
 		secret  hitlservice.Action
 	}{
-		{"hitl-policy-default.json", hitlPolicyDefault, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
-		{"hitl-policy-acp.json", hitlPolicyACP, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
-		{"hitl-policy-strict.json", hitlPolicyStrict, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
-		{"hitl-policy-acpx.json", hitlPolicyACPX, hitlservice.ActionAllow, hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
-		{"hitl-policy-dev.json", hitlPolicyDev, hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionAllow},
+		{"hitl-policy-default.json", shippedHITLPolicy(t, "default"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-acp.json", shippedHITLPolicy(t, "acp"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-strict.json", shippedHITLPolicy(t, "strict"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-acpx.json", shippedHITLPolicy(t, "acpx"), hitlservice.ActionAllow, hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"hitl-policy-dev.json", shippedHITLPolicy(t, "dev"), hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionAllow},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -199,9 +199,9 @@ func TestUnit_SeededPolicies_GateGitTools(t *testing.T) {
 func TestUnit_SeededPolicies_AllowSafeGitShellReads(t *testing.T) {
 	t.Parallel()
 	for name, content := range map[string]string{
-		"hitl-policy-default.json": hitlPolicyDefault,
-		"hitl-policy-acp.json":     hitlPolicyACP,
-		"hitl-policy-dev.json":     hitlPolicyDev,
+		"hitl-policy-default.json": shippedHITLPolicy(t, "default"),
+		"hitl-policy-acp.json":     shippedHITLPolicy(t, "acp"),
+		"hitl-policy-dev.json":     shippedHITLPolicy(t, "dev"),
 	} {
 		name, content := name, content
 		t.Run(name, func(t *testing.T) {

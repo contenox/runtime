@@ -227,6 +227,9 @@ func Sync(ctx context.Context, sourceDirs []SourceDir, generated Root, cfg Confi
 			policyPath = generated.Path(rec.PolicyFile)
 			policyCurrent = fileHas(ctx, generated.FS, rec.PolicyFile, policyJSON)
 		}
+		if prev, ok := state[path]; ok && prev.ChainFile != "" && prev.ChainFile != rec.ChainFile {
+			_ = generated.FS.Remove(ctx, prev.ChainFile)
+		}
 		if _, ok := state[path]; ok && fileHas(ctx, generated.FS, rec.ChainFile, chainJSON) && policyCurrent {
 			res.Action = ActionUnchanged
 			next[path] = rec

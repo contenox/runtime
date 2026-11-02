@@ -1,7 +1,6 @@
 package contenoxcli
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -74,8 +73,8 @@ var acpxCmd = &cobra.Command{
 	Short: "Run as an ACP agent under the headless / untrusted-driver profile (OpenClaw).",
 	Long: `Same Agent Client Protocol server as 'acp', for drivers that are not the
 device owner — OpenClaw and other non-editor clients. It loads the hardened
-hitl-policy-acpx.json (local_shell denied, web mutations denied, web reads
-gated) and the chain at ~/.contenox-harness/headless-acp-chain.json (override with
+acpx envelope from agents.toml (local_shell denied, web mutations denied, web
+reads gated) and the chain compiled from agents/acpx.md (override with
 CONTENOX_ACPX_CHAIN_PATH).
 
 Containment for the untrusted driver is the HITL policy, not an in-chain
@@ -110,8 +109,8 @@ type acpProfile struct {
 	hitlPolicy    string
 	chainFile     string
 	chainEnv      string
+	shippedAgent  string
 	compiledChain string
-	seedChain     func(contenoxDir string) error
 	embedFleet    bool
 }
 
@@ -119,15 +118,17 @@ var acpProfileACP = acpProfile{
 	hitlPolicy:    "hitl-policy-default.json",
 	chainFile:     "default-acp-chain.json",
 	chainEnv:      "CONTENOX_ACP_CHAIN_PATH",
-	compiledChain: "chain-agent-acp.json",
+	shippedAgent:  "acp",
+	compiledChain: agentdecl.ChainFileFor("chain-acp"),
 	embedFleet:    true,
 }
 
 var acpProfileACPX = acpProfile{
-	hitlPolicy: "hitl-policy-acpx.json",
-	chainFile:  headlessACPChainFilename,
-	chainEnv:   "CONTENOX_ACPX_CHAIN_PATH",
-	seedChain:  seedHeadlessACPChainIfMissing,
+	hitlPolicy:    "hitl-policy-acpx.json",
+	chainFile:     headlessACPChainFilename,
+	chainEnv:      "CONTENOX_ACPX_CHAIN_PATH",
+	shippedAgent:  "acpx",
+	compiledChain: agentdecl.ChainFileFor("chain-acpx"),
 }
 
 func runACP(cmd *cobra.Command, _ []string) error  { return runACPProfile(cmd, acpProfileACP) }
@@ -157,11 +158,7 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 			slog.Info("agent declarations: shipped files refreshed",
 				"created", len(preseeded.Created), "updated", len(preseeded.Updated), "edited", len(preseeded.Edited))
 		}
-		if refreshed, refreshErr := refreshEmbeddedHITLPolicies(contenoxDir); refreshErr != nil {
-			return refreshErr
-		} else if len(refreshed) > 0 {
-			slog.Info("agent declarations: shipped HITL policies refreshed", "updated", refreshed)
-		}
+		reportRetiredHITLPolicies(contenoxDir)
 		configRoots = append(configRoots, homeRoot)
 	}
 	project, _ := os.Getwd()
@@ -177,10 +174,7 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 			slog.Warn("agent declarations: a user agents.toml was ignored", "error", loadErr)
 		}
 	}
-	if stale, readErr := os.ReadFile(filepath.Join(contenoxDir, "default-acp-chain.json")); readErr == nil && !bytes.Equal(stale, []byte(initACPChain)) {
-		slog.Warn("contenox-runtime: default-acp-chain.json is no longer used; the default chain is compiled from agents/acp/ — edit that declaration instead",
-			"ignored", filepath.Join(contenoxDir, "default-acp-chain.json"))
-	}
+	warnRetiredChainFiles(contenoxDir)
 	preseeded, results, err := agentdecl.BootstrapFor(ctx, contenoxDir, project, cfg)
 	if err != nil {
 		slog.Error("agent declarations: bootstrap reported a problem; using what compiled", "error", err)
@@ -202,9 +196,9 @@ func defaultChainFor(contenoxDir string, profile acpProfile) (*acpsvc.ChainRegis
 	compiled := filepath.Join(contenoxDir, agentdecl.GeneratedDirName, profile.compiledChain)
 	if _, err := os.Stat(compiled); err != nil {
 		if cfg, cfgErr := agentdecl.Shipped(); cfgErr == nil {
-			if chain, cErr := agentdecl.CompileShippedTree(cfg); cErr == nil {
-				slog.Warn("agent declarations: serving the shipped tree; the home's copy is refused")
-				return acpsvc.NewChainRegistryFor(chain, "embedded:agentdecl/preseed/agents/acp"), nil
+			if chain, cErr := agentdecl.CompileShippedAgent(cfg, profile.shippedAgent); cErr == nil {
+				slog.Warn("agent declarations: serving the shipped declaration; the home's copy is refused", "agent", profile.shippedAgent)
+				return acpsvc.NewChainRegistryFor(chain, "embedded:agentdecl/preseed/agents/"+profile.shippedAgent), nil
 			}
 		}
 	}
@@ -266,12 +260,6 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		workspaceID = ResolveWorkspaceID(contenoxDir)
 	}
 	reportChange("phase", "seed_hitl")
-	if profile.seedChain != nil {
-		if err := profile.seedChain(contenoxDir); err != nil {
-			reportErr(err)
-			return fmt.Errorf("seed ACP chain preset: %w", err)
-		}
-	}
 	if err := seedAgentDeclarations(cmd.Context(), contenoxDir); err != nil {
 		reportErr(err)
 		return fmt.Errorf("seed agent declarations: %w", err)
@@ -498,7 +486,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		LiveDefaults:          liveDefaultsResolver(db, true, pinned),
 		WorkspaceID:           workspaceID,
 		ContenoxDir:           contenoxDir,
-		KnownPolicies:         embeddedPolicyNames(),
+		KnownPolicies:         knownPolicyNames(contenoxDir),
 		MissionPolicyDirs:     hitlPolicyDirs(contenoxDir),
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,

@@ -85,7 +85,7 @@ Examples:
   contenox config set default-autocomplete-model    mistral-code-fim-latest
   contenox config set default-max-tokens 8192
   contenox config set default-think    high
-  contenox config set default-chain    .contenox/default-chain.json
+  contenox config set default-chain    .contenox/my-chain.json
   contenox config set hitl-policy-name hitl-policy-strict.json`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

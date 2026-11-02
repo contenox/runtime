@@ -261,7 +261,8 @@ var initCmd = &cobra.Command{
 	Short: "Scaffold .contenox/ with default chain files.",
 	Long: `Create the .contenox/ directory and populate it with default chain files.
 
-This writes default-chain.json and default-run-chain.json.
+This writes agents.toml and the shipped agent declarations under agents/, and
+compiles them into .generated/.
 
 After init, register a backend, make sure the runtime can see a model, then set your defaults:
 
@@ -333,7 +334,7 @@ func init() {
 	f.Int("max-tokens", 0, "Response token cap for chains referencing {{var:max_tokens}}. Overrides config default-max-tokens when set.")
 	f.Int("context", defaultContext, "Context length")
 	f.Bool("no-delete-models", true, "Legacy compatibility flag; OSS runtime model deletion is disabled.")
-	f.String("chain", "", "Path to a task chain JSON file. Chains define the LLM workflow: which model, which tools, how to branch. Falls back to default_chain in config, then .contenox/default-chain.json")
+	f.String("chain", "", "Path to a task chain JSON file. Chains define the LLM workflow: which model, which tools, how to branch. Falls back to default_chain in config, then the chain compiled from agents/contenox/")
 	f.String("input", "", "Input for the chain (default: positional args or stdin if piped)")
 	f.Bool("shell", false, "Enable the local_shell tools (use only in trusted environments)")
 	f.String("local-exec-allowed-dir", "", "If set, local_shell may only run scripts/binaries under this directory")
@@ -576,7 +577,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 
 	effectiveChain, _ := flags.GetString("chain")
 	if effectiveChain == "" && !changed("chain") {
-		if kv, _ := getConfigKV(dbCtx, store, "default-chain"); kv != "" {
+		if kv, _ := getConfigKV(dbCtx, store, "default-chain"); kv != "" && !retiredChainFile(kv) {
 			effectiveChain = kv
 			if !filepath.IsAbs(effectiveChain) {
 				if resolved, rerr := lookupSystemFile(contenoxDir, effectiveChain); rerr == nil {
@@ -588,14 +589,13 @@ func runChat(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if effectiveChain == "" && !changed("chain") {
-		if resolved, rerr := lookupSystemFile(contenoxDir, "default-chain.json"); rerr == nil {
-			effectiveChain = resolved
+		resolved, rerr := resolveCompiledAgentChain(dbCtx, contenoxDir, chatAgentChainID)
+		if rerr != nil {
+			fmt.Fprintln(os.Stderr, rerr.Error())
+			fmt.Fprintln(os.Stderr, "Pass --chain explicitly, or set one with 'contenox-runtime config set default-chain <file>'.")
+			return errChainRequired
 		}
-	}
-	if effectiveChain == "" {
-		fmt.Fprintln(os.Stderr, "No default chain found in .contenox/ (workspace) or ~/.contenox-harness/.")
-		fmt.Fprintln(os.Stderr, "Run 'contenox-runtime init' to scaffold one, or pass --chain explicitly.")
-		return errChainRequired
+		effectiveChain = resolved
 	}
 
 	effectiveEnableLocalExec, _ := flags.GetBool("shell")

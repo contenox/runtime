@@ -63,11 +63,11 @@ func TestUnit_Sync_PerAgentOverlayReachesTheEmittedChain(t *testing.T) {
 token_limit = 4096
 `)
 
-	reviewer := readChain(t, gen, "chain-agent-reviewer.json")
+	reviewer := readChain(t, gen, "agent-reviewer.json")
 	if got := reviewer["token_limit"]; got != float64(4096) {
 		t.Fatalf("reviewer token_limit = %v, want 4096", got)
 	}
-	triage := readChain(t, gen, "chain-agent-triage.json")
+	triage := readChain(t, gen, "agent-triage.json")
 	if got := triage["token_limit"]; got == float64(4096) {
 		t.Fatalf("triage inherited reviewer's overlay: %v", got)
 	}
@@ -82,7 +82,7 @@ func TestUnit_Sync_ConfigEditRegeneratesWithoutTouchingTheDeclaration(t *testing
 	declare(t, filepath.Join(root, agentdecl.NativeSourceDir), "reviewer.md", declReviewer)
 
 	_, gen := syncOne(t, root, "")
-	if got := readChain(t, gen, "chain-agent-reviewer.json")["token_limit"]; got != float64(0) {
+	if got := readChain(t, gen, "agent-reviewer.json")["token_limit"]; got != float64(0) {
 		t.Fatalf("first pass token_limit = %v", got)
 	}
 
@@ -97,7 +97,7 @@ token_limit = 4096
 	if r.Action != agentdecl.ActionUpdated {
 		t.Fatalf("action = %q, want %q", r.Action, agentdecl.ActionUpdated)
 	}
-	if got := readChain(t, gen, "chain-agent-reviewer.json")["token_limit"]; got != float64(4096) {
+	if got := readChain(t, gen, "agent-reviewer.json")["token_limit"]; got != float64(4096) {
 		t.Fatalf("token_limit after config edit = %v, want 4096", got)
 	}
 }
@@ -128,13 +128,13 @@ func TestUnit_Sync_RewritesAGeneratedFileThatWasCorrupted(t *testing.T) {
 	declare(t, filepath.Join(root, agentdecl.NativeSourceDir), "reviewer.md", declReviewer)
 
 	_, gen := syncOne(t, root, "")
-	chainPath := filepath.Join(gen, "chain-agent-reviewer.json")
+	chainPath := filepath.Join(gen, "agent-reviewer.json")
 	if err := os.WriteFile(chainPath, []byte("{}"), 0o644); err != nil {
 		t.Fatalf("corrupt: %v", err)
 	}
 
 	syncOne(t, root, "")
-	if got := readChain(t, gen, "chain-agent-reviewer.json")["token_limit"]; got != float64(0) {
+	if got := readChain(t, gen, "agent-reviewer.json")["token_limit"]; got != float64(0) {
 		t.Fatalf("corrupted file was not rewritten: token_limit = %v", got)
 	}
 }
@@ -161,7 +161,7 @@ token_limit = -1
 	if r.Name != "reviewer" {
 		t.Fatalf("refusal names %q, want the agent it is about", r.Name)
 	}
-	if _, err := os.Stat(filepath.Join(gen, "chain-agent-triage.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(gen, "agent-triage.json")); err != nil {
 		t.Fatalf("one bad overlay cost the operator their other agent: %v", err)
 	}
 }
@@ -212,7 +212,7 @@ token_limit = 4096
 	if _, ok := resultFor(results, "[agents."); ok {
 		t.Fatalf("the scoped id did not match the overlay key; results: %+v", results)
 	}
-	if got := readChain(t, gen, "chain-agent-claude-code-reviewer.json")["token_limit"]; got != float64(4096) {
+	if got := readChain(t, gen, "agent-claude-code-reviewer.json")["token_limit"]; got != float64(4096) {
 		t.Fatalf("token_limit = %v, want 4096", got)
 	}
 }

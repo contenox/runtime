@@ -24,9 +24,9 @@ discovery; this command inspects them and toggles their enabled state.
 
 Examples:
   contenox agent list
-  contenox agent show agent-reviewer
-  contenox agent disable agent-reviewer
-  contenox agent remove agent-reviewer`,
+  contenox agent show reviewer
+  contenox agent disable reviewer
+  contenox agent remove reviewer`,
 }
 
 var agentListCmd = &cobra.Command{

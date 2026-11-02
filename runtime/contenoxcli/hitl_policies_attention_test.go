@@ -15,7 +15,7 @@ import (
 
 func TestUnit_SeededPolicies_StateWhoMayAnswer(t *testing.T) {
 	dir := t.TempDir()
-	for _, p := range HITLPolicyPresets {
+	for _, p := range shippedHITLPolicies(t) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, p.Name), []byte(p.Content), 0o600))
 	}
 	svc := hitlservice.New(hitlservice.NewFSPolicySource(dir), runtimetypes.LocalTenantID, nil, libtracker.NoopTracker{})
@@ -41,10 +41,21 @@ func TestUnit_SeededPolicies_StateWhoMayAnswer(t *testing.T) {
 	}
 }
 
-func TestUnit_SeededPolicies_DeclareAttentionExplicitly(t *testing.T) {
-	for _, p := range HITLPolicyPresets {
+func TestUnit_SeededPolicies_WithoutAnAttentionBlockOnlyAHumanAnswers(t *testing.T) {
+	dir := t.TempDir()
+	for _, p := range shippedHITLPolicies(t) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, p.Name), []byte(p.Content), 0o600))
+	}
+	svc := hitlservice.New(hitlservice.NewFSPolicySource(dir), runtimetypes.LocalTenantID, nil, libtracker.NoopTracker{})
+	for _, p := range shippedHITLPolicies(t) {
 		var doc map[string]any
 		require.NoErrorf(t, json.Unmarshal([]byte(p.Content), &doc), "%s must be valid JSON", p.Name)
-		require.Containsf(t, doc, "attention", "%s must state who may answer a unit's question", p.Name)
+		if _, stated := doc["attention"]; stated {
+			continue
+		}
+		bounds, err := svc.AttentionBoundsFor(context.Background(), p.Name)
+		require.NoError(t, err)
+		require.Falsef(t, bounds.AllowAgentAnswers, "%s states no attention block, so no agent may answer for it", p.Name)
+		require.Falsef(t, bounds.AllowAgentApprovals, "%s states no attention block, so no agent may approve for it", p.Name)
 	}
 }

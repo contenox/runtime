@@ -41,15 +41,14 @@ Input types (--input-type):
   json              Parsed as a JSON object (DataTypeJSON)
   int               Parsed as integer (DataTypeInt)
 
-If --chain is not specified, falls back to .contenox/default-run-chain.json
-if that file exists in the current directory.
+If --chain is not specified, runs the chain compiled from agents/run.md.
 
 Examples:
   contenox run --chain .contenox/score-chain.json "is this code safe?"
   cat diff.txt | contenox run --chain .contenox/review.json --input-type chat
   contenox run --chain .contenox/embed.json --input @myfile.go
   contenox run --chain .contenox/parse-chain.json --input-type json '{"key":"value"}'
-  git diff | contenox run "suggest a commit message"  # uses default-run-chain.json
+  git diff | contenox run "suggest a commit message"  # uses the run agent
 
   # HITL is on by default (write_file, sed, and local_shell prompt for approval).
   # Run unattended (no prompts) by passing --auto:
@@ -70,14 +69,13 @@ Examples:
 
 		chainPath, _ := flags.GetString("chain")
 		if chainPath == "" && !flags.Changed("chain") {
-			if resolved, rerr := lookupSystemFile(contenoxDir, "default-run-chain.json"); rerr == nil {
-				chainPath = resolved
+			resolved, rerr := resolveCompiledAgentChain(ctx, contenoxDir, runAgentChainID)
+			if rerr != nil {
+				fmt.Fprintln(os.Stderr, rerr.Error())
+				fmt.Fprintln(os.Stderr, "Pass --chain explicitly.")
+				return errChainRequired
 			}
-		}
-		if chainPath == "" {
-			fmt.Fprintln(os.Stderr, "No default-run-chain.json found in .contenox/ (workspace) or ~/.contenox-harness/.")
-			fmt.Fprintln(os.Stderr, "Run 'contenox-runtime init' to scaffold it, or pass --chain explicitly.")
-			return errChainRequired
+			chainPath = resolved
 		}
 
 		rawInput, err := resolveRunInput(cmd, args)
@@ -367,7 +365,7 @@ func buildRunOpts(cmd *cobra.Command, db libdbexec.DBManager, contenoxDir string
 
 func init() {
 	f := runCmd.Flags()
-	f.String("chain", "", "Path to a task chain JSON file (falls back to .contenox/default-run-chain.json if present)")
+	f.String("chain", "", "Path to a task chain JSON file (falls back to the chain compiled from agents/run.md)")
 	f.String("input", "", "Input value or @path to read from a file (e.g. --input @main.go)")
 	f.String("input-type", "string", "Input data type: string, chat, json, int")
 	f.Bool("auto", false, "Non-interactive mode: disable HITL approval prompts. Default is HITL on; tools route through the active hitl-policy. Use --auto only in trusted/scripted contexts.")

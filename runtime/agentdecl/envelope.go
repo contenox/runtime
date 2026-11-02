@@ -21,10 +21,12 @@ var envelopeNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 func EnvelopePolicyFile(name string) string { return PolicyFileFor(name) }
 
+const CompiledChainPrefix = "agent-"
+
 func PolicyFileFor(stem string) string { return "hitl-policy-" + stem + ".json" }
 
 func ChainFileFor(chainID string) string {
-	return "chain-agent-" + strings.TrimPrefix(chainID, "chain-") + ".json"
+	return CompiledChainPrefix + strings.TrimPrefix(chainID, "chain-") + ".json"
 }
 
 func EnvelopeName(s string) (string, bool) {

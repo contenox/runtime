@@ -69,6 +69,10 @@ func BootstrapFor(ctx context.Context, home, project string, cfg Config) (Presee
 }
 
 func CompileShippedTree(cfg Config) (*taskengine.TaskChainDefinition, error) {
+	return CompileShippedAgent(cfg, "acp")
+}
+
+func CompileShippedAgent(cfg Config, name string) (*taskengine.TaskChainDefinition, error) {
 	dir, err := os.MkdirTemp("", "contenox-shipped-")
 	if err != nil {
 		return nil, err
@@ -88,15 +92,30 @@ func CompileShippedTree(cfg Config) (*taskengine.TaskChainDefinition, error) {
 			return nil, err
 		}
 	}
-	root, err := LocalRoot(filepath.Join(dir, NativeSourceDir, "acp"))
+	agentCfg := cfg
+	agentCfg.Naming.ScopeWithDialect = false
+	treeDir := filepath.Join(dir, NativeSourceDir, name)
+	if info, statErr := os.Stat(treeDir); statErr == nil && info.IsDir() {
+		root, err := LocalRoot(treeDir)
+		if err != nil {
+			return nil, err
+		}
+		tree, err := LoadTree(context.Background(), root, agentCfg)
+		if err != nil {
+			return nil, err
+		}
+		return EmitTree(tree, agentCfg)
+	}
+	leaf := filepath.Join(treeDir + ".md")
+	data, err := os.ReadFile(leaf)
+	if err != nil {
+		return nil, fmt.Errorf("agentdecl: no shipped agent named %q: %w", name, err)
+	}
+	ir, err := ParseClaudeCode(leaf, data, agentCfg)
 	if err != nil {
 		return nil, err
 	}
-	tree, err := LoadTree(context.Background(), root, cfg)
-	if err != nil {
-		return nil, err
-	}
-	return EmitTree(tree, cfg)
+	return EmitChain(ir, agentCfg)
 }
 
 // CompileLock serializes compile passes over one home. Every project runtime in

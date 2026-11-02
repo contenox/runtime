@@ -2,11 +2,15 @@ package contenoxcli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
@@ -15,37 +19,58 @@ import (
 )
 
 const (
-	plannerChainFilename  = "agent-planner.json"
-	reviewerChainFilename = "agent-reviewer.json"
-
-	DefaultMissionAgent  = "agent-reviewer"
+	DefaultMissionAgent  = "reviewer"
 	DefaultMissionPolicy = "read_only"
 
 	missionAgentConfigKey  = "default-mission-agent"
 	missionPolicyConfigKey = "default-mission-policy"
 )
 
-func seedMissionAgentChains(dir string) ([]string, error) {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, fmt.Errorf("create %s: %w", dir, err)
-	}
-	var created []string
-	for _, f := range []struct{ name, content string }{
-		{plannerChainFilename, initPlannerChain},
-		{reviewerChainFilename, initReviewerChain},
-	} {
-		dst := filepath.Join(dir, f.name)
-		if _, err := os.Stat(dst); err == nil {
+var retiredAgentChains = map[string]struct {
+	successor string
+	hashes    []string
+}{
+	"agent-planner.json":  {"planner", []string{"b5517890d1290d80b7daa11099d0065f926a4b26753530f73b07cb00ce455c59"}},
+	"agent-reviewer.json": {"reviewer", []string{"16a188fc4f63a373f13aa82f827b3710a94d56a82b133214d2608359dcdb08d3"}},
+}
+
+func retireSeededAgentChains(dir string) ([]string, error) {
+	var removed []string
+	for name, retired := range retiredAgentChains {
+		path := filepath.Join(dir, name)
+		data, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
 			continue
-		} else if !os.IsNotExist(err) {
-			return created, fmt.Errorf("stat %s: %w", dst, err)
 		}
-		if err := os.WriteFile(dst, []byte(f.content), 0o644); err != nil {
-			return created, fmt.Errorf("write %s: %w", dst, err)
+		if err != nil {
+			return removed, fmt.Errorf("read %s: %w", path, err)
 		}
-		created = append(created, dst)
+		sum := sha256.Sum256(data)
+		if !slices.Contains(retired.hashes, hex.EncodeToString(sum[:])) {
+			continue
+		}
+		if err := os.Remove(path); err != nil {
+			return removed, fmt.Errorf("remove %s: %w", path, err)
+		}
+		removed = append(removed, path)
 	}
-	return created, nil
+	sort.Strings(removed)
+	return removed, nil
+}
+
+func migrateRetiredMissionAgent(ctx context.Context, store runtimetypes.Store) (string, error) {
+	var current string
+	if err := store.GetKV(ctx, clikv.Prefix+missionAgentConfigKey, &current); err != nil {
+		return "", nil
+	}
+	retired, ok := retiredAgentChains[current+".json"]
+	if !ok {
+		return "", nil
+	}
+	if err := clikv.SetString(ctx, store, missionAgentConfigKey, retired.successor); err != nil {
+		return "", fmt.Errorf("set %s: %w", missionAgentConfigKey, err)
+	}
+	return missionAgentConfigKey + "=" + retired.successor, nil
 }
 
 type missionDefaultCheck struct {

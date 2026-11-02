@@ -31,6 +31,9 @@ var preseedRun string
 //go:embed preseed/chat.md
 var preseedChat string
 
+//go:embed preseed/planner.md
+var preseedPlanner string
+
 //go:embed preseed/agents
 var preseedTrees embed.FS
 
@@ -45,6 +48,7 @@ var Preseeded = []struct {
 	{path.Join(NativeSourceDir, "researcher.md"), "preseed/researcher.md", func() string { return preseedResearcher }},
 	{path.Join(NativeSourceDir, "run.md"), "preseed/run.md", func() string { return preseedRun }},
 	{path.Join(NativeSourceDir, "chat.md"), "preseed/chat.md", func() string { return preseedChat }},
+	{path.Join(NativeSourceDir, "planner.md"), "preseed/planner.md", func() string { return preseedPlanner }},
 }
 
 type PreseedSource struct {
