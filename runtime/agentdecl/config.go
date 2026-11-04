@@ -119,18 +119,25 @@ func Load(ctx context.Context, roots ...Root) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("agentdecl: read %s: %w", path, err)
 		}
-		tools, models, agents := d.Tools, d.Models, d.Agents
-		envelopes := d.Envelopes
-		d.Envelopes = nil
-		if err := toml.Unmarshal(raw, &d); err != nil {
-			return Config{}, fmt.Errorf("agentdecl: parse %s: %w", path, err)
+		if err := mergeConfigLayer(&d, raw, path); err != nil {
+			return Config{}, err
 		}
-		d.Tools = mergeNames(tools, d.Tools)
-		d.Models = mergeNames(models, d.Models)
-		d.Agents = mergeRawSections(agents, d.Agents)
-		d.Envelopes = mergeRawSections(envelopes, d.Envelopes)
 	}
 	return d, nil
+}
+
+func mergeConfigLayer(d *Config, raw []byte, label string) error {
+	tools, models, agents := d.Tools, d.Models, d.Agents
+	envelopes := d.Envelopes
+	d.Envelopes = nil
+	if err := toml.Unmarshal(raw, d); err != nil {
+		return fmt.Errorf("agentdecl: parse %s: %w", label, err)
+	}
+	d.Tools = mergeNames(tools, d.Tools)
+	d.Models = mergeNames(models, d.Models)
+	d.Agents = mergeRawSections(agents, d.Agents)
+	d.Envelopes = mergeRawSections(envelopes, d.Envelopes)
+	return nil
 }
 
 func (cfg Config) For(agent string) (Config, error) {

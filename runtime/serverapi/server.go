@@ -22,6 +22,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/accessapi"
 	"github.com/contenox/runtime/runtime/internal/agentidentityapi"
 	"github.com/contenox/runtime/runtime/internal/agentregistryapi"
+	"github.com/contenox/runtime/runtime/internal/agentsconfigapi"
 	"github.com/contenox/runtime/runtime/internal/approvalapi"
 	"github.com/contenox/runtime/runtime/internal/backendapi"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
@@ -108,6 +109,7 @@ type Dependencies struct {
 	TerminalEnabled       bool
 	HITLPolicySource      hitlservice.PolicySource
 	HITLDefaultPolicyName string
+	AgentsConfigApplied   func(ctx context.Context, scope, workspaceRoot string)
 }
 
 type emptyKVReader struct{}
@@ -208,6 +210,11 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		taskchainapi.AddTaskChainRoutes(mux, chains)
 		hitlpolicyapi.AddRoutes(mux, chainFiles, deps.HITLPolicySource)
 		envelopeapi.AddRoutes(mux, deps.ContenoxDir, deps.HITLPolicySource)
+		var workspaceFolders func() []string
+		if deps.WorkspaceRoots != nil {
+			workspaceFolders = deps.WorkspaceRoots.Roots
+		}
+		agentsconfigapi.AddRoutes(mux, agentsconfigapi.Deps{Home: deps.ContenoxDir, Roots: workspaceFolders, Applied: deps.AgentsConfigApplied})
 	}
 	if deps.DB != nil {
 		agentidentityapi.AddRoutes(mux, runtimetypes.New(deps.DB.WithoutTransaction()), agentidentity.DefaultKeySource())

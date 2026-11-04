@@ -616,6 +616,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		WorkspaceRootMutators: workspaceReloader.mutators(bus),
 		HITLPolicySource:      hitlSource,
 		HITLDefaultPolicyName: acpDefaultPolicyName,
+		AgentsConfigApplied:   agentsConfigApplied(contenoxDir),
 		Defaults:              runtimeDefaults,
 	})
 	if err != nil {

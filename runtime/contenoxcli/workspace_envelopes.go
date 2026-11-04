@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/contenox/runtime/runtime/acpsvc"
 	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/project"
 )
@@ -66,4 +67,19 @@ func watchWorkspaceEnvelopes(ctx context.Context, contenoxDir string, roots func
 		}
 	}()
 	return cancel
+}
+
+func agentsConfigApplied(contenoxDir string) func(ctx context.Context, scope, workspaceRoot string) {
+	return func(ctx context.Context, scope, workspaceRoot string) {
+		if scope == "workspace" && workspaceRoot != "" {
+			renderWorkspaceEnvelopes(ctx, contenoxDir, []string{workspaceRoot})
+			acpsvc.NotifyAgentDeclarationsChanged()
+			return
+		}
+		if err := seedAgentDeclarations(ctx, contenoxDir); err != nil {
+			slog.Error("contenox-runtime serve: agent declarations failed to recompile after an agents.toml edit", "error", err)
+			return
+		}
+		acpsvc.NotifyAgentDeclarationsChanged()
+	}
 }

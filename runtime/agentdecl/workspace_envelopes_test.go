@@ -96,3 +96,30 @@ func TestUnit_WorkspaceEnvelopes_AFolderWithNothingToApplyIsLeftAlone(t *testing
 	require.Empty(t, project.LayerKeyOf(root), "no agents.toml, no layer")
 	require.False(t, project.HasMarker(root))
 }
+
+func TestUnit_Bootstrap_RemovesTheRenderedFileOfADeletedEnvelopeButNeverAnAgentsPolicy(t *testing.T) {
+	home := t.TempDir()
+	ctx := context.Background()
+	cfg, err := agentdecl.Shipped()
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, agentdecl.ConfigFilename), []byte("[envelopes.temp]\nextends = \"read_only\"\n"), 0o644))
+	withTemp, err := agentdecl.ConfigFromTexts("[envelopes.temp]\nextends = \"read_only\"\n")
+	require.NoError(t, err)
+	_, _, err = agentdecl.BootstrapFor(ctx, home, "", withTemp)
+	require.NoError(t, err)
+	generated := filepath.Join(home, agentdecl.GeneratedDirName)
+	_, statErr := os.Stat(filepath.Join(generated, "hitl-policy-temp.json"))
+	require.NoError(t, statErr, "the envelope is rendered")
+	require.NoError(t, os.WriteFile(filepath.Join(generated, "hitl-policy-chat.json"), []byte(`{"version": 1, "rules": []}`), 0o644))
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, agentdecl.ConfigFilename), []byte(""), 0o644))
+	_, _, err = agentdecl.BootstrapFor(ctx, home, "", cfg)
+	require.NoError(t, err)
+	_, statErr = os.Stat(filepath.Join(generated, "hitl-policy-temp.json"))
+	require.True(t, os.IsNotExist(statErr), "an envelope that is gone from agents.toml no longer has a policy file")
+	_, statErr = os.Stat(filepath.Join(generated, "hitl-policy-strict.json"))
+	require.NoError(t, statErr, "the others stay")
+	_, statErr = os.Stat(filepath.Join(generated, "hitl-policy-chat.json"))
+	require.NoError(t, statErr, "an agent's own policy file is not an envelope's")
+}

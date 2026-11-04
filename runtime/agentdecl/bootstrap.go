@@ -69,6 +69,9 @@ func BootstrapFor(ctx context.Context, home, project string, cfg Config) (Presee
 	if firstErr != nil {
 		return preseeded, results, firstErr
 	}
+	if _, retireErr := RetireStaleEnvelopePolicies(filepath.Join(home, GeneratedDirName), envelopeCfg.EnvelopeNames()); retireErr != nil {
+		return preseeded, results, fmt.Errorf("agentdecl: retire removed envelopes: %w", retireErr)
+	}
 	return preseeded, results, nil
 }
 

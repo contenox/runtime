@@ -3,7 +3,12 @@ package agentdecl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/contenox/runtime/runtime/hitlservice"
 )
@@ -70,4 +75,37 @@ func marshalPolicyDoc(p *hitlservice.Policy, annotations [][2]any) ([]byte, erro
 		return body, nil
 	}
 	return append([]byte(head), body[2:]...), nil
+}
+
+const envelopeRenderMarker = "Rendered from [" + EnvelopeSection + "."
+
+func RetireStaleEnvelopePolicies(generatedDir string, keep []string) ([]string, error) {
+	wanted := map[string]bool{}
+	for _, name := range keep {
+		wanted[EnvelopePolicyFile(name)] = true
+	}
+	entries, err := os.ReadDir(generatedDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var removed []string
+	for _, entry := range entries {
+		file := entry.Name()
+		if entry.IsDir() || wanted[file] || !strings.HasPrefix(file, "hitl-policy-") || !strings.HasSuffix(file, ".json") {
+			continue
+		}
+		path := filepath.Join(generatedDir, file)
+		data, readErr := os.ReadFile(path)
+		if readErr != nil || !strings.Contains(string(data), envelopeRenderMarker) {
+			continue
+		}
+		if err := os.Remove(path); err != nil {
+			return removed, err
+		}
+		removed = append(removed, file)
+	}
+	return removed, nil
 }
