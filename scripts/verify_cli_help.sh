@@ -19,8 +19,6 @@ if ! echo "$HELP_OUTPUT" | grep -q "Version:"; then
 fi
 
 EXPECTED_CMDS=(
-  "acp"
-  "acpx"
   "agent"
   "approvals"
   "backend"
@@ -58,6 +56,22 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
   exit 1
 fi
 
+HIDDEN_CMDS=(
+  "acp"
+  "acpx"
+)
+
+for cmd in "${HIDDEN_CMDS[@]}"; do
+  if echo "$HELP_OUTPUT" | grep -qE "^  $cmd[[:space:]]"; then
+    echo "FAIL: hidden subcommand '$cmd' is listed in --help output" >&2
+    exit 1
+  fi
+  if ! "$BIN" "$cmd" --help >/dev/null 2>&1; then
+    echo "FAIL: hidden subcommand '$cmd' no longer runs" >&2
+    exit 1
+  fi
+done
+
 VERSION_OUTPUT="$("$BIN" version 2>&1)"
 if ! echo "$VERSION_OUTPUT" | grep -qE "v[0-9]+\.[0-9]+\.[0-9]+"; then
   echo "FAIL: 'contenox version' did not print a semver string" >&2
@@ -65,4 +79,4 @@ if ! echo "$VERSION_OUTPUT" | grep -qE "v[0-9]+\.[0-9]+\.[0-9]+"; then
   exit 1
 fi
 
-echo "==> OK: all ${#EXPECTED_CMDS[@]} subcommands present, version $VERSION_OUTPUT"
+echo "==> OK: all ${#EXPECTED_CMDS[@]} subcommands present, ${#HIDDEN_CMDS[@]} hidden ones still run, version $VERSION_OUTPUT"
