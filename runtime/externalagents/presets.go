@@ -24,6 +24,7 @@ type Preset struct {
 	configNeeds string
 	env         map[string]string
 	sessionMeta string
+	unofficial  []string
 }
 
 var presets = []Preset{
@@ -43,6 +44,7 @@ var presets = []Preset{
 		configNeeds: "Claude's sign-in, settings and session history",
 		env:         claudeEnv(),
 		sessionMeta: claudeSessionMeta(),
+		unofficial:  []string{"claude-ai-login"},
 	},
 }
 
@@ -98,4 +100,13 @@ func claudeSessionMeta() string {
 		return `{"claudeCode":{"options":{"disallowedTools":["Bash"],"allowDangerouslySkipPermissions":false}}}`
 	}
 	return `{"claudeCode":{"options":{"allowDangerouslySkipPermissions":false}}}`
+}
+
+func (p Preset) isUnofficialMethod(id string) bool {
+	for _, u := range p.unofficial {
+		if u == id {
+			return true
+		}
+	}
+	return false
 }

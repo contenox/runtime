@@ -11,7 +11,7 @@ import (
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
-var ErrNoBoundSession = errors.New("acpsvc: no ACP transport bound to contenox session")
+var ErrNoBoundSession = errors.New("acpsvc: no ACP transport bound to contenox-runtime session")
 
 type SessionRouter struct {
 	mu       sync.RWMutex

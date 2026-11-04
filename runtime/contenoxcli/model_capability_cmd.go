@@ -22,11 +22,11 @@ Overrides are scoped by provider and model name and are applied before runtime
 providers are constructed.
 
 Examples:
-  contenox model capability set openai gpt-5-mini --think true
-  contenox model capability set vllm Qwen/Qwen3-32B --think false
-  contenox model capability set ollama my-vlm --vision true
-  contenox model capability show openai gpt-5-mini
-  contenox model capability unset openai gpt-5-mini`,
+  contenox-runtime model capability set openai gpt-5.6 --think true
+  contenox-runtime model capability set vllm Qwen/Qwen3-32B --think false
+  contenox-runtime model capability set ollama my-vlm --vision true
+  contenox-runtime model capability show openai gpt-5.6
+  contenox-runtime model capability unset openai gpt-5.6`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return cmd.Help()

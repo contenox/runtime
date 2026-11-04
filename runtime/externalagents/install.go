@@ -121,6 +121,9 @@ func (s *Service) Presets(ctx context.Context) ([]PresetStatus, error) {
 	node := s.node(ctx)
 	out := make([]PresetStatus, 0, len(presets))
 	for _, p := range presets {
+		if err := s.syncPreset(ctx, p); err != nil {
+			return nil, err
+		}
 		st := PresetStatus{Preset: p, Installed: s.installed(p), InstallState: InstallIdle, Node: node}
 		s.mu.Lock()
 		if job := s.installs[p.ID]; job != nil {
@@ -230,9 +233,16 @@ func (s *Service) install(ctx context.Context, p Preset) *Problem {
 	return nil
 }
 
-func (s *Service) presetConfig(p Preset, nodePath string) runtimetypes.ExternalACPConfig {
+func (s *Service) presetConfigDir(ctx context.Context, p Preset) string {
+	if s.unofficialAllowed(ctx) {
+		return filepath.Join(s.deps.Home, p.configDir)
+	}
+	return filepath.Join(s.deps.ContenoxDir, "external-agents", p.ID, "home")
+}
+
+func (s *Service) presetConfig(ctx context.Context, p Preset, nodePath string) runtimetypes.ExternalACPConfig {
 	dir := s.installDir(p)
-	configDir := filepath.Join(s.deps.Home, p.configDir)
+	configDir := s.presetConfigDir(ctx, p)
 	env := map[string]string{p.configEnv: configDir}
 	for k, v := range p.env {
 		env[k] = v
@@ -257,7 +267,7 @@ func (s *Service) presetConfig(p Preset, nodePath string) runtimetypes.ExternalA
 }
 
 func (s *Service) registerPreset(ctx context.Context, p Preset, nodePath string) error {
-	cfg := s.presetConfig(p, nodePath)
+	cfg := s.presetConfig(ctx, p, nodePath)
 	source := runtimetypes.AgentSourceRegistry
 	id, version := p.ID, p.Version
 	existing, err := s.deps.Agents.GetByName(ctx, p.AgentName)

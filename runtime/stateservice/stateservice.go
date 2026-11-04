@@ -38,6 +38,7 @@ type CLIConfigPatch struct {
 	UpdateCheck                 *string
 	DefaultMissionAgent         *string
 	DefaultMissionPolicy        *string
+	UnofficialSignIns           *string
 }
 
 type CLIConfigSnapshot struct {
@@ -55,6 +56,7 @@ type CLIConfigSnapshot struct {
 	UpdateCheck                 string
 	DefaultMissionAgent         string
 	DefaultMissionPolicy        string
+	UnofficialSignIns           string
 	ResolvedFrom                map[string]string
 	Present                     map[string]bool
 }
@@ -113,7 +115,8 @@ func (s *service) SetCLIConfig(ctx context.Context, patch CLIConfigPatch) (CLICo
 		patch.TelemetryEnabled == nil &&
 		patch.UpdateCheck == nil &&
 		patch.DefaultMissionAgent == nil &&
-		patch.DefaultMissionPolicy == nil {
+		patch.DefaultMissionPolicy == nil &&
+		patch.UnofficialSignIns == nil {
 		return CLIConfigSnapshot{}, fmt.Errorf("provide at least one CLI config key")
 	}
 	store := runtimetypes.New(s.db.WithoutTransaction())
@@ -195,6 +198,15 @@ func (s *service) SetCLIConfig(ctx context.Context, patch CLIConfigPatch) (CLICo
 			return CLIConfigSnapshot{}, fmt.Errorf("set default-mission-policy: %w", err)
 		}
 	}
+	if patch.UnofficialSignIns != nil {
+		v := strings.ToLower(strings.TrimSpace(*patch.UnofficialSignIns))
+		if v != "" && v != "true" && v != "false" {
+			return CLIConfigSnapshot{}, fmt.Errorf("unofficial-sign-ins must be true or false, got %q", v)
+		}
+		if err := clikv.SetString(ctx, store, "unofficial-sign-ins", v); err != nil {
+			return CLIConfigSnapshot{}, fmt.Errorf("set unofficial-sign-ins: %w", err)
+		}
+	}
 	return s.cliConfigSnapshot(ctx, store), nil
 }
 
@@ -213,6 +225,7 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 	updateCheck, updateCheckPresent := readCLIConfigValue(ctx, store, "update-check")
 	missionAgent, missionAgentPresent := readCLIConfigValue(ctx, store, "default-mission-agent")
 	missionPolicy, missionPolicyPresent := readCLIConfigValue(ctx, store, "default-mission-policy")
+	unofficial, unofficialPresent := readCLIConfigValue(ctx, store, "unofficial-sign-ins")
 	return CLIConfigSnapshot{
 		DefaultModel:                defaultModel,
 		DefaultProvider:             defaultProvider,
@@ -228,6 +241,7 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 		UpdateCheck:                 updateCheck,
 		DefaultMissionAgent:         missionAgent,
 		DefaultMissionPolicy:        missionPolicy,
+		UnofficialSignIns:           unofficial,
 		ResolvedFrom: map[string]string{
 			"defaultChain":   chainFrom,
 			"hitlPolicyName": policyFrom,
@@ -247,6 +261,7 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 			"update-check":                  updateCheckPresent,
 			"default-mission-agent":         missionAgentPresent,
 			"default-mission-policy":        missionPolicyPresent,
+			"unofficial-sign-ins":           unofficialPresent,
 		},
 	}
 }

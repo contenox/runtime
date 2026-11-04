@@ -88,7 +88,7 @@ var ErrAgentDisabled = errors.New("agentregistryservice: agent is disabled")
 type disabledAgentError struct{ name string }
 
 func (e *disabledAgentError) Error() string {
-	return fmt.Sprintf("agent %q is disabled; enable it with 'contenox agent enable %q'", e.name, e.name)
+	return fmt.Sprintf("agent %q is disabled; enable it with 'contenox-runtime agent enable %q'", e.name, e.name)
 }
 
 func (e *disabledAgentError) Unwrap() error { return ErrAgentDisabled }

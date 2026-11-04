@@ -15,14 +15,14 @@ import (
 
 var stateCmd = &cobra.Command{
 	Use:   "state",
-	Short: "Inspect captured execution state from past chain runs.",
-	Long: `Browse per-request execution captures persisted to KV by the engine's
-inspector chain. Each chain run produces a request ID and a sequence of
-captured step records (CapturedStateUnit) that survive process restart.
+	Short: "Inspect captured execution state from past runs.",
+	Long: `Browse the execution steps recorded for past runs. Each chat or run produces
+a request ID and a sequence of captured step records that survive process restart.
 
-  contenox state list             # list request IDs that have captured state
-  contenox state show <reqID>     # print step rows for a request
-  contenox state show <reqID> --raw   # JSON dump of the captured units`,
+
+  contenox-runtime state list             # list request IDs that have captured state
+  contenox-runtime state show <reqID>     # print step rows for a request
+  contenox-runtime state show <reqID> --raw   # JSON dump of the captured units`,
 }
 
 var stateListCmd = &cobra.Command{

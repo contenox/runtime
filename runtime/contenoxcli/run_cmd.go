@@ -24,11 +24,11 @@ import (
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run any task chain with explicit input type control (stateless).",
-	Long: `Run a task chain with explicit control over input type and content.
+	Short: "Run a one-off agent task with no chat history (stateless).",
+	Long: `Run a one-off agent task, with explicit control over input type and content.
 
-Unlike 'contenox-runtime chat', run is stateless — no chat history is loaded or saved.
-It accepts any task chain regardless of the first handler's expected input type.
+Unlike 'contenox-runtime chat', run is stateless: no chat history is loaded or saved.
+Pass --chain to run a specific chain file instead of the run agent.
 
 Input sources (in priority order):
   1. --input <value>         literal string (or @file to read from a file)
@@ -36,23 +36,24 @@ Input sources (in priority order):
   3. Stdin                   if piped
 
 Input types (--input-type):
-  string (default)  Raw string passed to the chain as DataTypeString
+  string (default)  Raw string (DataTypeString)
   chat              Wrapped as a single user message (DataTypeChatHistory)
   json              Parsed as a JSON object (DataTypeJSON)
   int               Parsed as integer (DataTypeInt)
 
-If --chain is not specified, runs the chain compiled from agents/run.md.
+If --chain is not specified, runs the agent declared in agents/run.md.
+
 
 Examples:
-  contenox run --chain .contenox/score-chain.json "is this code safe?"
-  cat diff.txt | contenox run --chain .contenox/review.json --input-type chat
-  contenox run --chain .contenox/embed.json --input @myfile.go
-  contenox run --chain .contenox/parse-chain.json --input-type json '{"key":"value"}'
-  git diff | contenox run "suggest a commit message"  # uses the run agent
+  contenox-runtime run --chain .contenox/score-chain.json "is this code safe?"
+  cat diff.txt | contenox-runtime run --chain .contenox/review.json --input-type chat
+  contenox-runtime run --chain .contenox/embed.json --input @myfile.go
+  contenox-runtime run --chain .contenox/parse-chain.json --input-type json '{"key":"value"}'
+  git diff | contenox-runtime run "suggest a commit message"  # uses the run agent
 
   # HITL is on by default (write_file, sed, and local_shell prompt for approval).
   # Run unattended (no prompts) by passing --auto:
-  contenox run --shell --auto --chain .contenox/my-chain.json "fix the bug"
+  contenox-runtime run --shell --auto --chain .contenox/my-chain.json "fix the bug"
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()

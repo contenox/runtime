@@ -9,7 +9,7 @@ import (
 	"sort"
 
 	"github.com/contenox/runtime/libdbexec"
-	"github.com/contenox/runtime/runtime/internal/models/modelauth"
+	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/modelcapability"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -52,8 +52,7 @@ func (s *State) ReconcileDeclarations(ctx context.Context, id string) error {
 		return err
 	}
 	state.SetAPIKey(credential)
-	if backend.Type == modelauth.ProviderType {
-		auth := modelauth.New(s.dbInstance)
+	if auth, ok := loginauth.For(s.dbInstance, backend.Type); ok {
 		state.authorize = func(ctx context.Context) (http.Header, error) { return auth.Headers(ctx, id) }
 	}
 	catalog, err := modelrepo.NewCatalogProvider(modelrepo.BackendSpec{Type: backend.Type, BaseURL: backend.BaseURL, APIKey: credential}, modelrepo.WithCatalogAuthorizer(state.authorize))

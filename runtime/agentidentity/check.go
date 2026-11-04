@@ -199,7 +199,7 @@ func (src KeySource) CheckSigning(ref string) SigningCheck {
 		return SigningCheck{Message: err.Error()}
 	}
 	defer closeSigner()
-	payload := []byte("contenox agent identity check\n")
+	payload := []byte("contenox-runtime agent identity check\n")
 	armored, err := NewCommitSigner(signer).Sign(bytes.NewReader(payload))
 	if err != nil {
 		return SigningCheck{Message: err.Error()}

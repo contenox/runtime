@@ -144,26 +144,26 @@ func firstNonFlagIsReserved(args []string) bool {
 
 var rootCmd = &cobra.Command{
 	Use:   "contenox-runtime",
-	Short: "AI harness runtime: run versioned chains with your tools and models.",
-	Long: `Contenox is a local runtime for packaged, auditable AI workflows.
-Chains define the prompts, model routing, tools, retries, branch conditions,
-and human approval gates. State is stored in SQLite. Cloud providers and Ollama
-work directly from the CLI; local inference is reached through an Ollama server.
+	Short: "Contenox: an AI agent you run in a project folder.",
+	Long: `Contenox runs an AI agent in your project folder. It reads your files, runs
+tools and shell commands, and asks before it changes anything. Sessions, settings,
+and approvals are stored in SQLite on your machine. Use a cloud provider, a
+ChatGPT subscription, or a local Ollama server.
 
   Quickstart:
-    contenox-runtime setup                         # interactive wizard — pick provider, model, API key
-    contenox-runtime init                          # scaffold .contenox/ with default chains
-    contenox-runtime "list files in my home dir"   # session-backed chat using your configured policy
+    contenox-runtime setup                         # pick a provider, model, and API key
+    contenox-runtime init                          # set up .contenox/ in this project
+    contenox-runtime "list files in this folder"   # chat in the current session
 
   Inspect models:
     contenox-runtime model list                    # models exposed by registered live backends
 
   Or register an LLM backend manually:
     # Local Ollama daemon
-    ollama serve && ollama pull qwen2.5:7b
+    ollama serve && ollama pull qwen3:8b
     contenox-runtime backend add ollama --type ollama
     contenox-runtime config set default-provider ollama
-    contenox-runtime config set default-model qwen2.5:7b
+    contenox-runtime config set default-model qwen3:8b
 
     # Hosted Ollama Cloud
     contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
@@ -176,25 +176,25 @@ work directly from the CLI; local inference is reached through an Ollama server.
 
     # OpenAI
     contenox-runtime backend add openai --type openai --api-key-env OPENAI_API_KEY
-    contenox-runtime config set default-model    gpt-4o-mini
+    contenox-runtime config set default-model    gpt-5.6
     contenox-runtime config set default-provider openai
+
+    # Anthropic
+    contenox-runtime backend add anthropic --type anthropic --api-key-env ANTHROPIC_API_KEY
+    contenox-runtime config set default-model    claude-sonnet-5-5
+    contenox-runtime config set default-provider anthropic
 
     # OpenRouter
     contenox-runtime backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
     contenox-runtime config set default-model    deepseek/deepseek-chat-v3-5
     contenox-runtime config set default-provider openrouter
 
-  VS Code autocomplete can use a separate model from chat:
-    # Example: chat on OpenAI, ghost text on a local Ollama model.
-    contenox-runtime config set default-provider openai
-    contenox-runtime config set default-model    gpt-5-mini
-    contenox-runtime config set default-autocomplete-provider llama
-    contenox-runtime config set default-autocomplete-model    qwen3-coder-30b-a3b
+  See 'contenox-runtime backend add --help' for every provider type.
 
   Scope note:
     Backends and config are GLOBAL (stored in ~/.contenox-harness/local.db).
-    Chain files (.contenox/) are LOCAL to each project directory — like .git/.
-    Run 'contenox-runtime init' once per project to create the local chain files.`,
+    Agent files (.contenox/) are LOCAL to each project directory, like .git/.
+    Run 'contenox-runtime init' once per project to create them.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -205,28 +205,28 @@ var chatCmd = &cobra.Command{
 	Long: `Send a message to the active chat session and get a response.
 Input is passed as positional args, --input, or piped via stdin.
 
-  contenox "what can you do?"
-  echo "summarise README.md" | contenox
-  contenox chat --shell "list files in the current dir"
+  contenox-runtime "what can you do?"
+  echo "summarise README.md" | contenox-runtime
+  contenox-runtime chat --shell "list files in the current dir"
 
 Sessions persist conversation history across invocations (stored in SQLite).
 Each session remembers previous messages so the model has context.
 The first run auto-creates a "default" session. Manage sessions with:
 
-  contenox session list              list active-scope sessions (* = active)
-  contenox session list --all        list every session across the whole DB
-  contenox session new <name>        create a new named session (becomes active)
-  contenox session switch <name>     switch to a different session
-  contenox session show [name|id]    print a session (active, by name, or by id)
-  contenox session delete <name>     delete a session and all its messages
-  contenox session workspaces        list workspaces and namespaces (whole DB)
-  contenox session fork --summary    compact older history into a summary and continue
+  contenox-runtime session list              list active-scope sessions (* = active)
+  contenox-runtime session list --all        list every session across the whole DB
+  contenox-runtime session new <name>        create a new named session (becomes active)
+  contenox-runtime session switch <name>     switch to a different session
+  contenox-runtime session show [name|id]    print a session (active, by name, or by id)
+  contenox-runtime session delete <name>     delete a session and all its messages
+  contenox-runtime session workspaces        list workspaces and namespaces (whole DB)
+  contenox-runtime session fork --summary    compact older history into a summary and continue
                                      in a new session (useful when context fills up)
 
 Giving the model tools (file system and shell access):
 
   --local-exec-allowed-dir <dir>     allow local_fs tools inside <dir>
-  --shell                            enable local_shell (command policy is defined in the chain)
+  --shell                            enable local_shell (the agent's tool policy decides which commands run)
 
 Human-in-the-loop is on by default. The workflow pauses for terminal approval before
 write_file, sed, and local_shell calls. The active policy is defined in
@@ -239,66 +239,67 @@ write_file, sed, and local_shell calls. The active policy is defined in
 
 Examples:
   # Chat with file system access to the current project:
-  contenox chat --local-exec-allowed-dir . "summarise the README"
+  contenox-runtime chat --local-exec-allowed-dir . "summarise the README"
 
-  # Shell access (policy comes from the chain's tools_policies; default chains allow common dev tools):
-  contenox chat --shell "suggest a commit message from git diff"
+  # Shell access (the agent's tool policy decides which commands run; the shipped agents allow common dev tools):
+  contenox-runtime chat --shell "suggest a commit message from git diff"
 
   # Non-interactive shell run — no approvals, runs everything allowed by policy (USE WITH CARE):
-  contenox chat --shell --local-exec-allowed-dir . --auto "refactor main.go to use slog"
+  contenox-runtime chat --shell --local-exec-allowed-dir . --auto "refactor main.go to use slog"
 
   # Trim context: only send last 10 messages from session history to the model:
-  contenox chat --trim 10 "let's continue where we left off"
+  contenox-runtime chat --trim 10 "let's continue where we left off"
 
   # Show last 6 turns of the conversation after the reply:
-  contenox chat --last 6 "hello"`,
+  contenox-runtime chat --last 6 "hello"`,
 	Args: cobra.ArbitraryArgs,
 	RunE: runChat,
 }
 
 var initCmd = &cobra.Command{
 	Use:   "init [provider]",
-	Short: "Scaffold .contenox/ with default chain files.",
-	Long: `Create the .contenox/ directory and populate it with default chain files.
+	Short: "Set up .contenox/ in this project with the default agents.",
+	Long: `Create the .contenox/ directory and populate it with the default agent files.
 
 This writes agents.toml and the shipped agent declarations under agents/, and
 compiles them into .generated/.
 
 After init, register a backend, make sure the runtime can see a model, then set your defaults:
 
-  # Local Ollama daemon
-  ollama pull qwen2.5:7b
-  contenox config set default-provider ollama
-  contenox config set default-model qwen2.5:7b
-
-  # Local Ollama:
-  contenox backend add local --type ollama
-  contenox config set default-provider ollama
-  contenox config set default-model qwen2.5:7b
+  # Local Ollama daemon:
+  ollama pull qwen3:8b
+  contenox-runtime backend add ollama --type ollama
+  contenox-runtime config set default-provider ollama
+  contenox-runtime config set default-model qwen3:8b
 
   # Hosted Ollama Cloud:
-  contenox backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
-  contenox config set default-provider ollama
-  contenox config set default-model gpt-oss:20b
+  contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
+  contenox-runtime config set default-provider ollama
+  contenox-runtime config set default-model gpt-oss:20b
 
   # OpenAI:
-  contenox backend add openai --type openai --api-key-env OPENAI_API_KEY
-  contenox config set default-provider openai
-  contenox config set default-model gpt-5-mini
+  contenox-runtime backend add openai --type openai --api-key-env OPENAI_API_KEY
+  contenox-runtime config set default-provider openai
+  contenox-runtime config set default-model gpt-5.6
+
+  # Anthropic:
+  contenox-runtime backend add anthropic --type anthropic --api-key-env ANTHROPIC_API_KEY
+  contenox-runtime config set default-provider anthropic
+  contenox-runtime config set default-model claude-sonnet-5-5
 
   # Google Gemini:
-  contenox backend add gemini --type gemini --api-key-env GEMINI_API_KEY
-  contenox config set default-provider gemini
-  contenox config set default-model gemini-3.1-pro-preview
+  contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY
+  contenox-runtime config set default-provider gemini
+  contenox-runtime config set default-model gemini-3.1-pro-preview
 
   # OpenRouter:
-  contenox backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
-  contenox config set default-provider openrouter
-  contenox config set default-model deepseek/deepseek-chat-v3-5
+  contenox-runtime backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
+  contenox-runtime config set default-provider openrouter
+  contenox-runtime config set default-model deepseek/deepseek-chat-v3-5
 
-  # Optional VS Code autocomplete model, independent from chat:
-  contenox config set default-autocomplete-provider llama
-  contenox config set default-autocomplete-model qwen3-coder-30b-a3b
+  # Optional code-completion model, independent from chat:
+  contenox-runtime config set default-autocomplete-provider ollama
+  contenox-runtime config set default-autocomplete-model qwen3-coder:30b
 
 Use --force to overwrite existing files, or --update to refresh unchanged default files to the latest version.`,
 	Args: cobra.MaximumNArgs(1),
@@ -307,8 +308,8 @@ Use --force to overwrite existing files, or --update to refresh unchanged defaul
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the contenox CLI version",
-	Long: `Print the contenox CLI version string.
+	Short: "Print the contenox-runtime version",
+	Long: `Print the contenox-runtime version string.
 
 This is the subcommand form of 'contenox-runtime --version' and exists so that typing
 'contenox-runtime version' is not mistaken for chat input by the default run command.`,
@@ -320,7 +321,7 @@ This is the subcommand form of 'contenox-runtime --version' and exists so that t
 func init() {
 	v := cliVersion()
 	rootCmd.Version = v
-	rootCmd.Short = fmt.Sprintf("AI harness runtime v%s: run versioned chains with your tools and models.", v)
+	rootCmd.Short = fmt.Sprintf("Contenox v%s: an AI agent you run in a project folder.", v)
 	rootCmd.Long = fmt.Sprintf("Version: %s\n\n%s", v, rootCmd.Long)
 
 	f := rootCmd.PersistentFlags()
@@ -329,13 +330,14 @@ func init() {
 	f.String("ollama", defaultOllama, "Ollama base URL")
 	f.String("model", "", "Model name (task/chat/embed). Overrides config default-model; no built-in default.")
 	f.String("provider", "", "Provider type override. See 'contenox-runtime backend add --help' for supported backend types.")
-	f.String("alt-model", "", "Alt model name (chains referencing {{var:alt_model}}). Overrides config default-alt-model.")
-	f.String("alt-provider", "", "Alt provider type (chains referencing {{var:alt_provider}}). Overrides config default-alt-provider.")
-	f.Int("max-tokens", 0, "Response token cap for chains referencing {{var:max_tokens}}. Overrides config default-max-tokens when set.")
+	f.String("alt-model", "", "Second model for agents that use one. Overrides config default-alt-model.")
+	f.String("alt-provider", "", "Provider type for the second model. Overrides config default-alt-provider.")
+	f.Int("max-tokens", 0, "Response token cap. Overrides config default-max-tokens when set.")
 	f.Int("context", defaultContext, "Context length")
 	f.Bool("no-delete-models", true, "Legacy compatibility flag; OSS runtime model deletion is disabled.")
-	f.String("chain", "", "Path to a task chain JSON file. Chains define the LLM workflow: which model, which tools, how to branch. Falls back to default_chain in config, then the chain compiled from agents/contenox/")
-	f.String("input", "", "Input for the chain (default: positional args or stdin if piped)")
+	_ = f.MarkHidden("no-delete-models")
+	f.String("chain", "", "Path to a chain JSON file to run instead of the default agent. Falls back to default-chain in config, then the agent in agents/contenox/")
+	f.String("input", "", "Input text (default: positional args or stdin if piped)")
 	f.Bool("shell", false, "Enable the local_shell tools (use only in trusted environments)")
 	f.String("local-exec-allowed-dir", "", "If set, local_shell may only run scripts/binaries under this directory")
 	f.Duration("timeout", defaultTimeout, "Maximum execution time (e.g., 5m, 1h)")
@@ -469,7 +471,8 @@ func runInitCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(),
-			"To let sessions open it (serve + Beam picker): contenox workspace add %s\n", cwd)
+			"To let sessions open it from the app: contenox-runtime workspace add %s\n", cwd)
+
 		return nil
 	}
 	contenoxDir, err = ResolveContenoxDir(cmd)

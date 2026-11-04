@@ -109,7 +109,7 @@ ADDR/PORT to bind a specific address. TOKEN gates every API request and is
 MANDATORY for any non-loopback bind (--remote or a LAN ADDR). The
 token is resolved as: TOKEN env, else ~/.contenox-harness/serve-token.txt, else (with
 --remote) a freshly generated token saved there (0600); programmatic clients
-(contenox approvals/mission/fleet) discover the same file automatically. Serving
+(contenox-runtime approvals/mission/fleet) discover the same file automatically. Serving
 is plain HTTP — put a TLS-terminating reverse proxy in front for untrusted
 networks. Chat needs a configured model; without one, serve still starts and
 reports what is missing through /api/setup-status so a client can configure it.`,

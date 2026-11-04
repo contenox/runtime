@@ -63,3 +63,9 @@ func WriteConfig(ctx context.Context, store runtimetypes.Store, workspaceID, key
 	}
 	return store.SetKV(ctx, Prefix+key, json.RawMessage(data))
 }
+
+const UnofficialSignInsKey = "unofficial-sign-ins"
+
+func UnofficialSignIns(ctx context.Context, store runtimetypes.Store) bool {
+	return strings.EqualFold(Read(ctx, store, UnofficialSignInsKey), "true")
+}

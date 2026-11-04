@@ -24,16 +24,17 @@ var releasesURL = "https://github.com/contenox/runtime/releases"
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update contenox to the latest release.",
-	Long: `Download and install the latest contenox release binary from GitHub.
+	Short: "Update contenox-runtime to the latest release.",
+	Long: `Download and install the latest contenox-runtime release binary from GitHub.
 
-If already on the latest version, nothing is downloaded.
+If already on the latest version, nothing is downloaded. If this copy came with
+the Contenox desktop app, update the app instead; update does not replace it.
 
-  contenox update          check and install if a newer version is available
-  contenox update check    print version info without installing
+  contenox-runtime update          check and install if a newer version is available
+  contenox-runtime update check    print version info without installing
 
 To disable automatic update notifications set the opt-out flag:
-  contenox config set update-check false`,
+  contenox-runtime config set update-check false`,
 	RunE: runUpdateInstall,
 }
 
@@ -73,7 +74,9 @@ func runUpdateCheck(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not check for updates: %w", err)
 	}
 
-	if available {
+	if available && appBundled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Update available: %s  →  update the Contenox desktop app to get it.\n", latest)
+	} else if available {
 		fmt.Fprintf(cmd.OutOrStdout(), "Update available: %s  →  run `contenox-runtime update` to install.\n", latest)
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "Already on the latest version (%s).\n", current)
@@ -108,8 +111,33 @@ func runUpdateInstall(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	if appBundled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Version %s is available. This copy of contenox-runtime came with the Contenox desktop app; update the app to get it.\n", latest)
+		return nil
+	}
+
 	fmt.Fprintf(cmd.OutOrStdout(), "Downloading %s...\n", latest)
 	return downloadAndReplace(ctx, cmd, latest)
+}
+
+func appBundled() bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return isAppBundledPath(exe)
+}
+
+func isAppBundledPath(exe string) bool {
+	resources := filepath.Dir(filepath.Dir(exe))
+	if !strings.EqualFold(filepath.Base(resources), "resources") {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(resources, "app.asar"))
+	return err == nil
 }
 
 func isUpdateCheckDisabled(cmd *cobra.Command, ctx context.Context) bool {

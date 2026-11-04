@@ -148,7 +148,7 @@ func (c *OpenAIChatClient) Chat(ctx context.Context, messages []modelrepo.Messag
 	reportErr, reportChange, end := c.tracker.Start(ctx, "chat", "openai", "model", c.modelName)
 	defer end()
 
-	usesResponses := openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
+	usesResponses := !c.chatOnly && openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
 	if !c.canAudio || usesResponses {
 		if err := modelrepo.RefuseAudioInput("openai", c.modelName, messages); err != nil {
 			reportErr(err)

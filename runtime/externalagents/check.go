@@ -35,6 +35,7 @@ type AuthMethod struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Type        string `json:"type,omitempty"`
+	Unofficial  bool   `json:"unofficial,omitempty"`
 }
 
 type AgentInfo struct {
@@ -141,6 +142,11 @@ func (s *Service) shake(ctx context.Context, cfg runtimetypes.ExternalACPConfig,
 }
 
 func (s *Service) Check(ctx context.Context, name string) (CheckResult, error) {
+	if p, ok := presetByAgentName(name); ok {
+		if err := s.syncPreset(ctx, p); err != nil {
+			return CheckResult{}, err
+		}
+	}
 	a, err := s.get(ctx, name)
 	if err != nil {
 		return CheckResult{}, err
@@ -171,8 +177,13 @@ func (s *Service) Check(ctx context.Context, name string) (CheckResult, error) {
 	if info := hs.init.AgentInfo; info != nil {
 		res.Agent = &AgentInfo{Name: info.Name, Title: info.Title, Version: info.Version}
 	}
+	preset, isPreset := presetByAgentName(name)
+	allowUnofficial := s.unofficialAllowed(ctx)
 	for _, m := range hs.init.AuthMethods {
-		res.AuthMethods = append(res.AuthMethods, AuthMethod{ID: m.ID, Name: m.Name, Description: strings.TrimSpace(m.Description), Type: m.Type})
+		if isPreset && preset.isUnofficialMethod(m.ID) && !allowUnofficial {
+			continue
+		}
+		res.AuthMethods = append(res.AuthMethods, AuthMethod{ID: m.ID, Name: m.Name, Description: strings.TrimSpace(m.Description), Type: m.Type, Unofficial: isPreset && preset.isUnofficialMethod(m.ID)})
 	}
 	if hs.authSeen {
 		signed := hs.authKind != "" && hs.authKind != "none"

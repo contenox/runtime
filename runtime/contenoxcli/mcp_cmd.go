@@ -33,14 +33,14 @@ Two transport modes are supported:
 
 Examples:
   # Register a local stdio MCP server:
-  contenox mcp add myserver --transport stdio --command npx --args "-y,@modelcontextprotocol/server-filesystem,/tmp"
+  contenox-runtime mcp add myserver --transport stdio --command npx --args "-y,@modelcontextprotocol/server-filesystem,/tmp"
 
   # Register a remote SSE-based MCP server:
-  contenox mcp add remote --transport sse --url https://mcp.example.com/sse
+  contenox-runtime mcp add remote --transport sse --url https://mcp.example.com/sse
 
-  contenox mcp list
-  contenox mcp show myserver
-  contenox mcp remove myserver`,
+  contenox-runtime mcp list
+  contenox-runtime mcp show myserver
+  contenox-runtime mcp remove myserver`,
 }
 
 var mcpAddCmd = &cobra.Command{
@@ -67,18 +67,18 @@ For authentication, use:
 
 Examples:
   # Shorthand: name + URL (transport defaults to http)
-  contenox mcp add notion https://mcp.notion.com/mcp
+  contenox-runtime mcp add notion https://mcp.notion.com/mcp
 
   # Stdio: spawn a local filesystem MCP server
-  contenox mcp add fs --transport stdio \
+  contenox-runtime mcp add fs --transport stdio \
     --command npx --args "-y,@modelcontextprotocol/server-filesystem,/tmp"
 
   # SSE: connect to a remote MCP endpoint
-  contenox mcp add remote --transport sse --url https://mcp.example.com/sse \
+  contenox-runtime mcp add remote --transport sse --url https://mcp.example.com/sse \
     --auth-type bearer --auth-env MCP_TOKEN
 
   # OAuth + pre-issued credentials (HubSpot-style: no dynamic registration)
-  contenox mcp add hubspot --transport http --url https://mcp.hubspot.com/ \
+  contenox-runtime mcp add hubspot --transport http --url https://mcp.hubspot.com/ \
     --auth-type oauth \
     --oauth-client-id <client_id from vendor UI> \
     --oauth-client-secret-env HUBSPOT_MCP_CLIENT_SECRET`,
@@ -124,9 +124,9 @@ Examples:
 			return fmt.Errorf(
 				"--transport is required (stdio, sse, http)\n\n"+
 					"  For a remote HTTP server:\n"+
-					"    contenox mcp add %s https://<url>\n"+
+					"    contenox-runtime mcp add %s https://<url>\n"+
 					"  For a local stdio server:\n"+
-					"    contenox mcp add %s --transport stdio --command <cmd>",
+					"    contenox-runtime mcp add %s --transport stdio --command <cmd>",
 				name, name,
 			)
 		}
@@ -134,7 +134,7 @@ Examples:
 			return fmt.Errorf(
 				"--command is required for stdio transport\n\n"+
 					"  Example:\n"+
-					"    contenox mcp add %s --transport stdio --command npx --args \"-y,@modelcontextprotocol/server-filesystem,/tmp\"",
+					"    contenox-runtime mcp add %s --transport stdio --command npx --args \"-y,@modelcontextprotocol/server-filesystem,/tmp\"",
 				name,
 			)
 		}
@@ -142,9 +142,9 @@ Examples:
 			return fmt.Errorf(
 				"--url is required for %s transport\n\n"+
 					"  Example:\n"+
-					"    contenox mcp add %s --transport %s --url https://<host>/mcp\n"+
+					"    contenox-runtime mcp add %s --transport %s --url https://<host>/mcp\n"+
 					"  Or use the shorthand:\n"+
-					"    contenox mcp add %s https://<host>/mcp",
+					"    contenox-runtime mcp add %s https://<host>/mcp",
 				transport, name, transport, name,
 			)
 		}
@@ -200,7 +200,7 @@ servers. If none are registered, prints a hint to run 'contenox-runtime mcp add'
 		}
 
 		if len(servers) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No MCP servers registered. Run: contenox mcp add <name> --transport <type> ...")
+			fmt.Fprintln(cmd.OutOrStdout(), "No MCP servers registered. Run: contenox-runtime mcp add <name> --transport <type> ...")
 			return nil
 		}
 
@@ -382,7 +382,7 @@ After you approve access, the token is stored locally and used for all
 subsequent connections — no re-authentication needed until it expires.
 
 Example:
-  contenox mcp auth notion`,
+  contenox-runtime mcp auth notion`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := libtracker.WithNewRequestID(context.Background())

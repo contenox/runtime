@@ -202,7 +202,7 @@ func TestLoopback_ExternalAgent_DisabledAgentRejected(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "disabled")
-	require.Contains(t, err.Error(), "contenox agent enable",
+	require.Contains(t, err.Error(), "contenox-runtime agent enable",
 		"the ACP-level error must name the remedy, matching fleetservice's dispatch-path wording")
 
 	h.tr.sessionMu.Lock()

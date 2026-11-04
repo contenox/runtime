@@ -29,12 +29,12 @@ editor session fired in-process via /mission belong to that editor process, not
 to serve, so they do not appear on this board — follow their durable record with
 'contenox-runtime mission show' instead.)
 
-  contenox fleet list                       # the board: every declared agent + its live units
-  contenox fleet list --json                # the raw /fleet records (declared agents + instances)
-  contenox fleet show <instance-id>         # one unit's status (state, sessions, viewers)
-  contenox fleet stop <instance-id>         # tear a unit down (idempotent)
-  contenox fleet cancel <instance-id>       # cancel every in-flight turn on the unit
-  contenox fleet cancel <instance-id> --session <session-id>   # cancel just that session
+  contenox-runtime fleet list                       # the board: every declared agent + its live units
+  contenox-runtime fleet list --json                # the raw /fleet records (declared agents + instances)
+  contenox-runtime fleet show <instance-id>         # one unit's status (state, sessions, viewers)
+  contenox-runtime fleet stop <instance-id>         # tear a unit down (idempotent)
+  contenox-runtime fleet cancel <instance-id>       # cancel every in-flight turn on the unit
+  contenox-runtime fleet cancel <instance-id> --session <session-id>   # cancel just that session
 
 To FIRE a new unit at an intent, use 'contenox-runtime mission fire' — firing is a
 mission, not a bare dispatch.`,

@@ -17,7 +17,7 @@ var workspaceCmd = &cobra.Command{
 	Use:   "workspace",
 	Short: "Grant or revoke workspace roots a session may run in.",
 	Long: `Manage the workspace-root allowlist — the directories a session (a chat, a
-dispatched mission unit, or a Beam file browse) may choose as its working
+dispatched mission unit, or the app's file browser) may choose as its working
 directory. Granting a root grants everything UNDER it; a directory outside every
 granted root is refused.
 
@@ -25,14 +25,14 @@ Grants are durable config in the shared database, so these verbs work whether or
 not 'contenox-runtime serve' is running. When serve IS running, a grant applies LIVE —
 these verbs ring a reload signal serve picks up without a restart.
 
-  contenox workspace add /home/me/src        # grant a root (and everything under it)
-  contenox workspace add /home/me/scratch
-  contenox workspace list                     # the roots you have granted
-  contenox workspace remove /home/me/scratch  # revoke a grant
+  contenox-runtime workspace add /home/me/src        # grant a root (and everything under it)
+  contenox-runtime workspace add /home/me/scratch
+  contenox-runtime workspace list                     # the roots you have granted
+  contenox-runtime workspace remove /home/me/scratch  # revoke a grant
 
 serve always also allows its own launched default root (its served directory, or
 home for a bare 'contenox-runtime serve'); that is not a grant and is not listed here —
-it appears in the API and the Beam folder picker (GET /workspace/roots).`,
+it appears in the API and the app's folder picker (GET /workspace/roots).`,
 }
 
 var workspaceAddCmd = &cobra.Command{
@@ -45,7 +45,7 @@ granted is a no-op.
 
 The granted directory is also registered as a project: its
 .contenox/workspace.id marker is created if absent, and --name stamps a friendly
-display name into it (shown by 'workspace list', the API, and the Beam picker;
+display name into it (shown by 'workspace list', the API, and the app's folder picker;
 default: the folder's basename shows). Re-adding an already-granted path with a
 new --name renames the project.`,
 	Args: cobra.ExactArgs(1),
@@ -68,7 +68,8 @@ var workspaceListCmd = &cobra.Command{
 	Short: "List the granted workspace roots.",
 	Long: `Print the workspace roots you have granted, one per line. This is the durable
 grant list these verbs manage; serve additionally allows its own launched default
-root, which is shown by the API and the Beam folder picker, not here.`,
+root, which is shown by the API and the app's folder picker, not here.`,
+
 	Args: cobra.NoArgs,
 	RunE: runWorkspaceList,
 }

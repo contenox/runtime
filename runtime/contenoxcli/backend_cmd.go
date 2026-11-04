@@ -51,16 +51,16 @@ A backend points at an LLM provider. Supported types:
 
 Examples:
   # Register a local Ollama server (default URL inferred):
-  contenox backend add ollama --type ollama
+  contenox-runtime backend add ollama --type ollama
 
   # Register Ollama Cloud directly:
-  contenox backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
+  contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY
 
   # Register OpenAI using an environment variable for the key:
-  contenox backend add openai --type openai --api-key-env OPENAI_API_KEY
+  contenox-runtime backend add openai --type openai --api-key-env OPENAI_API_KEY
 
   # Register OpenRouter (access 300+ models via one API key):
-  contenox backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
+  contenox-runtime backend add openrouter --type openrouter --api-key-env OPENROUTER_API_KEY
 
   # Register a ChatGPT subscription (then sign in with a device code):
   contenox-runtime backend add chatgpt --type openai-codex
@@ -70,19 +70,19 @@ Examples:
   contenox-runtime backend add deepseek --type deepseek --api-key-env DEEPSEEK_API_KEY
 
   # Register Google Gemini:
-  contenox backend add gemini --type gemini --api-key-env GEMINI_API_KEY
+  contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY
 
   # Register a Google Vertex AI backend (run gcloud auth application-default login first):
   export GOOGLE_CLOUD_PROJECT=my-project-id
-  contenox backend add vertex --type vertex-google \
+  contenox-runtime backend add vertex --type vertex-google \
     --url "https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1"
 
   # Register a custom vLLM server:
-  contenox backend add myvllm --type vllm --url http://gpu-host:8000
+  contenox-runtime backend add myvllm --type vllm --url http://gpu-host:8000
 
-  contenox backend list
-  contenox backend show openai
-  contenox backend remove myvllm`,
+  contenox-runtime backend list
+  contenox-runtime backend show openai
+  contenox-runtime backend remove myvllm`,
 }
 
 func defaultBaseURLForType(typ string) (string, error) {
@@ -245,7 +245,7 @@ If no backends are registered, prints a hint to run 'contenox-runtime backend ad
 			return fmt.Errorf("failed to list backends: %w", err)
 		}
 		if len(backends) == 0 {
-			fmt.Fprintln(cmd.OutOrStdout(), "No backends registered. Run: contenox backend add <name> --type <type>")
+			fmt.Fprintln(cmd.OutOrStdout(), "No backends registered. Run: contenox-runtime backend add <name> --type <type>")
 			return nil
 		}
 		w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
@@ -353,8 +353,9 @@ func globalContenoxDir() (string, error) {
 }
 
 func init() {
-	backendAddCmd.Flags().String("type", "ollama", "Backend type: ollama, openai, openrouter, anthropic, mistral, bedrock, gemini, vllm, vertex-google")
-	backendAddCmd.Flags().String("url", "", "Base URL of the backend (auto-inferred for openai/openrouter/anthropic/mistral/gemini if omitted; set https://ollama.com/api for hosted Ollama)")
+	backendAddCmd.Flags().String("type", "ollama", "Backend type: ollama, openai, openai-codex, openrouter, deepseek, anthropic, mistral, gemini, vllm, bedrock, vertex-google")
+	backendAddCmd.Flags().String("url", "", "Base URL of the backend (auto-inferred for openai/openai-codex/openrouter/deepseek/anthropic/mistral/gemini if omitted; set https://ollama.com/api for hosted Ollama)")
+
 	backendAddCmd.Flags().String("api-key-env", "", "Name of the environment variable holding the API key (preferred over --api-key)")
 	backendAddCmd.Flags().String("api-key", "", "API key literal — prefer --api-key-env to avoid leaking into shell history")
 

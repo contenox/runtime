@@ -37,7 +37,7 @@ func TestUnit_CodexRuntime_LoginCatalogExecutionLogout(t *testing.T) {
 	defer bus.Close()
 	state, err := New(ctx, db, bus)
 	require.NoError(t, err)
-	state.processCodexBackend(ctx, b, nil)
+	state.processLoginBackend(ctx, b, nil)
 	require.Contains(t, state.Get(ctx)[b.ID].Error, "login required")
 	seed := func(generation string) {
 		raw, err := json.Marshal(map[string]any{"generation": generation, "account": "account", "token": &oauth2.Token{AccessToken: "secret", RefreshToken: "refresh", Expiry: time.Now().Add(time.Hour)}})
@@ -58,8 +58,8 @@ func TestUnit_CodexRuntime_LoginCatalogExecutionLogout(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}
-	state.processCodexBackend(ctx, b, nil)
-	state.processCodexBackend(ctx, b, nil)
+	state.processLoginBackend(ctx, b, nil)
+	state.processLoginBackend(ctx, b, nil)
 	require.Equal(t, 1, modelsCalls)
 	view := state.Get(ctx)
 	require.Empty(t, view[b.ID].Error)
@@ -76,11 +76,11 @@ func TestUnit_CodexRuntime_LoginCatalogExecutionLogout(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "hello", r.Message.Content)
 	seed("replacement")
-	state.processCodexBackend(ctx, b, nil)
+	state.processLoginBackend(ctx, b, nil)
 	require.Equal(t, 2, modelsCalls)
 	require.NoError(t, modelauth.New(db).Logout(ctx, b.ID))
 	_, err = client.Chat(ctx, []modelrepo.Message{{Role: "user", Content: "hello"}})
 	require.ErrorIs(t, err, modelauth.ErrLoginRequired)
-	state.processCodexBackend(ctx, b, nil)
+	state.processLoginBackend(ctx, b, nil)
 	require.Contains(t, state.Get(ctx)[b.ID].Error, "login required")
 }

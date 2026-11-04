@@ -453,5 +453,5 @@ func requireDefaultModel(vars map[string]string) error {
 	if strings.TrimSpace(vars["model"]) != "" {
 		return nil
 	}
-	return fmt.Errorf("missing_default_model: No default model is set. Internal chat and chains using {{var:model}} need it. Fix: contenox config set default-model <name>")
+	return fmt.Errorf("missing_default_model: No default model is set. Internal chat and chains using {{var:model}} need it. Fix: contenox-runtime config set default-model <name>")
 }

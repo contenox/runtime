@@ -21,7 +21,7 @@ func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalReq
 	contenoxSessionID, _ := ctx.Value(runtimetypes.SessionIDContextKey).(string)
 	acpSessionID, ok := t.acpSessionForContenoxID(contenoxSessionID)
 	if !ok {
-		return false, libacp.InternalError("acpsvc: no ACP session bound to contenox session " + contenoxSessionID)
+		return false, libacp.InternalError("acpsvc: no ACP session bound to contenox-runtime session " + contenoxSessionID)
 	}
 
 	toolCallID := approvalflow.ToolCallID(req)

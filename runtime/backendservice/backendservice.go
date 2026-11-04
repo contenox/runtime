@@ -8,7 +8,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
-	"github.com/contenox/runtime/runtime/internal/models/modelauth"
+	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -111,7 +111,7 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if err := store.DeleteKV(ctx, runtimestate.BackendCredentialKey(backend.Type, backend.ID)); err != nil && !errors.Is(err, libdb.ErrNotFound) {
 		return err
 	}
-	if err := modelauth.DeleteCredentials(ctx, tx, id); err != nil {
+	if err := loginauth.DeleteCredentials(ctx, tx, id); err != nil {
 		return err
 	}
 	if err := store.DeleteBackend(ctx, id); err != nil {
@@ -133,9 +133,9 @@ func validate(backend *runtimetypes.Backend) error {
 		return fmt.Errorf("%w: baseURL is required", ErrInvalidBackend)
 	}
 	switch modelrepo.CanonicalBackendType(backend.Type) {
-	case "ollama", "vllm", "openai", "openrouter", "openai-codex", "anthropic", "mistral", "deepseek", "bedrock", "gemini", "vertex-google", "scripted-test":
+	case "ollama", "vllm", "openai", "openrouter", "openai-codex", "github-copilot", "anthropic", "mistral", "deepseek", "bedrock", "gemini", "vertex-google", "scripted-test":
 	default:
-		return fmt.Errorf("%w: Type must be ollama, vllm, openrouter, openai, openai-codex, anthropic, mistral, deepseek, bedrock, gemini, vertex-google, or scripted-test (test only)", ErrInvalidBackend)
+		return fmt.Errorf("%w: Type must be ollama, vllm, openrouter, openai, openai-codex, github-copilot, anthropic, mistral, deepseek, bedrock, gemini, vertex-google, or scripted-test (test only)", ErrInvalidBackend)
 	}
 
 	return nil

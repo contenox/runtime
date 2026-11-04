@@ -108,5 +108,5 @@ func (t *Transport) loadCompactChain() (*taskengine.TaskChainDefinition, error) 
 		}
 		return &chain, nil
 	}
-	return nil, fmt.Errorf("%s not found in %q or ~/.contenox-harness; run 'contenox init' to populate it", name, t.deps.ContenoxDir)
+	return nil, fmt.Errorf("%s not found in %q or ~/.contenox-harness; run 'contenox-runtime init' to populate it", name, t.deps.ContenoxDir)
 }

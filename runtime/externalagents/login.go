@@ -80,6 +80,9 @@ func (s *Service) StartLogin(ctx context.Context, name, methodID string) (LoginS
 	if problem != nil {
 		return LoginStatus{}, fmt.Errorf("%s: %w", problem.Message, apiframework.ErrUnprocessableEntity)
 	}
+	if p, isPreset := presetByAgentName(name); isPreset && p.isUnofficialMethod(methodID) && !s.unofficialAllowed(ctx) {
+		return LoginStatus{}, fmt.Errorf("sign-in method %q is only offered when unofficial sign-ins are allowed in the settings: %w", methodID, apiframework.ErrForbidden)
+	}
 	method, ok := hs.authMethod[methodID]
 	if !ok {
 		return LoginStatus{}, fmt.Errorf("agent %q offers no sign-in method %q: %w", name, methodID, apiframework.ErrInvalidParameterValue)

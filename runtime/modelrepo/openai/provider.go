@@ -16,6 +16,9 @@ type OpenAIProvider struct {
 	canNextEdit     bool
 	nextEditFormat  string
 	codex           *codexCatalog
+	authorize       func(context.Context) (http.Header, error)
+	providerName    string
+	chatOnly        bool
 	id              string
 	apiKey          string
 	modelName       string
@@ -91,6 +94,9 @@ func (p *OpenAIProvider) GetType() string {
 	if p.codex != nil {
 		return p.codex.Type()
 	}
+	if p.providerName != "" {
+		return p.providerName
+	}
 	return "openai"
 }
 
@@ -132,6 +138,9 @@ func (p *OpenAIProvider) GetChatConnection(ctx context.Context, backendID string
 	return &OpenAIChatClient{
 		openAIClient: openAIClient{
 			codex:           p.codex,
+			authorize:       p.authorize,
+			providerName:    p.providerName,
+			chatOnly:        p.chatOnly,
 			baseURL:         p.baseURL,
 			apiKey:          p.apiKey,
 			httpClient:      p.httpClient,
@@ -154,6 +163,9 @@ func (p *OpenAIProvider) GetPromptConnection(ctx context.Context, backendID stri
 	return &OpenAIPromptClient{
 		openAIClient: openAIClient{
 			codex:           p.codex,
+			authorize:       p.authorize,
+			providerName:    p.providerName,
+			chatOnly:        p.chatOnly,
 			baseURL:         p.baseURL,
 			apiKey:          p.apiKey,
 			httpClient:      p.httpClient,
@@ -192,6 +204,9 @@ func (p *OpenAIProvider) GetStreamConnection(ctx context.Context, backendID stri
 	return &OpenAIStreamClient{
 		openAIClient: openAIClient{
 			codex:           p.codex,
+			authorize:       p.authorize,
+			providerName:    p.providerName,
+			chatOnly:        p.chatOnly,
 			baseURL:         p.baseURL,
 			apiKey:          p.apiKey,
 			httpClient:      p.httpClient,
@@ -207,10 +222,12 @@ func (p *OpenAIProvider) GetStreamConnection(ctx context.Context, backendID stri
 	}, nil
 }
 
-func (p *OpenAIProvider) CanAutocomplete() bool { return p.codex == nil && p.canAutocomplete }
+func (p *OpenAIProvider) CanAutocomplete() bool {
+	return p.codex == nil && p.authorize == nil && p.canAutocomplete
+}
 
 func (p *OpenAIProvider) CanNextEdit() bool {
-	if p.codex != nil || !p.canNextEdit {
+	if p.codex != nil || p.authorize != nil || !p.canNextEdit {
 		return false
 	}
 	_, err := modelcontract.ResolveNextEdit(p.nextEditFormat)

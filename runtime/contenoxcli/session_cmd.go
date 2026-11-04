@@ -20,17 +20,17 @@ var sessionCmd = &cobra.Command{
 	Long: `Create and switch named chat sessions.
 Each session maintains its own persistent conversation history.
 
-  contenox session new [name]            create a session and make it active
-  contenox session list                  list active-scope sessions (* = active)
-  contenox session list --workspace W    list sessions in a workspace (whole DB)
-  contenox session list --namespace NS   list sessions in a namespace (whole DB)
-  contenox session list --all            list every session (whole DB)
-  contenox session switch <name>         switch the active session
-  contenox session delete <name>         delete a session and its messages
-  contenox session show [name|id]        print a session (active, by name, or id)
-  contenox session fork [name]           copy active session to a new one
-  contenox session fork --summary        compact older history before forking
-  contenox session workspaces            list workspaces and namespaces (whole DB)`,
+  contenox-runtime session new [name]            create a session and make it active
+  contenox-runtime session list                  list active-scope sessions (* = active)
+  contenox-runtime session list --workspace W    list sessions in a workspace (whole DB)
+  contenox-runtime session list --namespace NS   list sessions in a namespace (whole DB)
+  contenox-runtime session list --all            list every session (whole DB)
+  contenox-runtime session switch <name>         switch the active session
+  contenox-runtime session delete <name>         delete a session and its messages
+  contenox-runtime session show [name|id]        print a session (active, by name, or id)
+  contenox-runtime session fork [name]           copy active session to a new one
+  contenox-runtime session fork --summary        compact older history before forking
+  contenox-runtime session workspaces            list workspaces and namespaces (whole DB)`,
 	SilenceUsage: true,
 }
 
@@ -90,10 +90,10 @@ Flags:
   --ns NS     Namespace hint when resolving by id (advisory)
 
 Examples:
-  contenox session show
-  contenox session show my-session
-  contenox session show 6644fc61-fbc6-4e55-9006-b46178625de3
-  contenox session show --tail 10`,
+  contenox-runtime session show
+  contenox-runtime session show my-session
+  contenox-runtime session show 6644fc61-fbc6-4e55-9006-b46178625de3
+  contenox-runtime session show --tail 10`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSessionShow,
 }
@@ -165,7 +165,7 @@ func runSessionList(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if len(sessions) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No sessions yet. Run: contenox session new")
+		fmt.Fprintln(cmd.OutOrStdout(), "No sessions yet. Run: contenox-runtime session new")
 		return nil
 	}
 	for _, s := range sessions {

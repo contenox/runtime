@@ -32,10 +32,10 @@ http://127.0.0.1:32123, overridable with --server/--token or the
 CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN environment variables.
 
 Examples:
-  contenox approvals list
-  contenox approvals list --json
-  contenox approvals answer 3f9c6e2a-1b4d --approve
-  contenox approvals answer 3f9c6e2a-1b4d --deny`,
+  contenox-runtime approvals list
+  contenox-runtime approvals list --json
+  contenox-runtime approvals answer 3f9c6e2a-1b4d --approve
+  contenox-runtime approvals answer 3f9c6e2a-1b4d --deny`,
 }
 
 var approvalsListCmd = &cobra.Command{

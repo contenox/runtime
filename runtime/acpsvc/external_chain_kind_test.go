@@ -70,7 +70,7 @@ func TestLoopback_ChainAgent_ConnCtxPathRefusesHonestly(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "chain agent")
-	require.Contains(t, err.Error(), "contenox serve",
+	require.Contains(t, err.Error(), "contenox-runtime serve",
 		"the refusal must name where a chain unit CAN run, not just that this cannot run it")
 
 	h.tr.sessionMu.Lock()

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const DefaultOllamaSuggestModel = "qwen2.5:7b"
+const DefaultOllamaSuggestModel = "qwen3:8b"
 
 func resolveOllamaProbeBaseURL() string {
 	h := strings.TrimSpace(os.Getenv("OLLAMA_HOST"))
@@ -64,9 +64,9 @@ func needsNonDefaultOllamaBackendURL(probedBase string) bool {
 
 func ollamaRegistrationCommand(probedBase string) string {
 	if needsNonDefaultOllamaBackendURL(probedBase) {
-		return fmt.Sprintf("contenox backend add local --type ollama --url %q", probedBase)
+		return fmt.Sprintf("contenox-runtime backend add local --type ollama --url %q", probedBase)
 	}
-	return "contenox backend add local --type ollama"
+	return "contenox-runtime backend add local --type ollama"
 }
 
 func ollamaBackendAlreadyReachable(r Result) bool {
@@ -85,7 +85,7 @@ func enrichResultWithOllamaAt(r Result, probedBase string) Result {
 	suffix := fmt.Sprintf(" Local Ollama responded at %s — pull a chat model if needed, then register it.", probedBase)
 	cmd := ollamaRegistrationCommand(probedBase)
 	pull := fmt.Sprintf("ollama pull %s", DefaultOllamaSuggestModel)
-	config := fmt.Sprintf("contenox config set default-provider ollama && contenox config set default-model %s", DefaultOllamaSuggestModel)
+	config := fmt.Sprintf("contenox-runtime config set default-provider ollama && contenox-runtime config set default-model %s", DefaultOllamaSuggestModel)
 	full := pull + " && " + cmd + " && " + config
 
 	for i := range r.Issues {

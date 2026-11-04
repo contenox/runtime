@@ -19,12 +19,12 @@ terminal. They are added on top of whatever the environment scrub passes through
 so an injected value always wins, and they apply even when a scrub mode is off.
 
 Scope is global (every spawned shell). Values are stored as plain configuration,
-editable here or in Beam, and read live — an edit applies to the next shell
+editable here or in the app, and read live — an edit applies to the next shell
 without restarting serve. Do not store secrets here.
 
-  contenox shell-env set HTTP_PROXY=http://proxy:3128 GOCACHE=/var/cache/go
-  contenox shell-env list
-  contenox shell-env unset HTTP_PROXY
+  contenox-runtime shell-env set HTTP_PROXY=http://proxy:3128 GOCACHE=/var/cache/go
+  contenox-runtime shell-env list
+  contenox-runtime shell-env unset HTTP_PROXY
 
 To see what the scrub itself keeps or strips, use 'contenox-runtime sandbox env'.`,
 }

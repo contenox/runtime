@@ -14,6 +14,8 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libkvstore"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/internal/models/copilotauth"
+	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -21,17 +23,18 @@ import (
 )
 
 const (
-	ProviderTypeLocal        = "local"
-	ProviderTypeOllama       = "ollama"
-	ProviderTypeOpenAI       = "openai"
-	ProviderTypeAnthropic    = "anthropic"
-	ProviderTypeMistral      = "mistral"
-	ProviderTypeBedrock      = "bedrock"
-	ProviderTypeGemini       = "gemini"
-	ProviderTypeVLLM         = "vllm"
-	ProviderTypeVertexGoogle = "vertex-google"
-	ProviderTypeDeepSeek     = "deepseek"
-	ProviderTypeOpenAICodex  = "openai-codex"
+	ProviderTypeLocal         = "local"
+	ProviderTypeOllama        = "ollama"
+	ProviderTypeOpenAI        = "openai"
+	ProviderTypeAnthropic     = "anthropic"
+	ProviderTypeMistral       = "mistral"
+	ProviderTypeBedrock       = "bedrock"
+	ProviderTypeGemini        = "gemini"
+	ProviderTypeVLLM          = "vllm"
+	ProviderTypeVertexGoogle  = "vertex-google"
+	ProviderTypeDeepSeek      = "deepseek"
+	ProviderTypeOpenAICodex   = "openai-codex"
+	ProviderTypeGitHubCopilot = "github-copilot"
 )
 
 var ErrInvalidProvider = errors.New("invalid provider")
@@ -70,6 +73,7 @@ type ProviderCapability struct {
 	RequiresSecretConfig bool   `json:"requiresSecretConfig"`
 	RequiresLogin        bool   `json:"requiresLogin,omitempty"`
 	RecommendedAPIKeyEnv string `json:"recommendedApiKeyEnv,omitempty"`
+	Unofficial           bool   `json:"unofficial,omitempty"`
 }
 
 type Service interface {
@@ -139,20 +143,22 @@ type providerDefaults struct {
 	RequiresSecretConfig bool
 	RequiresLogin        bool
 	RecommendedAPIKeyEnv string
+	Unofficial           bool
 }
 
 var providerDefaultsByType = map[string]providerDefaults{
-	ProviderTypeLocal:        {Type: ProviderTypeLocal, RequiresBaseURL: true},
-	ProviderTypeOllama:       {Type: ProviderTypeOllama, DefaultBaseURL: "http://127.0.0.1:11434", RecommendedAPIKeyEnv: "OLLAMA_API_KEY"},
-	ProviderTypeOpenAI:       {Type: ProviderTypeOpenAI, DefaultBaseURL: "https://api.openai.com/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "OPENAI_API_KEY"},
-	ProviderTypeAnthropic:    {Type: ProviderTypeAnthropic, DefaultBaseURL: "https://api.anthropic.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "ANTHROPIC_API_KEY"},
-	ProviderTypeMistral:      {Type: ProviderTypeMistral, DefaultBaseURL: "https://api.mistral.ai/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "MISTRAL_API_KEY"},
-	ProviderTypeBedrock:      {Type: ProviderTypeBedrock, RequiresBaseURL: true},
-	ProviderTypeGemini:       {Type: ProviderTypeGemini, DefaultBaseURL: "https://generativelanguage.googleapis.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "GEMINI_API_KEY"},
-	ProviderTypeVLLM:         {Type: ProviderTypeVLLM, RequiresBaseURL: true},
-	ProviderTypeVertexGoogle: {Type: ProviderTypeVertexGoogle, RequiresBaseURL: true, RecommendedAPIKeyEnv: "GOOGLE_APPLICATION_CREDENTIALS"},
-	ProviderTypeDeepSeek:     {Type: ProviderTypeDeepSeek, DefaultBaseURL: "https://api.deepseek.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DEEPSEEK_API_KEY"},
-	ProviderTypeOpenAICodex:  {Type: ProviderTypeOpenAICodex, DefaultBaseURL: modelauth.BaseURL, RequiresLogin: true},
+	ProviderTypeLocal:         {Type: ProviderTypeLocal, RequiresBaseURL: true},
+	ProviderTypeOllama:        {Type: ProviderTypeOllama, DefaultBaseURL: "http://127.0.0.1:11434", RecommendedAPIKeyEnv: "OLLAMA_API_KEY"},
+	ProviderTypeOpenAI:        {Type: ProviderTypeOpenAI, DefaultBaseURL: "https://api.openai.com/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "OPENAI_API_KEY"},
+	ProviderTypeAnthropic:     {Type: ProviderTypeAnthropic, DefaultBaseURL: "https://api.anthropic.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "ANTHROPIC_API_KEY"},
+	ProviderTypeMistral:       {Type: ProviderTypeMistral, DefaultBaseURL: "https://api.mistral.ai/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "MISTRAL_API_KEY"},
+	ProviderTypeBedrock:       {Type: ProviderTypeBedrock, RequiresBaseURL: true},
+	ProviderTypeGemini:        {Type: ProviderTypeGemini, DefaultBaseURL: "https://generativelanguage.googleapis.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "GEMINI_API_KEY"},
+	ProviderTypeVLLM:          {Type: ProviderTypeVLLM, RequiresBaseURL: true},
+	ProviderTypeVertexGoogle:  {Type: ProviderTypeVertexGoogle, RequiresBaseURL: true, RecommendedAPIKeyEnv: "GOOGLE_APPLICATION_CREDENTIALS"},
+	ProviderTypeDeepSeek:      {Type: ProviderTypeDeepSeek, DefaultBaseURL: "https://api.deepseek.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DEEPSEEK_API_KEY"},
+	ProviderTypeOpenAICodex:   {Type: ProviderTypeOpenAICodex, DefaultBaseURL: modelauth.BaseURL, RequiresLogin: true},
+	ProviderTypeGitHubCopilot: {Type: ProviderTypeGitHubCopilot, DefaultBaseURL: copilotauth.BaseURL, RequiresLogin: true, Unofficial: true},
 }
 
 func supportedProviders() []ProviderCapability {
@@ -164,6 +170,7 @@ func supportedProviders() []ProviderCapability {
 			RequiresBaseURL:      defaults.RequiresBaseURL,
 			RequiresSecretConfig: defaults.RequiresSecretConfig,
 			RequiresLogin:        defaults.RequiresLogin,
+			Unofficial:           defaults.Unofficial,
 			RecommendedAPIKeyEnv: defaults.RecommendedAPIKeyEnv,
 		})
 	}
@@ -448,7 +455,7 @@ func (s *service) statusFrom(ctx context.Context, store runtimetypes.Store, defa
 	hasBackend := backend != nil
 	status.Configured = hasBackend && (!defaults.RequiresSecretConfig || status.SecretConfigured)
 	if defaults.RequiresLogin && backend != nil {
-		if authState, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID); err == nil {
+		if authState, err := s.auth(backend).Status(ctx, backend.ID); err == nil {
 			status.AuthState = authState.State
 			status.LoginRequired = authState.State == "login_required" || authState.State == "refresh_required"
 		}
@@ -517,7 +524,7 @@ func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginSt
 }
 
 func (s *service) startLogin(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStart, error) {
-	auth := modelauth.New(s.dbInstance)
+	auth := s.auth(backend)
 	if state, err := auth.Status(ctx, backend.ID); err == nil && state.State == "authenticated" {
 		return &LoginStart{Provider: providerType, ConnectionID: backend.ID, State: state.State, ExpiresAt: state.ExpiresAt}, nil
 	}
@@ -604,7 +611,7 @@ func (s *service) LoginStatus(ctx context.Context, providerType string) (*LoginS
 }
 
 func (s *service) loginStatus(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStatus, error) {
-	state, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID)
+	state, err := s.auth(backend).Status(ctx, backend.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +687,7 @@ func cancelLoginAttempt(backendID string) {
 
 func (s *service) logout(ctx context.Context, backend *runtimetypes.Backend) error {
 	cancelLoginAttempt(backend.ID)
-	if err := modelauth.New(s.dbInstance).Logout(ctx, backend.ID); err != nil {
+	if err := s.auth(backend).Logout(ctx, backend.ID); err != nil {
 		return err
 	}
 	s.invalidateBackendCache(backend.ID)
@@ -689,4 +696,11 @@ func (s *service) logout(ctx context.Context, backend *runtimetypes.Backend) err
 
 func (s *service) invalidateBackendCache(backendID string) {
 	_ = runtimestate.InvalidateModelCache(context.Background(), libkvstore.NewSQLiteManager(s.dbInstance), backendID)
+}
+
+func (s *service) auth(backend *runtimetypes.Backend) loginauth.Authenticator {
+	if a, ok := loginauth.For(s.dbInstance, backend.Type); ok {
+		return a
+	}
+	return modelauth.New(s.dbInstance)
 }

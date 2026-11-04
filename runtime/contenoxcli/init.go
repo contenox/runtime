@@ -45,7 +45,7 @@ type providerConfig struct {
 var providerConfigs = map[string]providerConfig{
 	"ollama": {
 		name:         "Ollama (local)",
-		defaultModel: "qwen2.5:7b", // suggestion printed by init only; never a runtime default
+		defaultModel: "qwen3:8b", // suggestion printed by init only; never a runtime default
 		envKey:       "",
 	},
 	"gemini": {
@@ -55,12 +55,12 @@ var providerConfigs = map[string]providerConfig{
 	},
 	"openai": {
 		name:         "OpenAI",
-		defaultModel: "gpt-5-mini",
+		defaultModel: "gpt-5.6",
 		envKey:       "OPENAI_API_KEY",
 	},
 	"anthropic": {
 		name:         "Anthropic (direct)",
-		defaultModel: "claude-sonnet-4-5",
+		defaultModel: "claude-sonnet-5-5",
 		envKey:       "ANTHROPIC_API_KEY",
 	},
 	"mistral": {
@@ -301,7 +301,7 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 				if curModel != "" {
 					fmt.Fprintf(out, "  default-model    = %s\n", curModel)
 				}
-				fmt.Fprintln(out, "  To change: contenox config set default-model <model>")
+				fmt.Fprintln(out, "  To change: contenox-runtime config set default-model <model>")
 				fmt.Fprintln(out, "")
 			}
 		}
@@ -347,13 +347,13 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		fmt.Fprintln(out, "       gcloud auth application-default login --project $GOOGLE_CLOUD_PROJECT")
 		fmt.Fprintln(out, "")
 		fmt.Fprintf(out, "  2. Register the %s backend:\n", pc.name)
-		fmt.Fprintf(out, "       contenox backend add %s --type %s \\\n", provider, provider)
+		fmt.Fprintf(out, "       contenox-runtime backend add %s --type %s \\\n", provider, provider)
 		fmt.Fprintln(out, `         --url "https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1"`)
-		fmt.Fprintln(out, "       contenox doctor")
+		fmt.Fprintln(out, "       contenox-runtime doctor")
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "  3. Set defaults:")
-		fmt.Fprintf(out, "       contenox config set default-provider %s\n", provider)
-		fmt.Fprintf(out, "       contenox config set default-model %s\n", pc.defaultModel)
+		fmt.Fprintf(out, "       contenox-runtime config set default-provider %s\n", provider)
+		fmt.Fprintf(out, "       contenox-runtime config set default-model %s\n", pc.defaultModel)
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "  Get started with Vertex AI: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstarts")
 		fmt.Fprintln(out, "")
@@ -400,10 +400,10 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		}
 		if !backendRegistered {
 			fmt.Fprintf(out, "  %d. Register the OpenRouter backend and set defaults:\n", step)
-			fmt.Fprintf(out, "       contenox backend add openrouter --type openrouter --api-key-env %s\n", pc.envKey)
-			fmt.Fprintf(out, "       contenox config set default-provider openrouter\n")
-			fmt.Fprintf(out, "       contenox config set default-model %s\n", pc.defaultModel)
-			fmt.Fprintln(out, "       contenox doctor")
+			fmt.Fprintf(out, "       contenox-runtime backend add openrouter --type openrouter --api-key-env %s\n", pc.envKey)
+			fmt.Fprintf(out, "       contenox-runtime config set default-provider openrouter\n")
+			fmt.Fprintf(out, "       contenox-runtime config set default-model %s\n", pc.defaultModel)
+			fmt.Fprintln(out, "       contenox-runtime doctor")
 			fmt.Fprintln(out, "")
 			fmt.Fprintln(out, "  Some cost-effective starting models on OpenRouter:")
 			fmt.Fprintln(out, "       deepseek/deepseek-chat-v3-5   (excellent quality, very low cost)")
@@ -429,19 +429,19 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		fmt.Fprintln(out, "       ollama serve")
 		fmt.Fprintln(out, "       ollama pull qwen3:8b")
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "  3. Register the local API and set defaults (URLs match contenox backend add defaults):")
-		fmt.Fprintln(out, "       contenox backend add ollama --type ollama")
-		fmt.Fprintln(out, "       contenox config set default-provider ollama")
-		fmt.Fprintln(out, "       contenox config set default-model qwen3:8b")
-		fmt.Fprintln(out, "       contenox doctor")
+		fmt.Fprintln(out, "  3. Register the local API and set defaults (URLs match contenox-runtime backend add defaults):")
+		fmt.Fprintln(out, "       contenox-runtime backend add ollama --type ollama")
+		fmt.Fprintln(out, "       contenox-runtime config set default-provider ollama")
+		fmt.Fprintln(out, "       contenox-runtime config set default-model qwen3:8b")
+		fmt.Fprintln(out, "       contenox-runtime doctor")
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "  Optional: use hosted Ollama Cloud instead of a local server:")
 		fmt.Fprintln(out, "       export OLLAMA_API_KEY=your-key-here")
-		fmt.Fprintln(out, "       contenox backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY")
+		fmt.Fprintln(out, "       contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY")
 		fmt.Fprintln(out, "  Get an Ollama API key for direct cloud access: https://ollama.com/settings/keys")
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "  Optional: run fully local GGUF models via the llama provider:")
-		fmt.Fprintln(out, "       contenox init llama")
+		fmt.Fprintln(out, "       contenox-runtime init llama")
 		fmt.Fprintln(out, "")
 		chatStep = 4
 	default:
@@ -461,10 +461,10 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		}
 		if !backendRegistered {
 			fmt.Fprintf(out, "  %d. Register the %s backend and set defaults:\n", registerStep, pc.name)
-			fmt.Fprintf(out, "       contenox backend add %s --type %s --api-key-env %s\n", provider, provider, pc.envKey)
-			fmt.Fprintf(out, "       contenox config set default-provider %s\n", provider)
-			fmt.Fprintf(out, "       contenox config set default-model %s\n", pc.defaultModel)
-			fmt.Fprintln(out, "       contenox doctor")
+			fmt.Fprintf(out, "       contenox-runtime backend add %s --type %s --api-key-env %s\n", provider, provider, pc.envKey)
+			fmt.Fprintf(out, "       contenox-runtime config set default-provider %s\n", provider)
+			fmt.Fprintf(out, "       contenox-runtime config set default-model %s\n", pc.defaultModel)
+			fmt.Fprintln(out, "       contenox-runtime doctor")
 			fmt.Fprintln(out, "")
 			chatStep = registerStep + 1
 		} else {
@@ -472,11 +472,11 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		}
 	}
 	fmt.Fprintf(out, "  %d. Chat with your model:\n", chatStep)
-	fmt.Fprintln(out, "       contenox hey, what can you do?")
+	fmt.Fprintln(out, "       contenox-runtime hey, what can you do?")
 	fmt.Fprintln(out, "       echo 'fix the typos in README.md' | contenox")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "  To enable shell and filesystem tools pass --shell to any command, e.g.:")
-	fmt.Fprintln(out, "       contenox --shell \"run the tests\"")
+	fmt.Fprintln(out, "       contenox-runtime --shell \"run the tests\"")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "  Run 'contenox-runtime --help' for full usage.")
 	return nil

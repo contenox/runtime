@@ -23,10 +23,10 @@ and addressable as ACP peers. They are registered automatically by chain-agent
 discovery; this command inspects them and toggles their enabled state.
 
 Examples:
-  contenox agent list
-  contenox agent show reviewer
-  contenox agent disable reviewer
-  contenox agent remove reviewer`,
+  contenox-runtime agent list
+  contenox-runtime agent show reviewer
+  contenox-runtime agent disable reviewer
+  contenox-runtime agent remove reviewer`,
 }
 
 var agentListCmd = &cobra.Command{

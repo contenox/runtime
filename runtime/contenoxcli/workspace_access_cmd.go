@@ -28,9 +28,9 @@ not resolve inside that root (outside every allowlisted root, or a symlink whose
 real target escapes it) comes back reachable:false with no read/write verdict —
 no policy is evaluated for a path that is not really inside the root.
 
-  contenox workspace access src/main.go
-  contenox workspace access --policy hitl-policy-strict.json .ssh/id_rsa
-  contenox workspace access --root /home/me/project src/main.go .ssh/id_rsa ../escape
+  contenox-runtime workspace access src/main.go
+  contenox-runtime workspace access --policy hitl-policy-strict.json .ssh/id_rsa
+  contenox-runtime workspace access --root /home/me/project src/main.go .ssh/id_rsa ../escape
 
 By default this talks to http://127.0.0.1:32123, overridable with --server/--token
 or the CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN environment variables — see

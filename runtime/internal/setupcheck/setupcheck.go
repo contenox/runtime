@@ -116,7 +116,7 @@ func Evaluate(in Input) Result {
 			Category:   CategoryDefaults,
 			Message:    "No default model is set. Internal chat and chains using {{var:model}} need it.",
 			FixPath:    "/settings",
-			CLICommand: "contenox config set default-model <name>",
+			CLICommand: "contenox-runtime config set default-model <name>",
 		})
 	}
 	if r.DefaultProvider == "" {
@@ -126,7 +126,7 @@ func Evaluate(in Input) Result {
 			Category:   CategoryDefaults,
 			Message:    "No default provider is set. Internal chat and chains using {{var:provider}} need it.",
 			FixPath:    "/settings",
-			CLICommand: "contenox config set default-provider ollama",
+			CLICommand: "contenox-runtime config set default-provider ollama",
 		})
 	}
 
@@ -281,7 +281,7 @@ func (r Result) Summary() string {
 			fmt.Fprintf(&b, "\n    Try: %s", iss.CLICommand)
 		}
 	}
-	b.WriteString("\n\nRun `contenox doctor` for full backend diagnostics.")
+	b.WriteString("\n\nRun `contenox-runtime doctor` for full backend diagnostics.")
 	return b.String()
 }
 
@@ -344,7 +344,7 @@ func addDefaultProviderIssues(r *Result) {
 				Category:   CategoryHealth,
 				Message:    fmt.Sprintf("Default provider %q is registered, but runtime state has not produced an entry for backend(s): %s.", r.DefaultProvider, joinBackendNames(filterByKinds(defaultChecks, backendErrorPending))),
 				FixPath:    "/backends?tab=backends",
-				CLICommand: "contenox doctor   # rerun after the backend cycle finishes",
+				CLICommand: "contenox-runtime doctor   # rerun after the backend cycle finishes",
 			})
 		case anyBackendKind(defaultChecks, backendErrorUnreachable), anyBackendKind(defaultChecks, backendErrorOther):
 			addIssue(r, Issue{
@@ -377,7 +377,7 @@ func addDefaultProviderIssues(r *Result) {
 	}
 
 	available := strings.Join(chatModels, ", ")
-	cmd := fmt.Sprintf("contenox config set default-model %q", chatModels[0])
+	cmd := fmt.Sprintf("contenox-runtime config set default-model %q", chatModels[0])
 	addIssue(r, Issue{
 		Code:       "default_model_not_available",
 		Severity:   "error",
@@ -774,28 +774,28 @@ func providerAddCommand(provider string) string {
 func noChatModelsCommand(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
 	case "openai", "anthropic", "mistral", "gemini":
-		return "contenox model list   # confirm which chat models the provider exposes"
+		return "contenox-runtime model list   # confirm which chat models the provider exposes"
 	case "vertex-google":
-		return "contenox model list   # Gemini models from AI Studio metadata; set default-model to a gemini-* name"
+		return "contenox-runtime model list   # Gemini models from AI Studio metadata; set default-model to a gemini-* name"
 	case "bedrock":
-		return "Enable the model in the AWS Bedrock console (Model access), then: contenox model list   # Bedrock returns AccessDeniedException until the model is enabled for your account"
+		return "Enable the model in the AWS Bedrock console (Model access), then: contenox-runtime model list   # Bedrock returns AccessDeniedException until the model is enabled for your account"
 	default:
-		return "contenox model list   # if empty, pull a chat model (e.g. ollama pull " + DefaultOllamaSuggestModel + ")"
+		return "contenox-runtime model list   # if empty, pull a chat model (e.g. ollama pull " + DefaultOllamaSuggestModel + ")"
 	}
 }
 
 func primaryDiagnosticCommand(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
 	case "openai", "anthropic", "mistral", "gemini":
-		return "contenox doctor --json   # inspect backendChecks.error for the provider backend"
+		return "contenox-runtime doctor --json   # inspect backendChecks.error for the provider backend"
 	case "vertex-google":
 		return "gcloud auth application-default print-access-token   # verify ADC is working; also check GOOGLE_CLOUD_PROJECT is set"
 	case "bedrock":
 		return "aws sts get-caller-identity   # verify AWS creds resolve; then check model access in the Bedrock console"
 	case "llama":
-		return "contenox model local   # confirm installed GGUF artifacts; start modeld in llama mode, then run 'contenox model list'"
+		return "contenox-runtime model local   # confirm installed GGUF artifacts; start modeld in llama mode, then run 'contenox-runtime model list'"
 	case "openvino":
-		return "contenox model local   # confirm installed OpenVINO IR artifacts; start modeld in openvino mode, then run 'contenox model list'"
+		return "contenox-runtime model local   # confirm installed OpenVINO IR artifacts; start modeld in openvino mode, then run 'contenox-runtime model list'"
 	default:
 		return "contenox-runtime backend list   # verify URL, then inspect runtime errors on the backend"
 	}

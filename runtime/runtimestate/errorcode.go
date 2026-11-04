@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	libdb "github.com/contenox/runtime/libdbexec"
-	"github.com/contenox/runtime/runtime/internal/models/modelauth"
+	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/modelrepo"
 )
 
@@ -35,8 +35,10 @@ func ClassifyError(err error) string {
 	}
 	var unset *EnvironmentUnsetError
 	switch {
-	case errors.Is(err, modelauth.ErrLoginRequired):
+	case loginauth.IsLoginRequired(err):
 		return ErrorCodeLoginRequired
+	case loginauth.IsNotAllowed(err):
+		return ErrorCodeMisconfigured
 	case errors.Is(err, errNoModels):
 		return ErrorCodeNoModels
 	case errors.As(err, &unset), errors.Is(err, libdb.ErrNotFound):

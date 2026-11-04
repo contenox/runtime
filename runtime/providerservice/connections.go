@@ -11,7 +11,6 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/backendservice"
-	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
@@ -495,7 +494,7 @@ func (s *service) connectionFrom(ctx context.Context, store runtimetypes.Store, 
 	}
 
 	if defaults.RequiresLogin {
-		status, err := modelauth.New(s.dbInstance).Status(ctx, backend.ID)
+		status, err := s.auth(backend).Status(ctx, backend.ID)
 		if err != nil {
 			return nil, err
 		}

@@ -65,7 +65,8 @@ The /mission slash command dispatches a mission in-process: the fired unit is a 
 subprocess of this editor session and its reports arrive live back in the firing session.
 No 'contenox-runtime serve' is needed. Setting CONTENOX_SERVER_URL opts into forwarding the
 dispatch to that serve instead (reports then land in its operator inbox).`,
-	RunE: runACP,
+	Hidden: true,
+	RunE:   runACP,
 }
 
 var acpxCmd = &cobra.Command{
@@ -81,7 +82,8 @@ Containment for the untrusted driver is the HITL policy, not an in-chain
 step. IDE clients (Zed, GoLand, AionUi) should keep using 'acp'. Selection
 is per-spawn: each ACP client launches its own contenox process, so the two
 profiles never share state.`,
-	RunE: runACPX,
+	Hidden: true,
+	RunE:   runACPX,
 }
 
 func init() {

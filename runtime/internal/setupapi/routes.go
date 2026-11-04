@@ -72,6 +72,7 @@ type putCLIConfigRequest struct {
 	UpdateCheck                 *string `json:"update-check"`
 	DefaultMissionAgent         *string `json:"default-mission-agent"`
 	DefaultMissionPolicy        *string `json:"default-mission-policy"`
+	UnofficialSignIns           *string `json:"unofficial-sign-ins"`
 }
 
 type putCLIConfigResponse struct {
@@ -89,6 +90,7 @@ type putCLIConfigResponse struct {
 	UpdateCheck                 string            `json:"updateCheck"`
 	DefaultMissionAgent         string            `json:"defaultMissionAgent"`
 	DefaultMissionPolicy        string            `json:"defaultMissionPolicy"`
+	UnofficialSignIns           string            `json:"unofficialSignIns"`
 	ResolvedFrom                map[string]string `json:"resolvedFrom,omitempty"`
 }
 
@@ -108,6 +110,7 @@ func cliConfigResponseFromSnapshot(snap stateservice.CLIConfigSnapshot) putCLICo
 		UpdateCheck:                 snap.UpdateCheck,
 		DefaultMissionAgent:         snap.DefaultMissionAgent,
 		DefaultMissionPolicy:        snap.DefaultMissionPolicy,
+		UnofficialSignIns:           snap.UnofficialSignIns,
 		ResolvedFrom:                snap.ResolvedFrom,
 	}
 }
@@ -150,7 +153,8 @@ func (h *setupHandler) putCLIConfig(w http.ResponseWriter, r *http.Request) {
 		body.TelemetryEnabled == nil &&
 		body.UpdateCheck == nil &&
 		body.DefaultMissionAgent == nil &&
-		body.DefaultMissionPolicy == nil {
+		body.DefaultMissionPolicy == nil &&
+		body.UnofficialSignIns == nil {
 		_ = apiframework.Error(w, r, apiframework.BadRequest("Provide at least one CLI config key."), apiframework.UpdateOperation)
 		return
 	}
@@ -169,6 +173,7 @@ func (h *setupHandler) putCLIConfig(w http.ResponseWriter, r *http.Request) {
 		UpdateCheck:                 body.UpdateCheck,
 		DefaultMissionAgent:         body.DefaultMissionAgent,
 		DefaultMissionPolicy:        body.DefaultMissionPolicy,
+		UnofficialSignIns:           body.UnofficialSignIns,
 	})
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)

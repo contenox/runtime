@@ -40,15 +40,15 @@ and read from, a running 'contenox-runtime serve' over its REST API (default
 http://127.0.0.1:32123; override with --server/--token or
 CONTENOX_SERVER_URL/CONTENOX_SERVER_TOKEN).
 
-  contenox mission fire --agent reviewer --intent "triage the failing CI run" --policy hitl-policy-strict.json
-  contenox mission fire --intent "summarise today's commits"   # --agent/--policy from config defaults
-  contenox mission list                     # what is running, for whom, and why
-  contenox mission show <mission-id>        # the mission plus its reports, newest first
-  contenox mission plan <mission-id>        # the living plan: entries, status and revision history
+  contenox-runtime mission fire --agent reviewer --intent "triage the failing CI run" --policy hitl-policy-strict.json
+  contenox-runtime mission fire --intent "summarise today's commits"   # --agent/--policy from config defaults
+  contenox-runtime mission list                     # what is running, for whom, and why
+  contenox-runtime mission show <mission-id>        # the mission plus its reports, newest first
+  contenox-runtime mission plan <mission-id>        # the living plan: entries, status and revision history
 
 Set the defaults 'mission fire' falls back to with:
-  contenox config set default-mission-agent  <agent-name>
-  contenox config set default-mission-policy <hitl-policy-file>`,
+  contenox-runtime config set default-mission-agent  <agent-name>
+  contenox-runtime config set default-mission-policy <hitl-policy-file>`,
 }
 
 var missionFireCmd = &cobra.Command{
@@ -59,8 +59,8 @@ intent as its first turn, and detach. The unit runs unattended inside the
 envelope (--policy): a HITL policy that decides, per gated action, whether the
 unit may proceed on its own or must escalate to the approvals inbox.
 
-  contenox mission fire --agent reviewer --intent "triage the failing CI run" --policy hitl-policy-strict.json
-  contenox mission fire --intent "summarise today's commits"
+  contenox-runtime mission fire --agent reviewer --intent "triage the failing CI run" --policy hitl-policy-strict.json
+  contenox-runtime mission fire --intent "summarise today's commits"
 
 --intent is always required. --agent and --policy fall back to the config keys
 default-mission-agent / default-mission-policy when omitted, so a configured
@@ -79,8 +79,8 @@ script can capture and correlate it.
 Scripting a sequence of missions:
 
   # -q prints only the mission id; --wait blocks until the fired unit terminates.
-  contenox mission fire -q --wait --intent "step one" && \
-    contenox mission fire -q --wait --intent "step two"
+  contenox-runtime mission fire -q --wait --intent "step one" && \
+    contenox-runtime mission fire -q --wait --intent "step two"
 
 --wait blocks until the fired unit reaches an HONESTLY observable terminal
 condition, so 'fire --wait && fire --wait' composes in a shell. It prefers the
@@ -269,7 +269,7 @@ func runMissionFire(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if !wait {
-			fmt.Fprintf(cmd.OutOrStdout(), "Track it with: contenox mission show %s\n", result.MissionID)
+			fmt.Fprintf(cmd.OutOrStdout(), "Track it with: contenox-runtime mission show %s\n", result.MissionID)
 		}
 	}
 

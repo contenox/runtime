@@ -73,7 +73,7 @@ func TestUnit_MissionFire_DispatchesAndPrintsIDs(t *testing.T) {
 	require.Equal(t, "hitl-policy-strict.json", got.HITLPolicyName)
 	require.Empty(t, got.ParentSessionID)
 
-	for _, want := range []string{"Mission fired.", "m-9", "inst-9", "sess-9", "contenox mission show m-9"} {
+	for _, want := range []string{"Mission fired.", "m-9", "inst-9", "sess-9", "contenox-runtime mission show m-9"} {
 		require.Contains(t, out, want)
 	}
 }

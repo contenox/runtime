@@ -1097,7 +1097,7 @@ func (t *Transport) bringUpExternal(ctx context.Context, upstreamID libacp.Sessi
 
 	if agent.Kind == runtimetypes.AgentKindChain {
 		return nil, libacp.NewErrorf(libacp.ErrInvalidParams,
-			"contenox.agent %q is a chain agent, which this transport cannot run: chain units are spawned by the fleet manager (run them under `contenox serve`)", agentName)
+			"contenox.agent %q is a chain agent, which this transport cannot run: chain units are spawned by the fleet manager (run them under `contenox-runtime serve`)", agentName)
 	}
 	spawnCfg := *cfg
 	if spawnCfg.Cwd == "" {

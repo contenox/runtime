@@ -17,13 +17,13 @@ import (
 )
 
 var validConfigKeys = map[string]string{
-	"default-model":                 "Default LLM model name (e.g. qwen2.5:7b)",
-	"default-provider":              "Default LLM provider type (e.g. llama, ollama, openrouter, openai, gemini; local aliases llama)",
-	"default-alt-model":             "Optional alt LLM model name. Used by chains referencing {{var:alt_model}}.",
-	"default-alt-provider":          "Optional alt LLM provider type. Used by chains referencing {{var:alt_provider}}.",
-	"default-autocomplete-model":    "Optional VS Code autocomplete model name, independent from default-model.",
-	"default-autocomplete-provider": "Optional VS Code autocomplete provider type, independent from default-provider.",
-	"default-max-tokens":            "Optional default response token cap. Used by chains referencing {{var:max_tokens}}.",
+	"default-model":                 "Default LLM model name (e.g. qwen3:8b)",
+	"default-provider":              "Default LLM provider type (e.g. ollama, openai, anthropic, openrouter, gemini)",
+	"default-alt-model":             "Optional second model name, for agents that use one.",
+	"default-alt-provider":          "Optional provider type for the second model.",
+	"default-autocomplete-model":    "Optional code-completion model name, independent from default-model.",
+	"default-autocomplete-provider": "Optional code-completion provider type, independent from default-provider.",
+	"default-max-tokens":            "Optional default response token cap.",
 	"default-think":                 "Default reasoning level: auto, off, minimal, low, medium, high, xhigh.",
 	"default-chain":                 "Default chain file path (relative to .contenox/ or absolute)",
 	"hitl-policy-name":              "Active HITL policy file name (e.g. hitl-policy-strict.json). Empty = use hitl-policy-default.json.",
@@ -31,24 +31,25 @@ var validConfigKeys = map[string]string{
 	"update-check":                  "Enable automatic update availability checks (true/false). Set false for zero-trust/air-gapped environments.",
 	"default-mission-agent":         "Default declared agent fired by '/mission <intent>' and 'contenox-runtime mission fire' with no --agent.",
 	"default-mission-policy":        "Default mission envelope (HITL policy) used when '/mission' or 'contenox-runtime mission fire' names none.",
+	"unofficial-sign-ins":           "Allow sign-ins the vendor does not support for third-party apps, such as a Claude subscription or GitHub Copilot (true/false). Off by default; may break or put the account at risk.",
 }
 
 var configCmd = &cobra.Command{
 	Use:   "config",
-	Short: "Manage persistent CLI settings (default model, provider, chain, HITL policy).",
+	Short: "Manage persistent CLI settings (default model, provider, agent, approval policy).",
 	Long: `Store and retrieve persistent CLI defaults backed by SQLite.
 
 Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy
 Workspace keys (scoped to current project): default-chain, hitl-policy-name
 
 Supported keys:
-  default-model                  Default LLM model name (e.g. qwen2.5:7b)
-  default-provider               Default LLM provider type (e.g. llama, ollama, openrouter, openai, gemini; local aliases llama)
-  default-alt-model              Optional alt LLM model name (chains using {{var:alt_model}})
-  default-alt-provider           Optional alt LLM provider (chains using {{var:alt_provider}})
-  default-autocomplete-model     Optional VS Code autocomplete model, separate from chat
-  default-autocomplete-provider  Optional VS Code autocomplete provider, separate from chat
-  default-max-tokens             Optional response token cap (chains using {{var:max_tokens}})
+  default-model                  Default LLM model name (e.g. qwen3:8b)
+  default-provider               Default LLM provider type (e.g. ollama, openai, anthropic, openrouter, gemini)
+  default-alt-model              Optional second model, for agents that use one
+  default-alt-provider           Optional provider for the second model
+  default-autocomplete-model     Optional code-completion model, separate from chat
+  default-autocomplete-provider  Optional code-completion provider, separate from chat
+  default-max-tokens             Optional response token cap
   default-think                  Default reasoning level: auto, off, minimal, low, medium, high, xhigh
   telemetry-enabled              Enable local telemetry logs (true/false)
   update-check                   Enable automatic update checks (true/false)
@@ -68,25 +69,22 @@ Workspace keys (default-chain, hitl-policy-name) are scoped to the current proje
 workspace and fall back to the global value when not set locally.
 
 Examples:
-  contenox config set default-model    qwen2.5:7b
-  contenox config set default-provider ollama
+  contenox-runtime config set default-model    qwen3:8b
+  contenox-runtime config set default-provider ollama
 
-  # Keep chat on a hosted provider, but run VS Code ghost text on a local Ollama model:
-  contenox config set default-provider openai
-  contenox config set default-model    gpt-5-mini
-  contenox config set default-autocomplete-provider llama
-  contenox config set default-autocomplete-model    qwen3-coder-30b-a3b
+  # Keep chat on a hosted provider, but run code completion on a local Ollama model:
+  contenox-runtime config set default-provider openai
+  contenox-runtime config set default-model    gpt-5.6
+  contenox-runtime config set default-autocomplete-provider ollama
+  contenox-runtime config set default-autocomplete-model    qwen3-coder:30b
 
-  # Local-network Ollama autocomplete only:
-  contenox config set default-autocomplete-provider ollama
-  contenox config set default-autocomplete-model    qwen2.5-coder:7b
 
-  contenox config set default-autocomplete-provider mistral
-  contenox config set default-autocomplete-model    mistral-code-fim-latest
-  contenox config set default-max-tokens 8192
-  contenox config set default-think    high
-  contenox config set default-chain    .contenox/my-chain.json
-  contenox config set hitl-policy-name hitl-policy-strict.json`,
+  contenox-runtime config set default-autocomplete-provider mistral
+  contenox-runtime config set default-autocomplete-model    mistral-code-fim-latest
+  contenox-runtime config set default-max-tokens 8192
+  contenox-runtime config set default-think    high
+  contenox-runtime config set default-chain    .contenox/my-chain.json
+  contenox-runtime config set hitl-policy-name hitl-policy-strict.json`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key, value := args[0], args[1]
@@ -129,11 +127,11 @@ var configGetCmd = &cobra.Command{
 	Long: `Print the current value of a persistent CLI setting.
 
 Examples:
-  contenox config get default-model
-  contenox config get default-provider
-  contenox config get default-think
-  contenox config get default-chain
-  contenox config get hitl-policy-name`,
+  contenox-runtime config get default-model
+  contenox-runtime config get default-provider
+  contenox-runtime config get default-think
+  contenox-runtime config get default-chain
+  contenox-runtime config get hitl-policy-name`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -159,7 +157,7 @@ var configListCmd = &cobra.Command{
 	Long: `Print all known CLI config keys, their current values, and their scope.
 
 Example:
-  contenox config list`,
+  contenox-runtime config list`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		db, store, workspaceID, err := openConfigDBWithWorkspace(cmd)

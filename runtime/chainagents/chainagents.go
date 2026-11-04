@@ -206,7 +206,7 @@ func disableVanished(ctx context.Context, agents agentregistryservice.Service, f
 		}
 		slog.Warn("chain agent disabled: its chain file is gone",
 			"agent", agent.Name, "chain_path", path,
-			"remedy", "restore the file and run 'contenox agent enable "+agent.Name+"', or remove the agent")
+			"remedy", "restore the file and run 'contenox-runtime agent enable "+agent.Name+"', or remove the agent")
 		disabled = append(disabled, agent.Name)
 	}
 	return disabled, nil

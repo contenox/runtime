@@ -627,7 +627,7 @@ func (p *MCPSessionPool) buildOAuthRoundTripper(base http.RoundTripper) (http.Ro
 	if stored == nil || stored.AccessToken == "" {
 		err := newMCPError(
 			ErrMCPOAuthNotAuthenticated,
-			fmt.Sprintf("mcp %q: authentication required; run 'contenox mcp auth %s'", p.cfg.Name, p.cfg.Name),
+			fmt.Sprintf("mcp %q: authentication required; run 'contenox-runtime mcp auth %s'", p.cfg.Name, p.cfg.Name),
 			nil,
 		)
 		reportErr(err)

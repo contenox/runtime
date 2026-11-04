@@ -32,7 +32,7 @@ func TestUnit_CompleteEnvSetup_OllamaWithDefaults(t *testing.T) {
 	require.NoError(t, completeEnvSetup(ctx, db))
 
 	assert.Equal(t, "ollama", acpsvc.ReadConfigValue(ctx, db, "default-provider"))
-	assert.Equal(t, "qwen2.5:7b", acpsvc.ReadConfigValue(ctx, db, "default-model"),
+	assert.Equal(t, "qwen3:8b", acpsvc.ReadConfigValue(ctx, db, "default-model"),
 		"empty model must fall back to the provider's default, matching the wizard")
 
 	backends, err := backendservice.New(db).List(ctx, nil, 10)

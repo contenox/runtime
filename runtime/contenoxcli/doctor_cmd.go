@@ -18,19 +18,21 @@ var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check LLM setup: defaults, registered backends, and connectivity.",
 	Long: `Shows whether your default model and provider are set, lists every registered backend
-(Ollama, OpenAI, Gemini, vLLM, Vertex AI), and reports reachability and setup issues for each. Use it after
-contenox init, after contenox backend add, or when chat/run cannot resolve a model.
+(any type 'contenox-runtime backend add' supports), and reports reachability and setup issues
+for each. Use it after 'contenox-runtime init', after 'contenox-runtime backend add', or when
+chat/run cannot resolve a model.
+
 
 Additionally, if you use local Ollama: when no Ollama backend is ready yet, doctor may probe
 your Ollama URL (OLLAMA_HOST, or http://127.0.0.1:11434) and suggest commands to pull a model
-(at least ollama pull qwen2.5:7b), register the backend, and set defaults—including --url for a
+(at least ollama pull qwen3:8b), register the backend, and set defaults—including --url for a
 non-default host or port.
 
 
 Examples:
-  contenox doctor
-  contenox doctor --json
-  contenox doctor --skip-cycle`,
+  contenox-runtime doctor
+  contenox-runtime doctor --json
+  contenox-runtime doctor --skip-cycle`,
 	RunE: runDoctor,
 }
 
@@ -87,7 +89,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(),
 					"\n⚠️  Advisory: default-max-tokens=%d exceeds %s provider ceiling (%d).\n"+
 						"   Requests will be clamped automatically; set a lower value to silence this warning:\n"+
-						"   contenox config set default-max-tokens %d\n",
+						"   contenox-runtime config set default-max-tokens %d\n",
 					n, res.DefaultProvider, ceiling, ceiling)
 			}
 		}

@@ -27,12 +27,14 @@ import (
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Interactive wizard to configure your LLM provider and model.",
-	Long: `Run the setup wizard to pick an LLM provider (Ollama, OpenAI, OpenRouter,
-Gemini, Vertex AI, or local llama/OpenVINO through modeld), enter credentials, and
-set defaults. This is the same wizard that runs inside IDE terminals via ACP.
+	Long: `Run the setup wizard to pick an LLM provider (Ollama, OpenAI, ChatGPT
+subscription, DeepSeek, OpenRouter, Google Gemini, or Google Vertex AI), enter
+credentials, and set defaults. For other providers, such as Anthropic, Mistral,
+or AWS Bedrock, use 'contenox-runtime backend add'.
+
 
 Examples:
-  contenox setup`,
+  contenox-runtime setup`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runSetup(cmd, cmd.OutOrStdout())
 	},
@@ -49,8 +51,8 @@ type setupProvider struct {
 }
 
 var setupProviders = []setupProvider{
-	{key: "ollama", label: "Ollama (local daemon)", defaultModel: "qwen2.5:7b", needsAPIKey: false},
-	{key: "openai", label: "OpenAI", defaultModel: "gpt-5-mini", envKey: "OPENAI_API_KEY", needsAPIKey: true},
+	{key: "ollama", label: "Ollama (local daemon)", defaultModel: "qwen3:8b", needsAPIKey: false},
+	{key: "openai", label: "OpenAI", defaultModel: "gpt-5.6", envKey: "OPENAI_API_KEY", needsAPIKey: true},
 	{key: "openai-codex", label: "ChatGPT subscription (Codex — device login, no API key)"},
 	{key: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat", envKey: "DEEPSEEK_API_KEY", needsAPIKey: true},
 	{key: "openrouter", label: "OpenRouter (300+ models, one API key — deepseek, qwen, llama, gemini, gpt and more)", defaultModel: "deepseek/deepseek-chat-v3-5", envKey: "OPENROUTER_API_KEY", needsAPIKey: true},
@@ -326,7 +328,7 @@ func promptOllamaModel(out io.Writer, scanner *bufio.Scanner, defaultModel strin
 	} else {
 		fmt.Fprintln(out, "")
 		fmt.Fprintln(out, "  ⚠ Ollama is not reachable. Make sure 'ollama serve' is running,")
-		fmt.Fprintln(out, "    then pull a model: ollama pull qwen2.5:7b")
+		fmt.Fprintln(out, "    then pull a model: ollama pull qwen3:8b")
 		fmt.Fprintln(out, "")
 	}
 	return promptLine(out, scanner, fmt.Sprintf("  Model [%s]", defaultModel), defaultModel)

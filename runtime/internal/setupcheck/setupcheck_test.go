@@ -187,7 +187,7 @@ func TestSystem_Evaluate_noChatModels_openaiHint(t *testing.T) {
 			break
 		}
 	}
-	if ncm == nil || !strings.Contains(ncm.CLICommand, "contenox model list") {
+	if ncm == nil || !strings.Contains(ncm.CLICommand, "contenox-runtime model list") {
 		t.Fatalf("expected openai no_chat_models diagnostic command, got %#v", ncm)
 	}
 }

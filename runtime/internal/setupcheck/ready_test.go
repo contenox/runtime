@@ -30,7 +30,7 @@ func TestResultSummary(t *testing.T) {
 	if !strings.Contains(ns, "credentials rejected") || !strings.Contains(ns, "Try: contenox backend add") {
 		t.Errorf("not-ready summary missing issue/fix:\n%s", ns)
 	}
-	if !strings.Contains(ns, "contenox doctor") {
+	if !strings.Contains(ns, "contenox-runtime doctor") {
 		t.Errorf("not-ready summary missing doctor pointer:\n%s", ns)
 	}
 }

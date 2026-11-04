@@ -254,7 +254,7 @@ func TestUnit_ResolveForSpawn_DisabledAgentRefused(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, errors.Is(err, ErrAgentDisabled), "a disabled agent's error must wrap ErrAgentDisabled")
 	require.Contains(t, err.Error(), "disabled")
-	require.Contains(t, err.Error(), `contenox agent enable "spawn-disabled"`,
+	require.Contains(t, err.Error(), `contenox-runtime agent enable "spawn-disabled"`,
 		"the refusal must name the remedy verbatim, matching every caller's expected wording")
 }
 

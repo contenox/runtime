@@ -35,13 +35,13 @@ use the --auth-* flags on 'tools add'. Contenox will perform the login
 automatically on 401/403 and retry the call without any external refresh tooling.
 
 Examples:
-  contenox tools add myapi --url http://localhost:8080
-  contenox tools add myapi --url http://localhost:8080 --header "Authorization: Bearer $TOKEN"
-  contenox tools add erpnext --url https://erp.example.com --spec ~/.contenox-harness/erp-subset.yaml
-  contenox tools list
-  contenox tools show myapi
-  contenox tools update myapi --url http://new-host:8080
-  contenox tools remove myapi`,
+  contenox-runtime tools add myapi --url http://localhost:8080
+  contenox-runtime tools add myapi --url http://localhost:8080 --header "Authorization: Bearer $TOKEN"
+  contenox-runtime tools add erpnext --url https://erp.example.com --spec ~/.contenox-harness/erp-subset.yaml
+  contenox-runtime tools list
+  contenox-runtime tools show myapi
+  contenox-runtime tools update myapi --url http://new-host:8080
+  contenox-runtime tools remove myapi`,
 	SilenceUsage: true,
 }
 
@@ -77,16 +77,16 @@ TLS: for services behind a private CA or self-signed certificate:
 
 Examples:
   # Public API — no auth
-  contenox tools add nws --url https://api.weather.gov --timeout 15000
+  contenox-runtime tools add nws --url https://api.weather.gov --timeout 15000
 
   # Static Bearer token
-  contenox tools add myapi --url https://api.example.com \
+  contenox-runtime tools add myapi --url https://api.example.com \
     --header "Authorization: Bearer $TOKEN" \
     --header "X-Tenant: acme" \
     --timeout 5000
 
   # Frappe/ERPNext — session cookie login
-  contenox tools add erp --url https://erp.local \
+  contenox-runtime tools add erp --url https://erp.local \
     --insecure-skip-tls-verify \
     --auth-login-url https://erp.local/api/method/login \
     --auth-login-body '{"usr":"${FRAPPE_USER}","pwd":"${FRAPPE_PASS}"}' \
@@ -94,7 +94,7 @@ Examples:
     --auth-inject-header Cookie
 
   # Custom API — Bearer token from JSON response
-  contenox tools add myapi --url https://api.example.com \
+  contenox-runtime tools add myapi --url https://api.example.com \
     --auth-login-url https://api.example.com/auth/token \
     --auth-login-body '{"username":"${API_USER}","password":"${API_PASS}"}' \
     --auth-extract-jsonpath '$.data.token' \
@@ -154,11 +154,11 @@ only be set at registration time via 'tools add'. To change them, remove the
 provider and re-add it with the updated flags.
 
 Examples:
-  contenox tools update myapi --url http://new-host:9090
-  contenox tools update myapi --timeout 15000
-  contenox tools update myapi --header "Authorization: Bearer $NEW_TOKEN"
-  contenox tools update myapi --spec ~/.contenox-harness/new-spec.yaml
-  contenox tools update myapi --spec ""`,
+  contenox-runtime tools update myapi --url http://new-host:9090
+  contenox-runtime tools update myapi --timeout 15000
+  contenox-runtime tools update myapi --header "Authorization: Bearer $NEW_TOKEN"
+  contenox-runtime tools update myapi --spec ~/.contenox-harness/new-spec.yaml
+  contenox-runtime tools update myapi --spec ""`,
 
 	Args: cobra.ExactArgs(1),
 	RunE: runToolsUpdate,
@@ -373,7 +373,7 @@ func runToolsList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(all) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No remote tool providers registered. Run: contenox tools add <name> --url <endpoint>")
+		fmt.Fprintln(cmd.OutOrStdout(), "No remote tool providers registered. Run: contenox-runtime tools add <name> --url <endpoint>")
 		return nil
 	}
 

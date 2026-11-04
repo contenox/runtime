@@ -16,6 +16,9 @@ import (
 
 type openAIClient struct {
 	codex           *codexCatalog
+	authorize       func(context.Context) (http.Header, error)
+	providerName    string
+	chatOnly        bool
 	baseURL         string
 	apiKey          string
 	httpClient      *http.Client
@@ -48,7 +51,28 @@ func (c *openAIClient) providerType() string {
 	if c.codex != nil {
 		return c.codex.Type()
 	}
+	if c.providerName != "" {
+		return c.providerName
+	}
 	return "openai"
+}
+
+func (c *openAIClient) authenticate(ctx context.Context, req *http.Request) error {
+	if c.authorize == nil {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		return nil
+	}
+	headers, err := c.authorize(ctx)
+	if err != nil {
+		return err
+	}
+	for name, values := range headers {
+		req.Header.Del(name)
+		for _, v := range values {
+			req.Header.Add(name, v)
+		}
+	}
+	return nil
 }
 
 type openAIChatRequest struct {
@@ -185,7 +209,9 @@ func (c *openAIClient) sendRequest(ctx context.Context, endpoint string, request
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		if err := c.authenticate(ctx, req); err != nil {
+			return nil, err
+		}
 		return req, nil
 	})
 	if err != nil {

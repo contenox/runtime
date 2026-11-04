@@ -21,7 +21,7 @@ type OpenAIStreamClient struct {
 func (c *OpenAIStreamClient) Stream(ctx context.Context, messages []modelrepo.Message, args ...modelrepo.ChatArgument) (<-chan *modelrepo.StreamParcel, error) {
 	reportErr, reportChange, end := c.tracker.Start(ctx, "stream", c.providerType(), "model", c.modelName)
 
-	usesResponses := c.codex != nil || openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args))
+	usesResponses := c.codex != nil || (!c.chatOnly && openAIUsesResponsesEndpoint(c.modelName, chatArgsHaveTools(args)))
 	if !c.canAudio || usesResponses {
 		if err := modelrepo.RefuseAudioInput(c.providerType(), c.modelName, messages); err != nil {
 			reportErr(err)
@@ -73,8 +73,11 @@ func (c *OpenAIStreamClient) Stream(ctx context.Context, messages []modelrepo.Me
 			return nil, fmt.Errorf("failed to create request: %w", createErr)
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-		resp, err = c.httpClient.Do(httpReq)
+		if authErr := c.authenticate(ctx, httpReq); authErr != nil {
+			err = authErr
+		} else {
+			resp, err = c.httpClient.Do(httpReq)
+		}
 	}
 	if err != nil {
 		err = fmt.Errorf("HTTP request failed for model %s: %w", c.modelName, err)

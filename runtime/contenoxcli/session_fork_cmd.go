@@ -23,16 +23,16 @@ var sessionForkCmd = &cobra.Command{
 Without flags, the new session is a verbatim copy of the active session's
 history. The original is left untouched.
 
-  contenox session fork                       # bare fork (verbatim copy)
-  contenox session fork archive-2026          # named fork
+  contenox-runtime session fork                       # bare fork (verbatim copy)
+  contenox-runtime session fork archive-2026          # named fork
 
 With --summary, an LLM compacts older messages into a single summary
 before forking. System messages and the last --keep messages are kept
 verbatim. Useful when conversation history exceeds the model's context
 window.
 
-  contenox session fork --summary             # compact older history into a summary
-  contenox session fork next --summary --keep 12`,
+  contenox-runtime session fork --summary             # compact older history into a summary
+  contenox-runtime session fork next --summary --keep 12`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSessionFork,
 }

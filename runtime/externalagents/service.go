@@ -15,6 +15,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
+	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
@@ -280,4 +281,23 @@ func presetByAgentName(name string) (Preset, bool) {
 		}
 	}
 	return Preset{}, false
+}
+
+func (s *Service) unofficialAllowed(ctx context.Context) bool {
+	if s.deps.DB == nil {
+		return false
+	}
+	return clikv.UnofficialSignIns(ctx, runtimetypes.New(s.deps.DB.WithoutTransaction()))
+}
+
+func (s *Service) syncPreset(ctx context.Context, p Preset) error {
+	a, err := s.deps.Agents.GetByName(ctx, p.AgentName)
+	if err != nil || a.Kind != runtimetypes.AgentKindExternalACP {
+		return nil
+	}
+	cfg, err := a.ExternalACPConfig()
+	if err != nil || cfg.Env[p.configEnv] == s.presetConfigDir(ctx, p) || !s.installed(p) {
+		return nil
+	}
+	return s.registerPreset(ctx, p, cfg.Command)
 }

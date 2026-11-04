@@ -371,7 +371,7 @@ func cwdIsUsable(cwd string) bool {
 }
 
 func errSetupRequired() error {
-	return libacp.NewError(libacp.ErrAuthRequired, "contenox is not configured yet: no default-model is set. Run the \"Setup Contenox\" auth method, set the CONTENOX_DEFAULT_* environment variables (or run `contenox acp --setup`), then reconnect.")
+	return libacp.NewError(libacp.ErrAuthRequired, "contenox is not configured yet: no default-model is set. Run the \"Setup Contenox\" auth method, set the CONTENOX_DEFAULT_* environment variables (or run `contenox-runtime acp --setup`), then reconnect.")
 }
 
 func (t *Transport) resolveWorkspaceCwd(cwd string) (string, error) {
