@@ -116,7 +116,9 @@ func TestFleetE2E_MissionRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(stopRouter)
 
-	fleet := fleetservice.New(kernel, agentRegistry, missions, nil, home, libtracker.NoopTracker{})
+	project := filepath.Join(home, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	fleet := fleetservice.New(kernel, agentRegistry, missions, nil, project, libtracker.NoopTracker{})
 
 	mrtWriteChainAgentFixture(t, contenoxDir)
 	res, err := chainagents.Discover(ctx, agentRegistry, contenoxDir)
@@ -131,6 +133,7 @@ func TestFleetE2E_MissionRoundTrip(t *testing.T) {
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: contenoxDir, Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agentRegistry.Create(ctx, reporterAgent))
 
@@ -295,7 +298,9 @@ func TestFleetE2E_MissionRoundTrip_UnitReportRoutesToSupervisor(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(stopRouter)
 
-	fleet := fleetservice.New(kernel, agentRegistry, missions, nil, home, libtracker.NoopTracker{})
+	project := filepath.Join(home, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	fleet := fleetservice.New(kernel, agentRegistry, missions, nil, project, libtracker.NoopTracker{})
 
 	mrtWriteChainAgentFixture(t, contenoxDir)
 	res, err := chainagents.Discover(ctx, agentRegistry, contenoxDir)
@@ -310,6 +315,7 @@ func TestFleetE2E_MissionRoundTrip_UnitReportRoutesToSupervisor(t *testing.T) {
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: contenoxDir, Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agentRegistry.Create(ctx, reporterAgent))
 
@@ -369,7 +375,7 @@ func mrtRunCLI(t *testing.T, bin, home string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = home
-	cmd.Env = append(os.Environ(), "HOME="+home)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
 	out, err := cmd.CombinedOutput()
 	require.NoErrorf(t, err, "contenox %v:\n%s", args, out)
 }

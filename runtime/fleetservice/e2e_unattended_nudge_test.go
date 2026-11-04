@@ -31,6 +31,7 @@ func TestFleetE2E_UnattendedNudge_MuteUnitHeartbeatsNudgedAndBlocked(t *testing.
 	home := t.TempDir()
 
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	for _, k := range []string{
 		"CONTENOX_DEFAULT_MODEL", "CONTENOX_DEFAULT_PROVIDER",
 		"CONTENOX_DEFAULT_ALT_MODEL", "CONTENOX_DEFAULT_ALT_PROVIDER",

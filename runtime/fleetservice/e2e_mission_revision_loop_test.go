@@ -74,6 +74,7 @@ func TestFleetService_E2E_MissionRevisionLoop(t *testing.T) {
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv("USERPROFILE", tmpHome)
 	contenoxDir := filepath.Join(tmpHome, ".contenox-harness")
 	require.NoError(t, os.MkdirAll(contenoxDir, 0o700))
 	dbPath := filepath.Join(contenoxDir, "local.db")
@@ -95,6 +96,7 @@ func TestFleetService_E2E_MissionRevisionLoop(t *testing.T) {
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: contenoxDir, Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agents.Create(ctx, agent))
 
@@ -118,7 +120,9 @@ func TestFleetService_E2E_MissionRevisionLoop(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(stopRouter)
 
-	svc := New(kernel, agents, missions, nil, tmpHome, libtracker.NoopTracker{})
+	project := filepath.Join(tmpHome, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	svc := New(kernel, agents, missions, nil, project, libtracker.NoopTracker{})
 
 	planner, err := svc.Dispatch(ctx, DispatchRequest{
 		AgentName:      "planner",

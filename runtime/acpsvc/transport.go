@@ -61,6 +61,8 @@ type Deps struct {
 	// audit row for it. Optional: nil disables recording.
 	DecisionRecorder hitlservice.DecisionRecorder
 
+	HITL hitlservice.PolicyEvaluator
+
 	Instances agentinstance.Manager
 
 	NativeTurns *nativeturn.Registry

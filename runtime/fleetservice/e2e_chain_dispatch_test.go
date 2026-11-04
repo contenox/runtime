@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -27,6 +28,9 @@ const chainFixtureReply = "contenox chain unit fixture reply"
 func buildContenoxBinary(t *testing.T) string {
 	t.Helper()
 	binPath := filepath.Join(t.TempDir(), "contenox")
+	if goruntime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -39,7 +43,7 @@ func runContenoxCLI(t *testing.T, bin, home string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = home
-	cmd.Env = append(os.Environ(), "HOME="+home)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("contenox %v: %v\n%s", args, err, out)
@@ -112,6 +116,7 @@ func TestFleetE2E_ChainAgent_DiscoveredDispatchedAndAnswers(t *testing.T) {
 	home := t.TempDir()
 
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	for _, k := range []string{
 		"CONTENOX_DEFAULT_MODEL", "CONTENOX_DEFAULT_PROVIDER",
 		"CONTENOX_DEFAULT_ALT_MODEL", "CONTENOX_DEFAULT_ALT_PROVIDER",

@@ -70,6 +70,7 @@ func TestSystem_ACPMissionForward(t *testing.T) {
 		"CONTENOX_UPDATE_CHECK=false",
 		"HOME="+homeDir,
 		"USERPROFILE="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=fwd-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 		"CONTENOX_SERVER_URL=",

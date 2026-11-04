@@ -30,7 +30,7 @@ func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec
 	}
 	// A caller-supplied PATH is part of the spec, so a bad one is diagnosed as
 	// such on every host, before confinement availability is considered.
-	if explicit, ok := spec.EnvSet["PATH"]; ok && strings.TrimSpace(explicit) != "" {
+	if explicit, ok := envMapValue(spec.EnvSet, "PATH"); ok && strings.TrimSpace(explicit) != "" {
 		if err := validatePATH(explicit, spec.Home, spec.FS); err != nil {
 			reportErr(err)
 			return nil, err
@@ -49,7 +49,7 @@ func Command(ctx context.Context, spec Spec, name string, args ...string) (*exec
 	cmd.Dir = spec.WorkspaceRoot
 	cmd.Env = scrubEnv(os.Environ(), spec.EnvAllow, spec.EnvSet, spec.Home)
 
-	if _, set := spec.EnvSet["PATH"]; !set {
+	if _, set := envMapValue(spec.EnvSet, "PATH"); !set {
 		cmd.Env = OverlayEnv(cmd.Env, map[string]string{
 			"PATH": confinedPATH(os.Getenv("PATH"), spec.Home, spec.FS),
 		})

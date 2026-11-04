@@ -58,6 +58,7 @@ func TestFleetService_E2E_MissionChanges(t *testing.T) {
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv("USERPROFILE", tmpHome)
 	contenoxDir := filepath.Join(tmpHome, ".contenox-harness")
 	require.NoError(t, os.MkdirAll(contenoxDir, 0o700))
 	dbPath := filepath.Join(contenoxDir, "local.db")
@@ -79,6 +80,7 @@ func TestFleetService_E2E_MissionChanges(t *testing.T) {
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: contenoxDir, Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agents.Create(ctx, agent))
 
@@ -86,9 +88,11 @@ func TestFleetService_E2E_MissionChanges(t *testing.T) {
 	kernel := agentinstance.New(agents, agentinstance.WithStderr(stderr))
 	t.Cleanup(func() { _ = kernel.Close() })
 	missions := missionservice.New(db)
-	svc := New(kernel, agents, missions, nil, tmpHome, libtracker.NoopTracker{})
+	project := filepath.Join(tmpHome, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	svc := New(kernel, agents, missions, nil, project, libtracker.NoopTracker{})
 
-	missionCwd := tmpHome
+	missionCwd := project
 
 	result, err := svc.Dispatch(ctx, DispatchRequest{
 		AgentName:      "writer",
@@ -174,7 +178,7 @@ func TestFleetService_E2E_MissionChanges(t *testing.T) {
 func requireChangedFileWithSuffix(t *testing.T, files []missionchanges.ChangedFile, suffix string) missionchanges.ChangedFile {
 	t.Helper()
 	for _, f := range files {
-		if strings.HasSuffix(f.Path, suffix) {
+		if strings.HasSuffix(filepath.ToSlash(f.Path), suffix) {
 			return f
 		}
 	}

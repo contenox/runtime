@@ -476,6 +476,9 @@ func (t *Transport) NewSession(ctx context.Context, req libacp.NewSessionRequest
 		t.persistSessionInstance(ctx, sessionID, att.instanceID)
 		t.persistSessionDownstream(ctx, sessionID, att.downstreamID)
 		t.clearToolCallState(sessionID)
+		if d, ok := entry.driver.(*externalDriver); ok {
+			d.enforceStartMode(ctx, entry, bridge)
+		}
 
 		libacp.AfterResponse(ctx, func() {
 			bridge.markBound(ctx)

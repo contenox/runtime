@@ -86,6 +86,7 @@ func TestSystem_ScriptedMissionSequence(t *testing.T) {
 	baseEnv := append(os.Environ(),
 		"HOME="+homeDir,
 		"USERPROFILE="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=scripted-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 	)

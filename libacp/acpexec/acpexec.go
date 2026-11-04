@@ -18,8 +18,13 @@ const defaultKillGrace = 5 * time.Second
 type Option func(*config)
 
 type config struct {
-	stderr    io.Writer
-	killGrace time.Duration
+	stderr     io.Writer
+	killGrace  time.Duration
+	afterStart func(cmd *exec.Cmd, startErr error) error
+}
+
+func WithAfterStart(fn func(cmd *exec.Cmd, startErr error) error) Option {
+	return func(c *config) { c.afterStart = fn }
 }
 
 func WithStderr(w io.Writer) Option {
@@ -71,7 +76,20 @@ func Spawn(ctx context.Context, cmd *exec.Cmd, opts ...Option) (*Process, error)
 	setProcessGroup(cmd)
 	hideWindow(cmd)
 
-	if err := cmd.Start(); err != nil {
+	startErr := cmd.Start()
+	if cfg.afterStart != nil {
+		if hookErr := cfg.afterStart(cmd, startErr); hookErr != nil && startErr == nil {
+			if cmd.Process != nil {
+				killProcessTree(cmd)
+				_ = cmd.Wait()
+			}
+			_ = stdin.Close()
+			_ = stdout.Close()
+			_ = childStdout.Close()
+			return nil, fmt.Errorf("acpexec: start %s: %w", cmd.Path, hookErr)
+		}
+	}
+	if err := startErr; err != nil {
 		_ = stdin.Close()
 		_ = stdout.Close()
 		_ = childStdout.Close()

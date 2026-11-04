@@ -495,6 +495,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,
 		DecisionRecorder:      decisionRecorderOf(acpHITL),
+		HITL:                  acpHITL,
 		Fleet:                 missionFleet,
 		Agents:                missionAgents,
 		MissionForwarded:      missionForward,

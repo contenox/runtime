@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -41,6 +42,9 @@ const missionReportChain = `{
 func buildContenoxBin(t *testing.T) string {
 	t.Helper()
 	binPath := filepath.Join(t.TempDir(), "contenox")
+	if goruntime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 	out, err := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox").CombinedOutput()
 	require.NoError(t, err, "build contenox:\n%s", out)
 	return binPath
@@ -56,6 +60,7 @@ func TestFleetService_E2E_MissionReportFromDispatchedUnit(t *testing.T) {
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv("USERPROFILE", tmpHome)
 	contenoxDir := filepath.Join(tmpHome, ".contenox-harness")
 	require.NoError(t, os.MkdirAll(contenoxDir, 0o700))
 	dbPath := filepath.Join(contenoxDir, "local.db")
@@ -77,6 +82,7 @@ func TestFleetService_E2E_MissionReportFromDispatchedUnit(t *testing.T) {
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: contenoxDir, Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agents.Create(ctx, agent))
 
@@ -84,7 +90,9 @@ func TestFleetService_E2E_MissionReportFromDispatchedUnit(t *testing.T) {
 	kernel := agentinstance.New(agents, agentinstance.WithStderr(stderr))
 	t.Cleanup(func() { _ = kernel.Close() })
 	missions := missionservice.New(db)
-	svc := New(kernel, agents, missions, nil, tmpHome, libtracker.NoopTracker{})
+	project := filepath.Join(tmpHome, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	svc := New(kernel, agents, missions, nil, project, libtracker.NoopTracker{})
 
 	result, err := svc.Dispatch(ctx, DispatchRequest{
 		AgentName:      "reporter",

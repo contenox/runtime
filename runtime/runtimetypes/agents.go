@@ -35,7 +35,24 @@ type ExternalACPConfig struct {
 	URL       string            `json:"url,omitempty" example:"https://agent.example.com/acp"`
 
 	McpServers []string `json:"mcp_servers,omitempty" example:"['filesystem']"`
+
+	Paths []ExternalACPPath `json:"paths,omitempty"`
+
+	Modes []string `json:"modes,omitempty" example:"['default','plan']"`
+
+	SessionMeta json.RawMessage `json:"sessionMeta,omitempty"`
 }
+
+type ExternalACPPath struct {
+	Path  string `json:"path" example:"~/.claude"`
+	Mode  string `json:"mode" example:"rw"`
+	Needs string `json:"needs" example:"login and session state"`
+}
+
+const (
+	ExternalACPPathRead  = "ro"
+	ExternalACPPathWrite = "rw"
+)
 
 const (
 	ExternalACPTransportStdio    = "stdio"
@@ -60,6 +77,23 @@ func (c ExternalACPConfig) Validate() error {
 	for _, name := range c.McpServers {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("external_acp: mcp_servers entries must be non-empty registered server names")
+		}
+	}
+	for i, p := range c.Paths {
+		if strings.TrimSpace(p.Path) == "" {
+			return fmt.Errorf("external_acp: paths[%d]: path is required", i)
+		}
+		if p.Mode != ExternalACPPathRead && p.Mode != ExternalACPPathWrite {
+			return fmt.Errorf("external_acp: paths[%d]: mode %q must be %q or %q", i, p.Mode, ExternalACPPathRead, ExternalACPPathWrite)
+		}
+		if strings.TrimSpace(p.Needs) == "" {
+			return fmt.Errorf("external_acp: paths[%d]: needs is required (why the agent breaks without %s)", i, p.Path)
+		}
+	}
+	if len(c.SessionMeta) > 0 {
+		var obj map[string]any
+		if err := json.Unmarshal(c.SessionMeta, &obj); err != nil || obj == nil {
+			return fmt.Errorf("external_acp: sessionMeta must be a JSON object")
 		}
 	}
 	return nil

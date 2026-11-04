@@ -573,6 +573,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			ShellSessions:         shellSessions,
 			SessionRouter:         sessionRouter,
 			DecisionRecorder:      decisionRecorderOf(hitlSvc),
+			HITL:                  hitlSvc,
 			Instances:             instances,
 			NativeTurns:           nativeTurns,
 			Fleet:                 fleet,

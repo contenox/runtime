@@ -63,7 +63,7 @@ func (a *ExternalACPAgent) connectStdio(ctx context.Context, harness libacp.Clie
 		return nil, fmt.Errorf("agenthost: sandbox external ACP agent %q: %w", a.Config.Command, err)
 	}
 
-	var opts []acpexec.Option
+	opts := []acpexec.Option{acpexec.WithAfterStart(libsandbox.Started)}
 	if a.Stderr != nil {
 		opts = append(opts, acpexec.WithStderr(a.Stderr))
 	}
@@ -102,6 +102,13 @@ func (a *ExternalACPAgent) connectStdio(ctx context.Context, harness libacp.Clie
 	return &Handle{Conn: conn, closeFn: closeFn}, nil
 }
 
+func (a *ExternalACPAgent) Command(ctx context.Context) (*exec.Cmd, error) {
+	if err := a.Config.Validate(); err != nil {
+		return nil, fmt.Errorf("agenthost: invalid external_acp config: %w", err)
+	}
+	return buildAgentCmd(ctx, a)
+}
+
 const sandboxDocsURL = "https://contenox.com/docs/guide/agent-sandbox/"
 
 const sandboxCarveoutFile = ".contenox-harness/sandbox-carveouts.json"
@@ -131,7 +138,7 @@ func buildAgentCmd(ctx context.Context, a *ExternalACPAgent) (*exec.Cmd, error) 
 		Home:               home,
 		EnvAllow:           libsandbox.DefaultEnvPolicy().Resolve(os.Environ()),
 		EnvSet:             a.Config.Env,
-		FS:                 defaultAgentCarveouts(),
+		FS:                 append(defaultAgentCarveouts(), configCarveouts(a.Config.Paths)...),
 		AllowPrivateEgress: false,
 		SyscallTap:         false,
 		Tracker:            tracker,
@@ -200,6 +207,14 @@ func defaultAgentCarveouts() []libsandbox.FSCarveout {
 		{Path: "~/.codex", Mode: libsandbox.ModeRO, Needs: "agent auth/config"},
 		{Path: "~/.config/goose", Mode: libsandbox.ModeRO, Needs: "agent auth/config"},
 	}
+}
+
+func configCarveouts(paths []runtimetypes.ExternalACPPath) []libsandbox.FSCarveout {
+	out := make([]libsandbox.FSCarveout, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, libsandbox.FSCarveout{Path: p.Path, Mode: p.Mode, Needs: p.Needs})
+	}
+	return out
 }
 
 func applyCarveoutFile(path string, spec *libsandbox.Spec) error {

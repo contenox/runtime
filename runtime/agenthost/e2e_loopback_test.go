@@ -23,7 +23,7 @@ const loopbackFixtureReply = "contenox loopback fixture reply"
 
 func buildContenoxBinary(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "contenox")
+	binPath := filepath.Join(t.TempDir(), "contenox"+exeSuffix())
 	cmd := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/cmd/contenox")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -36,7 +36,7 @@ func runContenoxCLI(t *testing.T, bin, home string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = home
-	cmd.Env = append(os.Environ(), "HOME="+home)
+	cmd.Env = append(os.Environ(), "HOME="+home, "USERPROFILE="+home)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("contenox %v: %v\n%s", args, err, out)

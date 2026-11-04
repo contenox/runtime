@@ -164,8 +164,8 @@ func TestUnit_Command_ReportsErrorToTracker(t *testing.T) {
 }
 
 func TestUnit_Command_FailsClosedOffLinux(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		t.Skip("on Linux the wall is built; the off-Linux fail-closed path does not apply")
+	if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
+		t.Skip("the wall is built on Linux and Windows; the fail-closed path applies elsewhere")
 	}
 	cmd, err := libsandbox.Command(context.Background(), libsandbox.Spec{
 		WorkspaceRoot: t.TempDir(),

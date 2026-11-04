@@ -15,8 +15,11 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/agenthost"
 	"github.com/contenox/runtime/runtime/agentinstance"
+	"github.com/contenox/runtime/runtime/agentoptions"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
+	"github.com/contenox/runtime/runtime/approvalflow"
 	"github.com/contenox/runtime/runtime/chatservice"
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/contenox/runtime/runtime/version"
@@ -303,6 +306,22 @@ type externalBridge struct {
 
 	termMu    sync.Mutex
 	terminals map[string]*bridgeTerminal
+
+	allowedModes []string
+
+	agentName string
+}
+
+func (b *externalBridge) setAllowedModes(modes []string) {
+	b.mu.Lock()
+	b.allowedModes = append([]string(nil), modes...)
+	b.mu.Unlock()
+}
+
+func (b *externalBridge) allowedModesSnapshot() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]string(nil), b.allowedModes...)
 }
 
 func newExternalBridge(t *Transport, upstreamID libacp.SessionID, bound bool) *externalBridge {
@@ -600,6 +619,8 @@ func (b *externalBridge) applyModel(modelID string) {
 func (b *externalBridge) buildConfigOptionsLocked() []libacp.SessionConfigOption {
 	modeOpt, hasMode := syntheticModeOption(b.modeState)
 	modelOpt, hasModel := syntheticModelOption(b.modelState)
+	hasMode = hasMode && !hasCategory(b.configOptions, configCategoryMode)
+	hasModel = hasModel && !hasCategory(b.configOptions, configCategoryModel)
 	if !hasMode && !hasModel {
 		return b.configOptions
 	}
@@ -621,6 +642,10 @@ func (b *externalBridge) snapshotConfigOptions() []libacp.SessionConfigOption {
 }
 
 func (b *externalBridge) configOptionsSurface() []libacp.SessionConfigOption {
+	return restrictModes(b.rawConfigOptionsSurface(), b.allowedModesSnapshot())
+}
+
+func (b *externalBridge) rawConfigOptionsSurface() []libacp.SessionConfigOption {
 	b.relayMu.Lock()
 	mgr, instanceID := b.mgr, b.instanceID
 	b.relayMu.Unlock()
@@ -641,8 +666,13 @@ func (b *externalBridge) persistCommands(ctx context.Context, cmds []libacp.Avai
 }
 
 func (b *externalBridge) persistConfigOptions(ctx context.Context, opts []libacp.SessionConfigOption) {
-	if t := b.transport(); t != nil {
-		t.persistSessionAgentConfigOptions(ctx, b.upstreamID, opts)
+	t := b.transport()
+	if t == nil {
+		return
+	}
+	t.persistSessionAgentConfigOptions(ctx, b.upstreamID, opts)
+	if b.agentName != "" && t.deps.DB != nil && len(opts) > 0 {
+		_ = agentoptions.Save(ctx, runtimetypes.New(t.deps.DB.WithoutTransaction()), b.agentName, opts)
 	}
 }
 
@@ -652,7 +682,76 @@ func (b *externalBridge) RequestPermission(ctx context.Context, req libacp.Reque
 		return libacp.RequestPermissionResponse{}, libacp.InternalError("acpsvc: no upstream connection to relay permission to")
 	}
 	req.SessionID = b.upstreamID
-	return t.conn.RequestPermission(ctx, req)
+	sess, _ := t.sessionFor(b.upstreamID)
+
+	policy := ""
+	if sess != nil {
+		policy = t.resolveSessionHITLPolicy(sess)
+	}
+	verdict, mapped, escalate := approvalflow.Judge(ctx, t.deps.HITL, policy, req)
+	ask := externalApprovalRequest(sess, mapped, verdict, policy)
+	askedAt := time.Now().UTC()
+	if t.deps.HITL != nil && escalate == "" {
+		switch verdict.Action {
+		case hitlservice.ActionAllow:
+			t.recordDecisionBy(ctx, ask, ask.SessionID, hitlservice.DecisionApproved, askedAt, decidedByPolicy)
+			return approvalflow.Answer(req, true), nil
+		case hitlservice.ActionDeny:
+			t.recordDecisionBy(ctx, ask, ask.SessionID, hitlservice.DecisionDenied, askedAt, decidedByPolicy)
+			return approvalflow.Answer(req, false), nil
+		}
+	}
+
+	resp, err := t.conn.RequestPermission(ctx, approvalflow.WithoutStandingOptions(req))
+	if err != nil {
+		t.recordDecisionBy(ctx, ask, ask.SessionID, hitlservice.DecisionCancelled, askedAt, decidedByACPClient)
+		return resp, err
+	}
+	t.recordDecisionBy(ctx, ask, ask.SessionID, permissionOutcome(req, resp), askedAt, decidedByACPClient)
+	return resp, nil
+}
+
+func externalApprovalRequest(sess *sessionEntry, mapped approvalflow.Mapped, verdict hitlservice.EvaluationResult, policy string) hitlservice.ApprovalRequest {
+	req := hitlservice.ApprovalRequest{
+		ToolCallID:  mapped.ToolCallID,
+		ToolsName:   mapped.ToolsName,
+		ToolName:    mapped.ToolName,
+		Args:        mapped.Args,
+		Diff:        mapped.Diff,
+		PolicyName:  policy,
+		MatchedRule: verdict.MatchedRule,
+	}
+	if req.ToolsName == "" {
+		req.ToolsName = "acp"
+	}
+	if req.ToolName == "" {
+		req.ToolName = mapped.Title
+	}
+	if verdict.PolicyName != "" {
+		req.PolicyName = verdict.PolicyName
+	}
+	if sess != nil {
+		req.SessionID = sess.InternalSessionID
+		if d, ok := sess.driver.(*externalDriver); ok {
+			req.AgentName = d.agentName
+		}
+	}
+	return req
+}
+
+func permissionOutcome(req libacp.RequestPermissionRequest, resp libacp.RequestPermissionResponse) hitlservice.DecisionOutcome {
+	if resp.Outcome.Outcome != libacp.PermissionOutcomeSelected {
+		return hitlservice.DecisionCancelled
+	}
+	for _, opt := range req.Options {
+		if opt.OptionID != resp.Outcome.OptionID {
+			continue
+		}
+		if opt.Kind == libacp.PermissionAllowOnce || opt.Kind == libacp.PermissionAllowAlways {
+			return hitlservice.DecisionApproved
+		}
+	}
+	return hitlservice.DecisionDenied
 }
 
 func (b *externalBridge) beginCapture() {
@@ -739,6 +838,18 @@ func (d *externalDriver) SetConfigOption(ctx context.Context, sess *sessionEntry
 		return nil
 	}
 
+	d.mu.Lock()
+	bridge := d.bridge
+	d.mu.Unlock()
+	if bridge != nil {
+		if o, ok := modeOptionOf(bridge.rawConfigOptionsSurface(), configID); ok && !modeAllowed(bridge.allowedModesSnapshot(), value.AsString()) {
+			return libacp.NewErrorf(libacp.ErrInvalidParams, "%s %q is not offered for agent %q: in this mode the agent would stop asking, and the session's policy decides what runs without asking", o.Name, value.AsString(), d.agentName)
+		}
+	}
+	return d.setAgentConfigOption(ctx, sess, configID, value)
+}
+
+func (d *externalDriver) setAgentConfigOption(ctx context.Context, sess *sessionEntry, configID string, value libacp.SessionConfigOptionValue) error {
 	d.mu.Lock()
 	conn, instanceID, downstreamID, bridge := d.conn, d.instanceID, d.downstreamID, d.bridge
 	d.mu.Unlock()
@@ -904,6 +1015,7 @@ func (t *Transport) openInstanceSession(ctx context.Context, instanceID string, 
 	downstreamID, err := t.deps.Instances.OpenSession(ctx, instanceID, agentinstance.SessionSpec{
 		Cwd:        cwd,
 		McpServers: mcpServers,
+		Meta:       cfg.SessionMeta,
 		Terminal:   false,
 	})
 	if err != nil {
@@ -943,6 +1055,7 @@ func (t *Transport) initExternalConn(ctx context.Context, conn *libacp.ClientSid
 	downstream, err := conn.NewSession(ctx, libacp.NewSessionRequest{
 		Cwd:        cwd,
 		McpServers: forwarded,
+		Meta:       cfg.SessionMeta,
 	})
 	if err != nil {
 		return "", libacp.InternalError(fmt.Sprintf("acpsvc: session/new against agent %q: %v", agentName, err))
@@ -961,6 +1074,8 @@ func (t *Transport) bringUpExternal(ctx context.Context, upstreamID libacp.Sessi
 		return nil, err
 	}
 	bridge := newExternalBridge(t, upstreamID, bound)
+	bridge.setAllowedModes(cfg.Modes)
+	bridge.agentName = agentName
 
 	if t.deps.Instances != nil {
 		instanceID, err := t.deps.Instances.StartResolved(ctx, agent, cwd)
@@ -1021,6 +1136,10 @@ func (d *externalDriver) ensureAttached(ctx context.Context, upstreamID libacp.S
 	if d.t.deps.Instances != nil && instanceID != "" && downstreamID != "" {
 		if st, err := d.t.deps.Instances.Get(instanceID); err == nil && st.State == agentinstance.StateRunning {
 			bridge := newExternalBridge(d.t, upstreamID, true)
+			bridge.agentName = d.agentName
+			if _, cfg, err := d.t.resolveExternalAgent(ctx, d.agentName); err == nil {
+				bridge.setAllowedModes(cfg.Modes)
+			}
 			bridge.setDownstreamID(downstreamID)
 			bridge.suppressReplay()
 			bridge.bindInstance(d.t.deps.Instances, instanceID)
@@ -1039,7 +1158,11 @@ func (d *externalDriver) ensureAttached(ctx context.Context, upstreamID libacp.S
 	if err != nil {
 		return nil, err
 	}
-	return d.commitBringUp(ctx, upstreamID, att)
+	tgt, err := d.commitBringUp(ctx, upstreamID, att)
+	if err == nil && tgt.bridge == att.bridge {
+		d.enforceStartMode(ctx, sess, att.bridge)
+	}
+	return tgt, err
 }
 
 func (d *externalDriver) commitReattach(instanceID string, downstreamID libacp.SessionID, bridge *externalBridge) *externalTarget {
@@ -1131,6 +1254,13 @@ func (d *externalDriver) Prompt(ctx context.Context, req libacp.PromptRequest, s
 	t.persistExternalTurn(ctx, sess.InternalSessionID, userText, captured)
 
 	if promptErr != nil {
+		var downstream *libacp.Error
+		if errors.As(promptErr, &downstream) && downstream.Code == libacp.ErrAuthRequired {
+			signIn := libacp.NewErrorf(libacp.ErrInvalidRequest, "%s needs you to sign in before it can answer", d.agentName)
+			signIn.Data = mustJSON(map[string]any{"contenox": map[string]any{"kind": "agent_sign_in_required", "agent": d.agentName}})
+			reportErr(signIn)
+			return libacp.PromptResponse{}, signIn
+		}
 		if errors.Is(promptErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 			reportChange(string(req.SessionID), map[string]any{"stop_reason": string(libacp.StopReasonCancelled)})
 			return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil

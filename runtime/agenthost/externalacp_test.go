@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 
 func buildStubAgent(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "acp-stub-agent")
+	binPath := filepath.Join(t.TempDir(), "acp-stub-agent"+exeSuffix())
 	cmd := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/libacp/cmd/acp-stub-agent")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -114,4 +115,11 @@ func TestHost_ExternalACPAgent_Connect_EndpointNotImplemented(t *testing.T) {
 	_, err := host.Connect(context.Background(), libacp.UnimplementedClient{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not implemented")
+}
+
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }

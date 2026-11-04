@@ -712,7 +712,11 @@ func TestManager_WatchDog_ManualStopNeverRestarts(t *testing.T) {
 
 func TestManager_External_UnexpectedExitBecomesError(t *testing.T) {
 	ctx, _, svc := setupRegistry(t)
-	registerExternal(t, ctx, svc, "dies-immediately", "sh", "-c", "exit 0")
+	if runtime.GOOS == "windows" {
+		registerExternal(t, ctx, svc, "dies-immediately", "cmd", "/c", "exit 0")
+	} else {
+		registerExternal(t, ctx, svc, "dies-immediately", "sh", "-c", "exit 0")
+	}
 
 	mgr := New(svc)
 	t.Cleanup(func() { _ = mgr.Close() })

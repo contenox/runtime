@@ -52,6 +52,5 @@ func TestUnit_BuildAgentCmd_ForeignCommandIsConfined(t *testing.T) {
 			"a host that cannot confine must refuse to run the agent, naming the sandbox")
 		return
 	}
-	require.NotEqual(t, foreign, cmd.Path,
-		"a foreign agent is reached through the sandbox shim, never exec'd directly")
+	assertForeignConfined(t, cmd, foreign)
 }

@@ -12,7 +12,10 @@ import (
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
-const decidedByACPClient = "acp_client"
+const (
+	decidedByACPClient = "acp_client"
+	decidedByPolicy    = "policy"
+)
 
 func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalRequest) (bool, error) {
 	contenoxSessionID, _ := ctx.Value(runtimetypes.SessionIDContextKey).(string)
@@ -70,6 +73,10 @@ func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalReq
 // through the durable approval service. Recording never changes the outcome of
 // the ask: a failure is logged and the decision stands.
 func (t *Transport) recordApprovalDecision(ctx context.Context, req hitlservice.ApprovalRequest, contenoxSessionID string, outcome hitlservice.DecisionOutcome, askedAt time.Time) {
+	t.recordDecisionBy(ctx, req, contenoxSessionID, outcome, askedAt, decidedByACPClient)
+}
+
+func (t *Transport) recordDecisionBy(ctx context.Context, req hitlservice.ApprovalRequest, contenoxSessionID string, outcome hitlservice.DecisionOutcome, askedAt time.Time, decidedBy string) {
 	rec := t.deps.DecisionRecorder
 	if rec == nil {
 		return
@@ -81,7 +88,7 @@ func (t *Transport) recordApprovalDecision(ctx context.Context, req hitlservice.
 	defer cancel()
 	if err := rec.RecordDecision(recordCtx, req, hitlservice.Decision{
 		Outcome:   outcome,
-		DecidedBy: decidedByACPClient,
+		DecidedBy: decidedBy,
 		AskedAt:   askedAt,
 	}); err != nil {
 		slog.Warn("acpsvc: could not record approval decision", "tool", req.ToolName, "outcome", string(outcome), "error", err)

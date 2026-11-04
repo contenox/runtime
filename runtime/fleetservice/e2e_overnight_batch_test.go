@@ -102,6 +102,7 @@ func TestFleetE2E_OvernightBatch(t *testing.T) {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	for _, k := range []string{
 		"CONTENOX_DEFAULT_MODEL", "CONTENOX_DEFAULT_PROVIDER",
 		"CONTENOX_DEFAULT_ALT_MODEL", "CONTENOX_DEFAULT_ALT_PROVIDER",
@@ -162,7 +163,9 @@ func TestFleetE2E_OvernightBatch(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(stopRouter)
 
-	svc := New(kernel, agents, missions, nil, home, libtracker.NoopTracker{})
+	project := filepath.Join(home, "project")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	svc := New(kernel, agents, missions, nil, project, libtracker.NoopTracker{})
 
 	writeChainAgentFixture(t, contenoxDir)
 	res, err := chainagents.Discover(ctx, agents, contenoxDir)
@@ -177,7 +180,7 @@ func TestFleetE2E_OvernightBatch(t *testing.T) {
 	require.NoError(t, os.WriteFile(plannerChainPath, []byte(obPlannerChain), 0o644))
 	obCreateAcpAgent(t, ctx, agents, "overnight-planner", contenoxBin, plannerChainPath)
 
-	gatedReportPath := filepath.Join(home, "overnight-gated-outcome.txt")
+	gatedReportPath := filepath.Join(project, "overnight-gated-outcome.txt")
 	gatedAgent := &runtimetypes.Agent{Name: "overnight-gated", Enabled: true}
 	require.NoError(t, gatedAgent.SetExternalACPConfig(runtimetypes.ExternalACPConfig{
 		Transport: runtimetypes.ExternalACPTransportStdio,
@@ -346,6 +349,7 @@ func obCreateAcpAgent(t *testing.T, ctx context.Context, agents agentregistryser
 		Command:   bin,
 		Args:      []string{"acp", "--auto"},
 		Env:       map[string]string{"CONTENOX_ACP_CHAIN_PATH": chainPath},
+		Paths:     []runtimetypes.ExternalACPPath{{Path: filepath.Dir(chainPath), Mode: runtimetypes.ExternalACPPathWrite, Needs: "the unit's own state"}},
 	}))
 	require.NoError(t, agents.Create(ctx, agent))
 }

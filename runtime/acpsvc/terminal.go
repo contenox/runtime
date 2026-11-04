@@ -48,6 +48,8 @@ func (t *Transport) handleExtRequest(ctx context.Context, method string, params 
 		return t.handleEnvelopesList()
 	case ExtMethodAgentProblems:
 		return t.handleAgentProblems()
+	case ExtMethodAgentConfigOptions:
+		return t.handleAgentConfigOptions(ctx, params)
 	default:
 		return nil, libacp.MethodNotFound(method)
 	}

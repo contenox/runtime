@@ -61,6 +61,7 @@ func TestSystem_ACPMissionInProcess(t *testing.T) {
 		"CONTENOX_UPDATE_CHECK=false",
 		"HOME="+homeDir,
 		"USERPROFILE="+homeDir,
+		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=inproc-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",
 		"CONTENOX_SERVER_URL=",
@@ -174,6 +175,7 @@ func TestSystem_ACPMissionForwardOptInHonest(t *testing.T) {
 
 	baseEnv := append(os.Environ(),
 		"HOME="+homeDir,
+		"USERPROFILE="+homeDir,
 		"USERPROFILE="+homeDir,
 		"CONTENOX_DEFAULT_MODEL=inproc-e2e-fake-model",
 		"CONTENOX_DEFAULT_PROVIDER=ollama",

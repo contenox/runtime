@@ -17,6 +17,7 @@ import (
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/backendservice"
+	"github.com/contenox/runtime/runtime/externalagents"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/accessapi"
@@ -27,6 +28,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/backendapi"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
 	"github.com/contenox/runtime/runtime/internal/envelopeapi"
+	"github.com/contenox/runtime/runtime/internal/externalagentsapi"
 	"github.com/contenox/runtime/runtime/internal/fleetapi"
 	"github.com/contenox/runtime/runtime/internal/hitlpolicyapi"
 	"github.com/contenox/runtime/runtime/internal/localfileapi"
@@ -169,6 +171,15 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 	agentSvc := agentregistryservice.New(deps.DB)
 	agentregistryapi.AddAgentRegistryRoutes(mux, agentSvc)
 	agentregistryapi.AddAgentPresetRoutes(mux, agentSvc, deps.ContenoxDir)
+	if home, err := os.UserHomeDir(); err == nil && deps.ContenoxDir != "" {
+		externalagentsapi.AddRoutes(mux, externalagents.New(externalagents.Deps{
+			Agents:      agentSvc,
+			DB:          deps.DB,
+			ContenoxDir: deps.ContenoxDir,
+			Home:        home,
+			Tracker:     deps.Tracker,
+		}))
+	}
 
 	backendapi.AddStateRoutes(mux, stateSvc)
 	backendapi.AddModelRoutes(mux, stateSvc, deps.Defaults)

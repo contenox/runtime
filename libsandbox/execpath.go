@@ -7,14 +7,7 @@ import (
 )
 
 func SystemExecDirs() []string {
-	return []string{
-		"/usr/local/sbin",
-		"/usr/local/bin",
-		"/usr/sbin",
-		"/usr/bin",
-		"/sbin",
-		"/bin",
-	}
+	return platformExecDirs()
 }
 
 func canonicalPATH() string {
@@ -34,11 +27,11 @@ func confinedPATH(operatorPATH, home string, fs []FSCarveout) string {
 			continue
 		}
 		clean := filepath.Clean(entry)
-		if _, dup := seen[clean]; dup {
+		if _, dup := seen[pathKey(clean)]; dup {
 			continue
 		}
 		if pathWithin(clean, roots) {
-			seen[clean] = struct{}{}
+			seen[pathKey(clean)] = struct{}{}
 			kept = append(kept, clean)
 		}
 	}
@@ -71,11 +64,18 @@ func validatePATH(pathValue, home string, fs []FSCarveout) error {
 	return nil
 }
 
+func pathKey(p string) string {
+	if pathsFold {
+		return strings.ToLower(p)
+	}
+	return p
+}
+
 func pathWithin(p string, roots []string) bool {
-	p = filepath.Clean(p)
+	p = pathKey(filepath.Clean(p))
 	for _, r := range roots {
-		r = filepath.Clean(r)
-		if p == r || strings.HasPrefix(p, r+string(filepath.Separator)) {
+		r = pathKey(filepath.Clean(r))
+		if p == r || strings.HasPrefix(p, strings.TrimSuffix(r, string(filepath.Separator))+string(filepath.Separator)) {
 			return true
 		}
 	}
@@ -83,11 +83,12 @@ func pathWithin(p string, roots []string) bool {
 }
 
 func lookupEnv(env []string, name string) string {
-	prefix := name + "="
+	key := envKey(name)
 	value := ""
 	for _, kv := range env {
-		if strings.HasPrefix(kv, prefix) {
-			value = kv[len(prefix):]
+		eq := strings.IndexByte(kv, '=')
+		if eq > 0 && envKey(kv[:eq]) == key {
+			value = kv[eq+1:]
 		}
 	}
 	return value

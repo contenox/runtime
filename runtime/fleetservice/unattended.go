@@ -51,7 +51,6 @@ func (a *unattendedAnswerer) answer(ctx context.Context, req agentinstance.Unatt
 		return approvalflow.Answer(req.Request, false), nil
 	}
 
-	mapped := approvalflow.MapRequest(req.Request)
 	policyName, missionID := a.envelope(ctx, req.InstanceID)
 	reportChange("policy", policyName)
 	if missionID != "" {
@@ -66,7 +65,7 @@ func (a *unattendedAnswerer) answer(ctx context.Context, req agentinstance.Unatt
 		return approvalflow.Answer(req.Request, false), nil
 	}
 
-	verdict, escalate := a.judge(ctx, policyName, mapped)
+	verdict, mapped, escalate := approvalflow.Judge(ctx, a.deps.HITL, policyName, req.Request)
 	reportChange("action", string(verdict.Action))
 	if escalate != "" {
 		reportChange("escalated", escalate)
@@ -118,36 +117,6 @@ func (a *unattendedAnswerer) toolCallBudgetRefusal(ctx context.Context, policyNa
 		return "", false
 	}
 	return toolCallsExhaustedReason(bounds.MaxToolCalls), true
-}
-
-func (a *unattendedAnswerer) judge(ctx context.Context, policyName string, mapped approvalflow.Mapped) (hitlservice.EvaluationResult, string) {
-	if !mapped.Named {
-		return hitlservice.EvaluationResult{
-			Action:     hitlservice.ActionApprove,
-			Reason:     "unmapped_request",
-			PolicyName: policyName,
-		}, "unmapped_request"
-	}
-
-	evalCtx := ctx
-	if policyName != "" {
-		evalCtx = hitlservice.WithPolicyName(ctx, policyName)
-	}
-	verdict, err := a.deps.HITL.Evaluate(evalCtx, mapped.ToolsName, mapped.ToolName, mapped.Args)
-	if err != nil {
-		return hitlservice.EvaluationResult{
-			Action:     hitlservice.ActionApprove,
-			Reason:     "policy_error",
-			PolicyName: policyName,
-		}, "policy_error"
-	}
-	if verdict.Action == hitlservice.ActionAllow && !mapped.ArgsKnown {
-		return verdict, "allow_without_args"
-	}
-	if verdict.Action == hitlservice.ActionApprove {
-		return verdict, "policy_requires_approval"
-	}
-	return verdict, ""
 }
 
 func (a *unattendedAnswerer) escalate(

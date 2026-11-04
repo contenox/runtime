@@ -12,7 +12,7 @@ type EnvPolicy struct {
 }
 
 func DefaultEnvAllow() []string {
-	return []string{
+	return append([]string{
 		"PATH",
 		"TERM",
 		"COLORTERM",
@@ -24,7 +24,7 @@ func DefaultEnvAllow() []string {
 		"USER",
 		"LOGNAME",
 		"SHELL",
-	}
+	}, platformEnvAllow()...)
 }
 
 func ControlPlaneEnvDeny() []string {
@@ -137,6 +137,9 @@ func matchesAnyFold(patterns []string, name string) bool {
 }
 
 func matchesAny(patterns []string, name string) bool {
+	if envNamesFold {
+		return matchesAnyFold(patterns, name)
+	}
 	for _, pat := range patterns {
 		if envNameMatches(pat, name) {
 			return true

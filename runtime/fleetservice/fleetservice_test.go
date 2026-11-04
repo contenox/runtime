@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -535,7 +536,11 @@ func TestFleetService_Cancel_UnknownInstancePropagatesNotFound(t *testing.T) {
 
 func buildStubAgentBin(t *testing.T) string {
 	t.Helper()
-	binPath := filepath.Join(t.TempDir(), "acp-stub-agent")
+	name := "acp-stub-agent"
+	if goruntime.GOOS == "windows" {
+		name += ".exe"
+	}
+	binPath := filepath.Join(t.TempDir(), name)
 	out, err := exec.Command("go", "build", "-o", binPath, "github.com/contenox/runtime/libacp/cmd/acp-stub-agent").CombinedOutput()
 	require.NoError(t, err, "build acp-stub-agent:\n%s", out)
 	return binPath
