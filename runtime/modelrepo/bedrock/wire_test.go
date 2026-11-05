@@ -692,12 +692,14 @@ func TestUnit_BedrockConverseRequest_ThinkingDisabledAndUnsupportedLevels(t *tes
 		require.Zero(t, transport.requests)
 	})
 
-	t.Run("a model with no declared controls refuses a level instead of guessing one", func(t *testing.T) {
+	t.Run("a model with no declared controls sends the request without a thinking control", func(t *testing.T) {
 		transport := &wireTransport{handler: replyJSON(textOut("ok", "end_turn"))}
 		provider := newWireProvider("meta.llama3-70b-instruct-v1:0", modelrepo.CapabilityConfig{CanChat: true}, transport)
 		_, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}}, thinkArg("high"))
-		require.ErrorContains(t, err, "has no declared thinking controls")
-		require.Zero(t, transport.requests)
+		require.NoError(t, err)
+		require.Equal(t, 1, transport.requests)
+		_, body := transport.request()
+		require.NotContains(t, body, "additionalModelRequestFields")
 	})
 
 	t.Run("no declared control leaves the request untouched", func(t *testing.T) {

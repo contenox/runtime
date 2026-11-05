@@ -352,11 +352,8 @@ func planBedrockThinking(m converseModel, cfg *modelrepo.ChatConfig, ceiling int
 	if err != nil {
 		return bedrockThinkingPlan{}, err
 	}
-	if !ok || level == reasoning.Auto {
+	if !ok || level == reasoning.Auto || m.thinking == nil {
 		return bedrockThinkingPlan{enabled: alwaysThinking}, nil
-	}
-	if m.thinking == nil {
-		return bedrockThinkingPlan{}, fmt.Errorf("bedrock model %s has no declared thinking controls, so think=%s cannot be expressed; %s", m.name, level, reasoningEffortRemedy(false))
 	}
 	if level == reasoning.Off {
 		if !m.thinking.Disabled {
@@ -400,7 +397,7 @@ func reasoningEffortRemedy(declared bool) string {
 	if declared {
 		lead, level = "choose a reasoning effort the model declares, or auto, which sends no thinking control", "<level>"
 	}
-	return fmt.Sprintf("%s: `/think %s` in the chat, or `contenox-runtime config set %s %s`, then start a new Contenox invocation", lead, level, "inference.reasoning.effort", level)
+	return fmt.Sprintf("%s: in the app, open the chat's … menu and set Think; in a terminal client, `/think %s`; or `contenox-runtime config set %s %s`, then start a new session", lead, level, "default-think", level)
 }
 
 func thinkDeclarationRefusal() string {
