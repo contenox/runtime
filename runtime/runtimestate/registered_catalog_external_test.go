@@ -16,7 +16,7 @@ import (
 )
 
 func TestUnit_RunBackendCycle_ObservesEveryRegisteredCatalog(t *testing.T) {
-	for _, backendType := range []string{"deepseek", "mistral"} {
+	for _, backendType := range []string{"deepseek", "mistral", "alibaba-cloud"} {
 		t.Run(backendType, func(t *testing.T) {
 			ctx := context.Background()
 			db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "runtime.db"), runtimetypes.SchemaSQLite)

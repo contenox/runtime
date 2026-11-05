@@ -28,7 +28,8 @@ var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Interactive wizard to configure your LLM provider and model.",
 	Long: `Run the setup wizard to pick an LLM provider (Ollama, OpenAI, ChatGPT
-subscription, DeepSeek, OpenRouter, Google Gemini, or Google Vertex AI), enter
+subscription, DeepSeek, Alibaba Cloud Model Studio, OpenRouter, Google Gemini, or
+Google Vertex AI), enter
 credentials, and set defaults. For other providers, such as Anthropic, Mistral,
 or AWS Bedrock, use 'contenox-runtime backend add'.
 
@@ -55,6 +56,7 @@ var setupProviders = []setupProvider{
 	{key: "openai", label: "OpenAI", defaultModel: "gpt-5.6", envKey: "OPENAI_API_KEY", needsAPIKey: true},
 	{key: "openai-codex", label: "ChatGPT subscription (Codex — device login, no API key)"},
 	{key: "deepseek", label: "DeepSeek", defaultModel: "deepseek-chat", envKey: "DEEPSEEK_API_KEY", needsAPIKey: true},
+	{key: "alibaba-cloud", label: "Alibaba Cloud Model Studio (Qwen)", defaultModel: "qwen3.5-plus", envKey: "DASHSCOPE_API_KEY", needsAPIKey: true},
 	{key: "openrouter", label: "OpenRouter (300+ models, one API key — deepseek, qwen, llama, gemini, gpt and more)", defaultModel: "deepseek/deepseek-chat-v3-5", envKey: "OPENROUTER_API_KEY", needsAPIKey: true},
 	{key: "gemini", label: "Google Gemini", defaultModel: "gemini-flash-latest", envKey: "GEMINI_API_KEY", needsAPIKey: true},
 	{key: "vertex-google", label: "Google Vertex AI (Gemini via gcloud ADC)", defaultModel: "gemini-flash-latest", needsAPIKey: false, needsBaseURL: true, baseURLHint: "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT/locations/us-central1"},
@@ -282,6 +284,8 @@ func registerSetupBackend(ctx context.Context, db libdb.DBManager, providerType,
 			backendURL = "https://generativelanguage.googleapis.com"
 		case "deepseek":
 			backendURL = "https://api.deepseek.com"
+		case "alibaba-cloud":
+			backendURL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 		case "openai-codex":
 			backendURL = modelauth.BaseURL
 		}

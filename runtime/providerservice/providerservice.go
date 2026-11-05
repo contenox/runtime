@@ -33,6 +33,7 @@ const (
 	ProviderTypeVLLM          = "vllm"
 	ProviderTypeVertexGoogle  = "vertex-google"
 	ProviderTypeDeepSeek      = "deepseek"
+	ProviderTypeAlibabaCloud  = "alibaba-cloud"
 	ProviderTypeOpenAICodex   = "openai-codex"
 	ProviderTypeGitHubCopilot = "github-copilot"
 )
@@ -157,6 +158,7 @@ var providerDefaultsByType = map[string]providerDefaults{
 	ProviderTypeVLLM:          {Type: ProviderTypeVLLM, RequiresBaseURL: true},
 	ProviderTypeVertexGoogle:  {Type: ProviderTypeVertexGoogle, RequiresBaseURL: true, RecommendedAPIKeyEnv: "GOOGLE_APPLICATION_CREDENTIALS"},
 	ProviderTypeDeepSeek:      {Type: ProviderTypeDeepSeek, DefaultBaseURL: "https://api.deepseek.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DEEPSEEK_API_KEY"},
+	ProviderTypeAlibabaCloud:  {Type: ProviderTypeAlibabaCloud, DefaultBaseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DASHSCOPE_API_KEY"},
 	ProviderTypeOpenAICodex:   {Type: ProviderTypeOpenAICodex, DefaultBaseURL: modelauth.BaseURL, RequiresLogin: true},
 	ProviderTypeGitHubCopilot: {Type: ProviderTypeGitHubCopilot, DefaultBaseURL: copilotauth.BaseURL, RequiresLogin: true, Unofficial: true},
 }

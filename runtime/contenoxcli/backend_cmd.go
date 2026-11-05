@@ -41,6 +41,9 @@ A backend points at an LLM provider. Supported types:
   openrouter                    openrouter.ai — routes 300+ models from many providers through one
                                 OpenAI-compatible endpoint (requires --api-key-env OPENROUTER_API_KEY).
   deepseek                      api.deepseek.com (requires --api-key-env DEEPSEEK_API_KEY).
+  alibaba-cloud                 Alibaba Cloud Model Studio (Qwen). International endpoint by default;
+                                pass --url for the China region or the Coding Plan endpoint
+                                (requires --api-key-env DASHSCOPE_API_KEY).
   anthropic                     api.anthropic.com (requires --api-key-env).
   mistral                       api.mistral.ai (requires --api-key-env).
   gemini                        Google Gemini (requires --api-key-env).
@@ -68,6 +71,13 @@ Examples:
 
   # Register DeepSeek:
   contenox-runtime backend add deepseek --type deepseek --api-key-env DEEPSEEK_API_KEY
+
+  # Register Alibaba Cloud Model Studio (Qwen) on the international endpoint:
+  contenox-runtime backend add alibaba --type alibaba-cloud --api-key-env DASHSCOPE_API_KEY
+
+  # The same provider on the China (Beijing) endpoint or the Coding Plan endpoint:
+  contenox-runtime backend add alibaba-cn --type alibaba-cloud --url https://dashscope.aliyuncs.com/compatible-mode/v1 --api-key-env DASHSCOPE_API_KEY
+  contenox-runtime backend add alibaba-coding --type alibaba-cloud --url https://coding-intl.dashscope.aliyuncs.com/v1 --api-key-env DASHSCOPE_CODING_API_KEY
 
   # Register Google Gemini:
   contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY
@@ -103,6 +113,8 @@ func defaultBaseURLForType(typ string) (string, error) {
 		return "", fmt.Errorf("--url is required for %s backends\n  Include project and location, e.g.:\n  --url \"https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1\"", typ)
 	case "deepseek":
 		return "https://api.deepseek.com", nil
+	case "alibaba-cloud":
+		return "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", nil
 	case "openai-codex":
 		return modelauth.BaseURL, nil
 	case "bedrock":
@@ -125,6 +137,8 @@ The --type flag determines which provider protocol is used.
                                 with 'backend login <name>' after adding it.
   openrouter                    openrouter.ai — 300+ models through one OpenAI-compatible endpoint.
   deepseek                      api.deepseek.com (requires --api-key-env DEEPSEEK_API_KEY).
+  alibaba-cloud                 Alibaba Cloud Model Studio (Qwen); dashscope-intl by default, --url for
+                                the China region or the Coding Plan (requires --api-key-env DASHSCOPE_API_KEY).
   anthropic                     api.anthropic.com (requires --api-key-env).
   mistral                       api.mistral.ai (requires --api-key-env).
   gemini                        Google Gemini (requires --api-key-env).
@@ -139,6 +153,7 @@ Examples:
   contenox-runtime backend add ollama    --type ollama
   contenox-runtime backend add openai    --type openai    --api-key-env OPENAI_API_KEY
   contenox-runtime backend add deepseek  --type deepseek  --api-key-env DEEPSEEK_API_KEY
+  contenox-runtime backend add alibaba   --type alibaba-cloud --api-key-env DASHSCOPE_API_KEY
   contenox-runtime backend add chatgpt   --type openai-codex
   contenox-runtime backend login chatgpt
   contenox-runtime backend add gemini    --type gemini    --api-key-env GEMINI_API_KEY
@@ -353,8 +368,8 @@ func globalContenoxDir() (string, error) {
 }
 
 func init() {
-	backendAddCmd.Flags().String("type", "ollama", "Backend type: ollama, openai, openai-codex, openrouter, deepseek, anthropic, mistral, gemini, vllm, bedrock, vertex-google")
-	backendAddCmd.Flags().String("url", "", "Base URL of the backend (auto-inferred for openai/openai-codex/openrouter/deepseek/anthropic/mistral/gemini if omitted; set https://ollama.com/api for hosted Ollama)")
+	backendAddCmd.Flags().String("type", "ollama", "Backend type: ollama, openai, openai-codex, openrouter, deepseek, alibaba-cloud, anthropic, mistral, gemini, vllm, bedrock, vertex-google")
+	backendAddCmd.Flags().String("url", "", "Base URL of the backend (auto-inferred for openai/openai-codex/openrouter/deepseek/alibaba-cloud/anthropic/mistral/gemini if omitted; set https://ollama.com/api for hosted Ollama)")
 
 	backendAddCmd.Flags().String("api-key-env", "", "Name of the environment variable holding the API key (preferred over --api-key)")
 	backendAddCmd.Flags().String("api-key", "", "API key literal — prefer --api-key-env to avoid leaking into shell history")

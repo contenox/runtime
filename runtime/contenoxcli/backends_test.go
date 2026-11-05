@@ -216,6 +216,10 @@ func TestUnit_BackendDefaultsIncludeChatGPTSubscriptionAndDeepSeek(t *testing.T)
 	codex, err := defaultBaseURLForType("openai-codex")
 	require.NoError(t, err)
 	require.Equal(t, modelauth.BaseURL, codex)
+
+	alibaba, err := defaultBaseURLForType("alibaba-cloud")
+	require.NoError(t, err)
+	require.Equal(t, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", alibaba)
 }
 
 func TestUnit_SetupOffersCodexAndDeepSeek(t *testing.T) {
@@ -233,4 +237,11 @@ func TestUnit_SetupOffersCodexAndDeepSeek(t *testing.T) {
 	require.True(t, ok, "setup must offer DeepSeek")
 	require.Equal(t, "DEEPSEEK_API_KEY", deepseek.envKey)
 	require.Equal(t, "deepseek-chat", deepseek.defaultModel)
+
+	alibaba, ok := byKey["alibaba-cloud"]
+	require.True(t, ok, "setup must offer Alibaba Cloud Model Studio")
+	require.Equal(t, "DASHSCOPE_API_KEY", alibaba.envKey)
+	require.Equal(t, "qwen3.5-plus", alibaba.defaultModel)
+	require.True(t, alibaba.needsAPIKey)
+	require.False(t, alibaba.needsBaseURL)
 }

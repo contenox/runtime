@@ -79,7 +79,7 @@ func ClearModelCache(ctx context.Context, kv libkvstore.KVManager) (int, error) 
 
 func takesCredential(backendType string) bool {
 	switch modelrepo.CanonicalBackendType(backendType) {
-	case "ollama", "openai", "anthropic", "mistral", "deepseek", "bedrock", "gemini", "vllm", "vertex-google":
+	case "ollama", "openai", "anthropic", "mistral", "deepseek", "alibaba-cloud", "bedrock", "gemini", "vllm", "vertex-google":
 		return true
 	}
 	return false

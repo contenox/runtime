@@ -136,6 +136,13 @@ func TestUnit_ProviderService_SupportedProvidersIncludeDeepSeekAndCodex(t *testi
 	require.True(t, deepseek.RequiresSecretConfig)
 	require.Equal(t, "DEEPSEEK_API_KEY", deepseek.RecommendedAPIKeyEnv)
 
+	alibaba, ok := byType["alibaba-cloud"]
+	require.True(t, ok, "alibaba-cloud must be offered")
+	require.Equal(t, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", alibaba.DefaultBaseURL)
+	require.True(t, alibaba.RequiresSecretConfig)
+	require.False(t, alibaba.RequiresBaseURL)
+	require.Equal(t, "DASHSCOPE_API_KEY", alibaba.RecommendedAPIKeyEnv)
+
 	codex, ok := byType["openai-codex"]
 	require.True(t, ok, "the ChatGPT subscription must be offered")
 	require.True(t, codex.RequiresLogin)

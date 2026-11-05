@@ -725,7 +725,7 @@ func modelNamePresent(available []string, wanted string) bool {
 
 func providerFixPath(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "openrouter", "openai-codex", "deepseek", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openrouter", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	default:
 		return "/backends?tab=backends"
@@ -734,7 +734,7 @@ func providerFixPath(provider string) string {
 
 func providerFixPathForChecks(provider string, checks []BackendCheck) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "openai-codex", "deepseek", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	case "ollama":
 		if anyHostedOllamaCheck(checks) {
@@ -756,6 +756,8 @@ func providerAddCommand(provider string) string {
 		return "contenox-runtime backend add gemini --type gemini --api-key-env GEMINI_API_KEY"
 	case "deepseek":
 		return "contenox-runtime backend add deepseek --type deepseek --api-key-env DEEPSEEK_API_KEY"
+	case "alibaba-cloud":
+		return "contenox-runtime backend add alibaba --type alibaba-cloud --api-key-env DASHSCOPE_API_KEY"
 	case "openai-codex":
 		return "contenox-runtime backend add chatgpt --type openai-codex && contenox-runtime backend login chatgpt"
 	case "llama":

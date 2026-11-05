@@ -1,6 +1,7 @@
 package runtimestate
 
 import (
+	_ "github.com/contenox/runtime/runtime/modelrepo/alibabacloud"
 	_ "github.com/contenox/runtime/runtime/modelrepo/anthropic"
 	_ "github.com/contenox/runtime/runtime/modelrepo/bedrock"
 	_ "github.com/contenox/runtime/runtime/modelrepo/deepseek"
