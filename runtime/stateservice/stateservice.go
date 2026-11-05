@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/reasoning"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -39,6 +40,7 @@ type CLIConfigPatch struct {
 	DefaultMissionAgent         *string
 	DefaultMissionPolicy        *string
 	UnofficialSignIns           *string
+	Locale                      *string
 }
 
 type CLIConfigSnapshot struct {
@@ -57,6 +59,8 @@ type CLIConfigSnapshot struct {
 	DefaultMissionAgent         string
 	DefaultMissionPolicy        string
 	UnofficialSignIns           string
+	Locale                      string
+	DetectedLocale              string
 	ResolvedFrom                map[string]string
 	Present                     map[string]bool
 }
@@ -116,7 +120,8 @@ func (s *service) SetCLIConfig(ctx context.Context, patch CLIConfigPatch) (CLICo
 		patch.UpdateCheck == nil &&
 		patch.DefaultMissionAgent == nil &&
 		patch.DefaultMissionPolicy == nil &&
-		patch.UnofficialSignIns == nil {
+		patch.UnofficialSignIns == nil &&
+		patch.Locale == nil {
 		return CLIConfigSnapshot{}, fmt.Errorf("provide at least one CLI config key")
 	}
 	store := runtimetypes.New(s.db.WithoutTransaction())
@@ -207,7 +212,28 @@ func (s *service) SetCLIConfig(ctx context.Context, patch CLIConfigPatch) (CLICo
 			return CLIConfigSnapshot{}, fmt.Errorf("set unofficial-sign-ins: %w", err)
 		}
 	}
+	if patch.Locale != nil {
+		v, err := NormalizeLocale(*patch.Locale)
+		if err != nil {
+			return CLIConfigSnapshot{}, err
+		}
+		if err := clikv.SetString(ctx, store, locale.Key, v); err != nil {
+			return CLIConfigSnapshot{}, fmt.Errorf("set locale: %w", err)
+		}
+	}
 	return s.cliConfigSnapshot(ctx, store), nil
+}
+
+func NormalizeLocale(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	v, ok := locale.Normalize(value)
+	if !ok {
+		return "", fmt.Errorf("locale must be a language tag such as en-US or de-DE, got %q", value)
+	}
+	return v, nil
 }
 
 func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Store) CLIConfigSnapshot {
@@ -226,6 +252,14 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 	missionAgent, missionAgentPresent := readCLIConfigValue(ctx, store, "default-mission-agent")
 	missionPolicy, missionPolicyPresent := readCLIConfigValue(ctx, store, "default-mission-policy")
 	unofficial, unofficialPresent := readCLIConfigValue(ctx, store, "unofficial-sign-ins")
+	detectedLocale := locale.Detect()
+	localeFrom := "detected"
+	effectiveLocale := detectedLocale
+	localeOverride := locale.Override(ctx, store)
+	if localeOverride != "" {
+		localeFrom = "set"
+		effectiveLocale = localeOverride
+	}
 	return CLIConfigSnapshot{
 		DefaultModel:                defaultModel,
 		DefaultProvider:             defaultProvider,
@@ -242,9 +276,12 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 		DefaultMissionAgent:         missionAgent,
 		DefaultMissionPolicy:        missionPolicy,
 		UnofficialSignIns:           unofficial,
+		Locale:                      effectiveLocale,
+		DetectedLocale:              detectedLocale,
 		ResolvedFrom: map[string]string{
 			"defaultChain":   chainFrom,
 			"hitlPolicyName": policyFrom,
+			"locale":         localeFrom,
 		},
 		Present: map[string]bool{
 			"default-model":                 defaultModelPresent,
@@ -262,6 +299,7 @@ func (s *service) cliConfigSnapshot(ctx context.Context, store runtimetypes.Stor
 			"default-mission-agent":         missionAgentPresent,
 			"default-mission-policy":        missionPolicyPresent,
 			"unofficial-sign-ins":           unofficialPresent,
+			"locale":                        localeOverride != "",
 		},
 	}
 }

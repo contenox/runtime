@@ -30,6 +30,7 @@ import (
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/updatecheck"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/missiontools"
@@ -428,6 +429,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		if defaultMaxTokens != "" {
 			templateVars["max_tokens"] = defaultMaxTokens
 		}
+		templateVars["locale"] = locale.Resolve(ctx, runtimetypes.New(db.WithoutTransaction()))
 		hitlservice.SetAdjudicator(acpHITL, &oracleDriver{
 			agent:         agentservice.New(agentservice.Deps{Engine: engine, DB: db, WorkspaceID: workspaceID}),
 			chain:         oracleChain,

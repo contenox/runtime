@@ -103,6 +103,36 @@ func stubRepo() *stubToolsRepo {
 	}}
 }
 
+func TestUnit_MacroEnv_VarLocale(t *testing.T) {
+	env, err := taskengine.NewMacroEnv(&noopEnv{}, stubRepo())
+	if err != nil {
+		t.Fatalf("NewMacroEnv: %v", err)
+	}
+	withVars := func(vars map[string]string) context.Context {
+		return taskengine.WithTemplateVars(libtracker.WithNewRequestID(context.Background()), vars)
+	}
+
+	raw, _, _, err := env.ExecEnv(withVars(map[string]string{"locale": "de-DE"}), newMacroChain("Locale: {{var:locale}} / {{var:locale|en-US}}", nil), "", taskengine.DataTypeString)
+	if err != nil {
+		t.Fatalf("ExecEnv: %v", err)
+	}
+	if got := raw.(string); got != "Locale: de-DE / de-DE" {
+		t.Fatalf("unexpected rendering: %q", got)
+	}
+
+	raw, _, _, err = env.ExecEnv(withVars(map[string]string{}), newMacroChain("Locale: {{var:locale|en-US}}", nil), "", taskengine.DataTypeString)
+	if err != nil {
+		t.Fatalf("ExecEnv: %v", err)
+	}
+	if got := raw.(string); got != "Locale: en-US" {
+		t.Fatalf("unexpected fallback rendering: %q", got)
+	}
+
+	if _, _, _, err = env.ExecEnv(withVars(map[string]string{}), newMacroChain("Locale: {{var:locale}}", nil), "", taskengine.DataTypeString); err == nil {
+		t.Fatal("expected an error when locale is unset and no fallback is given")
+	}
+}
+
 func TestUnit_MacroEnv_Tools_NoAllowlist(t *testing.T) {
 	out := runMacroExpand(t, stubRepo(), "{{toolservice:tools}}", nil)
 	var names []string

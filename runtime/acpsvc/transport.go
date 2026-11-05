@@ -15,6 +15,7 @@ import (
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/shellsession"
@@ -83,6 +84,7 @@ type LiveDefaults struct {
 	AltProvider string
 	MaxTokens   string
 	Think       string
+	Locale      string
 }
 
 // defaultsTTL bounds how often the live defaults hit the DB.
@@ -107,6 +109,7 @@ type sessionEntry struct {
 	Provider            string
 	Model               string
 	Think               string
+	Locale              string
 	EffectiveTokenLimit int
 	HITLPolicy          string
 
@@ -151,6 +154,7 @@ type Transport struct {
 	defaultAltProvider string
 	defaultMaxTokens   string
 	defaultThink       string
+	defaultLocale      string
 	defaultsAt         time.Time
 
 	permMu      sync.Mutex
@@ -293,6 +297,29 @@ func (t *Transport) refreshDefaults() {
 	t.defaultAltProvider = pick(d.AltProvider, t.deps.DefaultAltProvider)
 	t.defaultMaxTokens = pick(d.MaxTokens, t.deps.DefaultMaxTokens)
 	t.defaultThink = pick(d.Think, t.deps.DefaultThink)
+	t.defaultLocale = d.Locale
+}
+
+func (t *Transport) locale() string {
+	t.refreshDefaults()
+	t.cfgMu.Lock()
+	defer t.cfgMu.Unlock()
+	if v, ok := locale.Normalize(t.defaultLocale); ok {
+		return v
+	}
+	return locale.Detect()
+}
+
+func (t *Transport) sessionLocale(sess *sessionEntry) string {
+	if sess == nil {
+		return t.locale()
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	if sess.Locale == "" {
+		sess.Locale = t.locale()
+	}
+	return sess.Locale
 }
 
 // invalidateDefaults forces the next read to reload live defaults.
@@ -357,6 +384,7 @@ func (t *Transport) chainTemplateVars(sess *sessionEntry) map[string]string {
 	if maxTokens := t.maxTokens(); maxTokens != "" {
 		vars["max_tokens"] = maxTokens
 	}
+	vars["locale"] = t.sessionLocale(sess)
 	// The project folder is the session's, not the runtime process's: one
 	// runtime can serve several projects.
 	if cwd := strings.TrimSpace(sess.Cwd); cwd != "" {

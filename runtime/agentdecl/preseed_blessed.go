@@ -38,15 +38,18 @@ var blessedPreseedHashes = map[string][]string{
 		"4a928e566606eab7e026fc40a9ee7b5005d9d554d113c38c534a65e6d8cfb15f",
 		"0e4268d475c561b03ebc61c0f2d12099cbd0db8efd323322d8764c350d93c25a",
 		"bc11f07dae45969d5cba0331686527fd5fd57b6bc81f1bebfea70fa980449bf8",
+		"5c49188abfe5ec5e6421fb9e70427b84be61d9283cad2effe5eddefb95b4344f",
 	},
 	"agents/acp/coding/recovery.md": {
 		"3dbcceb70a1e2850971145b77e53b3daa4466f64bdd8b45b27a0e7179ad0840d",
 		"6f0c4f55e2858981f067c955231a6edc48c7ed6d60a5e71d4766707a2acab6b1",
 		"eff0e05baeecf8aa877e7a7f538903bc93535e31d6ea7f45d5c14179ace631e1",
 		"1d453d050ae5a3e373db76460f1c7537b069b22fc8f4d291c02f1096f50b5713",
+		"2c41e9b0a1c18613a05e8aa0e5859f1a355008845db1cb14f89cf1e5c461857e",
 	},
 	"agents/acp/failure.md": {
 		"85bdb3b48aff225e9d3edc80912a9680fd8c3e6d7ed67d1456e6b8e10fa78629",
+		"f31a4c5ad77eb88f46efecdfc54348e3cc937911abc87ac9f6df469ef3d6c558",
 	},
 	"agents/acp/general/agent.md": {
 		"30875d0f1204583b4cdcae490af3a4c6eed506aa5c685b6be2311049a7b15055",
@@ -56,12 +59,14 @@ var blessedPreseedHashes = map[string][]string{
 		"6c3f34a8db95baef52c6309043b2589e78a1776d86fc415b007e58acb0f595d8",
 		"6836b13a3d87a1b25d76ffb91dc9e34dc2248ef934886c221bafe9477c009f07",
 		"674833696674f0b5d5dfee4ec7f1a34c32307f9e92842acedda389262e1f6032",
+		"177849ab3e46ee763fdaa54cf633752bea702d069f5fa55deb920579732ca24f",
 	},
 	"agents/acp/general/recovery.md": {
 		"8c158c27cca4ffa4fb42825fa1bc7f8622a8f65af8a2446824fdf4fdaf785328",
 		"c3b1f049d07561dd3674c5d0fadf524425116df4ace95443d401ed17e26124cf",
 		"1bf1782b077fe575de968a21f060b463cfef9277f339709172a448f918880c1a",
 		"64eb3fce30b39c35a16eda612cf84797495882dd82ee5da1fd016452ef56e860",
+		"a82d848eeef6955f81ca6ecf1e1c1905397ca4be953886e4cb4a9ed842950e97",
 	},
 	"agents/acp/review/agent.md": {
 		"63105b39efbbc6cbbf81fd9bfeb4c8f2fcb12a25c9d49c9eaa89ac7bdb3b9a8d",
@@ -69,6 +74,7 @@ var blessedPreseedHashes = map[string][]string{
 		"1eb8799bdb42c5b0d0199e0607be400a92be9384cffa665f05bec48d3405bd4f",
 		"f54d1f43d20d48d720207494f09d98c65804806d2e734a712c48638cea099a00",
 		"c2f421cb03023ab63b231f40443eefb23037bb67a0b54dad54fee5468cfddf36",
+		"37f4096ef0526aa6521e4047c249259a6b5e18c01119f91954e4d64139bc219c",
 	},
 	"agents/acpx.md": {
 		"9b1d876ba7987a343c1c766fc7e9b4a47ba007852fd52a7124c17329f0dd5763",
@@ -76,6 +82,7 @@ var blessedPreseedHashes = map[string][]string{
 		"4cfdb4d16a11bb4b466f6882e4f1e7abecc3ff6a47c44e0656bd340e51b7edee",
 		"fefee9ba8d81317529ca67a5c36ec6b91b6f4535dde7be5557659d032c3d1743",
 		"0773a03472ded217acf356cb97b394e24b37f4ffbbee35fb0977aac076156e3a",
+		"102cb7677be00059279b895cf67c8595b79a7402401f72bc35bf73cfd8e096ce",
 	},
 	"agents/change/agent.md": {
 		"5993c0e0e5e1dc951c8fb0c0e8ed3128a7d671400c493eb7ca7dc07389d6f3fe",
@@ -91,27 +98,34 @@ var blessedPreseedHashes = map[string][]string{
 		"b3b5247dcfefeefdfe69a7a45af5f8d7a1592ebc63d6982c1b2071ec5931f7c9",
 		"4706bc96ed07bd3bfdef59729a3e342155bc7fe713063828727f8530e197771b",
 		"6cea996fb8c58312e5d574d6dec67cf1ef70babf3e78c24327a5041e93dff50a",
+		"ca63cd5276800c1bdbfcd1613d9fa4d115d0b31c190e12b6be6fe9886c6d0150",
 	},
 	"agents/contenox/agent.md": {
 		"073b4d0bf412ec6fe4d021c6a2be80c83df460c61c762fbdfe608a5136c44600",
 	},
 	"agents/contenox/coding/agent.md": {
 		"c4246e52e89c8196e7917bec81c6438a5dbfea60ddca3b54be22ab1684877b0f",
+		"8153c550af8f97f230bbc9e292ce8109eafbfb57851524664e87096b153caf86",
 	},
 	"agents/contenox/coding/recovery.md": {
 		"5c52d6be22d902286127f01746e6d4a9d872edd5b7aa7676ca8336d6bfcb6f04",
+		"4469729a64c9aced99555316d89cfa17590b2bc0e7ecfa550a451399795d19b1",
 	},
 	"agents/contenox/failure.md": {
 		"2972ba4cc7b281034a8ddf37a0f91bd7d78b1fbdf509628bc21b0a8620ce4957",
+		"1a2d6973aa4ae58848b520c01ac25ccd833932d3d9f2e6c12b28870bf7da96a9",
 	},
 	"agents/contenox/general/agent.md": {
 		"781c6647c6ad7df267cb4fff9c3ec67f9f93591a5d8458caf4c52fcbe854be76",
+		"b0d59066d702133f07c3b6f518104d9bb12e744ff7cf14f818d1c8207b82ad23",
 	},
 	"agents/contenox/general/recovery.md": {
 		"28535f6981083e4f6235ac29b3bda192cff01079eb5cdc966e36c524ba5673ca",
+		"b19f82f897324e004d588f9484baa05e59ae6c7cb6811582815ff915ed00ba14",
 	},
 	"agents/planner.md": {
 		"85a3ce2b81de427b2232f7cf49cc68d5e6492c8fb658af46f5432e70745c73f3",
+		"f3b94a8033177edfd21a47ecd9c64968f92506b11da893b6e6619ecac42133d7",
 	},
 	"agents/researcher.md": {
 		"35c1002c7c86c8509ad974312dfa43b8bae44fc446c28d1ec8bc8fb793f1a11c",
@@ -119,11 +133,13 @@ var blessedPreseedHashes = map[string][]string{
 	"agents/reviewer.md": {
 		"0aa955fa9ec4f9350ff080d247ad72903a1a078c2561626da8882728ffdc0694",
 		"cedee05565bcfc34ff2eb470a4026cd6be1747ff96fad58a491c0592abfb2ae5",
+		"0a8154dcb9638a2e410d651931903c08707d6c5ed2d9d3a96f7ae0b4e27043ab",
 	},
 	"agents/run.md": {
 		"73d4dec4896d783d1d43a29d9f9b222d8c19837a6cb9c4c8cbb3e0f40bbe5d94",
 		"5dfe1b0309ec6a26e46bfadf6bdb8c013993c02b5b1da3ad5d17813858c58003",
 		"4bbac2b1e3cb68e34a5afc5c36d03b16fea6ac655bb1b8cefbad31fef704cbfe",
+		"4f56e744e5347913d97f6938967c91b30e13c05d9896b90c29b62b63fe9d2bd1",
 	},
 	"agents/triage/agent.md": {
 		"0d337ef8d1f22eca62741bab7783b0d758d10c5e64b403724171e1c6af85c6b0",

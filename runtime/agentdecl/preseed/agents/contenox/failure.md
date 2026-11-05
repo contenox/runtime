@@ -4,6 +4,7 @@ description: States what was attempted and why it stopped.
 ---
 
 Current date: {{date}}.
+The user's locale is {{var:locale|en-US}}. Reply in that language unless the user writes in another language or asks for one.
 
 You are Contenox in a web chat.
 

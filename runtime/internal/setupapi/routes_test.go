@@ -45,6 +45,42 @@ func (f *fakeStateService) SetCLIConfig(_ context.Context, patch stateservice.CL
 	return f.setSnapshot, nil
 }
 
+func TestPutCLIConfigAcceptsLocale(t *testing.T) {
+	svc := &fakeStateService{
+		setSnapshot: stateservice.CLIConfigSnapshot{
+			Locale:         "de-DE",
+			DetectedLocale: "en-US",
+			ResolvedFrom:   map[string]string{"locale": "set"},
+		},
+	}
+	mux := http.NewServeMux()
+	AddSetupRoutes(mux, svc, nil)
+
+	req := httptest.NewRequest(http.MethodPut, "/cli-config", strings.NewReader(`{"locale":"de-DE"}`))
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.True(t, svc.setCalled)
+	require.NotNil(t, svc.setPatch.Locale)
+	require.Equal(t, "de-DE", *svc.setPatch.Locale)
+
+	var got putCLIConfigResponse
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&got))
+	require.Equal(t, "de-DE", got.Locale)
+	require.Equal(t, "en-US", got.DetectedLocale)
+	require.Equal(t, "set", got.ResolvedFrom["locale"])
+
+	req = httptest.NewRequest(http.MethodGet, "/cli-config", nil)
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusOK, rr.Code)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&body))
+	require.Equal(t, "de-DE", body["locale"])
+	require.Equal(t, "en-US", body["detectedLocale"])
+}
+
 func TestRefreshStatusRunsStateRefresh(t *testing.T) {
 	svc := &fakeStateService{
 		refreshResult: setupcheck.Result{

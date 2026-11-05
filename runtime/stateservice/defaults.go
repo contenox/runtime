@@ -3,6 +3,8 @@ package stateservice
 import (
 	"context"
 	"strings"
+
+	"github.com/contenox/runtime/runtime/locale"
 )
 
 type RuntimeDefaults struct {
@@ -16,6 +18,7 @@ type RuntimeDefaults struct {
 	AutocompleteProvider string
 	MaxTokens            string
 	Think                string
+	Locale               string
 }
 
 func ResolveRuntimeDefaults(ctx context.Context, service Service, fallback RuntimeDefaults) RuntimeDefaults {
@@ -57,7 +60,17 @@ func (d RuntimeDefaults) WithCLIConfig(snap CLIConfigSnapshot) RuntimeDefaults {
 	if snap.has("default-think", snap.DefaultThink) {
 		d.Think = snap.DefaultThink
 	}
+	if snap.Locale != "" {
+		d.Locale = snap.Locale
+	}
 	return d
+}
+
+func (d RuntimeDefaults) EffectiveLocale() string {
+	if v, ok := locale.Normalize(d.Locale); ok {
+		return v
+	}
+	return locale.Detect()
 }
 
 func (d RuntimeDefaults) Trimmed() RuntimeDefaults {
@@ -72,6 +85,7 @@ func (d RuntimeDefaults) Trimmed() RuntimeDefaults {
 		AutocompleteProvider: strings.TrimSpace(d.AutocompleteProvider),
 		MaxTokens:            strings.TrimSpace(d.MaxTokens),
 		Think:                strings.TrimSpace(d.Think),
+		Locale:               strings.TrimSpace(d.Locale),
 	}
 }
 
@@ -98,6 +112,7 @@ func (d RuntimeDefaults) TemplateVars() map[string]string {
 	if d.Think != "" {
 		vars["think"] = d.Think
 	}
+	vars["locale"] = d.EffectiveLocale()
 	return vars
 }
 

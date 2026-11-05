@@ -11,6 +11,7 @@ import (
 	"github.com/contenox/runtime/runtime/acpsvc"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/reasoning"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
@@ -68,6 +69,11 @@ func liveDefaultsResolver(db libdb.DBManager, withEnv bool, pinned acpsvc.LiveDe
 			if level, err := reasoning.Normalize(v); err == nil {
 				d.Think = level
 			}
+		}
+		if pinned.Locale != "" {
+			d.Locale = pinned.Locale
+		} else {
+			d.Locale = locale.Resolve(ctx, runtimetypes.New(db.WithoutTransaction()))
 		}
 		return d
 	}

@@ -6,9 +6,38 @@ import (
 	"testing"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSetCLIConfig_LocaleOverrideBeatsDetection(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	snap, err := svc.CLIConfig(ctx)
+	require.NoError(t, err)
+	require.Equal(t, locale.Detect(), snap.Locale)
+	require.Equal(t, locale.Detect(), snap.DetectedLocale)
+	require.Equal(t, "detected", snap.ResolvedFrom["locale"])
+	require.False(t, snap.Present["locale"])
+	require.Equal(t, locale.Detect(), ResolveRuntimeDefaults(ctx, svc, RuntimeDefaults{}).EffectiveLocale())
+
+	snap, err = svc.SetCLIConfig(ctx, CLIConfigPatch{Locale: strPtr("ja_JP.UTF-8")})
+	require.NoError(t, err)
+	require.Equal(t, "ja-JP", snap.Locale)
+	require.Equal(t, "set", snap.ResolvedFrom["locale"])
+	require.True(t, snap.Present["locale"])
+	require.Equal(t, "ja-JP", ResolveRuntimeDefaults(ctx, svc, RuntimeDefaults{}).TemplateVars()["locale"])
+
+	_, err = svc.SetCLIConfig(ctx, CLIConfigPatch{Locale: strPtr("klingon speech")})
+	require.Error(t, err)
+
+	snap, err = svc.SetCLIConfig(ctx, CLIConfigPatch{Locale: strPtr("")})
+	require.NoError(t, err)
+	require.Equal(t, locale.Detect(), snap.Locale)
+	require.Equal(t, "detected", snap.ResolvedFrom["locale"])
+}
 
 func newTestService(t *testing.T) Service {
 	t.Helper()

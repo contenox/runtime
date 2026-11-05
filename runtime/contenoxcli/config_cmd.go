@@ -11,8 +11,10 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/reasoning"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/stateservice"
 	"github.com/spf13/cobra"
 )
 
@@ -32,6 +34,7 @@ var validConfigKeys = map[string]string{
 	"default-mission-agent":         "Default declared agent fired by '/mission <intent>' and 'contenox-runtime mission fire' with no --agent.",
 	"default-mission-policy":        "Default mission envelope (HITL policy) used when '/mission' or 'contenox-runtime mission fire' names none.",
 	"unofficial-sign-ins":           "Allow sign-ins the vendor does not support for third-party apps, such as a Claude subscription or GitHub Copilot (true/false). Off by default; may break or put the account at risk.",
+	"locale":                        "Language tag agents see as {{var:locale}} (e.g. de-DE). Empty = detected from the operating system.",
 }
 
 var configCmd = &cobra.Command{
@@ -39,7 +42,7 @@ var configCmd = &cobra.Command{
 	Short: "Manage persistent CLI settings (default model, provider, agent, approval policy).",
 	Long: `Store and retrieve persistent CLI defaults backed by SQLite.
 
-Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy
+Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy, locale
 Workspace keys (scoped to current project): default-chain, hitl-policy-name
 
 Supported keys:
@@ -56,7 +59,8 @@ Supported keys:
   default-chain                  Default chain file path
   hitl-policy-name               Active HITL policy file name (e.g. hitl-policy-strict.json)
   default-mission-agent          Default agent fired by /mission and 'mission fire' with no --agent
-  default-mission-policy         Default mission envelope (HITL policy) when none is named`,
+  default-mission-policy         Default mission envelope (HITL policy) when none is named
+  locale                         Language tag agents see as {{var:locale}}, e.g. de-DE (empty = detected from the OS)`,
 }
 
 var configSetCmd = &cobra.Command{
@@ -84,12 +88,20 @@ Examples:
   contenox-runtime config set default-max-tokens 8192
   contenox-runtime config set default-think    high
   contenox-runtime config set default-chain    .contenox/my-chain.json
-  contenox-runtime config set hitl-policy-name hitl-policy-strict.json`,
+  contenox-runtime config set hitl-policy-name hitl-policy-strict.json
+  contenox-runtime config set locale           de-DE`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key, value := args[0], args[1]
 		if _, ok := validConfigKeys[key]; !ok {
 			return fmt.Errorf("unknown key %q — valid keys: %s", key, validConfigKeyList())
+		}
+		if key == locale.Key {
+			normalized, err := stateservice.NormalizeLocale(value)
+			if err != nil {
+				return err
+			}
+			value = normalized
 		}
 		if key == "default-max-tokens" {
 			normalized, err := normalizeMaxTokensConfig(value)
@@ -131,7 +143,8 @@ Examples:
   contenox-runtime config get default-provider
   contenox-runtime config get default-think
   contenox-runtime config get default-chain
-  contenox-runtime config get hitl-policy-name`,
+  contenox-runtime config get hitl-policy-name
+  contenox-runtime config get locale`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
@@ -145,10 +158,20 @@ Examples:
 		defer db.Close()
 
 		ctx := libtracker.WithNewRequestID(context.Background())
-		val, scope := clikv.ReadConfig(ctx, store, workspaceID, key)
+		val, scope := readConfigForDisplay(ctx, store, workspaceID, key)
 		fmt.Fprintf(cmd.OutOrStdout(), "%s  (%s)\n", val, scope)
 		return nil
 	},
+}
+
+func readConfigForDisplay(ctx context.Context, store runtimetypes.Store, workspaceID, key string) (string, string) {
+	if key == locale.Key {
+		if v := locale.Override(ctx, store); v != "" {
+			return v, "global"
+		}
+		return locale.Detect(), "detected"
+	}
+	return clikv.ReadConfig(ctx, store, workspaceID, key)
 }
 
 var configListCmd = &cobra.Command{
@@ -170,7 +193,7 @@ Example:
 		w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "KEY\tVALUE\tSCOPE")
 		for _, key := range validConfigKeyNames() {
-			val, scope := clikv.ReadConfig(ctx, store, workspaceID, key)
+			val, scope := readConfigForDisplay(ctx, store, workspaceID, key)
 			fmt.Fprintf(w, "%s\t%s\t%s\n", key, val, scope)
 		}
 		return w.Flush()

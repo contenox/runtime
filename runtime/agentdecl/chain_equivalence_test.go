@@ -144,7 +144,7 @@ func TestUnit_CompiledPrompts_LeaveNoMacroUnexpanded(t *testing.T) {
 		for _, macro := range known {
 			rest = strings.ReplaceAll(rest, macro, "")
 		}
-		for _, macro := range []string{"{{var:cwd", "{{var:model", "{{var:provider", "{{var:max_tokens", "{{edge_count:"} {
+		for _, macro := range []string{"{{var:cwd", "{{var:model", "{{var:provider", "{{var:max_tokens", "{{var:locale", "{{edge_count:"} {
 			rest = strings.ReplaceAll(rest, macro, "")
 			_ = macro
 		}

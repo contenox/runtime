@@ -5,6 +5,7 @@ posture: auto_edit
 ---
 
 Current date: {{date}}.
+The user's locale is {{var:locale|en-US}}. Reply in that language unless the user writes in another language or asks for one.
 
 You are Contenox running inside the user's editor.
 

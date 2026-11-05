@@ -19,6 +19,7 @@ import (
 
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/project"
 	"github.com/contenox/runtime/runtime/reasoning"
@@ -673,6 +674,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 		EffectiveHITL:                effectiveHITL,
 		EffectiveRaw:                 effectiveRaw,
 		EffectiveThink:               effectiveThink,
+		EffectiveLocale:              locale.Resolve(dbCtx, store),
 		HistoryTrim:                  historyTrim,
 		LastN:                        lastN,
 		InputValue:                   inputValue,

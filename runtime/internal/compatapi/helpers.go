@@ -88,6 +88,9 @@ func buildTemplateVars(chain *taskengine.TaskChainDefinition, defaults stateserv
 	if chainUsesVar(chain, "think") && defaults.Think != "" {
 		vars["think"] = defaults.Think
 	}
+	if chainUsesVar(chain, "locale") {
+		vars["locale"] = defaults.EffectiveLocale()
+	}
 	return vars
 }
 

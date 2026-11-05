@@ -10,6 +10,7 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/agentservice"
+	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/taskengine"
 )
@@ -33,6 +34,7 @@ type chatOpts struct {
 	EffectiveHITL                bool
 	EffectiveRaw                 bool
 	EffectiveThink               string
+	EffectiveLocale              string
 	HistoryTrim                  int
 	LastN                        int
 	InputValue                   string
@@ -203,6 +205,10 @@ func buildTemplateVars(opts chatOpts) map[string]string {
 	}
 	if opts.EffectiveMaxTokens != "" {
 		templateVars["max_tokens"] = opts.EffectiveMaxTokens
+	}
+	templateVars["locale"] = opts.EffectiveLocale
+	if templateVars["locale"] == "" {
+		templateVars["locale"] = locale.Detect()
 	}
 	return templateVars
 }

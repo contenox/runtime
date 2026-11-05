@@ -73,6 +73,7 @@ type putCLIConfigRequest struct {
 	DefaultMissionAgent         *string `json:"default-mission-agent"`
 	DefaultMissionPolicy        *string `json:"default-mission-policy"`
 	UnofficialSignIns           *string `json:"unofficial-sign-ins"`
+	Locale                      *string `json:"locale"`
 }
 
 type putCLIConfigResponse struct {
@@ -91,6 +92,8 @@ type putCLIConfigResponse struct {
 	DefaultMissionAgent         string            `json:"defaultMissionAgent"`
 	DefaultMissionPolicy        string            `json:"defaultMissionPolicy"`
 	UnofficialSignIns           string            `json:"unofficialSignIns"`
+	Locale                      string            `json:"locale"`
+	DetectedLocale              string            `json:"detectedLocale"`
 	ResolvedFrom                map[string]string `json:"resolvedFrom,omitempty"`
 }
 
@@ -111,6 +114,8 @@ func cliConfigResponseFromSnapshot(snap stateservice.CLIConfigSnapshot) putCLICo
 		DefaultMissionAgent:         snap.DefaultMissionAgent,
 		DefaultMissionPolicy:        snap.DefaultMissionPolicy,
 		UnofficialSignIns:           snap.UnofficialSignIns,
+		Locale:                      snap.Locale,
+		DetectedLocale:              snap.DetectedLocale,
 		ResolvedFrom:                snap.ResolvedFrom,
 	}
 }
@@ -154,7 +159,8 @@ func (h *setupHandler) putCLIConfig(w http.ResponseWriter, r *http.Request) {
 		body.UpdateCheck == nil &&
 		body.DefaultMissionAgent == nil &&
 		body.DefaultMissionPolicy == nil &&
-		body.UnofficialSignIns == nil {
+		body.UnofficialSignIns == nil &&
+		body.Locale == nil {
 		_ = apiframework.Error(w, r, apiframework.BadRequest("Provide at least one CLI config key."), apiframework.UpdateOperation)
 		return
 	}
@@ -174,6 +180,7 @@ func (h *setupHandler) putCLIConfig(w http.ResponseWriter, r *http.Request) {
 		DefaultMissionAgent:         body.DefaultMissionAgent,
 		DefaultMissionPolicy:        body.DefaultMissionPolicy,
 		UnofficialSignIns:           body.UnofficialSignIns,
+		Locale:                      body.Locale,
 	})
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
