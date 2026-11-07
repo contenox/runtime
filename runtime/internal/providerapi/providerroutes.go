@@ -26,6 +26,7 @@ func AddProviderRoutes(mux *http.ServeMux, providerService providerservice.Servi
 	mux.HandleFunc("POST /providers/{providerType}/connections", p.createConnection)
 	mux.HandleFunc("PATCH /providers/connections/{id}", p.updateConnection)
 	mux.HandleFunc("POST /providers/connections/{id}/check", p.checkConnection)
+	mux.HandleFunc("DELETE /providers/connections/{id}/hidden-models", p.clearHiddenModels)
 	mux.HandleFunc("POST /providers/connections/{id}/login", p.startConnectionLogin)
 	mux.HandleFunc("GET /providers/connections/{id}/login", p.connectionLoginStatus)
 	mux.HandleFunc("POST /providers/connections/{id}/login/cancel", p.cancelConnectionLogin)
@@ -294,6 +295,16 @@ func (p *providerManager) checkConnection(w http.ResponseWriter, r *http.Request
 	conn, err := p.providerService.CheckConnection(r.Context(), id)
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.GetOperation)
+		return
+	}
+	_ = apiframework.Encode(w, r, http.StatusOK, conn)
+}
+
+func (p *providerManager) clearHiddenModels(w http.ResponseWriter, r *http.Request) {
+	id := apiframework.GetPathParam(r, "id", "Connection (backend) ID.")
+	conn, err := p.providerService.ClearHiddenModels(r.Context(), id, r.URL.Query().Get("model"))
+	if err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
 		return
 	}
 	_ = apiframework.Encode(w, r, http.StatusOK, conn)

@@ -72,6 +72,7 @@ const (
 	ArgLocationHeader
 	ArgLocationPath
 	ArgLocationBody
+	ArgLocationArg
 )
 
 type ParamArg struct {
@@ -156,7 +157,7 @@ func (p *OpenAPIToolProtocol) ExecuteTool(
 	}
 
 	for _, injectedParam := range injectParams {
-		valStr := fmt.Sprintf("%v", finalArgs[injectedParam.Name])
+		valStr := injectedParam.Value
 		switch injectedParam.In {
 		case ArgLocationPath:
 			finalURL = strings.Replace(finalURL, "{"+injectedParam.Name+"}", valStr, 1)
@@ -351,7 +352,7 @@ func (p *OpenAPIToolProtocol) buildParametersSchema(
 
 		if injectedParam, ok := injectParams[param.Name]; ok {
 			paramLocation := mapOA3LocationToArgLocation(param.In)
-			if injectedParam.In == paramLocation {
+			if injectedParam.In == paramLocation || injectedParam.In == ArgLocationArg {
 				continue
 			}
 		}
@@ -382,7 +383,7 @@ func (p *OpenAPIToolProtocol) buildParametersSchema(
 
 				if schema.Type.Is("object") {
 					for propName, propSchemaRef := range schema.Properties {
-						if injectedParam, ok := injectParams[propName]; ok && injectedParam.In == ArgLocationBody {
+						if injectedParam, ok := injectParams[propName]; ok && (injectedParam.In == ArgLocationBody || injectedParam.In == ArgLocationArg) {
 							continue
 						}
 
@@ -397,7 +398,12 @@ func (p *OpenAPIToolProtocol) buildParametersSchema(
 							}
 						}
 					}
-					required = append(required, schema.Required...)
+					for _, name := range schema.Required {
+						if injectedParam, ok := injectParams[name]; ok && (injectedParam.In == ArgLocationBody || injectedParam.In == ArgLocationArg) {
+							continue
+						}
+						required = append(required, name)
+					}
 				}
 			}
 		}

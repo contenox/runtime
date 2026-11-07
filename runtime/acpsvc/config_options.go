@@ -19,11 +19,13 @@ const (
 	configIDThink         = "think"
 	configIDTokenLimit    = "token-limit"
 	configIDWorkspaceRoot = "workspace-root"
+	configIDOracle        = "oracle"
 
 	configCategoryModel         = "model"
 	configCategoryHITLPolicy    = "_hitl_policy"
 	configCategoryThink         = "thought_level"
 	configCategoryWorkspaceRoot = "workspace"
+	configCategoryOracle        = "oracle"
 
 	configTypeSelect = "select"
 
@@ -80,6 +82,25 @@ func (t *Transport) workspaceRootConfigOption(sess *sessionEntry) (libacp.Sessio
 		CurrentValue: current,
 		Options:      libacp.NewSessionConfigValues(values),
 	}, true
+}
+
+func (t *Transport) offersOracle(ctx context.Context, sess *sessionEntry) bool {
+	if !t.deps.OracleMounted || t.deps.Approvals == nil {
+		return false
+	}
+	bounds, err := t.deps.Approvals.AttentionBoundsFor(ctx, t.resolveSessionHITLPolicy(sess))
+	return err == nil && bounds.AllowAgentApprovals
+}
+
+func (t *Transport) oracleConfigOption(sess *sessionEntry) libacp.SessionConfigOption {
+	return libacp.SessionConfigOption{
+		ID:           configIDOracle,
+		Name:         "Oracle",
+		Description:  "Approves tool calls that are plainly part of what you asked; anything else still asks you.",
+		Category:     configCategoryOracle,
+		Type:         libacp.SessionConfigOptionTypeBoolean,
+		CurrentValue: strconv.FormatBool(t.sessionOracle(sess)),
+	}
 }
 
 func workspaceRootDisplayName(root string) string {
@@ -328,6 +349,7 @@ func (t *Transport) setSessionConfigOption(ctx context.Context, sess *sessionEnt
 			return libacp.NewErrorf(libacp.ErrInvalidParams, "unknown model option %q (expected any/<model> or connection:<id>/<model>)", value)
 		}
 		sess.setModelSelection(provider, model)
+		t.persistSessionModelFor(ctx, sess)
 		return nil
 
 	case configIDHITLPolicy:
@@ -346,6 +368,14 @@ func (t *Transport) setSessionConfigOption(ctx context.Context, sess *sessionEnt
 			return libacp.NewErrorf(libacp.ErrInvalidParams, "unknown think option %q", value)
 		}
 		sess.setThink(level)
+		return nil
+
+	case configIDOracle:
+		on, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			return libacp.NewErrorf(libacp.ErrInvalidParams, "oracle must be true or false, got %q", value)
+		}
+		sess.setOracle(on)
 		return nil
 
 	case configIDTokenLimit:

@@ -593,6 +593,7 @@ func (s *State) processOptionalCredCloudBackend(ctx context.Context, backend *ru
 	}
 
 	if cachedModels, ok := s.loadObservedModelCache(ctx, backend.ID, credJSON); ok {
+		cachedModels = modelrepo.WithoutUnavailableModels(s.availabilityScope(backend, credJSON), cachedModels)
 		stateInstance.Models = observedModelNames(cachedModels)
 		stateInstance.PulledModels = make([]ModelPullStatus, 0, len(cachedModels))
 		for _, model := range cachedModels {

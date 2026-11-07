@@ -183,6 +183,7 @@ func seedAgentDeclarations(ctx context.Context, contenoxDir string) error {
 		slog.Error("agent declarations: bootstrap reported a problem; using what compiled", "error", err)
 		return nil
 	}
+	publishDeclaredTools(ctx, results)
 	slog.Info("contenox-runtime serve: agent declarations synced",
 		"created", len(preseeded.Created), "updated", len(preseeded.Updated),
 		"edited", len(preseeded.Edited), "declarations", len(results))
@@ -409,7 +410,8 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		defer engine.Stop()
 	}
 
-	if engine != nil && oracleCfg.enabled() {
+	oracleMounted := engine != nil && oracleCfg.enabled()
+	if oracleMounted {
 		oracleChain, oracleChainRef, oracleErr := loadOracleChain(ctx, contenoxDir, oracleCfg)
 		if oracleErr != nil {
 			return oracleErr
@@ -499,6 +501,8 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		HITLDefaultPolicyName: profile.hitlPolicy,
 		UpdateBanner:          updateBanner,
 		DecisionRecorder:      decisionRecorderOf(acpHITL),
+		Approvals:             acpHITL,
+		OracleMounted:         oracleMounted,
 		HITL:                  acpHITL,
 		Fleet:                 missionFleet,
 		Agents:                missionAgents,

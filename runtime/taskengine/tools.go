@@ -11,7 +11,7 @@ func resolveToolsNames(ctx context.Context, allowlist []string, provider ToolsPr
 		return nil, err
 	}
 
-	taskSet := applyAllowlist(allowlist, all)
+	taskSet := applyTaskAllowlist(allowlist, all)
 
 	runtime, runtimeAttached := RuntimeToolsAllowlistFromContext(ctx)
 	if !runtimeAttached {
@@ -33,6 +33,26 @@ func resolveToolsNames(ctx context.Context, allowlist []string, provider ToolsPr
 		}
 	}
 	return result, nil
+}
+
+const declaredToolsPrefix = "decl-"
+
+func applyTaskAllowlist(allowlist []string, all []string) []string {
+	exact := make(map[string]struct{}, len(allowlist))
+	for _, entry := range allowlist {
+		exact[entry] = struct{}{}
+	}
+	picked := applyAllowlist(allowlist, all)
+	out := picked[:0]
+	for _, name := range picked {
+		if strings.HasPrefix(name, declaredToolsPrefix) {
+			if _, named := exact[name]; !named {
+				continue
+			}
+		}
+		out = append(out, name)
+	}
+	return out
 }
 
 func applyAllowlist(allowlist []string, all []string) []string {
@@ -75,4 +95,8 @@ func ExportedApplyAllowlist(allowlist []string, all []string) []string {
 
 func ExportedResolveToolsNames(ctx context.Context, allowlist []string, provider ToolsProvider) ([]string, error) {
 	return resolveToolsNames(ctx, allowlist, provider)
+}
+
+func ExportedApplyTaskAllowlist(allowlist []string, all []string) []string {
+	return applyTaskAllowlist(allowlist, all)
 }

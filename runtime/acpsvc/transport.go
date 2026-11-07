@@ -2,11 +2,13 @@ package acpsvc
 
 import (
 	"context"
-	"github.com/contenox/runtime/runtime/project"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/contenox/runtime/runtime/connectorservice"
+	"github.com/contenox/runtime/runtime/project"
 
 	libacp "github.com/contenox/runtime/libacp"
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -35,9 +37,6 @@ type Deps struct {
 	DefaultMaxTokens   string
 	DefaultThink       string
 
-	// LiveDefaults, when set, is consulted (TTL-cached) so defaults saved by
-	// another process or the HTTP API take effect without a restart. Non-empty
-	// fields override the static Default* values above, which remain the fallback.
 	LiveDefaults func(ctx context.Context) LiveDefaults
 
 	WorkspaceID string
@@ -57,14 +56,17 @@ type Deps struct {
 
 	SessionRouter *SessionRouter
 
-	// DecisionRecorder, when set, receives every interactive approval decision
-	// answered through session/request_permission, so hitl_approvals keeps an
-	// audit row for it. Optional: nil disables recording.
 	DecisionRecorder hitlservice.DecisionRecorder
+
+	Approvals hitlservice.Service
+
+	OracleMounted bool
 
 	HITL hitlservice.PolicyEvaluator
 
 	Instances agentinstance.Manager
+
+	Connectors connectorservice.Service
 
 	NativeTurns *nativeturn.Registry
 
@@ -75,8 +77,6 @@ type Deps struct {
 	MissionForwarded *MissionForwardConfig
 }
 
-// LiveDefaults is a snapshot of the persisted default-* configuration.
-// Empty fields mean "not configured" and fall back to the startup values.
 type LiveDefaults struct {
 	Model       string
 	Provider    string
@@ -85,9 +85,9 @@ type LiveDefaults struct {
 	MaxTokens   string
 	Think       string
 	Locale      string
+	OracleChat  string
 }
 
-// defaultsTTL bounds how often the live defaults hit the DB.
 const defaultsTTL = 2 * time.Second
 
 type MissionForwardConfig struct {
@@ -112,6 +112,8 @@ type sessionEntry struct {
 	Locale              string
 	EffectiveTokenLimit int
 	HITLPolicy          string
+	Oracle              string
+	LastPrompt          string
 
 	MissionID string
 
@@ -141,8 +143,7 @@ type Transport struct {
 	clientInfo *libacp.Implementation
 	clientCaps libacp.ClientCapabilities
 
-	sessionMu sync.Mutex
-	// statesFn overrides the engine backend state source (tests).
+	sessionMu       sync.Mutex
 	statesFn        func() []statetype.BackendRuntimeState
 	sessions        map[libacp.SessionID]*sessionEntry
 	contenoxToACPID map[string]libacp.SessionID
@@ -155,6 +156,7 @@ type Transport struct {
 	defaultMaxTokens   string
 	defaultThink       string
 	defaultLocale      string
+	defaultOracleChat  string
 	defaultsAt         time.Time
 
 	permMu      sync.Mutex
@@ -259,9 +261,6 @@ func (t *Transport) takeBanner() string {
 	return b
 }
 
-// refreshDefaults reloads the effective defaults from Deps.LiveDefaults at most
-// once per defaultsTTL. The DB config is the source of truth: /model and
-// /provider persist before updating memory, so a reload never loses them.
 func (t *Transport) refreshDefaults() {
 	if t.deps.LiveDefaults == nil {
 		return
@@ -269,7 +268,6 @@ func (t *Transport) refreshDefaults() {
 	t.cfgMu.Lock()
 	fresh := !t.defaultsAt.IsZero() && time.Since(t.defaultsAt) < defaultsTTL
 	if !fresh {
-		// Claim the refresh so concurrent callers don't stampede the DB.
 		t.defaultsAt = time.Now()
 	}
 	t.cfgMu.Unlock()
@@ -298,6 +296,7 @@ func (t *Transport) refreshDefaults() {
 	t.defaultMaxTokens = pick(d.MaxTokens, t.deps.DefaultMaxTokens)
 	t.defaultThink = pick(d.Think, t.deps.DefaultThink)
 	t.defaultLocale = d.Locale
+	t.defaultOracleChat = d.OracleChat
 }
 
 func (t *Transport) locale() string {
@@ -322,7 +321,6 @@ func (t *Transport) sessionLocale(sess *sessionEntry) string {
 	return sess.Locale
 }
 
-// invalidateDefaults forces the next read to reload live defaults.
 func (t *Transport) invalidateDefaults() {
 	t.cfgMu.Lock()
 	t.defaultsAt = time.Time{}
@@ -385,8 +383,6 @@ func (t *Transport) chainTemplateVars(sess *sessionEntry) map[string]string {
 		vars["max_tokens"] = maxTokens
 	}
 	vars["locale"] = t.sessionLocale(sess)
-	// The project folder is the session's, not the runtime process's: one
-	// runtime can serve several projects.
 	if cwd := strings.TrimSpace(sess.Cwd); cwd != "" {
 		vars["cwd"] = cwd
 	}
@@ -461,6 +457,53 @@ func (s *sessionEntry) setHITLPolicy(v string) {
 	s.mu.Lock()
 	s.HITLPolicy = v
 	s.mu.Unlock()
+}
+
+func (t *Transport) oracleChatDefault() bool {
+	t.refreshDefaults()
+	t.cfgMu.Lock()
+	defer t.cfgMu.Unlock()
+	return !strings.EqualFold(strings.TrimSpace(t.defaultOracleChat), "false")
+}
+
+func (t *Transport) sessionOracle(sess *sessionEntry) bool {
+	if sess == nil {
+		return t.oracleChatDefault()
+	}
+	sess.mu.Lock()
+	v := sess.Oracle
+	sess.mu.Unlock()
+	if v == "" {
+		return t.oracleChatDefault()
+	}
+	return v == "true"
+}
+
+func (s *sessionEntry) setOracle(on bool) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.Oracle = strconv.FormatBool(on)
+	s.mu.Unlock()
+}
+
+func (s *sessionEntry) setLastPrompt(text string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.LastPrompt = text
+	s.mu.Unlock()
+}
+
+func (s *sessionEntry) lastPrompt() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.LastPrompt
 }
 
 func (s *sessionEntry) providerOrDefault(defaultProvider string) string {

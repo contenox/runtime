@@ -72,7 +72,11 @@ type Service interface {
 
 	RequestApproval(ctx context.Context, req ApprovalRequest, sink taskengine.TaskEventSink) (bool, error)
 
+	OpenApproval(ctx context.Context, req ApprovalRequest, sink taskengine.TaskEventSink) (*OpenAsk, error)
+
 	Respond(ctx context.Context, approvalID string, approved bool) error
+
+	RespondBy(ctx context.Context, approvalID string, approved bool, decidedBy, reason string) error
 
 	RequestAttention(ctx context.Context, req AttentionRequest, sink taskengine.TaskEventSink) (string, error)
 
@@ -231,9 +235,58 @@ func (s *service) Evaluate(ctx context.Context, toolsName, toolName string, args
 	return result, nil
 }
 
+type Verdict struct {
+	Approved  bool
+	DecidedBy string
+}
+
+type OpenAsk struct {
+	ID          string
+	ExpiresAt   time.Time
+	ch          chan answer
+	waitTimeout time.Duration
+	closeOnce   sync.Once
+	release     func()
+}
+
+func (a *OpenAsk) Wait(ctx context.Context) (Verdict, error) {
+	waitCtx := ctx
+	if a.waitTimeout > 0 {
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, a.waitTimeout)
+		defer cancel()
+	}
+	select {
+	case ans := <-a.ch:
+		return Verdict{Approved: ans.approved, DecidedBy: ans.by}, nil
+	case <-waitCtx.Done():
+		if ctx.Err() != nil {
+			return Verdict{}, ctx.Err()
+		}
+		return Verdict{}, nil
+	}
+}
+
+func (a *OpenAsk) Close() {
+	if a == nil || a.release == nil {
+		return
+	}
+	a.closeOnce.Do(a.release)
+}
+
 func (s *service) RequestApproval(ctx context.Context, req ApprovalRequest, sink taskengine.TaskEventSink) (bool, error) {
+	ask, err := s.OpenApproval(ctx, req, sink)
+	if err != nil {
+		return false, err
+	}
+	defer ask.Close()
+	verdict, err := ask.Wait(ctx)
+	return verdict.Approved, err
+}
+
+func (s *service) OpenApproval(ctx context.Context, req ApprovalRequest, sink taskengine.TaskEventSink) (*OpenAsk, error) {
 	if s.approvals == nil {
-		return false, fmt.Errorf("hitlservice: durable approval store not configured; pass a runtimetypes.Store-backed store to New/NewWithDefaultPolicy")
+		return nil, fmt.Errorf("hitlservice: durable approval store not configured; pass a runtimetypes.Store-backed store to New/NewWithDefaultPolicy")
 	}
 	approvalID := uuid.NewString()
 	now := time.Now().UTC()
@@ -262,6 +315,7 @@ func (s *service) RequestApproval(ctx context.Context, req ApprovalRequest, sink
 		AgentName:   req.AgentName,
 		CreatedAt:   now,
 		ExpiresAt:   now.Add(timeoutDur),
+		ToolCallID:  req.ToolCallID,
 	}
 	if req.MissionID != "" {
 		missionID := req.MissionID
@@ -272,19 +326,27 @@ func (s *service) RequestApproval(ctx context.Context, req ApprovalRequest, sink
 		row.Diff = &diff
 	}
 	if err := s.approvals.CreateHITLApproval(ctx, row); err != nil {
-		return false, fmt.Errorf("hitlservice: persist pending approval: %w", err)
+		return nil, fmt.Errorf("hitlservice: persist pending approval: %w", err)
 	}
 
 	ch := make(chan answer, 1)
 	s.mu.Lock()
 	s.pending[approvalID] = ch
 	s.mu.Unlock()
+	ask := &OpenAsk{
+		ID:        approvalID,
+		ExpiresAt: row.ExpiresAt,
+		ch:        ch,
+		release: func() {
+			s.mu.Lock()
+			delete(s.pending, approvalID)
+			s.mu.Unlock()
+		},
+	}
+	if !ruleTimeout {
+		ask.waitTimeout = timeoutDur
+	}
 	s.offerAdjudication(ctx, adjudicationFromApprovalRequest(approvalID, req))
-	defer func() {
-		s.mu.Lock()
-		delete(s.pending, approvalID)
-		s.mu.Unlock()
-	}()
 
 	ev := taskengine.NewTaskEvent(ctx, taskengine.TaskEventApprovalRequested)
 	ev.ApprovalID = approvalID
@@ -293,28 +355,17 @@ func (s *service) RequestApproval(ctx context.Context, req ApprovalRequest, sink
 	ev.ApprovalArgs = req.Args
 	ev.ApprovalDiff = req.Diff
 	if err := sink.PublishTaskEvent(ctx, ev); err != nil {
-		return false, fmt.Errorf("hitl: publish approval request: %w", err)
+		ask.Close()
+		return nil, fmt.Errorf("hitl: publish approval request: %w", err)
 	}
-
-	waitCtx := ctx
-	if !ruleTimeout {
-		var cancel context.CancelFunc
-		waitCtx, cancel = context.WithTimeout(ctx, timeoutDur)
-		defer cancel()
-	}
-
-	select {
-	case ans := <-ch:
-		return ans.approved, nil
-	case <-waitCtx.Done():
-		if ctx.Err() != nil {
-			return false, ctx.Err()
-		}
-		return false, nil
-	}
+	return ask, nil
 }
 
 func (s *service) Respond(ctx context.Context, approvalID string, approved bool) error {
+	return s.RespondBy(ctx, approvalID, approved, "", "")
+}
+
+func (s *service) RespondBy(ctx context.Context, approvalID string, approved bool, decidedBy, reason string) error {
 	if s.approvals == nil {
 		return fmt.Errorf("hitlservice: durable approval store not configured; pass a runtimetypes.Store-backed store to New/NewWithDefaultPolicy")
 	}
@@ -322,8 +373,19 @@ func (s *service) Respond(ctx context.Context, approvalID string, approved bool)
 	if !approved {
 		state = runtimetypes.HITLApprovalDenied
 	}
+	res := approvalResolution{Approved: &approved}
+	if by := strings.TrimSpace(decidedBy); by != "" {
+		res.DecidedBy = &by
+	}
+	if r := strings.TrimSpace(reason); r != "" {
+		res.Reason = &r
+	}
+	raw, err := marshalResolution(res)
+	if err != nil {
+		return err
+	}
 	now := time.Now().UTC()
-	err := s.approvals.ResolveHITLApproval(ctx, approvalID, state, marshalApprovalResolution(approved), now)
+	err = s.approvals.ResolveHITLApproval(ctx, approvalID, state, raw, now)
 	if err != nil {
 		if !errors.Is(err, libdb.ErrNotFound) {
 			return fmt.Errorf("hitlservice: resolve approval %s: %w", approvalID, err)
@@ -340,17 +402,20 @@ func (s *service) Respond(ctx context.Context, approvalID string, approved bool)
 		}
 		return ErrApprovalAlreadyResolved
 	}
+	s.wake(approvalID, answer{approved: approved, by: decidedBy})
+	return nil
+}
 
+func (s *service) wake(approvalID string, ans answer) {
 	s.mu.Lock()
 	ch, ok := s.pending[approvalID]
 	s.mu.Unlock()
 	if ok {
 		select {
-		case ch <- answer{approved: approved}:
+		case ch <- ans:
 		default:
 		}
 	}
-	return nil
 }
 
 const sweepBatchLimit = 200
@@ -375,18 +440,12 @@ func (s *service) SweepExpired(ctx context.Context) (int, error) {
 			return expired, fmt.Errorf("hitlservice: resolve expired approval %s: %w", row.ID, err)
 		}
 		expired++
-		s.mu.Lock()
-		ch, ok := s.pending[row.ID]
-		s.mu.Unlock()
-		if ok {
-			select {
-			case ch <- answer{approved: approved}:
-			default:
-			}
-		}
+		s.wake(row.ID, answer{approved: approved, by: DecidedByDeadline})
 	}
 	return expired, nil
 }
+
+const DecidedByDeadline = "deadline"
 
 func (s *service) ListPending(ctx context.Context, limit int) ([]*runtimetypes.HITLApproval, error) {
 	if s.approvals == nil {
@@ -418,6 +477,7 @@ type approvalResolution struct {
 type answer struct {
 	approved bool
 	text     string
+	by       string
 }
 
 func marshalAttentionResolution(text, by string) json.RawMessage {

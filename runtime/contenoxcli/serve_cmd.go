@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/connectorservice"
 	"log/slog"
 	"net"
 	"net/http"
@@ -358,6 +359,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	toolsRepo := internaltools.NewPersistentRepo(localTools, db, http.DefaultClient, bus, tracker)
 	toolsProviderSvc := toolsproviderservice.New(db, toolsRepo, tracker)
+	connectors := connectorservice.New(db, toolsRepo)
 
 	taskEventSink := taskengine.NewKVJournalTaskEventSink(
 		taskengine.NewBusTaskEventSink(bus), kvMgr, tracker)
@@ -480,6 +482,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 	stopNativeTurnReaper := startNativeTurnReaper(ctx, nativeTurns, nativeTurnReapInterval(nativeTurnCfg.GraceWindow))
 	defer stopNativeTurnReaper()
 
+	var declaredWorkers mcpWorkers
+	if engine.MCPManager != nil {
+		declaredWorkers = engine.MCPManager
+	}
+	setDeclaredToolsSink(registerDeclaredTools(db, declaredWorkers))
+	defer setDeclaredToolsSink(nil)
 	// The app's runtime compiles the declared agents before anything discovers
 	// them: a fresh home has no chain to serve otherwise.
 	if err := seedAgentDeclarations(ctx, contenoxDir); err != nil {
@@ -573,6 +581,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 			ShellSessions:         shellSessions,
 			SessionRouter:         sessionRouter,
 			DecisionRecorder:      decisionRecorderOf(hitlSvc),
+			Approvals:             hitlSvc,
+			OracleMounted:         oracleCfg.enabled(),
 			HITL:                  hitlSvc,
 			Instances:             instances,
 			NativeTurns:           nativeTurns,
@@ -581,6 +591,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			PolicyCatalog:         policyCatalog(contenoxDir),
 			PolicyResolver:        policyResolver(contenoxDir),
 			HITLDefaultPolicyName: acpDefaultPolicyName,
+			Connectors:            connectors,
 		})
 	}
 
@@ -600,6 +611,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		PubSub:                bus,
 		State:                 engine.State,
 		ToolsProviderService:  toolsProviderSvc,
+		Connectors:            connectors,
 		Agent:                 agent,
 		Chains:                chains,
 		Fleet:                 fleet,

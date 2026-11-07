@@ -68,10 +68,11 @@ func (c *mistralInvokePromptClient) Prompt(ctx context.Context, systemInstructio
 		Accept:      aws.String("application/json"),
 	})
 	if err != nil {
-		err = classifyBedrockError(fmt.Errorf("bedrock mistral invoke (model=%s): %w", c.model.name, err))
+		err = c.classify(fmt.Errorf("bedrock mistral invoke (model=%s): %w", c.model.name, err))
 		reportErr(err)
 		return "", nil, err
 	}
+	c.succeeded()
 	if response == nil || len(response.Body) == 0 {
 		err := errors.New("bedrock mistral response returned an empty body")
 		reportErr(err)

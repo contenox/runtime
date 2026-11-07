@@ -63,6 +63,12 @@ func (f *fakeHITL) RequestApproval(_ context.Context, req hitlservice.ApprovalRe
 
 func (f *fakeHITL) Respond(context.Context, string, bool) error { return nil }
 
+func (f *fakeHITL) RespondBy(context.Context, string, bool, string, string) error { return nil }
+
+func (f *fakeHITL) OpenApproval(context.Context, hitlservice.ApprovalRequest, taskengine.TaskEventSink) (*hitlservice.OpenAsk, error) {
+	return nil, nil
+}
+
 func (f *fakeHITL) RequestAttention(context.Context, hitlservice.AttentionRequest, taskengine.TaskEventSink) (string, error) {
 	return "", nil
 }

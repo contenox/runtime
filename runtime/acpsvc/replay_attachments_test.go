@@ -19,7 +19,7 @@ func TestLoopback_ReplayRestoresTheUsersImagesAndAudio(t *testing.T) {
 	h.tr.replayMessages(context.Background(), "sess-1", []taskengine.Message{
 		{Role: "user", Content: "what is this?", Images: []taskengine.ImagePart{{Data: png, MimeType: "image/png"}}},
 		{Role: "user", Audio: []taskengine.AudioPart{{Data: wav, MimeType: "audio/wav"}}},
-	}, false)
+	}, false, nil)
 
 	var got []libacp.SessionUpdate
 	deadline := time.After(2 * time.Second)

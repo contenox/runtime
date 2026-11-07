@@ -51,7 +51,7 @@ func TestUnit_ACPRuntimeToolsAllowlist_ExcludesOtherACPServers(t *testing.T) {
 	require.NoError(t, store.CreateMCPServer(ctx, testMCPServer("acp-other")))
 
 	tr := &Transport{}
-	allowlist, err := tr.runtimeToolsAllowlist(ctx, store, []string{"acp-current"})
+	allowlist, err := tr.runtimeToolsAllowlist(ctx, store, &sessionEntry{McpServerNames: []string{"acp-current"}})
 	require.NoError(t, err)
 
 	require.Contains(t, allowlist, "*")

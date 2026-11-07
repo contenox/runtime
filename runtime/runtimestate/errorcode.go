@@ -41,7 +41,7 @@ func ClassifyError(err error) string {
 		return ErrorCodeMisconfigured
 	case errors.Is(err, errNoModels):
 		return ErrorCodeNoModels
-	case errors.As(err, &unset), errors.Is(err, libdb.ErrNotFound):
+	case errors.As(err, &unset), errors.Is(err, libdb.ErrNotFound), errors.Is(err, modelrepo.ErrCredentialsMissing):
 		return ErrorCodeMisconfigured
 	case isUnauthorized(err):
 		return ErrorCodeUnauthorized

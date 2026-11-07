@@ -87,9 +87,10 @@ type KV struct {
 }
 
 const (
-	LocationPath  = "path"
-	LocationQuery = "query"
-	LocationBody  = "body"
+	LocationPath   = "path"
+	LocationQuery  = "query"
+	LocationBody   = "body"
+	LocationHeader = "header"
 )
 
 type InjectionArg struct {
@@ -120,6 +121,7 @@ type RemoteTools struct {
 	InjectParams       map[string]string `json:"injectParams,omitempty"`
 	AuthFlow           *AuthFlow         `json:"authFlow,omitempty"`
 	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	Workspace          string            `json:"workspace,omitempty"`
 	CreatedAt          time.Time         `json:"createdAt" example:"2023-11-15T14:30:45Z"`
 	UpdatedAt          time.Time         `json:"updatedAt" example:"2023-11-15T14:30:45Z"`
 }
@@ -227,6 +229,7 @@ type Store interface {
 	ListExpiredHITLApprovals(ctx context.Context, asOf time.Time, limit int) ([]*HITLApproval, error)
 	ListHITLApprovals(ctx context.Context, state HITLApprovalState, createdAtCursor *time.Time, limit int, afterID ...string) ([]*HITLApproval, error)
 	ListHITLApprovalsForMission(ctx context.Context, missionID string, limit int) ([]*HITLApproval, error)
+	ListHITLApprovalsForSession(ctx context.Context, sessionID string, limit int) ([]*HITLApproval, error)
 	EstimateHITLApprovalCount(ctx context.Context) (int64, error)
 
 	EnforceMaxRowCount(ctx context.Context, count int64) error

@@ -39,10 +39,11 @@ type HITLApproval struct {
 	CreatedAt   time.Time         `json:"createdAt" example:"2024-01-15T10:00:00Z"`
 	ExpiresAt   time.Time         `json:"expiresAt" example:"2024-01-15T11:00:00Z"`
 	ResolvedAt  *time.Time        `json:"resolvedAt,omitempty"`
+	ToolCallID  string            `json:"toolCallId,omitempty" example:"call_01H8XGJWBWBAQ4Z8"`
 }
 
 const hitlApprovalColumns = `id, tools_name, tool_name, args_summary, diff, policy_name, matched_rule, on_timeout, state, resolution, ` +
-	`instance_id, session_id, agent_name, mission_id, created_at, expires_at, resolved_at`
+	`instance_id, session_id, agent_name, mission_id, created_at, expires_at, resolved_at, tool_call_id`
 
 func (s *store) CreateHITLApproval(ctx context.Context, a *HITLApproval) error {
 	if a.State == "" {
@@ -51,9 +52,9 @@ func (s *store) CreateHITLApproval(ctx context.Context, a *HITLApproval) error {
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO hitl_approvals
 		(`+hitlApprovalColumns+`)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
 		a.ID, a.ToolsName, a.ToolName, a.ArgsSummary, a.Diff, a.PolicyName, a.MatchedRule, a.OnTimeout, string(a.State), nullableJSON(a.Resolution),
-		a.InstanceID, a.SessionID, a.AgentName, a.MissionID, a.CreatedAt, a.ExpiresAt, a.ResolvedAt,
+		a.InstanceID, a.SessionID, a.AgentName, a.MissionID, a.CreatedAt, a.ExpiresAt, a.ResolvedAt, a.ToolCallID,
 	)
 	return err
 }
@@ -70,7 +71,7 @@ func (s *store) scanHITLApproval(ctx context.Context, query string, arg any) (*H
 	var rawResolution []byte
 	err := s.Exec.QueryRowContext(ctx, query, arg).Scan(
 		&a.ID, &a.ToolsName, &a.ToolName, &a.ArgsSummary, &a.Diff, &a.PolicyName, &a.MatchedRule, &a.OnTimeout, &state, &rawResolution,
-		&a.InstanceID, &a.SessionID, &a.AgentName, &a.MissionID, &a.CreatedAt, &a.ExpiresAt, &a.ResolvedAt,
+		&a.InstanceID, &a.SessionID, &a.AgentName, &a.MissionID, &a.CreatedAt, &a.ExpiresAt, &a.ResolvedAt, &a.ToolCallID,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -87,18 +88,25 @@ func (s *store) scanHITLApproval(ctx context.Context, query string, arg any) (*H
 
 type AgentAnswerBound struct {
 	MissionID      string
+	SessionID      string
 	ResolutionLike string
 	Max            int
 }
 
 func (s *store) ResolveHITLApprovalWithinBound(ctx context.Context, id string, bound AgentAnswerBound, state HITLApprovalState, resolution json.RawMessage, resolvedAt time.Time) error {
+	scope := `mission_id = $5`
+	scopeArg := bound.MissionID
+	if bound.MissionID == "" {
+		scope = `session_id = $5 AND mission_id IS NULL`
+		scopeArg = bound.SessionID
+	}
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE hitl_approvals
 		SET state = $2, resolution = $3, resolved_at = $4
 		WHERE id = $1 AND state = 'pending'
 		  AND (SELECT COUNT(*) FROM hitl_approvals
-		       WHERE mission_id = $5 AND state <> 'pending' AND resolution LIKE $6) < $7`,
-		id, string(state), nullableJSON(resolution), resolvedAt, bound.MissionID, bound.ResolutionLike, bound.Max,
+		       WHERE `+scope+` AND state <> 'pending' AND resolution LIKE $6) < $7`,
+		id, string(state), nullableJSON(resolution), resolvedAt, scopeArg, bound.ResolutionLike, bound.Max,
 	)
 	if err != nil {
 		return err
@@ -184,6 +192,26 @@ func (s *store) ListHITLApprovalsForMission(ctx context.Context, missionID strin
 	return scanHITLApprovalRows(rows)
 }
 
+func (s *store) ListHITLApprovalsForSession(ctx context.Context, sessionID string, limit int) ([]*HITLApproval, error) {
+	if limit > MAXLIMIT {
+		return nil, ErrLimitParamExceeded
+	}
+	if limit <= 0 {
+		limit = MAXLIMIT
+	}
+	rows, err := s.Exec.QueryContext(ctx, `
+		SELECT `+hitlApprovalColumns+`
+		FROM hitl_approvals
+		WHERE session_id = $1
+		ORDER BY created_at DESC, id DESC
+		LIMIT $2`, sessionID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("hitl_approvals: list for session query: %w", err)
+	}
+	defer rows.Close()
+	return scanHITLApprovalRows(rows)
+}
+
 func scanHITLApprovalRows(rows *sql.Rows) ([]*HITLApproval, error) {
 	out := []*HITLApproval{}
 	for rows.Next() {
@@ -192,7 +220,7 @@ func scanHITLApprovalRows(rows *sql.Rows) ([]*HITLApproval, error) {
 		var rawResolution []byte
 		if err := rows.Scan(
 			&a.ID, &a.ToolsName, &a.ToolName, &a.ArgsSummary, &a.Diff, &a.PolicyName, &a.MatchedRule, &a.OnTimeout, &state, &rawResolution,
-			&a.InstanceID, &a.SessionID, &a.AgentName, &a.MissionID, &a.CreatedAt, &a.ExpiresAt, &a.ResolvedAt,
+			&a.InstanceID, &a.SessionID, &a.AgentName, &a.MissionID, &a.CreatedAt, &a.ExpiresAt, &a.ResolvedAt, &a.ToolCallID,
 		); err != nil {
 			return nil, fmt.Errorf("hitl_approvals: scan row: %w", err)
 		}

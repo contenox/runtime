@@ -191,22 +191,7 @@ func (p *PersistentRepo) execRemoteTools(
 		return nil, taskengine.DataTypeAny, fmt.Errorf("timeout must be positive: %dms", tools.TimeoutMs)
 	}
 
-	injectParams := make(map[string]ParamArg)
-	if tools.Properties.Name != "" {
-		loc := p.mapLocation(tools.Properties.In)
-		injectParams[tools.Properties.Name] = ParamArg{
-			Name:  tools.Properties.Name,
-			Value: fmt.Sprintf("%v", tools.Properties.Value),
-			In:    loc,
-		}
-	}
-	for k, v := range tools.Headers {
-		injectParams[k] = ParamArg{
-			Name:  k,
-			Value: fmt.Sprintf("%v", v),
-			In:    ArgLocationHeader,
-		}
-	}
+	injectParams := p.remoteInjectParams(tools)
 	bareName := args.ToolName
 	if prefix := tools.Name + "."; strings.HasPrefix(bareName, prefix) {
 		bareName = strings.TrimPrefix(bareName, prefix)
@@ -330,22 +315,7 @@ func (p *PersistentRepo) GetToolsForToolsByName(ctx context.Context, name string
 		return nil, fmt.Errorf("unknown tools %q: %w", name, taskengine.ErrToolsNotFound)
 	}
 
-	injectParams := make(map[string]ParamArg)
-	if remoteTools.Properties.Name != "" {
-		loc := p.mapLocation(remoteTools.Properties.In)
-		injectParams[remoteTools.Properties.Name] = ParamArg{
-			Name:  remoteTools.Properties.Name,
-			Value: fmt.Sprintf("%v", remoteTools.Properties.Value),
-			In:    loc,
-		}
-	}
-	for k, v := range remoteTools.Headers {
-		injectParams[k] = ParamArg{
-			Name:  k,
-			Value: fmt.Sprintf("%v", v),
-			In:    ArgLocationHeader,
-		}
-	}
+	injectParams := p.remoteInjectParams(remoteTools)
 	tools, err := p.protocolFor(remoteTools.SpecURL).FetchTools(ctx, remoteTools.EndpointURL, injectParams, p.httpClient)
 	if err != nil {
 		return nil, taskengine.ToolsToolsUnavailable(name, fmt.Errorf("remote tools fetch tools: %w", err))
@@ -465,8 +435,32 @@ func acpMCPServerVisible(ctx context.Context, name string) bool {
 	return hasStar || hasExact
 }
 
+func (p *PersistentRepo) remoteInjectParams(tools *runtimetypes.RemoteTools) map[string]ParamArg {
+	injectParams := make(map[string]ParamArg)
+	for k, v := range tools.InjectParams {
+		injectParams[k] = ParamArg{Name: k, Value: v, In: ArgLocationArg}
+	}
+	if tools.Properties.Name != "" {
+		injectParams[tools.Properties.Name] = ParamArg{
+			Name:  tools.Properties.Name,
+			Value: fmt.Sprintf("%v", tools.Properties.Value),
+			In:    p.mapLocation(tools.Properties.In),
+		}
+	}
+	for k, v := range tools.Headers {
+		injectParams[k] = ParamArg{
+			Name:  k,
+			Value: fmt.Sprintf("%v", v),
+			In:    ArgLocationHeader,
+		}
+	}
+	return injectParams
+}
+
 func (p *PersistentRepo) mapLocation(in string) ArgLocation {
 	switch in {
+	case runtimetypes.LocationHeader:
+		return ArgLocationHeader
 	case runtimetypes.LocationPath:
 		return ArgLocationPath
 	case runtimetypes.LocationQuery:

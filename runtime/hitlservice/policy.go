@@ -44,10 +44,12 @@ type ApprovalRequest struct {
 	// card can list them instead of asking about an opaque call.
 	ReadPaths []string
 
-	InstanceID string
-	SessionID  string
-	AgentName  string
-	MissionID  string
+	InstanceID  string
+	SessionID   string
+	AgentName   string
+	MissionID   string
+	Intent      string
+	AgentReview bool
 }
 
 type ConditionOp string
@@ -562,11 +564,45 @@ func commandLineFromArgs(args map[string]any) string {
 }
 
 func commandLineUnsafe(line string) bool {
-	if strings.ContainsAny(line, ";&|<>`\n\r") || strings.Contains(line, "$(") {
+	return commandLineCarriesShellSyntax(line, false)
+}
+
+func commandLineCarriesShellSyntax(line string, pipesAllowed bool) bool {
+	unsafe := ";&|<>`\n\r"
+	if pipesAllowed {
+		unsafe = ";&<>`\n\r"
+	}
+	if strings.ContainsAny(line, unsafe) || strings.Contains(line, "$(") {
 		return true
 	}
 	if runtime.GOOS == "windows" {
 		return strings.ContainsAny(line, "(){}@%^!$")
+	}
+	return false
+}
+
+func pipelineStages(line string) ([]string, bool) {
+	if strings.Contains(line, "||") || commandLineCarriesShellSyntax(line, true) {
+		return nil, false
+	}
+	parts := strings.Split(line, "|")
+	stages := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, false
+		}
+		stages = append(stages, part)
+	}
+	return stages, true
+}
+
+func matchesAnyCommandPrefix(line string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		prefix = strings.TrimSpace(prefix)
+		if prefix != "" && hasCommandPrefix(line, prefix) {
+			return true
+		}
 	}
 	return false
 }
@@ -633,28 +669,26 @@ func commandProgram(line string) string {
 
 func commandPrefixAllowMatch(args map[string]any, prefixList string, action Action, trusted *TrustedBinaries) (bool, string) {
 	line := commandLineFromArgs(args)
-	if strings.TrimSpace(line) == "" || commandLineUnsafe(line) {
+	if strings.TrimSpace(line) == "" {
 		return false, ""
 	}
-	matched := false
-	for _, prefix := range strings.Split(prefixList, ",") {
-		prefix = strings.TrimSpace(prefix)
-		if prefix == "" {
-			continue
-		}
-		if hasCommandPrefix(line, prefix) {
-			matched = true
-			break
-		}
-	}
-	if !matched {
+	stages, ok := pipelineStages(line)
+	if !ok {
 		return false, ""
+	}
+	prefixes := strings.Split(prefixList, ",")
+	for _, stage := range stages {
+		if !matchesAnyCommandPrefix(stage, prefixes) {
+			return false, ""
+		}
 	}
 	if action != ActionAllow || trusted == nil || !trusted.enforced() {
 		return true, ""
 	}
-	if note := trusted.verifyCommand(commandProgram(line)); note != "" {
-		return false, "the allow was withheld: " + note
+	for _, stage := range stages {
+		if note := trusted.verifyCommand(commandProgram(stage)); note != "" {
+			return false, "the allow was withheld: " + note
+		}
 	}
 	return true, ""
 }

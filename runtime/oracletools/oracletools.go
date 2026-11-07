@@ -55,9 +55,10 @@ const (
 )
 
 type AskBinding struct {
-	askID string
-	kind  AskKind
-	input string
+	askID    string
+	kind     AskKind
+	input    string
+	resolver Resolver
 
 	mu       sync.Mutex
 	outcome  Outcome
@@ -67,6 +68,11 @@ type AskBinding struct {
 
 func NewAskBinding(askID string, kind AskKind, input string) *AskBinding {
 	return &AskBinding{askID: askID, kind: kind, input: input}
+}
+
+func (b *AskBinding) WithResolver(r Resolver) *AskBinding {
+	b.resolver = r
+	return b
 }
 
 func (b *AskBinding) AskID() string { return b.askID }
@@ -138,6 +144,13 @@ func New(resolver Resolver) taskengine.ToolsRepo {
 		panic("oracletools: resolver is required")
 	}
 	return &provider{resolver: resolver}
+}
+
+func (p *provider) resolverFor(b *AskBinding) Resolver {
+	if b != nil && b.resolver != nil {
+		return b.resolver
+	}
+	return p.resolver
 }
 
 func (p *provider) Supports(context.Context) ([]string, error) {
@@ -346,7 +359,7 @@ func (p *provider) execSubmitVerdict(ctx context.Context, b *AskBinding, input a
 		if answer == "" {
 			return corrective(`invalid call: verdict "answer" requires a non-empty "answer" — the one short plain sentence the unit acts on. %s`, schemaLineFor(b.kind))
 		}
-		if err := p.resolver.Answer(ctx, b.askID, answer); err != nil {
+		if err := p.resolverFor(b).Answer(ctx, b.askID, answer); err != nil {
 			return p.deliveryFailure(b, err)
 		}
 		b.settle(OutcomeAnswered, answer, "")
@@ -361,7 +374,7 @@ func (p *provider) execSubmitVerdict(ctx context.Context, b *AskBinding, input a
 		if approve {
 			guidance = ""
 		}
-		if err := p.resolver.Decide(ctx, b.askID, approve, guidance); err != nil {
+		if err := p.resolverFor(b).Decide(ctx, b.askID, approve, guidance); err != nil {
 			return p.deliveryFailure(b, err)
 		}
 		if approve {

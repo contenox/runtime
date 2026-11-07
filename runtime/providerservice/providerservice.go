@@ -94,6 +94,7 @@ type Service interface {
 	UpdateConnection(ctx context.Context, id string, req UpdateConnectionRequest) (*Connection, error)
 	DeleteConnection(ctx context.Context, id string) error
 	CheckConnection(ctx context.Context, id string) (*Connection, error)
+	ClearHiddenModels(ctx context.Context, id, model string) (*Connection, error)
 	StartConnectionLogin(ctx context.Context, id string) (*LoginStart, error)
 	ConnectionLoginStatus(ctx context.Context, id string) (*LoginStatus, error)
 	CancelConnectionLogin(ctx context.Context, id string) (*LoginStatus, error)

@@ -20,6 +20,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/chatservice"
+	"github.com/contenox/runtime/runtime/connectorservice"
 	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
@@ -139,13 +140,14 @@ func (t *Transport) LoadSession(ctx context.Context, req libacp.LoadSessionReque
 	t.bindContenoxSession(contenoxSessionID, req.SessionID)
 	t.sessionMu.Unlock()
 	t.persistSessionCwd(ctx, store, req.SessionID, sessionCwd)
+	t.restoreSessionModel(ctx, store, req.SessionID, entry)
 	t.markExternalIfPersisted(ctx, store, req.SessionID, entry)
 	entry.FiredMissions = t.readSessionFiredMission(ctx, store, req.SessionID)
 
 	t.clearToolCallState(req.SessionID)
 	t.subscribeTerminal(req.SessionID, contenoxSessionID)
 	_, isExternal := entry.driver.(*externalDriver)
-	t.replayMessages(ctx, req.SessionID, messages, isExternal)
+	t.replayMessages(ctx, req.SessionID, messages, isExternal, t.replayApprovalDecisions(ctx, store, contenoxSessionID))
 	t.reattachNativeTurn(ctx, req.SessionID)
 	if _, isExternal := entry.driver.(*externalDriver); isExternal {
 		t.reemitExternalCommandMenu(ctx, store, req.SessionID)
@@ -168,7 +170,7 @@ func (t *Transport) LoadSession(ctx context.Context, req libacp.LoadSessionReque
 	return libacp.LoadSessionResponse{ConfigOptions: t.reloadedConfigOptions(ctx, store, req.SessionID, entry)}, nil
 }
 
-func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.SessionID, messages []taskengine.Message, external bool) {
+func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.SessionID, messages []taskengine.Message, external bool, decisions map[string]approvalMeta) {
 	_, reportChange, end := t.tracker().Start(ctx, "replay", "acp_session", "session_id", string(sessionID), "message_count", len(messages))
 	defer end()
 
@@ -232,6 +234,9 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 				if u, ok := externalToolReplayUpdate(m); ok {
 					update = u
 				}
+			}
+			if meta, ok := decisions[update.ToolCallID]; ok {
+				update.Meta = mergeMeta(update.Meta, approvalMetaKey, meta)
 			}
 			t.sendUpdate(ctx, libacp.SessionNotification{
 				SessionID: sessionID,
@@ -640,6 +645,7 @@ func (t *Transport) ResumeSession(ctx context.Context, req libacp.ResumeSessionR
 	t.bindContenoxSession(contenoxSessionID, req.SessionID)
 	t.sessionMu.Unlock()
 	t.persistSessionCwd(ctx, store, req.SessionID, sessionCwd)
+	t.restoreSessionModel(ctx, store, req.SessionID, entry)
 	t.markExternalIfPersisted(ctx, store, req.SessionID, entry)
 	t.clearToolCallState(req.SessionID)
 	t.subscribeTerminal(req.SessionID, contenoxSessionID)
@@ -738,6 +744,7 @@ func (t *Transport) DeleteSession(ctx context.Context, req libacp.DeleteSessionR
 		return libacp.DeleteSessionResponse{}, libacp.InternalError(err.Error())
 	}
 	_ = store.DeleteKV(ctx, acpSessionCwdKVPrefix+string(req.SessionID))
+	_ = store.DeleteKV(ctx, acpSessionModelKVPrefix+string(req.SessionID))
 	_ = store.DeleteKV(ctx, acpSessionAgentKVPrefix+string(req.SessionID))
 	_ = store.DeleteKV(ctx, acpSessionAgentCommandsKVPrefix+string(req.SessionID))
 	_ = store.DeleteKV(ctx, acpSessionAgentConfigOptionsKVPrefix+string(req.SessionID))
@@ -821,34 +828,8 @@ func cleanupMCPSessionIDs(ctx context.Context, store runtimetypes.Store, serverN
 	}
 }
 
-func (t *Transport) runtimeToolsAllowlist(ctx context.Context, store runtimetypes.Store, sessionNames []string) ([]string, error) {
-	allowlist := []string{"*"}
-	current := make(map[string]struct{}, len(sessionNames))
-	for _, name := range sessionNames {
-		current[name] = struct{}{}
-	}
-	var cursor *time.Time
-	var cursorID string
-	for {
-		page, err := store.ListMCPServers(ctx, cursor, 100, cursorID)
-		if err != nil {
-			return nil, fmt.Errorf("acpsvc: list mcp servers for runtime allowlist: %w", err)
-		}
-		for _, srv := range page {
-			if !runtimetypes.IsACPManagedMCPServerName(srv.Name) {
-				continue
-			}
-			if _, ok := current[srv.Name]; ok {
-				continue
-			}
-			allowlist = append(allowlist, "!"+srv.Name)
-		}
-		if len(page) < 100 {
-			return allowlist, nil
-		}
-		cursor = &page[len(page)-1].CreatedAt
-		cursorID = page[len(page)-1].ID
-	}
+func (t *Transport) runtimeToolsAllowlist(ctx context.Context, store runtimetypes.Store, sess *sessionEntry) ([]string, error) {
+	return connectorservice.Allowlist(ctx, store, sess.Cwd, sess.InternalSessionID, sess.McpServerNames)
 }
 
 func CleanupStaleACPManagedMCPServers(ctx context.Context, db libdb.DBManager) error {
@@ -912,6 +893,12 @@ func mcpRowFromLibacp(name string, srv libacp.McpServer) *runtimetypes.MCPServer
 		row.Headers = make(map[string]string, len(srv.Headers))
 		for _, h := range srv.Headers {
 			row.Headers[h.Name] = h.Value
+		}
+	}
+	if len(srv.Env) > 0 {
+		row.Env = make(map[string]string, len(srv.Env))
+		for _, e := range srv.Env {
+			row.Env[e.Name] = e.Value
 		}
 	}
 	return row

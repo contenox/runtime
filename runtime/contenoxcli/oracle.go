@@ -17,6 +17,7 @@ const (
 	configKeyOracleChain        = "default-oracle-chain"
 	configKeyOraclePolicy       = "default-oracle-policy"
 	configKeyOracleApprovesCall = "oracle-approves-tool-calls"
+	configKeyOracleChat         = "oracle-chat"
 
 	flagOracleChain    = "oracle"
 	flagOraclePolicy   = "oracle-policy"
@@ -113,6 +114,6 @@ func oracleMountedLine(c oracleConfig) string {
 	if c.approves {
 		scope = "a subagent's questions AND its approve-tier tool calls"
 	}
-	return fmt.Sprintf("Oracle mounted (%s under %s): it may rule on %s as agent %q, within each subagent envelope's attention bounds.",
+	return fmt.Sprintf("Oracle mounted (%s under %s): it may rule on %s as agent %q, within each subagent envelope's attention bounds, and on a chat's gated tool calls while that chat's Oracle switch is on.",
 		c.chain, c.policy, scope, oracleAgentName)
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1035,6 +1036,26 @@ func TestUnit_BedrockConverseError_ClassifiesTheDocumentedErrorList(t *testing.T
 			require.ErrorContains(t, err, c.errorType)
 		})
 	}
+
+	t.Run("a model the account has not enabled gets a short remedy instead of the vendor text", func(t *testing.T) {
+		transport := &wireTransport{handler: func(request *http.Request, _ []byte) *http.Response {
+			return errorResponse(request, http.StatusForbidden, "AccessDeniedException", "anthropic.claude-sonnet-5-5 is not available for this account")
+		}}
+		provider := newWireProvider("us.anthropic.claude-sonnet-5-5", modelrepo.CapabilityConfig{CanChat: true}, transport)
+		_, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}})
+		require.ErrorIs(t, err, modelrepo.ErrModelAccessDenied)
+		require.Equal(t, "Bedrock model us.anthropic.claude-sonnet-5-5 is not enabled for this AWS account. Enable it under Model access in the Bedrock console, or pick another model.", err.Error())
+		var notEnabled *bedrock.ModelNotEnabledError
+		require.ErrorAs(t, err, &notEnabled)
+		require.ErrorContains(t, errors.Unwrap(notEnabled), "is not available for this account")
+
+		provider = newWireProvider(claudeSonnet45, modelrepo.CapabilityConfig{CanChat: true, CanStream: true}, transport)
+		streamConnection, err := provider.GetStreamConnection(context.Background(), "bedrock:us-east-1")
+		require.NoError(t, err)
+		_, err = streamConnection.Stream(context.Background(), []modelrepo.Message{{Role: "user", Content: "hi"}})
+		require.ErrorIs(t, err, modelrepo.ErrModelAccessDenied)
+		require.ErrorContains(t, err, "is not enabled for this AWS account")
+	})
 
 	t.Run("an unclassified error keeps the vendor's diagnostic", func(t *testing.T) {
 		transport := &wireTransport{handler: func(request *http.Request, _ []byte) *http.Response {

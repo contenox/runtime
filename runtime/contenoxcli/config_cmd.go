@@ -35,6 +35,10 @@ var validConfigKeys = map[string]string{
 	"default-mission-policy":        "Default mission envelope (HITL policy) used when '/mission' or 'contenox-runtime mission fire' names none.",
 	"unofficial-sign-ins":           "Allow sign-ins the vendor does not support for third-party apps, such as a Claude subscription or GitHub Copilot (true/false). Off by default; may break or put the account at risk.",
 	"locale":                        "Language tag agents see as {{var:locale}} (e.g. de-DE). Empty = detected from the operating system.",
+	"oracle-chat":                   "Let Oracle approve chat tool calls that are plainly part of your request (true/false). On by default; false makes every gated call ask you.",
+	"default-oracle-chain":          "Chain that reviews asks as Oracle (e.g. chain-oracle-default.json). Empty or off = no Oracle.",
+	"default-oracle-policy":         "Envelope the Oracle chain runs under (default hitl-policy-oracle.json).",
+	"oracle-approves-tool-calls":    "Let Oracle rule on a mission's gated tool calls, not just its questions (true/false).",
 }
 
 var configCmd = &cobra.Command{
@@ -42,7 +46,7 @@ var configCmd = &cobra.Command{
 	Short: "Manage persistent CLI settings (default model, provider, agent, approval policy).",
 	Long: `Store and retrieve persistent CLI defaults backed by SQLite.
 
-Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy, locale
+Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy, locale, oracle-chat
 Workspace keys (scoped to current project): default-chain, hitl-policy-name
 
 Supported keys:
@@ -60,7 +64,8 @@ Supported keys:
   hitl-policy-name               Active HITL policy file name (e.g. hitl-policy-strict.json)
   default-mission-agent          Default agent fired by /mission and 'mission fire' with no --agent
   default-mission-policy         Default mission envelope (HITL policy) when none is named
-  locale                         Language tag agents see as {{var:locale}}, e.g. de-DE (empty = detected from the OS)`,
+  locale                         Language tag agents see as {{var:locale}}, e.g. de-DE (empty = detected from the OS)
+  oracle-chat                    Let Oracle approve chat tool calls that are plainly part of your request (true/false, default true)`,
 }
 
 var configSetCmd = &cobra.Command{

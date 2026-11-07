@@ -725,7 +725,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			taskErr = fmt.Errorf("failed to resolve execution tools scope: %w", err)
 			break
 		}
-		hiddenTools := executionHiddenTools(currentTask)
+		hiddenTools := executionHiddenTools(taskCtx, currentTask)
 		executedAny := false
 		priorToolMessages := append([]Message(nil), chatHistory.Messages[:assistantIdx]...)
 		batchRepeatCounts := make(map[string]int)
@@ -1054,6 +1054,9 @@ func (exe *SimpleExec) executeLLM(
 	tools := []libmodelprovider.Tool{}
 	hiddenTools := map[string]struct{}{}
 	for _, toolName := range llmCall.HideTools {
+		hiddenTools[toolName] = struct{}{}
+	}
+	for _, toolName := range RuntimeHiddenTools(ctx) {
 		hiddenTools[toolName] = struct{}{}
 	}
 
@@ -1754,12 +1757,20 @@ func (exe *SimpleExec) executionToolsScope(ctx context.Context, currentTask *Tas
 	return allowed, true, nil
 }
 
-func executionHiddenTools(currentTask *TaskDefinition) map[string]struct{} {
-	if currentTask == nil || currentTask.ExecuteConfig == nil || len(currentTask.ExecuteConfig.HideTools) == 0 {
+func executionHiddenTools(ctx context.Context, currentTask *TaskDefinition) map[string]struct{} {
+	runtimeHidden := RuntimeHiddenTools(ctx)
+	var declared []string
+	if currentTask != nil && currentTask.ExecuteConfig != nil {
+		declared = currentTask.ExecuteConfig.HideTools
+	}
+	if len(declared) == 0 && len(runtimeHidden) == 0 {
 		return nil
 	}
-	hidden := make(map[string]struct{}, len(currentTask.ExecuteConfig.HideTools))
-	for _, name := range currentTask.ExecuteConfig.HideTools {
+	hidden := make(map[string]struct{}, len(declared)+len(runtimeHidden))
+	for _, name := range runtimeHidden {
+		hidden[name] = struct{}{}
+	}
+	for _, name := range declared {
 		name = strings.TrimSpace(name)
 		if name != "" {
 			hidden[name] = struct{}{}

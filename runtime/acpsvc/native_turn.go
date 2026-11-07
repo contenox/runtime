@@ -217,7 +217,7 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	var toolsAllowlist []string
 	if t.deps.DB != nil {
 		var err error
-		toolsAllowlist, err = t.runtimeToolsAllowlist(turnCtx, runtimetypes.New(t.deps.DB.WithoutTransaction()), sess.McpServerNames)
+		toolsAllowlist, err = t.runtimeToolsAllowlist(turnCtx, runtimetypes.New(t.deps.DB.WithoutTransaction()), sess)
 		if err != nil {
 			if drainEvents != nil {
 				drainEvents()

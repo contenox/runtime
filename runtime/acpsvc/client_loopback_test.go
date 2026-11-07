@@ -34,6 +34,7 @@ type loopbackClient struct {
 	permMu   sync.Mutex
 	permReqs []libacp.RequestPermissionRequest
 	permResp libacp.RequestPermissionResponse
+	permHold chan struct{}
 }
 
 func newLoopbackClient() *loopbackClient {
@@ -54,12 +55,26 @@ func (c *loopbackClient) SessionUpdate(_ context.Context, n libacp.SessionNotifi
 	return nil
 }
 
-func (c *loopbackClient) RequestPermission(_ context.Context, req libacp.RequestPermissionRequest) (libacp.RequestPermissionResponse, error) {
+func (c *loopbackClient) RequestPermission(ctx context.Context, req libacp.RequestPermissionRequest) (libacp.RequestPermissionResponse, error) {
 	c.permMu.Lock()
 	c.permReqs = append(c.permReqs, req)
 	resp := c.permResp
+	hold := c.permHold
 	c.permMu.Unlock()
+	if hold != nil {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+			return libacp.RequestPermissionResponse{Outcome: libacp.RequestPermissionOutcome{Outcome: libacp.PermissionOutcomeCancelled}}, nil
+		}
+	}
 	return resp, nil
+}
+
+func (c *loopbackClient) holdPermissions(hold chan struct{}) {
+	c.permMu.Lock()
+	c.permHold = hold
+	c.permMu.Unlock()
 }
 
 func (c *loopbackClient) setPermissionResponse(resp libacp.RequestPermissionResponse) {

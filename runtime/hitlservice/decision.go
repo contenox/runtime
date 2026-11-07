@@ -106,6 +106,7 @@ func (s *service) RecordDecision(ctx context.Context, req ApprovalRequest, d Dec
 		CreatedAt:   asked,
 		ExpiresAt:   expires,
 		ResolvedAt:  &now,
+		ToolCallID:  req.ToolCallID,
 	}
 	if req.MissionID != "" {
 		missionID := req.MissionID

@@ -13,6 +13,7 @@ import (
 
 	libbus "github.com/contenox/runtime/libbus"
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/providerservice"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -444,4 +445,70 @@ func TestIntegration_ProviderAPI_CheckConnectionReportsHealthAndErrorCodes(t *te
 	status, _ := f.do("POST", "/providers/connections/missing/check", nil)
 	require.Equal(t, http.StatusNotFound, status)
 
+}
+
+func TestUnit_ProviderAPI_VertexDisplayURLHidesTheProject(t *testing.T) {
+	f := newFixture(t, false)
+	base := "https://us-central1-aiplatform.googleapis.com/v1/projects/secret-project-123/locations/us-central1"
+	created := f.connection("POST", "/providers/vertex-google/connections", map[string]any{"baseUrl": base}, http.StatusCreated)
+	require.Equal(t, base, created.BaseURL, "the stored base URL stays editable as entered")
+	require.Equal(t, "https://us-central1-aiplatform.googleapis.com/v1/projects/…/locations/us-central1", created.DisplayURL)
+	require.NotContains(t, created.DisplayURL, "secret-project-123")
+	require.NotContains(t, created.Error, "secret-project-123")
+
+	plain := f.connection("POST", "/providers/openai/connections", map[string]any{"apiKey": "sk-x"}, http.StatusCreated)
+	require.Equal(t, plain.BaseURL, plain.DisplayURL, "only Vertex carries a project in its URL")
+}
+
+func bedrockScope(t *testing.T, baseURL, credential string) string {
+	t.Helper()
+	catalogue, err := modelrepo.NewCatalogProvider(modelrepo.BackendSpec{Type: "bedrock", BaseURL: baseURL, APIKey: credential})
+	require.NoError(t, err)
+	scoper, ok := catalogue.(modelrepo.AvailabilityScoper)
+	require.True(t, ok)
+	return scoper.AvailabilityScope()
+}
+
+func TestUnit_ProviderAPI_HiddenBedrockModelsSurviveCheckAndClearOnlyOnPurpose(t *testing.T) {
+	f := newFixture(t, true)
+	base := "https://bedrock-runtime.us-east-1.amazonaws.com"
+	credA := `{"access_key_id":"AKIAEXAMPLEA","secret_access_key":"secret-a"}`
+	credB := `{"access_key_id":"AKIAEXAMPLEB","secret_access_key":"secret-b"}`
+	hidden := []string{"us.anthropic.claude-opus-5", "us.anthropic.claude-sonnet-5-5"}
+
+	conn := f.connection("POST", "/providers/bedrock/connections", map[string]any{"baseUrl": base, "apiKey": credA}, http.StatusCreated)
+	scopeA := bedrockScope(t, base, credA)
+	scopeB := bedrockScope(t, base, credB)
+	t.Cleanup(func() {
+		modelrepo.ResetUnavailableModels(scopeA)
+		modelrepo.ResetUnavailableModels(scopeB)
+	})
+	hide := func(scope string) {
+		for _, m := range hidden {
+			modelrepo.MarkModelUnavailable(scope, m)
+		}
+	}
+	hide(scopeA)
+
+	require.Equal(t, hidden, f.connection("PATCH", "/providers/connections/"+conn.ID, map[string]any{"name": "renamed"}, http.StatusOK).HiddenModels)
+
+	checked := f.connection("POST", "/providers/connections/"+conn.ID+"/check", nil, http.StatusOK)
+	require.Equal(t, hidden, checked.HiddenModels, "Check again keeps the not-enabled record")
+
+	one := f.connection("DELETE", "/providers/connections/"+conn.ID+"/hidden-models?model=us.anthropic.claude-opus-5", nil, http.StatusOK)
+	require.Equal(t, []string{"us.anthropic.claude-sonnet-5-5"}, one.HiddenModels)
+
+	hide(scopeA)
+	all := f.connection("DELETE", "/providers/connections/"+conn.ID+"/hidden-models", nil, http.StatusOK)
+	require.Empty(t, all.HiddenModels)
+
+	hide(scopeA)
+	changed := f.connection("PATCH", "/providers/connections/"+conn.ID, map[string]any{"apiKey": credB}, http.StatusOK)
+	require.Empty(t, changed.HiddenModels, "new credentials start without the old record")
+	require.Empty(t, modelrepo.UnavailableModels(scopeA), "the old credential's record is dropped too")
+
+	hide(scopeB)
+	region := f.connection("PATCH", "/providers/connections/"+conn.ID, map[string]any{"baseUrl": "https://bedrock-runtime.eu-west-1.amazonaws.com"}, http.StatusOK)
+	require.Empty(t, region.HiddenModels, "a region change drops the record")
+	require.Empty(t, modelrepo.UnavailableModels(scopeB))
 }

@@ -145,6 +145,7 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 	t.persistCommandTurn(ctx, sess, name, args, out)
 	if commandUpdatesSessionModel(name) {
 		sess.setModelSelection(t.provider(), t.model())
+		t.persistSessionModelFor(ctx, sess)
 	}
 	if commandUpdatesConfigOptions(name) {
 		t.sendConfigOptionUpdate(ctx, sid, sess)

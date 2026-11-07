@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -27,6 +28,8 @@ Each session maintains its own persistent conversation history.
   contenox-runtime session list --all            list every session (whole DB)
   contenox-runtime session switch <name>         switch the active session
   contenox-runtime session delete <name>         delete a session and its messages
+  contenox-runtime session delete <name> --all   delete a session from any workspace (whole DB)
+  contenox-runtime session delete <name> --workspace W   delete a session in a workspace
   contenox-runtime session show [name|id]        print a session (active, by name, or id)
   contenox-runtime session fork [name]           copy active session to a new one
   contenox-runtime session fork --summary        compact older history before forking
@@ -70,7 +73,12 @@ var sessionDeleteCmd = &cobra.Command{
 	Short: "Delete a session and all its messages.",
 	Long: `Permanently delete the named session and its entire message history.
 If the deleted session was the active one, no session is active afterward;
-create or switch to another before chatting again.`,
+create or switch to another before chatting again.
+
+By default only sessions in the active scope are considered. Pass --all or
+--workspace to resolve the name (or session id) the same way
+'contenox-runtime session list --all' and '--workspace' do, which also
+reaches sessions the desktop app created.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runSessionDelete,
 }
@@ -105,6 +113,8 @@ func init() {
 	sessionListCmd.Flags().String("workspace", "", "List sessions in this workspace id (scans whole DB)")
 	sessionListCmd.Flags().String("namespace", "", "List sessions in this namespace (scans whole DB)")
 	sessionListCmd.Flags().Bool("all", false, "List every session across all workspaces and namespaces")
+	sessionDeleteCmd.Flags().String("workspace", "", "Resolve the session in this workspace id (scans whole DB)")
+	sessionDeleteCmd.Flags().Bool("all", false, "Resolve the session across all workspaces and identities")
 	sessionCmd.AddCommand(sessionNewCmd, sessionListCmd, sessionSwitchCmd, sessionDeleteCmd, sessionShowCmd, sessionWorkspacesCmd)
 }
 
@@ -198,13 +208,18 @@ func runSessionSwitch(cmd *cobra.Command, args []string) error {
 }
 
 func runSessionDelete(cmd *cobra.Command, args []string) error {
-	ctx, _, svc, cleanup, err := openSessionService(cmd)
+	ctx, db, svc, cleanup, err := openSessionService(cmd)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
 	name := args[0]
+	ws, _ := cmd.Flags().GetString("workspace")
+	all, _ := cmd.Flags().GetBool("all")
+	if ws != "" || all {
+		return runSessionDeleteScoped(cmd, ctx, db, svc, name, ws)
+	}
 	wasActive, err := svc.Delete(ctx, localIdentity, name)
 	if err != nil {
 		return err
@@ -214,6 +229,57 @@ func runSessionDelete(cmd *cobra.Command, args []string) error {
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q.\n", name)
 	}
+	return nil
+}
+
+func runSessionDeleteScoped(cmd *cobra.Command, ctx context.Context, db libdb.DBManager, svc sessionservice.Service, name, workspace string) error {
+	rows, err := querySessionIndex(ctx, db.WithoutTransaction())
+	if err != nil {
+		return fmt.Errorf("failed to scan sessions: %w", err)
+	}
+	var matches []sessionIndexRow
+	for _, r := range rows {
+		if workspace != "" && r.workspace != workspace {
+			continue
+		}
+		if r.name == name || r.id == name {
+			matches = append(matches, r)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		if workspace != "" {
+			return fmt.Errorf("session %q not found in workspace %q; run 'contenox-runtime session list --workspace %s'", name, workspace, workspace)
+		}
+		return fmt.Errorf("session %q not found in any workspace; run 'contenox-runtime session list --all'", name)
+	case 1:
+	default:
+		workspaces := make([]string, 0, len(matches))
+		for _, m := range matches {
+			workspaces = append(workspaces, m.workspace)
+		}
+		return fmt.Errorf("session %q exists in %d workspaces (%s); pass --workspace <id> to pick one", name, len(matches), strings.Join(workspaces, ", "))
+	}
+	row := matches[0]
+
+	activeID, _ := svc.GetActiveID(ctx)
+	txExec, commit, release, err := db.WithTransaction(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer release()
+	if err := messagestore.New(txExec, row.workspace).DeleteMessageIndex(ctx, row.id, row.identity); err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+	if err := commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+	if activeID == row.id {
+		_ = svc.SetActiveID(ctx, "")
+		fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q from workspace %s (was active; run 'contenox-runtime session new' or 'contenox-runtime session switch' to set a new active session).\n", name, row.workspace)
+		return nil
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Deleted session %q from workspace %s.\n", name, row.workspace)
 	return nil
 }
 

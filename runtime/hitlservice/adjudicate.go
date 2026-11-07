@@ -35,6 +35,8 @@ type Adjudication struct {
 	PolicyName  string
 	MatchedRule string
 	OnTimeout   string
+	Intent      string
+	AgentReview bool
 }
 
 type Adjudicator interface {
@@ -76,7 +78,13 @@ func adjudicationFromApprovalRequest(askID string, req ApprovalRequest) Adjudica
 		PolicyName:  req.PolicyName,
 		MatchedRule: matchedRule,
 		OnTimeout:   string(req.OnTimeout),
+		Intent:      req.Intent,
+		AgentReview: req.AgentReview,
 	}
+}
+
+func AdjudicationOf(askID string, req ApprovalRequest) Adjudication {
+	return adjudicationFromApprovalRequest(askID, req)
 }
 
 func adjudicationFromAttentionRequest(askID string, req AttentionRequest) Adjudication {
@@ -110,8 +118,14 @@ func (s *service) RespondAsAgentBounded(ctx context.Context, askID, agentName st
 	if IsAttentionAsk(row) {
 		return fmt.Errorf("hitlservice: ask %s is a question, which is answered with words, not approve/deny", askID)
 	}
-	if row.MissionID == nil || strings.TrimSpace(*row.MissionID) == "" {
-		return fmt.Errorf("hitlservice: ask %s belongs to no mission, so no agent-approval bound can be applied to it", askID)
+	bound := runtimetypes.AgentAnswerBound{ResolutionLike: agentApprovalResolutionLike, Max: max}
+	switch {
+	case row.MissionID != nil && strings.TrimSpace(*row.MissionID) != "":
+		bound.MissionID = *row.MissionID
+	case strings.TrimSpace(row.SessionID) != "":
+		bound.SessionID = row.SessionID
+	default:
+		return fmt.Errorf("hitlservice: ask %s belongs to no mission or session, so no agent-approval bound can be applied to it", askID)
 	}
 	state := runtimetypes.HITLApprovalApproved
 	if !approved {
@@ -119,11 +133,7 @@ func (s *service) RespondAsAgentBounded(ctx context.Context, askID, agentName st
 	}
 	resolution := marshalDecidedApprovalResolution(approved, agentActor(agentName), guidance)
 	now := time.Now().UTC()
-	resolveErr := s.approvals.ResolveHITLApprovalWithinBound(ctx, askID, runtimetypes.AgentAnswerBound{
-		MissionID:      *row.MissionID,
-		ResolutionLike: agentApprovalResolutionLike,
-		Max:            max,
-	}, state, resolution, now)
+	resolveErr := s.approvals.ResolveHITLApprovalWithinBound(ctx, askID, bound, state, resolution, now)
 	if resolveErr != nil {
 		if !errors.Is(resolveErr, libdb.ErrNotFound) {
 			return fmt.Errorf("hitlservice: resolve ask %s: %w", askID, resolveErr)
@@ -140,15 +150,7 @@ func (s *service) RespondAsAgentBounded(ctx context.Context, askID, agentName st
 		}
 		return ErrApprovalAlreadyResolved
 	}
-	s.mu.Lock()
-	ch, ok := s.pending[askID]
-	s.mu.Unlock()
-	if ok {
-		select {
-		case ch <- answer{approved: approved}:
-		default:
-		}
-	}
+	s.wake(askID, answer{approved: approved, by: agentActor(agentName)})
 	return nil
 }
 

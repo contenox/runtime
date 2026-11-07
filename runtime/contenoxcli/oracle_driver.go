@@ -11,6 +11,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/missionservice"
@@ -105,20 +106,31 @@ func (r oracleResolver) Decide(ctx context.Context, askID string, approve bool, 
 	if hitlservice.IsAttentionAsk(row) {
 		return r.refuse(askID, fmt.Sprintf("ask %s is a question, not a gated tool call", askID))
 	}
-	if row.MissionID == nil || strings.TrimSpace(*row.MissionID) == "" {
-		return r.refuse(askID, fmt.Sprintf("ask %s belongs to no subagent, so no envelope bounds it", askID))
-	}
-	m, err := r.missions.Get(ctx, *row.MissionID)
-	if err != nil || m == nil {
-		return r.refuse(askID, fmt.Sprintf("read subagent %s: %v", *row.MissionID, err))
-	}
-	bounds, err := r.hitl.AttentionBoundsFor(ctx, m.HITLPolicyName)
-	if err != nil {
-		return r.refuse(askID, "the subagent's envelope could not be read")
-	}
-	allowApprovals := bounds.AllowAgentApprovals || (m.ParentSessionID == "" && r.approves)
-	if !allowApprovals {
-		return r.refuse(askID, "the subagent's envelope does not allow agent-decided tool calls")
+	var bounds hitlservice.AttentionBounds
+	switch {
+	case row.MissionID != nil && strings.TrimSpace(*row.MissionID) != "":
+		m, err := r.missions.Get(ctx, *row.MissionID)
+		if err != nil || m == nil {
+			return r.refuse(askID, fmt.Sprintf("read subagent %s: %v", *row.MissionID, err))
+		}
+		bounds, err = r.hitl.AttentionBoundsFor(ctx, m.HITLPolicyName)
+		if err != nil {
+			return r.refuse(askID, "the subagent's envelope could not be read")
+		}
+		if !bounds.AllowAgentApprovals && !(m.ParentSessionID == "" && r.approves) {
+			return r.refuse(askID, "the subagent's envelope does not allow agent-decided tool calls")
+		}
+	case strings.TrimSpace(row.SessionID) != "":
+		var err error
+		bounds, err = r.hitl.AttentionBoundsFor(ctx, row.PolicyName)
+		if err != nil {
+			return r.refuse(askID, "the chat's envelope could not be read")
+		}
+		if !bounds.AllowAgentApprovals {
+			return r.refuse(askID, "the chat's envelope does not allow agent-decided tool calls")
+		}
+	default:
+		return r.refuse(askID, fmt.Sprintf("ask %s belongs to no subagent or chat, so no envelope bounds it", askID))
 	}
 	bounded, ok := r.hitl.(oracleBoundedService)
 	if !ok {
@@ -157,10 +169,13 @@ type oracleDriver struct {
 var _ hitlservice.Adjudicator = (*oracleDriver)(nil)
 
 func (d *oracleDriver) Adjudicate(ctx context.Context, ask hitlservice.Adjudication) {
-	if ask.AskID == "" || ask.MissionID == "" {
+	if ask.AskID == "" {
 		return
 	}
-	if ask.Kind == hitlservice.AskKindPermission && !d.approves {
+	if ask.MissionID == "" && !ask.AgentReview {
+		return
+	}
+	if ask.Kind == hitlservice.AskKindPermission && !d.approves && !ask.AgentReview {
 		return
 	}
 	if !d.claim(ask.AskID) {
@@ -168,15 +183,20 @@ func (d *oracleDriver) Adjudicate(ctx context.Context, ask hitlservice.Adjudicat
 	}
 	defer d.release(ask.AskID)
 
-	input, err := json.Marshal(newOracleInput(ask, d.intentOf(ctx, ask.MissionID)))
+	intent := ask.Intent
+	if intent == "" {
+		intent = d.intentOf(ctx, ask.MissionID)
+	}
+	input, err := json.Marshal(newOracleInput(ask, intent))
 	if err != nil {
 		return
 	}
 	binding := oracletools.NewAskBinding(ask.AskID, bindingKind(ask.Kind), string(input))
-	runCtx := hitlservice.WithPolicyName(ctx, d.policyName())
+	runCtx := libtracker.WithNewRequestID(context.WithValue(ctx, runtimetypes.SessionIDContextKey, ""))
+	runCtx = hitlservice.WithPolicyName(runCtx, d.policyName())
 	runCtx = oracletools.WithBinding(runCtx, binding)
 
-	d.tracef("oracle: reviewing %s ask %s (subagent %s): %s", ask.Kind, ask.AskID, ask.MissionID, askHeadline(ask))
+	d.tracef("oracle: reviewing %s ask %s (%s): %s", ask.Kind, ask.AskID, askOwner(ask), askHeadline(ask))
 	start := time.Now()
 	_, runErr := d.agent.Prompt(runCtx, agentservice.PromptRequest{
 		Input:         string(input),
@@ -193,9 +213,9 @@ func (d *oracleDriver) Adjudicate(ctx context.Context, ask hitlservice.Adjudicat
 	case oracletools.OutcomeAnswered:
 		d.tracef("oracle: answered ask %s in %s: %q", ask.AskID, elapsed, binding.Answer())
 	case oracletools.OutcomeApproved:
-		d.tracef("oracle: APPROVED %s.%s for subagent %s in %s", ask.ToolsName, ask.ToolName, ask.MissionID, elapsed)
+		d.tracef("oracle: APPROVED %s.%s for %s in %s", ask.ToolsName, ask.ToolName, askOwner(ask), elapsed)
 	case oracletools.OutcomeDenied:
-		d.tracef("oracle: DENIED %s.%s for subagent %s in %s: %s", ask.ToolsName, ask.ToolName, ask.MissionID, elapsed, binding.Guidance())
+		d.tracef("oracle: DENIED %s.%s for %s in %s: %s", ask.ToolsName, ask.ToolName, askOwner(ask), elapsed, binding.Guidance())
 	case oracletools.OutcomeWait:
 		d.tracef("oracle: WAIT for ask %s (%s) - it stays with a human", ask.AskID, elapsed)
 	default:
@@ -255,6 +275,13 @@ func bindingKind(k hitlservice.AskKind) oracletools.AskKind {
 		return oracletools.AskKindAttention
 	}
 	return oracletools.AskKindPermission
+}
+
+func askOwner(ask hitlservice.Adjudication) string {
+	if ask.MissionID != "" {
+		return "subagent " + ask.MissionID
+	}
+	return "session " + ask.SessionID
 }
 
 func askHeadline(ask hitlservice.Adjudication) string {

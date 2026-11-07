@@ -115,3 +115,57 @@ func postJSON(t *testing.T, mux *http.ServeMux, path string, body any, wantStatu
 	}
 	return rr
 }
+
+func TestBackendsRedactTheVertexProjectInDisplayURL(t *testing.T) {
+	ctx := context.Background()
+	db, err := libdb.NewSQLiteDBManager(ctx, filepath.Join(t.TempDir(), "displayurl.db"), runtimetypes.SchemaSQLite)
+	if err != nil {
+		t.Fatalf("open sqlite db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	mux := http.NewServeMux()
+	backendapi.AddBackendRoutes(mux, backendservice.New(db), &stubStateService{})
+
+	vertexURL := "https://us-central1-aiplatform.googleapis.com/v1/projects/secret-project-123/locations/us-central1"
+	postJSON(t, mux, "/backends", map[string]string{"name": "vtx", "type": "vertex-google", "baseUrl": vertexURL}, http.StatusCreated)
+	postJSON(t, mux, "/backends", map[string]string{"name": "oll", "type": "ollama", "baseUrl": "http://127.0.0.1:11434"}, http.StatusCreated)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/backends", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /backends = %d: %s", rr.Code, rr.Body.String())
+	}
+	var list []struct {
+		ID         string `json:"id"`
+		Name       string `json:"name"`
+		BaseURL    string `json:"baseUrl"`
+		DisplayURL string `json:"displayUrl"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	byName := map[string]int{}
+	for i, b := range list {
+		byName[b.Name] = i
+	}
+	vtx, oll := list[byName["vtx"]], list[byName["oll"]]
+	if vtx.BaseURL != vertexURL {
+		t.Fatalf("baseUrl must stay editable, got %q", vtx.BaseURL)
+	}
+	if want := "https://us-central1-aiplatform.googleapis.com/v1/projects/…/locations/us-central1"; vtx.DisplayURL != want {
+		t.Fatalf("displayUrl = %q, want %q", vtx.DisplayURL, want)
+	}
+	if oll.DisplayURL != oll.BaseURL {
+		t.Fatalf("displayUrl = %q, want the base URL", oll.DisplayURL)
+	}
+
+	rr = httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/backends/"+vtx.ID, nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /backends/{id} = %d: %s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), `"displayUrl":"`+vertexURL) || !strings.Contains(rr.Body.String(), "projects/…/locations") {
+		t.Fatalf("detail displayUrl not redacted: %s", rr.Body.String())
+	}
+}

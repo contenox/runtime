@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type Connection struct {
 	Name             string    `json:"name"`
 	ProviderType     string    `json:"providerType"`
 	BaseURL          string    `json:"baseUrl"`
+	DisplayURL       string    `json:"displayUrl"`
 	ConfigState      string    `json:"configState"`
 	AuthState        string    `json:"authState"`
 	Health           string    `json:"health"`
@@ -62,6 +64,7 @@ type Connection struct {
 	SecretPresent    bool      `json:"secretPresent"`
 	APIKeyEnv        string    `json:"apiKeyEnv,omitempty"`
 	ModelCount       int       `json:"modelCount"`
+	HiddenModels     []string  `json:"hiddenModels,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -242,6 +245,7 @@ func (s *service) UpdateConnection(ctx context.Context, id string, req UpdateCon
 	}
 
 	updated := *backend
+	credentialChanges := req.ClearSecret || apiKey != "" || apiKeyEnv != ""
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if err := validateConnectionName(name); err != nil {
@@ -270,6 +274,10 @@ func (s *service) UpdateConnection(ctx context.Context, id string, req UpdateCon
 		updated.BaseURL = baseURL
 	}
 
+	connectionChanges := credentialChanges || updated.BaseURL != backend.BaseURL
+	if connectionChanges && s.state != nil {
+		s.state.ClearHiddenModels(ctx, backend, "")
+	}
 	if updated.Name != backend.Name || updated.BaseURL != backend.BaseURL {
 		if err := s.saveBackend(ctx, store, &updated, false); err != nil {
 			return nil, fmt.Errorf("update backend: %w", err)
@@ -285,8 +293,23 @@ func (s *service) UpdateConnection(ctx context.Context, id string, req UpdateCon
 			return nil, err
 		}
 	}
+	if connectionChanges && s.state != nil {
+		s.state.ClearHiddenModels(ctx, &updated, "")
+	}
 	s.afterChange(backend.ID)
 	return s.GetConnection(ctx, backend.ID)
+}
+
+func (s *service) ClearHiddenModels(ctx context.Context, id, model string) (*Connection, error) {
+	backend, err := s.store().GetBackend(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if s.state == nil {
+		return s.GetConnection(ctx, backend.ID)
+	}
+	s.state.ClearHiddenModels(ctx, backend, strings.TrimSpace(model))
+	return s.CheckConnection(ctx, backend.ID)
 }
 
 func (s *service) DeleteConnection(ctx context.Context, id string) error {
@@ -456,6 +479,7 @@ func (s *service) connectionFrom(ctx context.Context, store runtimetypes.Store, 
 		Name:         backend.Name,
 		ProviderType: providerType,
 		BaseURL:      backend.BaseURL,
+		DisplayURL:   DisplayURL(providerType, backend.BaseURL),
 		SecretSource: "none",
 		AuthState:    AuthNotRequired,
 		Health:       HealthUnknown,
@@ -522,6 +546,9 @@ func (s *service) connectionFrom(ctx context.Context, store runtimetypes.Store, 
 	if s.isChecking(backend.ID) {
 		conn.Health = HealthChecking
 	}
+	if s.state != nil && providerType == ProviderTypeBedrock {
+		conn.HiddenModels = s.state.HiddenModels(ctx, backend)
+	}
 
 	if conn.ErrorCode == "" || conn.Health != HealthUnavailable {
 		switch {
@@ -532,6 +559,15 @@ func (s *service) connectionFrom(ctx context.Context, store runtimetypes.Store, 
 		}
 	}
 	return conn, nil
+}
+
+var vertexProjectSegment = regexp.MustCompile(`(/projects/)[^/]+`)
+
+func DisplayURL(providerType, baseURL string) string {
+	if providerType != ProviderTypeVertexGoogle {
+		return baseURL
+	}
+	return vertexProjectSegment.ReplaceAllString(baseURL, "${1}…")
 }
 
 func trimmed(p *string) string {

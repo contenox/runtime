@@ -2,6 +2,8 @@ package bedrock
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +22,38 @@ import (
 	"github.com/contenox/runtime/runtime/modelrepo"
 )
 
-func classifyBedrockError(err error) error {
+const modelNotEnabledMessage = "Bedrock model %s is not enabled for this AWS account. Enable it under Model access in the Bedrock console, or pick another model."
+
+type ModelNotEnabledError struct {
+	Model string
+	cause error
+}
+
+func (e *ModelNotEnabledError) Error() string { return fmt.Sprintf(modelNotEnabledMessage, e.Model) }
+
+func (e *ModelNotEnabledError) Unwrap() error { return e.cause }
+
+func (e *ModelNotEnabledError) Is(target error) bool {
+	return target == modelrepo.ErrModelAccessDenied
+}
+
+var modelNotEnabledMarkers = []string{
+	"is not available for this account",
+	"you don't have access to the model",
+	"model access",
+}
+
+func isModelNotEnabledMessage(message string) bool {
+	lower := strings.ToLower(message)
+	for _, marker := range modelNotEnabledMarkers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func classifyBedrockError(model string, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -40,6 +73,9 @@ func classifyBedrockError(err error) error {
 	}
 	var denied *types.AccessDeniedException
 	if errors.As(err, &denied) {
+		if isModelNotEnabledMessage(denied.ErrorMessage()) {
+			return &ModelNotEnabledError{Model: model, cause: err}
+		}
 		return modelrepo.ClassifyProviderError(err, 403, "AccessDeniedException", denied.ErrorMessage())
 	}
 	var missing *types.ResourceNotFoundException
@@ -82,6 +118,25 @@ type bedrockClient struct {
 	api     *bedrockruntime.Client
 	model   converseModel
 	tracker libtracker.ActivityTracker
+	scope   string
+}
+
+func (c bedrockClient) classify(err error) error {
+	out := classifyBedrockError(c.model.name, err)
+	var notEnabled *ModelNotEnabledError
+	if errors.As(out, &notEnabled) {
+		modelrepo.MarkModelUnavailable(c.scope, c.model.name)
+	}
+	return out
+}
+
+func (c bedrockClient) succeeded() {
+	modelrepo.MarkModelAvailable(c.scope, c.model.name)
+}
+
+func availabilityScope(region, credBlob string) string {
+	sum := sha256.Sum256([]byte(credBlob))
+	return "bedrock|" + region + "|" + hex.EncodeToString(sum[:8])
 }
 
 type staticCreds struct {

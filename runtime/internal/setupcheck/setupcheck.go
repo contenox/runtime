@@ -557,7 +557,9 @@ func classifyBackendError(err string) backendErrorKind {
 	case msg == "":
 		return backendErrorNone
 	case strings.Contains(msg, "api key not configured"),
-		strings.Contains(msg, "failed to retrieve api key configuration"):
+		strings.Contains(msg, "failed to retrieve api key configuration"),
+		strings.Contains(msg, "needs google credentials"),
+		strings.Contains(msg, "could not find default credentials"):
 		return backendErrorAPIKeyMissing
 	case strings.Contains(msg, "401"),
 		strings.Contains(msg, "403"),

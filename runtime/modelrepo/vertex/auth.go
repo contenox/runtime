@@ -3,16 +3,36 @@ package vertex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/contenox/runtime/runtime/modelrepo"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
 const cloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform"
+
+const MissingCredentialsMessage = "Vertex AI needs Google credentials. Paste a service account key JSON into this connection's settings, or sign in with the Google Cloud CLI: gcloud auth application-default login"
+
+type MissingCredentialsError struct {
+	cause error
+}
+
+func (e *MissingCredentialsError) Error() string { return MissingCredentialsMessage }
+
+func (e *MissingCredentialsError) Unwrap() error { return e.cause }
+
+func (e *MissingCredentialsError) Is(target error) bool {
+	return target == modelrepo.ErrCredentialsMissing
+}
+
+func isMissingDefaultCredentials(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "could not find default credentials")
+}
 
 func NewTokenSource(ctx context.Context, credJSON string) (oauth2.TokenSource, error) {
 	if credJSON != "" {
@@ -24,6 +44,9 @@ func NewTokenSource(ctx context.Context, credJSON string) (oauth2.TokenSource, e
 	}
 	ts, err := google.DefaultTokenSource(ctx, cloudPlatformScope)
 	if err != nil {
+		if isMissingDefaultCredentials(err) {
+			return nil, &MissingCredentialsError{cause: err}
+		}
 		return nil, fmt.Errorf("vertex AI ADC: %w", err)
 	}
 	return ts, nil
@@ -70,6 +93,9 @@ func BearerToken(ctx context.Context) (string, error) {
 func BearerTokenWithCreds(ctx context.Context, credJSON string) (string, error) {
 	ts, err := NewTokenSource(ctx, credJSON)
 	if err != nil {
+		if errors.Is(err, modelrepo.ErrCredentialsMissing) {
+			return "", err
+		}
 		return "", fmt.Errorf("vertex AI ADC: %w", err)
 	}
 	tok, err := ts.Token()

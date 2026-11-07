@@ -50,6 +50,16 @@ func (t *Transport) handleExtRequest(ctx context.Context, method string, params 
 		return t.handleAgentProblems()
 	case ExtMethodAgentConfigOptions:
 		return t.handleAgentConfigOptions(ctx, params)
+	case ExtMethodSessionConnectors:
+		return t.handleSessionConnectors(ctx, params)
+	case ExtMethodSessionConnectorsSet:
+		return t.handleSessionConnectorsSet(ctx, params)
+	case ExtMethodSessionConnectorsAdd:
+		return t.handleSessionConnectorsAdd(ctx, params)
+	case ExtMethodSessionConnectorsRemove:
+		return t.handleSessionConnectorsRemove(ctx, params)
+	case ExtMethodSessionConnectorsTool:
+		return t.handleSessionConnectorsTool(ctx, params)
 	default:
 		return nil, libacp.MethodNotFound(method)
 	}
@@ -203,9 +213,6 @@ func (t *Transport) handleEnvelopesList() (json.RawMessage, *libacp.Error) {
 	return raw, nil
 }
 
-// ExtMethodAgentProblems reports what the last declaration sync could not do:
-// a refused or ignored file, or a field this build does not carry. The app shows
-// it instead of leaving it in the log.
 const ExtMethodAgentProblems = "_contenox/agents/problems"
 
 func (t *Transport) handleAgentProblems() (json.RawMessage, *libacp.Error) {

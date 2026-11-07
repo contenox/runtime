@@ -81,6 +81,14 @@ func (f *fakeApprovals) Respond(_ context.Context, id string, approved bool) err
 	return f.respondErr
 }
 
+func (f *fakeApprovals) RespondBy(ctx context.Context, id string, approved bool, _, _ string) error {
+	return f.Respond(ctx, id, approved)
+}
+
+func (f *fakeApprovals) OpenApproval(context.Context, hitlservice.ApprovalRequest, taskengine.TaskEventSink) (*hitlservice.OpenAsk, error) {
+	return nil, nil
+}
+
 func (f *fakeApprovals) ListPending(_ context.Context, limit int) ([]*runtimetypes.HITLApproval, error) {
 	f.mu.Lock()
 	f.listLimit = limit

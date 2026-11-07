@@ -14,6 +14,7 @@ var (
 	ErrModelAccessDenied      = errors.New("backend denied access to the requested model")
 	ErrPaymentRequired        = errors.New("provider account requires payment")
 	ErrRequestTooLarge        = errors.New("request exceeds the provider's size limit")
+	ErrCredentialsMissing     = errors.New("provider credentials are not configured")
 )
 
 func IsBackendTerminal(err error) bool {

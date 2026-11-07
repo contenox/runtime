@@ -44,6 +44,46 @@ func (s *State) RefreshProviderModels(ctx context.Context, providers ...string) 
 	return s.RunProviderCycle(ctx, providers...)
 }
 
+func (s *State) availabilityScope(backend *runtimetypes.Backend, credential string) string {
+	catalog, err := s.newCatalogProvider(backend, credential)
+	if err != nil {
+		return ""
+	}
+	scoper, ok := catalog.(modelrepo.AvailabilityScoper)
+	if !ok {
+		return ""
+	}
+	return scoper.AvailabilityScope()
+}
+
+func (s *State) scopeOf(ctx context.Context, backend *runtimetypes.Backend) string {
+	credential, err := s.loadProviderAPIKey(ctx, backend)
+	if err != nil && !errors.Is(err, libdbexec.ErrNotFound) {
+		return ""
+	}
+	return s.availabilityScope(backend, credential)
+}
+
+func (s *State) HiddenModels(ctx context.Context, backend *runtimetypes.Backend) []string {
+	scope := s.scopeOf(ctx, backend)
+	if scope == "" {
+		return nil
+	}
+	return modelrepo.UnavailableModels(scope)
+}
+
+func (s *State) ClearHiddenModels(ctx context.Context, backend *runtimetypes.Backend, model string) {
+	scope := s.scopeOf(ctx, backend)
+	if scope == "" {
+		return
+	}
+	if model == "" {
+		modelrepo.ResetUnavailableModels(scope)
+		return
+	}
+	modelrepo.MarkModelAvailable(scope, model)
+}
+
 func InvalidateModelCache(ctx context.Context, kv libkvstore.KVManager, backendID string) error {
 	if kv == nil {
 		return nil

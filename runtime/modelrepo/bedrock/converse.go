@@ -587,7 +587,13 @@ func decodeConverse(m converseModel, out *bedrockruntime.ConverseOutput, toOrigi
 		return modelrepo.ChatResult{}, fmt.Errorf("bedrock model %s returned %s", m.name, stopReason)
 	}
 
-	if text.Len() == 0 && len(toolCalls) == 0 && thinking.Len() == 0 {
+	content := text.String()
+	if tagged, answer, ok := splitLeadingThinking(content); ok {
+		thinking.WriteString(tagged)
+		content = answer
+	}
+
+	if content == "" && len(toolCalls) == 0 && thinking.Len() == 0 {
 		if stopReason == "" {
 			return modelrepo.ChatResult{}, errors.New("bedrock: converse output carried no stop reason")
 		}
@@ -595,7 +601,7 @@ func decodeConverse(m converseModel, out *bedrockruntime.ConverseOutput, toOrigi
 	return modelrepo.ChatResult{
 		Message: modelrepo.Message{
 			Role:         "assistant",
-			Content:      text.String(),
+			Content:      content,
 			Thinking:     thinking.String(),
 			Continuation: reasoningContinuation(m, reasoning),
 		},

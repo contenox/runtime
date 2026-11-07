@@ -159,8 +159,8 @@ func TestUnit_SeededPolicies_GateGitTools(t *testing.T) {
 		write   hitlservice.Action
 		secret  hitlservice.Action
 	}{
-		{"hitl-policy-default.json", shippedHITLPolicy(t, "default"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
-		{"hitl-policy-acp.json", shippedHITLPolicy(t, "acp"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-default.json", shippedHITLPolicy(t, "default"), hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"hitl-policy-acp.json", shippedHITLPolicy(t, "acp"), hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
 		{"hitl-policy-strict.json", shippedHITLPolicy(t, "strict"), hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove, hitlservice.ActionApprove},
 		{"hitl-policy-acpx.json", shippedHITLPolicy(t, "acpx"), hitlservice.ActionAllow, hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
 		{"hitl-policy-dev.json", shippedHITLPolicy(t, "dev"), hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionAllow},

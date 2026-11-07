@@ -3,6 +3,7 @@ package vertex
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -168,6 +169,9 @@ func listVertexPublisherModelNames(ctx context.Context, vertexLocationBaseURL, p
 			return nil, err
 		}
 		if err := auth.apply(ctx, req); err != nil {
+			if errors.Is(err, modelrepo.ErrCredentialsMissing) {
+				return nil, err
+			}
 			return nil, fmt.Errorf("vertex-%s list models: %w", publisher, err)
 		}
 

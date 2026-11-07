@@ -95,6 +95,17 @@ func TestUnit_HandleThinkStatusSetAndInvalid(t *testing.T) {
 	if got := sess.think(); got != "high" {
 		t.Fatalf("invalid /think mutated session value to %q", got)
 	}
+
+	out, err = tr.handleThink(sess, "auto")
+	if err != nil {
+		t.Fatalf("handleThink auto: %v", err)
+	}
+	if out != "Think set to auto for this session." {
+		t.Fatalf("auto output = %q", out)
+	}
+	if got := sess.think(); got != "auto" {
+		t.Fatalf("session think = %q, want auto", got)
+	}
 }
 
 func TestUnit_HandleMaxTokensStatusSetAndInvalid(t *testing.T) {

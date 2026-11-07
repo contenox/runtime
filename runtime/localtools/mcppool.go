@@ -150,8 +150,10 @@ type MCPServerConfig struct {
 
 	Command string
 	Args    []string
+	Env     map[string]string
 
-	URL string
+	URL     string
+	Headers map[string]string
 
 	Auth *MCPAuthConfig
 
@@ -260,6 +262,12 @@ func (p *MCPSessionPool) buildTransport() (mcp.Transport, error) {
 			return nil, fmt.Errorf("stdio transport requires a command")
 		}
 		cmd := exec.Command(p.cfg.Command, p.cfg.Args...)
+		if len(p.cfg.Env) > 0 {
+			cmd.Env = os.Environ()
+			for k, v := range p.cfg.Env {
+				cmd.Env = append(cmd.Env, k+"="+v)
+			}
+		}
 		winproc.Hide(cmd)
 		return &mcp.CommandTransport{Command: cmd}, nil
 
@@ -268,6 +276,9 @@ func (p *MCPSessionPool) buildTransport() (mcp.Transport, error) {
 			return nil, fmt.Errorf("sse transport requires a url")
 		}
 		var rt http.RoundTripper = http.DefaultTransport
+		if len(p.cfg.Headers) > 0 {
+			rt = &headerRoundTripper{base: rt, headers: p.cfg.Headers}
+		}
 		if p.cfg.Auth != nil && p.cfg.Auth.Type == MCPAuthOAuth {
 			oauthRT, err := p.buildOAuthRoundTripper(rt)
 			if err != nil {
@@ -287,6 +298,9 @@ func (p *MCPSessionPool) buildTransport() (mcp.Transport, error) {
 			return nil, fmt.Errorf("http transport requires a url")
 		}
 		var rt http.RoundTripper = http.DefaultTransport
+		if len(p.cfg.Headers) > 0 {
+			rt = &headerRoundTripper{base: rt, headers: p.cfg.Headers}
+		}
 		if p.cfg.Auth != nil && p.cfg.Auth.Type == MCPAuthOAuth {
 			oauthRT, err := p.buildOAuthRoundTripper(rt)
 			if err != nil {
@@ -793,4 +807,19 @@ func openBrowserDefault(rawURL string) error {
 func commandExists(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
+}
+
+type headerRoundTripper struct {
+	base    http.RoundTripper
+	headers map[string]string
+}
+
+func (h *headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	r := req.Clone(req.Context())
+	for k, v := range h.headers {
+		if r.Header.Get(k) == "" {
+			r.Header.Set(k, v)
+		}
+	}
+	return h.base.RoundTrip(r)
 }

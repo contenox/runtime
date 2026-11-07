@@ -27,10 +27,11 @@ func (c *bedrockChatClient) Chat(ctx context.Context, messages []modelrepo.Messa
 		out, err = c.api.Converse(ctx, in)
 	}
 	if err != nil {
-		err = classifyBedrockError(fmt.Errorf("bedrock converse (model=%s): %w", c.model.name, err))
+		err = c.classify(fmt.Errorf("bedrock converse (model=%s): %w", c.model.name, err))
 		reportErr(err)
 		return modelrepo.ChatResult{}, err
 	}
+	c.succeeded()
 	res, err := decodeConverse(c.model, out, toOriginal)
 	if err != nil {
 		reportErr(err)

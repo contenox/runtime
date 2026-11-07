@@ -7,6 +7,7 @@ import (
 
 	apiframework "github.com/contenox/runtime/apiframework"
 	"github.com/contenox/runtime/runtime/backendservice"
+	"github.com/contenox/runtime/runtime/providerservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/stateservice"
 	"github.com/contenox/runtime/runtime/statetype"
@@ -24,10 +25,11 @@ func AddBackendRoutes(mux *http.ServeMux, backendService backendservice.Service,
 }
 
 type backendSummary struct {
-	ID      string `json:"id" example:"backend-id"`
-	Name    string `json:"name" example:"backend-name"`
-	BaseURL string `json:"baseUrl" example:"http://localhost:11434"`
-	Type    string `json:"type" example:"ollama"`
+	ID         string `json:"id" example:"backend-id"`
+	Name       string `json:"name" example:"backend-name"`
+	BaseURL    string `json:"baseUrl" example:"http://localhost:11434"`
+	DisplayURL string `json:"displayUrl" example:"http://localhost:11434"`
+	Type       string `json:"type" example:"ollama"`
 
 	Models       []string                    `json:"models"`
 	PulledModels []statetype.ModelPullStatus `json:"pulledModels"`
@@ -84,12 +86,13 @@ func (b *backendManager) listBackends(w http.ResponseWriter, r *http.Request) {
 	resp := []backendSummary{}
 	for _, backend := range backends {
 		item := backendSummary{
-			ID:        backend.ID,
-			Name:      backend.Name,
-			BaseURL:   backend.BaseURL,
-			Type:      backend.Type,
-			CreatedAt: backend.CreatedAt,
-			UpdatedAt: backend.UpdatedAt,
+			ID:         backend.ID,
+			Name:       backend.Name,
+			BaseURL:    backend.BaseURL,
+			DisplayURL: providerservice.DisplayURL(backend.Type, backend.BaseURL),
+			Type:       backend.Type,
+			CreatedAt:  backend.CreatedAt,
+			UpdatedAt:  backend.UpdatedAt,
 		}
 		ok := false
 		var itemState statetype.BackendRuntimeState
@@ -116,6 +119,7 @@ type backendDetails struct {
 	ID           string                      `json:"id" example:"b7d9e1a3-8f0c-4a7d-9b1e-2f3a4b5c6d7e"`
 	Name         string                      `json:"name" example:"ollama-production"`
 	BaseURL      string                      `json:"baseUrl" example:"http://ollama-prod.internal:11434"`
+	DisplayURL   string                      `json:"displayUrl" example:"http://ollama-prod.internal:11434"`
 	Type         string                      `json:"type" example:"ollama"`
 	Models       []string                    `json:"models" example:"[\"mistral:instruct\", \"llama2:7b\", \"nomic-embed-text:latest\"]"`
 	PulledModels []statetype.ModelPullStatus `json:"pulledModels"`
@@ -158,6 +162,7 @@ func (b *backendManager) getBackend(w http.ResponseWriter, r *http.Request) {
 		ID:           backend.ID,
 		Name:         backend.Name,
 		BaseURL:      backend.BaseURL,
+		DisplayURL:   providerservice.DisplayURL(backend.Type, backend.BaseURL),
 		Type:         backend.Type,
 		Models:       []string{},
 		PulledModels: []statetype.ModelPullStatus{},

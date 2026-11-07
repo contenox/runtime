@@ -75,6 +75,7 @@ func liveDefaultsResolver(db libdb.DBManager, withEnv bool, pinned acpsvc.LiveDe
 		} else {
 			d.Locale = locale.Resolve(ctx, runtimetypes.New(db.WithoutTransaction()))
 		}
+		d.OracleChat = acpsvc.ReadConfigValue(ctx, db, configKeyOracleChat)
 		return d
 	}
 }

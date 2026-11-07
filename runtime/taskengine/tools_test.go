@@ -163,3 +163,30 @@ func TestUnit_ResolveToolsNames_Runtime_StricterWins(t *testing.T) {
 		t.Errorf("runtime [tools_a] ∩ task [*]: expected [tools_a], got %v", names)
 	}
 }
+
+func TestUnit_StarSkipsDeclaredToolsetsUnlessNamed(t *testing.T) {
+	all := []string{"local_shell", "decl-reviewer-fs", "decl-other-fs", "github"}
+	got := taskengine.ExportedApplyTaskAllowlist([]string{"*"}, all)
+	if len(got) != 2 || got[0] != "local_shell" || got[1] != "github" {
+		t.Fatalf("star = %v", got)
+	}
+	got = taskengine.ExportedApplyTaskAllowlist([]string{"local_shell", "decl-reviewer-fs"}, all)
+	if len(got) != 2 || got[1] != "decl-reviewer-fs" {
+		t.Fatalf("named = %v", got)
+	}
+	got = taskengine.ExportedApplyTaskAllowlist([]string{"*", "decl-reviewer-fs"}, all)
+	if len(got) != 3 {
+		t.Fatalf("star plus named = %v", got)
+	}
+}
+
+func TestUnit_RuntimeHiddenToolsComeFromQualifiedExclusions(t *testing.T) {
+	ctx := taskengine.WithRuntimeToolsAllowlist(context.Background(), []string{"*", "!github", "!local_fs.write_file", "!github.delete_repo"})
+	got := taskengine.RuntimeHiddenTools(ctx)
+	if len(got) != 2 || got[0] != "local_fs.write_file" || got[1] != "github.delete_repo" {
+		t.Fatalf("hidden = %v", got)
+	}
+	if taskengine.RuntimeHiddenTools(context.Background()) != nil {
+		t.Fatal("no allowlist means nothing hidden")
+	}
+}

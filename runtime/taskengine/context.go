@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"strings"
 
 	libmodelprovider "github.com/contenox/runtime/runtime/modelrepo"
 )
@@ -52,6 +53,20 @@ type runtimeToolsAllowlist struct {
 
 func WithRuntimeToolsAllowlist(ctx context.Context, allowlist []string) context.Context {
 	return context.WithValue(ctx, runtimeToolsAllowlistKey{}, runtimeToolsAllowlist{list: allowlist})
+}
+
+func RuntimeHiddenTools(ctx context.Context) []string {
+	list, ok := RuntimeToolsAllowlistFromContext(ctx)
+	if !ok {
+		return nil
+	}
+	var hidden []string
+	for _, entry := range list {
+		if name, isExcluded := strings.CutPrefix(entry, "!"); isExcluded && strings.Contains(name, ".") {
+			hidden = append(hidden, name)
+		}
+	}
+	return hidden
 }
 
 func RuntimeToolsAllowlistFromContext(ctx context.Context) ([]string, bool) {

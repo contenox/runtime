@@ -128,6 +128,46 @@ func TestUnit_Envelopes_DefaultShellTiers(t *testing.T) {
 		"a PowerShell reader carrying a second command must not stay allowed")
 }
 
+func TestUnit_Envelopes_DefaultEditsTheWorkspaceWithoutAsking(t *testing.T) {
+	cfg, err := agentdecl.Shipped()
+	require.NoError(t, err)
+	svc := envelopeEvaluator(t, cfg, "default")
+
+	assert.Equal(t, hitlservice.ActionAllow, evaluate(t, svc, "local_fs", "write_file", map[string]any{"path": "main.go", "content": "x"}))
+	assert.Equal(t, hitlservice.ActionAllow, evaluate(t, svc, "local_fs", "edit_file", map[string]any{"path": "src/app.ts"}))
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, svc, "local_fs", "write_file", map[string]any{"path": ".git/config", "content": "x"}),
+		"the write wall stays: .git is commands, not project files")
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, svc, "local_fs", "write_file", map[string]any{"path": "/home/dev/.bashrc", "content": "x"}))
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, svc, "local_fs", "write_file", map[string]any{"path": "/home/dev/.ssh/config", "content": "x"}))
+	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "local_fs", "read_file", map[string]any{"path": ".env"}),
+		"secrets still ask on read")
+	assert.Equal(t, hitlservice.ActionAllow, evaluate(t, svc, "native-git", "git_add", nil))
+	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "native-git", "git_commit", nil))
+	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "native-git", "git_push", nil))
+}
+
+func TestUnit_Envelopes_DefaultRunsReaderPipelines(t *testing.T) {
+	cfg, err := agentdecl.Shipped()
+	require.NoError(t, err)
+	svc := envelopeEvaluator(t, cfg, "default")
+
+	shell := func(command string) hitlservice.Action {
+		return evaluate(t, svc, "local_shell", "local_shell", map[string]any{"command": command})
+	}
+	assert.Equal(t, hitlservice.ActionAllow, shell("grep -rn todo src | head -n 5"))
+	assert.Equal(t, hitlservice.ActionAllow, shell("git log --oneline | head -n 20"))
+	assert.Equal(t, hitlservice.ActionAllow, shell("cargo test"))
+	assert.Equal(t, hitlservice.ActionAllow, shell("npm run typecheck"))
+	assert.Equal(t, hitlservice.ActionAllow, shell("Get-ChildItem -Recurse | Select-String todo"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("grep -rn todo src | sh"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("cat notes.txt | tee copy.txt"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("ls || rm -rf build"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("grep -rn todo src | head > hits.txt"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("npm install"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("git commit -m x"))
+	assert.Equal(t, hitlservice.ActionApprove, shell("git push"))
+}
+
 func TestUnit_Envelopes_StrictRefusesWhatItDoesNotName(t *testing.T) {
 	cfg, err := agentdecl.Shipped()
 	require.NoError(t, err)

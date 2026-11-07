@@ -27,6 +27,7 @@ func TestUnit_ClassifyError(t *testing.T) {
 		{"no models", errNoModels, ErrorCodeNoModels},
 		{"env unset", &EnvironmentUnsetError{Variable: "K"}, ErrorCodeMisconfigured},
 		{"credential missing", libdb.ErrNotFound, ErrorCodeMisconfigured},
+		{"provider credentials missing", fmt.Errorf("catalog: %w", modelrepo.ErrCredentialsMissing), ErrorCodeMisconfigured},
 		{"provider 401", &modelrepo.ProviderError{StatusCode: 401}, ErrorCodeUnauthorized},
 		{"provider 403 wrapped", fmt.Errorf("catalog: %w", &modelrepo.ProviderError{StatusCode: 403}), ErrorCodeUnauthorized},
 		{"http 401", &modelrepo.HTTPError{StatusCode: 401}, ErrorCodeUnauthorized},

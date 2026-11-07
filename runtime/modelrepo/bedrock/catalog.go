@@ -14,6 +14,8 @@ import (
 	"github.com/contenox/runtime/runtime/modelrepo"
 )
 
+const inferenceTypeInferenceProfile types.InferenceType = "INFERENCE_PROFILE"
+
 type catalogProvider struct {
 	spec       modelrepo.BackendSpec
 	httpClient *http.Client
@@ -47,7 +49,7 @@ func (p *catalogProvider) ListModels(ctx context.Context) ([]modelrepo.ObservedM
 
 	profileIDs, _ := listInferenceProfileIDs(ctx, client)
 
-	var models []modelrepo.ObservedModel
+	models := []modelrepo.ObservedModel{}
 	for _, summary := range output.ModelSummaries {
 		invokeID, ok := resolveInvocableModelID(aws.ToString(summary.ModelId), summary.InferenceTypesSupported, profileIDs)
 		if !ok {
@@ -56,7 +58,11 @@ func (p *catalogProvider) ListModels(ctx context.Context) ([]modelrepo.ObservedM
 		models = append(models, observedFromSummary(summary, invokeID))
 	}
 
-	return models, nil
+	return modelrepo.WithoutUnavailableModels(p.AvailabilityScope(), models), nil
+}
+
+func (p *catalogProvider) AvailabilityScope() string {
+	return availabilityScope(regionFromURL(p.spec.BaseURL), p.spec.APIKey)
 }
 
 func listInferenceProfileIDs(ctx context.Context, client *bedrock.Client) ([]string, error) {
@@ -83,10 +89,20 @@ func listInferenceProfileIDs(ctx context.Context, client *bedrock.Client) ([]str
 }
 
 func resolveInvocableModelID(modelID string, inferenceTypes []types.InferenceType, profileIDs []string) (string, bool) {
+	var onDemand, viaProfile bool
 	for _, t := range inferenceTypes {
-		if t == types.InferenceTypeOnDemand {
-			return modelID, true
+		switch t {
+		case types.InferenceTypeOnDemand:
+			onDemand = true
+		case inferenceTypeInferenceProfile:
+			viaProfile = true
 		}
+	}
+	if onDemand {
+		return modelID, true
+	}
+	if !viaProfile {
+		return "", false
 	}
 	suffix := "." + modelID
 	var matches []string
@@ -114,7 +130,7 @@ func observedFromSummary(summary types.FoundationModelSummary, invokeID string) 
 	conversational := text && !embedding
 
 	meta := map[string]string{}
-	if name := aws.ToString(summary.ModelName); name != "" {
+	if name := displayNameFor(aws.ToString(summary.ModelName), aws.ToString(summary.ModelId), invokeID); name != "" {
 		meta[modelrepo.ObservedDisplayNameMetaKey] = name
 	}
 
@@ -128,6 +144,17 @@ func observedFromSummary(summary types.FoundationModelSummary, invokeID string) 
 		},
 		Meta: meta,
 	}
+}
+
+func displayNameFor(vendorName, baseID, invokeID string) string {
+	if vendorName == "" || invokeID == baseID {
+		return vendorName
+	}
+	prefix := strings.TrimSuffix(invokeID, "."+baseID)
+	if prefix == invokeID {
+		return vendorName
+	}
+	return fmt.Sprintf("%s (cross-region inference profile, %s)", vendorName, prefix)
 }
 
 func bedrockModalities(modalities []types.ModelModality) map[types.ModelModality]bool {

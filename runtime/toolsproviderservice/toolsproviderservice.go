@@ -224,6 +224,20 @@ func validate(tools *runtimetypes.RemoteTools) error {
 		}
 	}
 
+	if tools.Properties.Name != "" {
+		switch tools.Properties.In {
+		case runtimetypes.LocationPath, runtimetypes.LocationQuery, runtimetypes.LocationBody, runtimetypes.LocationHeader:
+		default:
+			return fmt.Errorf("%w %w: properties.in must be path, query, body or header", ErrInvalidTools, errdefs.ErrUnprocessableEntity)
+		}
+	}
+
+	ws, err := runtimetypes.CleanWorkspacePath(tools.Workspace)
+	if err != nil {
+		return fmt.Errorf("%w %w: %w", ErrInvalidTools, errdefs.ErrUnprocessableEntity, err)
+	}
+	tools.Workspace = ws
+
 	return nil
 }
 

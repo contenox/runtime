@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/contenox/runtime/runtime/connectorservice"
 	"net/http"
 	"os"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/approvalapi"
 	"github.com/contenox/runtime/runtime/internal/backendapi"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
+	"github.com/contenox/runtime/runtime/internal/connectorsapi"
 	"github.com/contenox/runtime/runtime/internal/envelopeapi"
 	"github.com/contenox/runtime/runtime/internal/externalagentsapi"
 	"github.com/contenox/runtime/runtime/internal/fleetapi"
@@ -92,6 +94,7 @@ type Dependencies struct {
 	PubSub                libbus.Messenger
 	State                 *runtimestate.State
 	ToolsProviderService  toolsproviderservice.Service
+	Connectors            connectorservice.Service
 	Auth                  middleware.AuthZReader
 	Agent                 agentservice.Agent
 	Chains                taskchainservice.Service
@@ -255,6 +258,9 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		terminalapi.AddRoutes(mux, deps.TerminalService, deps.Auth, deps.TerminalEnabled, terminalAuth)
 	}
 
+	if deps.Connectors != nil {
+		connectorsapi.AddRoutes(mux, deps.Connectors, deps.DB)
+	}
 	if deps.ToolsProviderService != nil {
 		toolsapi.AddRemoteToolsRoutes(mux, deps.ToolsProviderService)
 	}

@@ -193,7 +193,8 @@ ChatGPT subscription, or a local Ollama server.
   See 'contenox-runtime backend add --help' for every provider type.
 
   Scope note:
-    Backends and config are GLOBAL (stored in ~/.contenox-harness/local.db).
+    Backends and config are GLOBAL (stored in .contenox-harness/local.db in your
+    home folder; the desktop app uses its own database, see --db).
     Agent files (.contenox/) are LOCAL to each project directory, like .git/.
     Run 'contenox-runtime init' once per project to create them.`,
 	SilenceUsage:  true,
@@ -326,7 +327,7 @@ func init() {
 	rootCmd.Long = fmt.Sprintf("Version: %s\n\n%s", v, rootCmd.Long)
 
 	f := rootCmd.PersistentFlags()
-	f.String("db", "", "SQLite database path (default: ~/.contenox-harness/local.db)")
+	f.String("db", "", "SQLite database path (default: the .contenox-harness/local.db file in your home folder; the desktop app keeps its own database under its app-data folder, on Windows %APPDATA%\\ContenoxHarness\\local.db, and passes it with this flag)")
 	f.String("data-dir", "", "Override the .contenox data directory path")
 	f.String("ollama", defaultOllama, "Ollama base URL")
 	f.String("model", "", "Model name (task/chat/embed). Overrides config default-model; no built-in default.")

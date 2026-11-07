@@ -3,9 +3,11 @@ package mcpserverservice
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/errdefs"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
@@ -50,7 +52,7 @@ func (s *service) store() runtimetypes.Store {
 
 func (s *service) Create(ctx context.Context, srv *runtimetypes.MCPServer) error {
 	if err := validate(srv); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errdefs.ErrUnprocessableEntity, err)
 	}
 	if srv.ID == "" {
 		srv.ID = uuid.NewString()
@@ -77,7 +79,7 @@ func (s *service) Update(ctx context.Context, srv *runtimetypes.MCPServer) error
 		return fmt.Errorf("id is required for update")
 	}
 	if err := validate(srv); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errdefs.ErrUnprocessableEntity, err)
 	}
 	return s.store().UpdateMCPServer(ctx, srv)
 }
@@ -113,6 +115,21 @@ func validate(srv *runtimetypes.MCPServer) error {
 		return fmt.Errorf("transport is required (stdio, sse, or http)")
 	default:
 		return fmt.Errorf("unknown transport %q: must be stdio, sse, or http", srv.Transport)
+	}
+	ws, err := runtimetypes.CleanWorkspacePath(srv.Workspace)
+	if err != nil {
+		return fmt.Errorf("%w: %q", err, srv.Workspace)
+	}
+	srv.Workspace = ws
+	for key := range srv.Env {
+		if strings.TrimSpace(key) == "" || strings.ContainsAny(key, "= ") {
+			return fmt.Errorf("environment variable name %q is not valid", key)
+		}
+	}
+	for key := range srv.Headers {
+		if strings.TrimSpace(key) == "" {
+			return fmt.Errorf("header name cannot be empty")
+		}
 	}
 	return nil
 }

@@ -34,12 +34,13 @@ func (c *bedrockStreamClient) Stream(ctx context.Context, messages []modelrepo.M
 		out, err = c.api.ConverseStream(ctx, converseStreamInput(in))
 	}
 	if err != nil {
-		err = classifyBedrockError(fmt.Errorf("bedrock converse-stream (model=%s): %w", c.model.name, err))
+		err = c.classify(fmt.Errorf("bedrock converse-stream (model=%s): %w", c.model.name, err))
 		reportErr(err)
 		end()
 		return nil, err
 	}
 
+	c.succeeded()
 	parcels := make(chan *modelrepo.StreamParcel)
 	go func() {
 		defer close(parcels)
@@ -49,7 +50,7 @@ func (c *bedrockStreamClient) Stream(ctx context.Context, messages []modelrepo.M
 
 		outcome := relayConverseEvents(ctx, c.model, stream.Events(), toOriginal, parcels)
 		if err := stream.Err(); err != nil {
-			err = classifyBedrockError(fmt.Errorf("bedrock stream (model=%s): %w", c.model.name, err))
+			err = c.classify(fmt.Errorf("bedrock stream (model=%s): %w", c.model.name, err))
 			reportErr(err)
 			select {
 			case parcels <- &modelrepo.StreamParcel{Error: err}:
@@ -114,6 +115,23 @@ func relayConverseEvents(ctx context.Context, m converseModel, events <-chan typ
 		sawTermEvent bool
 	)
 	reasoning := map[int]*bedrockReasoningItem{}
+	tags := &thinkingTagFilter{}
+	relayText := func(thinking, answer string) bool {
+		if thinking != "" {
+			outcome.chunks++
+			if !send(&modelrepo.StreamParcel{Thinking: thinking}) {
+				return false
+			}
+		}
+		if answer != "" {
+			content.WriteString(answer)
+			outcome.chunks++
+			if !send(&modelrepo.StreamParcel{Data: answer}) {
+				return false
+			}
+		}
+		return true
+	}
 
 	for ev := range events {
 		switch v := ev.(type) {
@@ -143,9 +161,7 @@ func relayConverseEvents(ctx context.Context, m converseModel, events <-chan typ
 				if d.Value == "" {
 					continue
 				}
-				content.WriteString(d.Value)
-				outcome.chunks++
-				if !send(&modelrepo.StreamParcel{Data: d.Value}) {
+				if thinking, answer := tags.feed(d.Value); !relayText(thinking, answer) {
 					return outcome
 				}
 			case *types.ContentBlockDeltaMemberReasoningContent:
@@ -189,6 +205,10 @@ func relayConverseEvents(ctx context.Context, m converseModel, events <-chan typ
 				usage = u
 			}
 		}
+	}
+
+	if thinking, answer := tags.flush(); !relayText(thinking, answer) {
+		return outcome
 	}
 
 	terminal := &modelrepo.StreamTerminal{

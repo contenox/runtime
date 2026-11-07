@@ -247,7 +247,8 @@ CREATE TABLE IF NOT EXISTS hitl_approvals (
     mission_id   VARCHAR(255),
     created_at   TIMESTAMP NOT NULL,
     expires_at   TIMESTAMP NOT NULL,
-    resolved_at  TIMESTAMP
+    resolved_at  TIMESTAMP,
+    tool_call_id VARCHAR(255) NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_hitl_approvals_state_created ON hitl_approvals(state, created_at);
 CREATE INDEX IF NOT EXISTS idx_hitl_approvals_state_expires ON hitl_approvals(state, expires_at);
@@ -451,6 +452,11 @@ ALTER TABLE hitl_approvals ADD COLUMN session_id  VARCHAR(255) NOT NULL DEFAULT 
 ALTER TABLE hitl_approvals ADD COLUMN agent_name  VARCHAR(255) NOT NULL DEFAULT '';
 ALTER TABLE hitl_approvals ADD COLUMN mission_id  VARCHAR(255);
 
+-- tool_call_id: the engine-minted id of the gated tool call, so a session
+-- reload can attach the ask's verdict to the step it gated. '' for asks that
+-- have no tool call behind them (attention asks, legacy rows).
+ALTER TABLE hitl_approvals ADD COLUMN tool_call_id VARCHAR(255) NOT NULL DEFAULT '';
+
 -- The per-session ask inbox's access path
 -- (ListPendingHITLApprovalsForSession): name a session, then filter to
 -- pending — how a client attaching to a session finds the ask a parked run is
@@ -635,3 +641,6 @@ CREATE TABLE IF NOT EXISTS llm_provider_model_facts (
 ALTER TABLE kv ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE kv ADD COLUMN generation TEXT NOT NULL DEFAULT '';
 ALTER TABLE llm_backends ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE mcp_servers ADD COLUMN env_json                TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE mcp_servers ADD COLUMN workspace               TEXT NOT NULL DEFAULT '';
+ALTER TABLE remote_tools ADD COLUMN workspace TEXT NOT NULL DEFAULT '';

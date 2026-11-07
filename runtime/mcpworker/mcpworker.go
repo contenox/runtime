@@ -387,7 +387,9 @@ func mcpServerToConfig(srv *runtimetypes.MCPServer, store runtimetypes.Store) lo
 		Transport:      localtools.MCPTransport(srv.Transport),
 		Command:        srv.Command,
 		Args:           srv.Args,
+		Env:            srv.Env,
 		URL:            srv.URL,
+		Headers:        srv.Headers,
 		ConnectTimeout: time.Duration(srv.ConnectTimeoutSeconds) * time.Second,
 	}
 	if srv.AuthType != "" {

@@ -430,14 +430,16 @@ deny_paths = [
 # removable: a build without it degrades to the no-file fallback, which asks on
 # everything.
 #
-# It is ask_always with the shell spelled out in tiers and with ceilings on what
-# one detached mission may spend. Attached sessions ignore the ceilings; a
+# It is auto_edit with the shell spelled out in tiers and with ceilings on what
+# one detached mission may spend: the workspace is edited without asking, the
+# write wall and the credential quarantine stay, and every command that changes
+# something outside the project's own build and test loop still asks. Attached sessions ignore the ceilings; a
 # fire-and-detach mission has nobody watching it, so unbounded would mean a
 # runaway spending real money unchecked. A mission that crosses one finishes at
 # status "stuck" with the reason named.
 [envelopes.default]
-extends = "ask_always"
-description = "The default envelope: read freely, ask before writing or running."
+extends = "auto_edit"
+description = "The default envelope: read and edit the workspace freely, ask before commands that change things."
 default_action = "approve"
 # Reserved intent, not a grant. Nothing in this build serves either axis; the
 # reading half was open and the writing half asked, and that is what a revived
@@ -457,7 +459,7 @@ grant = "allow"
 approve_paths = ["**/{*.pem,*.key,.env,.env.*}"]
 
 [envelopes.default.files.write]
-grant = "approve"
+grant = "allow"
 deny_paths = [
   "**/{.ssh,.gnupg}/**",
   "**/{.config/autostart,.config/systemd/user,Library/LaunchAgents,Library/LaunchDaemons}/**",
@@ -475,7 +477,9 @@ deny_paths = [
 # program actually being run, so a path or a pipeline cannot smuggle one past.
 # `prefix_allowlist` matches a whole line by its opening words and refuses to fire
 # if the line carries a redirect or a metacharacter, since an allowlisted reader
-# with a `>` on it is a writer. Safe git readers are on it; mutating git verbs
+# with a `>` on it is a writer. A pipeline is allowed when every stage opens with
+# an allowlisted prefix, so `grep -rn todo src | head` runs without a prompt while
+# `grep -rn todo src | sh` asks. Safe git readers are on it; mutating git verbs
 # are not. Prefer the native git tools where they are served: a git subprocess
 # can execute repository-local config even on a read, and they cannot.
 [envelopes.default.shell]
@@ -484,22 +488,46 @@ blacklist = ["mkfs", "mke2fs", "fdisk", "shred", "wipefs"]
 # A line containing $() or backticks asks, whatever verb it starts with.
 substitution = "approve"
 prefix_allowlist = [
+  # The project's own build, test and lint loop. These run code the repository
+  # already holds, which is the code the session is editing anyway.
   "go build", "go test", "go vet", "go list", "go doc", "go env", "go version",
-  "gofmt -l", "gofmt -d",
-  "ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "rg",
-  "npm test", "npm run test", "npm run build", "npm run lint", "npm run typecheck", "npm ls",
-  "tsc --noEmit", "eslint", "vitest run", "jest",
-  "pytest", "python -m pytest", "python3 -m pytest", "ruff check", "mypy",
-  "pip list", "pip show",
+  "go mod why", "go mod graph", "go mod verify",
+  "gofmt -l", "gofmt -d", "golangci-lint run", "staticcheck",
+  "npm test", "npm run test", "npm run build", "npm run lint", "npm run typecheck",
+  "npm run check", "npm run format:check", "npm ls", "npm outdated", "npm --version",
+  "pnpm test", "pnpm run test", "pnpm run build", "pnpm run lint", "pnpm run typecheck", "pnpm ls",
+  "yarn test", "yarn run test", "yarn run build", "yarn run lint", "yarn run typecheck",
+  "bun test", "bun run test", "bun run build", "bun run lint", "bun run typecheck",
+  "tsc --noEmit", "tsc -p", "tsc --build", "eslint", "prettier --check", "vitest run", "jest", "node --version",
+  "pytest", "python -m pytest", "python3 -m pytest", "python -m unittest", "python3 -m unittest",
+  "ruff check", "ruff format --check", "mypy", "pyright", "flake8", "black --check",
+  "pip list", "pip show", "pip freeze", "python --version", "python3 --version",
+  "cargo build", "cargo test", "cargo check", "cargo clippy", "cargo fmt --check", "cargo metadata", "cargo tree",
+  "rustc --version", "cargo --version",
+  "dotnet build", "dotnet test", "dotnet --version", "dotnet --info",
+  "mvn test", "mvn compile", "mvn verify", "mvn -q test", "gradle test", "gradle build", "gradle check",
+  "./gradlew test", "./gradlew build", "./gradlew check",
+  "make test", "make build", "make lint", "make check",
+  # Readers. Reading is not changing, and a redirect on any of these turns the
+  # whole line back into an ask.
+  "ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "rg", "ag",
+  "cut", "tr", "nl", "diff", "cmp", "stat", "file", "du", "df", "tree",
+  "which", "whereis", "date", "uname", "hostname", "whoami", "id", "basename", "dirname", "realpath",
+  "jq", "yq", "od", "strings", "md5sum", "sha256sum", "printf",
   # Git inspection. `git branch` alone can delete, so only its listing forms
   # are here; commits, checkouts and restores keep asking.
   "git status", "git diff", "git log", "git show",
-  "git branch --list", "git branch -a", "git branch -v",
+  "git branch --list", "git branch -a", "git branch -v", "git branch --show-current",
   "git rev-parse", "git ls-files", "git describe", "git rev-list",
   "git merge-base", "git blame", "git grep", "git remote -v",
+  "git stash list", "git tag --list", "git tag -l", "git shortlog", "git worktree list",
+  "git config --get", "git check-ignore", "git cat-file", "git ls-tree", "git --version",
   # PowerShell and cmd readers; the same rule as above — reading is not changing.
   "Get-ChildItem", "Get-Content", "Get-Location", "Select-String", "Test-Path",
-  "where", "dir", "type", "findstr",
+  "Get-Item", "Get-Command", "Get-Date", "Get-Process", "Get-FileHash", "Resolve-Path",
+  "Split-Path", "Join-Path", "Measure-Object", "Select-Object", "Compare-Object",
+  "Format-List", "Format-Table", "Out-String", "Write-Output", "ConvertFrom-Json", "ConvertTo-Json",
+  "gci", "gc", "sls", "where", "dir", "type", "findstr", "tree", "fc", "more", "ver", "hostname",
 ]
 # Commands that delete, escalate or overwrite ask regardless of the allowlist
 # beside them. The last two are the redirection forms, so that a line whose only
@@ -521,14 +549,19 @@ on_exhausted = "finish_stuck"
 [envelopes.default.attention]
 allow_agent_answers = true
 max_agent_answers = 2
+allow_agent_approvals = true
+max_agent_approvals = 10
 
 # Attended default only. Introspection reads and sandboxed eval were observed
 # asking hundreds of times and never vetoed; they elevate to allow so the ask
-# gate stops nagging on reads. Every mutation stays approve, git_restore stays
-# ask, and the unattended acpx / strict / oracle envelopes are untouched. This
+# gate stops nagging on reads. Staging is the one git write that lands here:
+# it changes the index and nothing else, and the commit that follows still
+# asks. Every other mutation stays approve, git_restore stays ask, and the
+# unattended acpx / strict / oracle envelopes are untouched. This
 # is a floor, not a ceiling: a shadow policy file still overrides it.
 [envelopes.default.tools]
 "@client-mcp.*" = "approve"
+"native-git.git_add" = "allow"
 "native-git.git_status" = "allow"
 "native-git.git_diff" = "allow"
 "native-git.git_log" = "allow"
@@ -649,6 +682,8 @@ description = "The editor session: the default envelope under the name editors s
 [envelopes.acp.attention]
 allow_agent_answers = true
 max_agent_answers = 3
+allow_agent_approvals = true
+max_agent_approvals = 10
 
 [envelopes.dev]
 extends = "default"
@@ -678,6 +713,8 @@ on_exhausted = "finish_stuck"
 [envelopes.dev.attention]
 allow_agent_answers = true
 max_agent_answers = 5
+allow_agent_approvals = true
+max_agent_approvals = 10
 
 [envelopes.dev.tools]
 "native-git.git_add" = "allow"

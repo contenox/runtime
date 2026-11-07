@@ -4,18 +4,45 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime/libacp"
 	"github.com/contenox/runtime/runtime/approvalflow"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/taskengine"
 )
 
 const (
 	decidedByACPClient = "acp_client"
 	decidedByPolicy    = "policy"
+	decidedByOracle    = "oracle"
+
+	oracleApprovedNote    = "Approved by Oracle: part of your request"
+	oracleDeniedNote      = "Denied by Oracle: not part of your request"
+	elsewhereApprovedNote = "Approved from the Inbox"
+	elsewhereDeniedNote   = "Denied from the Inbox"
+	askExpiredNote        = "No answer before the deadline"
+
+	approvalMetaKey = "contenox.approval"
 )
+
+type approvalMeta struct {
+	DecidedBy string `json:"decidedBy"`
+	Approved  bool   `json:"approved"`
+	Note      string `json:"note"`
+}
+
+type askOutcome struct {
+	verdict hitlservice.Verdict
+	err     error
+}
+
+type clientOutcome struct {
+	resp libacp.RequestPermissionResponse
+	err  error
+}
 
 func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalRequest) (bool, error) {
 	contenoxSessionID, _ := ctx.Value(runtimetypes.SessionIDContextKey).(string)
@@ -34,7 +61,78 @@ func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalReq
 	defer end()
 
 	askedAt := time.Now().UTC()
-	resp, err := t.conn.RequestPermission(ctx, rpcReq)
+	ask := t.openAsk(ctx, req, contenoxSessionID, acpSessionID)
+	if ask == nil {
+		resp, err := t.conn.RequestPermission(ctx, rpcReq)
+		allowed, outcome, err := clientAnswer(ctx, resp, err, reportErr, reportChange)
+		t.recordApprovalDecision(ctx, req, contenoxSessionID, outcome, askedAt)
+		return allowed, err
+	}
+	defer ask.Close()
+
+	decided := make(chan askOutcome, 1)
+	go func() {
+		verdict, err := ask.Wait(ctx)
+		decided <- askOutcome{verdict: verdict, err: err}
+	}()
+
+	rpcCtx, cancelRPC := context.WithCancel(ctx)
+	defer cancelRPC()
+	answered := make(chan clientOutcome, 1)
+	go func() {
+		resp, err := t.conn.RequestPermission(rpcCtx, rpcReq)
+		answered <- clientOutcome{resp: resp, err: err}
+	}()
+
+	select {
+	case a := <-answered:
+		allowed, outcome, err := clientAnswer(ctx, a.resp, a.err, reportErr, reportChange)
+		if outcome == hitlservice.DecisionTimedOut {
+			return allowed, err
+		}
+		reason := ""
+		if outcome == hitlservice.DecisionCancelled {
+			reason = string(outcome)
+		}
+		respondErr := t.deps.Approvals.RespondBy(ctx, ask.ID, allowed, decidedByACPClient, reason)
+		if respondErr == nil {
+			return allowed, err
+		}
+		if !errors.Is(respondErr, hitlservice.ErrApprovalAlreadyResolved) && !errors.Is(respondErr, hitlservice.ErrApprovalExpired) {
+			slog.Warn("acpsvc: could not record the client's decision", "tool", req.ToolName, "error", respondErr)
+			return allowed, err
+		}
+		d := <-decided
+		return d.verdict.Approved, d.err
+	case d := <-decided:
+		cancelRPC()
+		reportChange("outcome", "resolved_elsewhere")
+		reportChange("decided_by", d.verdict.DecidedBy)
+		t.withdrawCard(ctx, acpSessionID, toolCallID, d)
+		return d.verdict.Approved, d.err
+	}
+}
+
+func (t *Transport) openAsk(ctx context.Context, req hitlservice.ApprovalRequest, contenoxSessionID string, sid libacp.SessionID) *hitlservice.OpenAsk {
+	if t.deps.Approvals == nil {
+		return nil
+	}
+	if req.SessionID == "" {
+		req.SessionID = contenoxSessionID
+	}
+	if sess, ok := t.sessionFor(sid); ok && t.sessionOracle(sess) && t.offersOracle(ctx, sess) {
+		req.AgentReview = true
+		req.Intent = sess.lastPrompt()
+	}
+	ask, err := t.deps.Approvals.OpenApproval(ctx, req, taskengine.NoopTaskEventSink{})
+	if err != nil {
+		slog.Warn("acpsvc: could not open a durable approval; asking the client directly", "tool", req.ToolName, "error", err)
+		return nil
+	}
+	return ask
+}
+
+func clientAnswer(ctx context.Context, resp libacp.RequestPermissionResponse, err error, reportErr func(error), reportChange func(string, any)) (bool, hitlservice.DecisionOutcome, error) {
 	if err != nil {
 		ctxErr := ""
 		if e := ctx.Err(); e != nil {
@@ -47,26 +145,53 @@ func (t *Transport) AskApproval(ctx context.Context, req hitlservice.ApprovalReq
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			outcome = hitlservice.DecisionTimedOut
 		}
-		t.recordApprovalDecision(ctx, req, contenoxSessionID, outcome, askedAt)
-		return false, err
+		return false, outcome, err
 	}
 	reportChange("outcome", string(resp.Outcome.Outcome))
 	reportChange("option_id", resp.Outcome.OptionID)
 	switch resp.Outcome.Outcome {
 	case libacp.PermissionOutcomeCancelled:
-		t.recordApprovalDecision(ctx, req, contenoxSessionID, hitlservice.DecisionCancelled, askedAt)
-		return false, context.Canceled
+		return false, hitlservice.DecisionCancelled, context.Canceled
 	case libacp.PermissionOutcomeSelected:
-		allowed := resp.Outcome.OptionID == approvalflow.OptionAllow
-		outcome := hitlservice.DecisionDenied
-		if allowed {
-			outcome = hitlservice.DecisionApproved
+		if resp.Outcome.OptionID == approvalflow.OptionAllow {
+			return true, hitlservice.DecisionApproved, nil
 		}
-		t.recordApprovalDecision(ctx, req, contenoxSessionID, outcome, askedAt)
-		return allowed, nil
+		return false, hitlservice.DecisionDenied, nil
 	}
-	t.recordApprovalDecision(ctx, req, contenoxSessionID, hitlservice.DecisionDenied, askedAt)
-	return false, nil
+	return false, hitlservice.DecisionDenied, nil
+}
+
+func (t *Transport) withdrawCard(ctx context.Context, sid libacp.SessionID, toolCallID string, d askOutcome) {
+	if d.err != nil {
+		return
+	}
+	meta := approvalMetaFor(d.verdict.DecidedBy, d.verdict.Approved)
+	content := libacp.NewTextContent(meta.Note)
+	t.sendUpdate(ctx, libacp.SessionNotification{
+		SessionID: sid,
+		Update: libacp.SessionUpdate{
+			SessionUpdate: libacp.SessionUpdateToolCallUpdate,
+			ToolCallID:    toolCallID,
+			ToolContent:   []libacp.ToolCallContent{{Type: libacp.ToolCallContentRegular, Content: &content}},
+			Meta:          mergeMeta(nil, approvalMetaKey, meta),
+		},
+	})
+}
+
+func approvalMetaFor(decidedBy string, approved bool) approvalMeta {
+	by := strings.ToLower(decidedBy)
+	note := elsewhereDeniedNote
+	switch {
+	case by == hitlservice.DecidedByDeadline:
+		note = askExpiredNote
+	case strings.Contains(by, decidedByOracle) && approved:
+		note = oracleApprovedNote
+	case strings.Contains(by, decidedByOracle):
+		note = oracleDeniedNote
+	case approved:
+		note = elsewhereApprovedNote
+	}
+	return approvalMeta{DecidedBy: by, Approved: approved, Note: note}
 }
 
 // recordApprovalDecision writes the interactive decision to hitl_approvals

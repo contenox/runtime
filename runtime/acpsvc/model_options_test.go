@@ -32,7 +32,7 @@ func TestUnit_ModelOptionsGroupByConnection(t *testing.T) {
 	require.Len(t, opts.Groups, 3, "any + two reachable connections; the failing one is skipped")
 	require.Equal(t, "any", opts.Groups[0].Group)
 	require.Equal(t, "Any provider", opts.Groups[0].Name)
-	require.Equal(t, []string{"any/deepseek-chat", "any/deepseek-reasoner"}, groupValues(opts.Groups[0]))
+	require.Equal(t, []string{"any/deepseek-chat"}, groupValues(opts.Groups[0]), "only models served by more than one connection are offered under any")
 	require.Equal(t, "d1", opts.Groups[1].Group)
 	require.Equal(t, []string{"connection:d1/deepseek-chat"}, groupValues(opts.Groups[1]))
 	require.Equal(t, []string{"connection:d2/deepseek-chat", "connection:d2/deepseek-reasoner"}, groupValues(opts.Groups[2]))
@@ -42,6 +42,25 @@ func TestUnit_ModelOptionsGroupByConnection(t *testing.T) {
 	for _, v := range opts.AllValues() {
 		require.NotContains(t, v.Value, "gpt-x", "unserved/unreachable models are never listed")
 	}
+}
+
+func TestUnit_ModelOptionsSingleServedModelListedUnderItsProviderOnly(t *testing.T) {
+	states := []statetype.BackendRuntimeState{
+		conn("b1", "Bedrock", "bedrock", "", chat("us.anthropic.claude-sonnet-4", 200000)),
+		conn("a1", "Anthropic", "anthropic", "", chat("claude-haiku", 200000)),
+	}
+	opts := buildModelOptions(states)
+	require.Len(t, opts.Groups, 2, "no any group when no model is served twice")
+	for _, g := range opts.Groups {
+		require.NotEqual(t, "any", g.Group)
+	}
+	value, ok := canonicalModelSelection(states, "any", "us.anthropic.claude-sonnet-4")
+	require.True(t, ok)
+	require.Equal(t, "connection:b1/us.anthropic.claude-sonnet-4", value)
+	provider, model, ok := resolveModelValue(states, "any/us.anthropic.claude-sonnet-4")
+	require.True(t, ok)
+	require.Equal(t, "connection:b1", provider)
+	require.Equal(t, "us.anthropic.claude-sonnet-4", model)
 }
 
 func groupValues(g libacp.SessionConfigGroup) []string {

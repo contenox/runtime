@@ -61,7 +61,7 @@ func (h *approvalHandler) answer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.Respond(ctx, id, req.Approved); err != nil {
+	if err := h.svc.RespondBy(ctx, id, req.Approved, "inbox", ""); err != nil {
 		_ = apiframework.Error(w, r, mapRespondError(err), apiframework.UpdateOperation)
 		return
 	}

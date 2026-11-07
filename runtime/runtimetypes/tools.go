@@ -88,8 +88,8 @@ func (s *store) CreateRemoteTools(ctx context.Context, tools *RemoteTools) error
 
 	_, err = s.Exec.ExecContext(ctx, `
         INSERT INTO remote_tools
-        (id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, auth_flow_json, insecure_skip_verify, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        (id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, auth_flow_json, insecure_skip_verify, workspace, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		tools.ID,
 		tools.Name,
 		tools.EndpointURL,
@@ -100,6 +100,7 @@ func (s *store) CreateRemoteTools(ctx context.Context, tools *RemoteTools) error
 		string(injectJSON),
 		encodeAuthFlow(tools.AuthFlow),
 		tools.InsecureSkipVerify,
+		tools.Workspace,
 		tools.CreatedAt,
 		tools.UpdatedAt,
 	)
@@ -112,7 +113,7 @@ func (s *store) GetRemoteTools(ctx context.Context, id string) (*RemoteTools, er
 	var injectJSON, authFlowJSON string
 
 	err := s.Exec.QueryRowContext(ctx, `
-        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), created_at, updated_at
+        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), workspace, created_at, updated_at
         FROM remote_tools
         WHERE id = $1`, id).Scan(
 		&tools.ID,
@@ -125,6 +126,7 @@ func (s *store) GetRemoteTools(ctx context.Context, id string) (*RemoteTools, er
 		&injectJSON,
 		&authFlowJSON,
 		&tools.InsecureSkipVerify,
+		&tools.Workspace,
 		&tools.CreatedAt,
 		&tools.UpdatedAt,
 	)
@@ -167,7 +169,7 @@ func (s *store) GetRemoteToolsByName(ctx context.Context, name string) (*RemoteT
 	var injectJSON, authFlowJSON string
 
 	err := s.Exec.QueryRowContext(ctx, `
-        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), created_at, updated_at
+        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), workspace, created_at, updated_at
         FROM remote_tools
         WHERE name = $1`, name).Scan(
 		&tools.ID,
@@ -180,6 +182,7 @@ func (s *store) GetRemoteToolsByName(ctx context.Context, name string) (*RemoteT
 		&injectJSON,
 		&authFlowJSON,
 		&tools.InsecureSkipVerify,
+		&tools.Workspace,
 		&tools.CreatedAt,
 		&tools.UpdatedAt,
 	)
@@ -236,7 +239,7 @@ func (s *store) UpdateRemoteTools(ctx context.Context, tools *RemoteTools) error
 
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE remote_tools
-		SET name = $2, endpoint_url = $3, spec_url = $4, timeout_ms = $5, headers = $6, properties = $7, inject_params_json = $8, auth_flow_json = $9, insecure_skip_verify = $10, updated_at = $11
+		SET name = $2, endpoint_url = $3, spec_url = $4, timeout_ms = $5, headers = $6, properties = $7, inject_params_json = $8, auth_flow_json = $9, insecure_skip_verify = $10, workspace = $12, updated_at = $11
 		WHERE id = $1`,
 		tools.ID,
 		tools.Name,
@@ -249,6 +252,7 @@ func (s *store) UpdateRemoteTools(ctx context.Context, tools *RemoteTools) error
 		encodeAuthFlow(tools.AuthFlow),
 		tools.InsecureSkipVerify,
 		tools.UpdatedAt,
+		tools.Workspace,
 	)
 
 	if err != nil {
@@ -265,7 +269,7 @@ func (s *store) ListRemoteTools(ctx context.Context, createdAtCursor *time.Time,
 	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
 	args = append(args, limit)
 	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), created_at, updated_at
+        SELECT id, name, endpoint_url, spec_url, timeout_ms, headers, properties, inject_params_json, COALESCE(auth_flow_json, '{}'), COALESCE(insecure_skip_verify, false), workspace, created_at, updated_at
         FROM remote_tools`+whereAnd(cond)+`
         ORDER BY created_at DESC, id DESC
         LIMIT $`+strconv.Itoa(len(args)), args...)
@@ -291,6 +295,7 @@ func (s *store) ListRemoteTools(ctx context.Context, createdAtCursor *time.Time,
 			&injectJSON,
 			&authFlowJSON,
 			&tools.InsecureSkipVerify,
+			&tools.Workspace,
 			&tools.CreatedAt,
 			&tools.UpdatedAt,
 		); err != nil {

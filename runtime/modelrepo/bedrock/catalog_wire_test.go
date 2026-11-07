@@ -141,6 +141,16 @@ func TestUnit_BedrockCatalog_ResolvesTheInvocableModelID(t *testing.T) {
 		"us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 		"global.meta.llama4-maverick-17b-instruct-v1:0",
 	}, names, "a profile-only model resolves to its geographic profile, its global profile when that is all there is, and is omitted when it has neither")
+
+	displayNames := make([]string, 0, len(models))
+	for _, model := range models {
+		displayNames = append(displayNames, model.Meta[modelrepo.ObservedDisplayNameMetaKey])
+	}
+	require.Equal(t, []string{
+		"Claude 3 Haiku",
+		"Claude Sonnet 4.5 (cross-region inference profile, us)",
+		"Llama 4 Maverick (cross-region inference profile, global)",
+	}, displayNames, "a base model keeps the vendor name; a profile says it is one and which region group it routes through")
 }
 
 func TestUnit_BedrockMistralClassification(t *testing.T) {
@@ -187,4 +197,85 @@ func withTransport(provider modelrepo.Provider, transport *wireTransport) modelr
 	return bedrock.NewBedrockProvider("us-east-1", staticCredentials, model, modelrepo.CapabilityConfig{
 		CanChat: true, CanPrompt: true, MaxOutputTokens: 128,
 	}, &http.Client{Transport: transport}, nil)
+}
+
+func TestUnit_BedrockCatalog_DropsModelsWithoutAnInvocableInferenceType(t *testing.T) {
+	provisionedOnly := modelSummary("anthropic.claude-old-v1:0", "Claude Old", true, []string{"TEXT"}, []string{"TEXT"})
+	provisionedOnly["inferenceTypesSupported"] = []string{"PROVISIONED"}
+	untyped := modelSummary("anthropic.claude-untyped-v1:0", "Claude Untyped", true, []string{"TEXT"}, []string{"TEXT"})
+	untyped["inferenceTypesSupported"] = []string{}
+	models := listModels(t, catalogueTransport(catalogueFixture{
+		models: []map[string]any{
+			modelSummary("anthropic.claude-3-haiku-20240307-v1:0", "Claude 3 Haiku", true, []string{"TEXT"}, []string{"TEXT"}),
+			provisionedOnly,
+			untyped,
+		},
+		profiles: []map[string]any{
+			{"inferenceProfileId": "us.anthropic.claude-old-v1:0"},
+			{"inferenceProfileId": "us.anthropic.claude-untyped-v1:0"},
+		},
+	}))
+	require.Len(t, models, 1)
+	require.Equal(t, "anthropic.claude-3-haiku-20240307-v1:0", models[0].Name)
+}
+
+func TestUnit_BedrockCatalog_HidesAModelTheAccountCannotUseUntilReset(t *testing.T) {
+	sonnet := modelSummary("anthropic.claude-sonnet-5-5", "Claude Sonnet 5.5", true, []string{"TEXT"}, []string{"TEXT"})
+	sonnet["inferenceTypesSupported"] = []string{"INFERENCE_PROFILE"}
+	haiku := modelSummary("anthropic.claude-3-haiku-20240307-v1:0", "Claude 3 Haiku", true, []string{"TEXT"}, []string{"TEXT"})
+	transport := catalogueTransport(catalogueFixture{
+		models:   []map[string]any{sonnet, haiku},
+		profiles: []map[string]any{{"inferenceProfileId": "us.anthropic.claude-sonnet-5-5"}},
+	})
+	require.Len(t, listModels(t, transport), 2)
+
+	denied := &wireTransport{handler: func(request *http.Request, _ []byte) *http.Response {
+		return errorResponse(request, http.StatusForbidden, "AccessDeniedException", "anthropic.claude-sonnet-5-5 is not available for this account")
+	}}
+	provider := newWireProvider("us.anthropic.claude-sonnet-5-5", modelrepo.CapabilityConfig{CanChat: true}, denied)
+	_, err := chatOnce(t, provider, []modelrepo.Message{{Role: "user", Content: "hi"}})
+	require.ErrorIs(t, err, modelrepo.ErrModelAccessDenied)
+
+	models := listModels(t, transport)
+	require.Len(t, models, 1)
+	require.Equal(t, "anthropic.claude-3-haiku-20240307-v1:0", models[0].Name)
+
+	catalogue, err := modelrepo.NewCatalogProvider(
+		modelrepo.BackendSpec{Type: "bedrock", BaseURL: "https://bedrock-runtime.us-east-1.amazonaws.com", APIKey: staticCredentials},
+	)
+	require.NoError(t, err)
+	scoper, ok := catalogue.(modelrepo.AvailabilityScoper)
+	require.True(t, ok)
+	modelrepo.ResetUnavailableModels(scoper.AvailabilityScope())
+	require.Len(t, listModels(t, transport), 2)
+}
+
+func TestUnit_BedrockCatalog_ListsAHiddenModelAgainOnceItSucceeds(t *testing.T) {
+	sonnet := modelSummary("anthropic.claude-sonnet-5-5", "Claude Sonnet 5.5", true, []string{"TEXT"}, []string{"TEXT"})
+	sonnet["inferenceTypesSupported"] = []string{"INFERENCE_PROFILE"}
+	transport := catalogueTransport(catalogueFixture{
+		models:   []map[string]any{sonnet},
+		profiles: []map[string]any{{"inferenceProfileId": "us.anthropic.claude-sonnet-5-5"}},
+	})
+	catalogue, err := modelrepo.NewCatalogProvider(
+		modelrepo.BackendSpec{Type: "bedrock", BaseURL: "https://bedrock-runtime.us-east-1.amazonaws.com", APIKey: staticCredentials},
+	)
+	require.NoError(t, err)
+	scope := catalogue.(modelrepo.AvailabilityScoper).AvailabilityScope()
+	modelrepo.ResetUnavailableModels(scope)
+	t.Cleanup(func() { modelrepo.ResetUnavailableModels(scope) })
+
+	denied := &wireTransport{handler: func(request *http.Request, _ []byte) *http.Response {
+		return errorResponse(request, http.StatusForbidden, "AccessDeniedException", "anthropic.claude-sonnet-5-5 is not available for this account")
+	}}
+	_, err = chatOnce(t, newWireProvider("us.anthropic.claude-sonnet-5-5", modelrepo.CapabilityConfig{CanChat: true}, denied), []modelrepo.Message{{Role: "user", Content: "hi"}})
+	require.ErrorIs(t, err, modelrepo.ErrModelAccessDenied)
+	require.Empty(t, listModels(t, transport))
+
+	allowed := &wireTransport{handler: func(request *http.Request, _ []byte) *http.Response {
+		return jsonResponse(request, http.StatusOK, converseResponse(textBlock("ok"), "end_turn", ""))
+	}}
+	_, err = chatOnce(t, newWireProvider("us.anthropic.claude-sonnet-5-5", modelrepo.CapabilityConfig{CanChat: true}, allowed), []modelrepo.Message{{Role: "user", Content: "hi"}})
+	require.NoError(t, err)
+	require.Len(t, listModels(t, transport), 1)
 }

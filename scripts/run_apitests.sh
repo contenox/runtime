@@ -35,12 +35,27 @@ cleanup() {
 }
 trap cleanup EXIT
 
-PYTHON="${CONTENOX_APITEST_PYTHON:-python3}"
-VENV_DIR="$ROOT_DIR/apitests/.venv"
+pick_python() {
+  local candidate
+  for candidate in python3 python py; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
 
-# Prefer whatever python already has the deps; otherwise fall back to a
-# repo-local venv, creating it on first use (PEP 668 hosts can't pip-install
-# into the system python, so `make test-api` must work with zero manual setup).
+if [[ -n "${CONTENOX_APITEST_PYTHON:-}" ]]; then
+  PYTHON="$CONTENOX_APITEST_PYTHON"
+else
+  PYTHON="$(pick_python)" || {
+    echo "no usable python (3.8+) found; install Python or set CONTENOX_APITEST_PYTHON" >&2
+    exit 1
+  }
+fi
+VENV_DIR="${CONTENOX_APITEST_VENV:-$ROOT_DIR/tmp/apitests-venv}"
+
 if ! "$PYTHON" - <<'PY'
 import importlib.util
 import sys
@@ -48,14 +63,33 @@ import sys
 sys.exit(0 if all(importlib.util.find_spec(n) for n in ("pytest", "requests")) else 1)
 PY
 then
-  if [[ ! -x "$VENV_DIR/bin/python" ]]; then
-    python3 -m venv "$VENV_DIR"
+  if [[ -x "$VENV_DIR/Scripts/python.exe" ]]; then
+    VENV_PYTHON="$VENV_DIR/Scripts/python.exe"
+  else
+    VENV_PYTHON="$VENV_DIR/bin/python"
   fi
-  "$VENV_DIR/bin/python" -m pip install --quiet -r "$ROOT_DIR/apitests/requirements.txt"
-  PYTHON="$VENV_DIR/bin/python"
+  if [[ ! -x "$VENV_PYTHON" ]]; then
+    mkdir -p "$(dirname "$VENV_DIR")"
+    "$PYTHON" -m venv "$VENV_DIR"
+    if [[ -x "$VENV_DIR/Scripts/python.exe" ]]; then
+      VENV_PYTHON="$VENV_DIR/Scripts/python.exe"
+    else
+      VENV_PYTHON="$VENV_DIR/bin/python"
+    fi
+  fi
+  "$VENV_PYTHON" -m pip install --quiet -r "$ROOT_DIR/apitests/requirements.txt"
+  PYTHON="$VENV_PYTHON"
 fi
 
 mkdir -p "$HOME_DIR" "$WORKSPACE_DIR"
+
+if command -v cygpath >/dev/null 2>&1; then
+  mkdir -p "$HOME_DIR/appdata" "$HOME_DIR/localappdata"
+  USERPROFILE="$(cygpath -w "$HOME_DIR")"
+  APPDATA="$(cygpath -w "$HOME_DIR/appdata")"
+  LOCALAPPDATA="$(cygpath -w "$HOME_DIR/localappdata")"
+  export USERPROFILE APPDATA LOCALAPPDATA
+fi
 
 HOME="$HOME_DIR" "$BIN" --data-dir "$DATA_DIR" --db "$DB_PATH" init --force >/dev/null
 

@@ -49,6 +49,9 @@ func (d *nativeDriver) ConfigOptions(ctx context.Context, sess *sessionEntry) []
 	if opt, ok := t.workspaceRootConfigOption(sess); ok {
 		opts = append(opts, opt)
 	}
+	if t.offersOracle(ctx, sess) {
+		opts = append(opts, t.oracleConfigOption(sess))
+	}
 	return opts
 }
 
@@ -139,6 +142,8 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		return withDroppedContentMeta(resp, droppedContentKinds, droppedWhy), nil
 	}
 
+	sess.setLastPrompt(input)
+
 	if t.deps.NativeTurns != nil {
 		return d.promptViaRegistry(ctx, req, sess, input, images, audio, droppedWhy, droppedContentKinds)
 	}
@@ -197,7 +202,7 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 	var toolsAllowlist []string
 	if t.deps.DB != nil {
 		var err error
-		toolsAllowlist, err = t.runtimeToolsAllowlist(promptCtx, runtimetypes.New(t.deps.DB.WithoutTransaction()), sess.McpServerNames)
+		toolsAllowlist, err = t.runtimeToolsAllowlist(promptCtx, runtimetypes.New(t.deps.DB.WithoutTransaction()), sess)
 		if err != nil {
 			reportErr(err)
 			return libacp.PromptResponse{}, libacp.InternalError(err.Error())

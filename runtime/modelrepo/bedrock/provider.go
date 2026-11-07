@@ -80,7 +80,7 @@ func (p *bedrockProvider) client(ctx context.Context) (bedrockClient, error) {
 	if p.apiErr != nil {
 		return bedrockClient{}, p.apiErr
 	}
-	return bedrockClient{api: p.api, model: p.model, tracker: p.tracker}, nil
+	return bedrockClient{api: p.api, model: p.model, tracker: p.tracker, scope: availabilityScope(p.region, p.credBlob)}, nil
 }
 
 func (p *bedrockProvider) GetChatConnection(ctx context.Context, _ string) (modelrepo.LLMChatClient, error) {

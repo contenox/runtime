@@ -109,9 +109,7 @@ func canonicalModelSelection(states []statetype.BackendRuntimeState, provider, m
 	case 0:
 		return "", false
 	case 1:
-		if !runtimestate.IsAnyProvider(provider) {
-			return connectionValue(matches[0].Backend.ID, exactServedName(matches[0], model)), true
-		}
+		return connectionValue(matches[0].Backend.ID, exactServedName(matches[0], model)), true
 	}
 	return anyValue(exactServedName(matches[0], model)), true
 }
@@ -158,8 +156,9 @@ func modelValueMeta(p statetype.ModelPullStatus) json.RawMessage {
 }
 
 // buildModelOptions builds the grouped model option: an "Any provider" group
-// first (one value per distinct chat model; its context length is the minimum
-// across serving connections), then one group per reachable connection.
+// first (one value per chat model served by more than one connection; its
+// context length is the minimum across them), then one group per reachable
+// connection.
 // Models no reachable connection serves are never listed.
 func buildModelOptions(states []statetype.BackendRuntimeState) libacp.SessionConfigValues {
 	conns := reachableConnections(states)
@@ -169,6 +168,7 @@ func buildModelOptions(states []statetype.BackendRuntimeState) libacp.SessionCon
 		name string
 		meta statetype.ModelPullStatus
 		min  int
+		n    int
 	}
 	anyModels := map[string]*anyEntry{}
 	var anyOrder []string
@@ -191,10 +191,13 @@ func buildModelOptions(states []statetype.BackendRuntimeState) libacp.SessionCon
 			key := strings.ToLower(name)
 			e := anyModels[key]
 			if e == nil {
-				anyModels[key] = &anyEntry{name: name, meta: p, min: p.ContextLength}
+				anyModels[key] = &anyEntry{name: name, meta: p, min: p.ContextLength, n: 1}
 				anyOrder = append(anyOrder, key)
-			} else if p.ContextLength > 0 && (e.min == 0 || p.ContextLength < e.min) {
-				e.min = p.ContextLength
+			} else {
+				e.n++
+				if p.ContextLength > 0 && (e.min == 0 || p.ContextLength < e.min) {
+					e.min = p.ContextLength
+				}
 			}
 		}
 		if len(opts) == 0 {
@@ -222,6 +225,9 @@ func buildModelOptions(states []statetype.BackendRuntimeState) libacp.SessionCon
 	anyOpts := make([]libacp.SessionConfigValue, 0, len(anyOrder))
 	for _, key := range anyOrder {
 		e := anyModels[key]
+		if e.n < 2 {
+			continue
+		}
 		meta := e.meta
 		meta.ContextLength = e.min
 		anyOpts = append(anyOpts, libacp.SessionConfigValue{
@@ -232,7 +238,10 @@ func buildModelOptions(states []statetype.BackendRuntimeState) libacp.SessionCon
 		})
 	}
 	sort.SliceStable(anyOpts, func(i, j int) bool { return strings.ToLower(anyOpts[i].Name) < strings.ToLower(anyOpts[j].Name) })
-	all := append([]libacp.SessionConfigGroup{{Group: anyModelGroupID, Name: anyModelGroupName, Options: anyOpts}}, groups...)
+	all := groups
+	if len(anyOpts) > 0 {
+		all = append([]libacp.SessionConfigGroup{{Group: anyModelGroupID, Name: anyModelGroupName, Options: anyOpts}}, groups...)
+	}
 	return libacp.NewGroupedSessionConfigValues(all)
 }
 
