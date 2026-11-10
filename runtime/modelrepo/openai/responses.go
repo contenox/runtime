@@ -3,6 +3,7 @@ package openai
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/contenox/runtime/runtime/modelrepo"
@@ -618,11 +619,20 @@ func parseOpenAIResponsesResponseFromObject(nameMap map[string]string, response 
 	return modelrepo.ChatResult{
 		Message: modelrepo.Message{
 			Role:     role,
-			Content:  textBuilder.String(),
+			Content:  stripInlineToolCallMarkup(textBuilder.String()),
 			Thinking: strings.TrimSpace(thinkingBuilder.String()),
 		},
 		ToolCalls:    toolCalls,
 		Usage:        resp.Usage.neutralUsage(),
 		FinishReason: finishReason,
 	}, nil
+}
+
+var inlineToolCallMarkup = regexp.MustCompile(`(?s)[ \t]*to=functions\.[A-Za-z0-9_.\-]+\s*\((?:json|code)[^{]*\{(?:[^{}]|\{[^{}]*\})*\}\)?`)
+
+func stripInlineToolCallMarkup(text string) string {
+	if !strings.Contains(text, "to=functions.") {
+		return text
+	}
+	return strings.TrimSpace(inlineToolCallMarkup.ReplaceAllString(text, ""))
 }

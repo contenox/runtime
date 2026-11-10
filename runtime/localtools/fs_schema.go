@@ -50,10 +50,10 @@ var fsToolDocs = map[string]fsToolDoc{
 			"A missing path returns a 'Did you mean:' suggestion of similar sibling names.",
 	},
 	"grep": {
-		terse: "Search one file for a pattern. Literal substring by default; set regex=true for RE2. Optional start_line/end_line limit the range. Returns matching lines as 'N: text', truncated with a notice if there are too many.",
-		verbose: "Search a single file for a pattern. Default: literal substring match. Set regex true for a Go RE2 regular expression matched per line. " +
+		terse: "Search a file, a directory or a glob ('*.go', 'src/*.ts') for a pattern. Literal substring by default; set regex=true for RE2. Optional start_line/end_line limit the range in a single file. Returns matching lines as 'N: text' for one file or 'path:N: text' across files, truncated with a notice if there are too many.",
+		verbose: "Search a file, a directory or a glob for a pattern. A directory path searches every text file under it (gitignored and denied paths skipped); a glob such as '*.go' or 'src/*.ts' limits the files by name or relative path, '**/' prefixes are accepted. Default: literal substring match. Set regex true for a Go RE2 regular expression matched per line. " +
 			"Optional start_line and end_line (1-based, inclusive) limit the search to a line range. " +
-			"Output: matching lines as 'N: text'. When there are more matches than the cap allows, the matches found so far are returned with a notice naming the last line searched, so you can narrow the pattern or resume from a later start_line. Refuses binary files.",
+			"Output: matching lines as 'N: text' for one file, 'path:N: text' across files. When there are more matches than the cap allows, the matches found so far are returned with a notice naming the last line searched, so you can narrow the pattern or resume from a later start_line. Refuses binary files.",
 	},
 	"find_files": {
 		terse: "Find files by glob under the project root. filepath.Match syntax ('*.go'); no '**' support. Pattern matches the basename unless it contains a slash. Returns JSON {matches, count, truncated}. Gitignored paths are skipped.",

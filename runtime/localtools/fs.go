@@ -968,14 +968,24 @@ func (h *LocalFSTools) grep(ctx context.Context, args map[string]any) (any, task
 			return nil, taskengine.DataTypeAny, recoverablef("local_fs: grep: invalid regex: %v", err)
 		}
 	}
+	match := func(line string) bool {
+		if useRegex {
+			return re.MatchString(line)
+		}
+		return strings.Contains(line, pattern)
+	}
+
+	if hasGlobMeta(path) {
+		dir, glob := splitGlobPath(path)
+		return h.grepTree(ctx, dir, glob, match)
+	}
 
 	absPath, display, info, err := h.resolveTarget(ctx, "grep", path)
 	if err != nil {
 		return nil, taskengine.DataTypeAny, err
 	}
 	if info.IsDir() {
-		return nil, taskengine.DataTypeAny, recoverablef(
-			"local_fs: grep: %s is a directory; grep searches a single file — use find_files to locate candidates first", display)
+		return h.grepTree(ctx, path, "", match)
 	}
 	if err := h.checkFileSizeLimit(ctx, absPath); err != nil {
 		return nil, taskengine.DataTypeAny, err
@@ -991,68 +1001,206 @@ func (h *LocalFSTools) grep(ctx context.Context, args map[string]any) (any, task
 
 	lines := strings.Split(string(content), "\n")
 	start, end := grepLineRange(args, len(lines))
-	maxMatches := h.maxGrepMatchesFromPolicy(ctx)
-	budget, unlimited := h.maxOutputBytesFromPolicy(ctx)
-	if unlimited {
-		budget = 0
-	}
-	if budget > 1024 {
-		budget -= 512
-	}
+	state := &grepState{maxMatches: h.maxGrepMatchesFromPolicy(ctx), budget: h.grepOutputBudget(ctx)}
+	state.scan("", lines, start, end, match)
 
-	var (
-		matches   []string
-		size      int64
-		truncated bool
-		hitCap    bool
-		lastLine  = end
-	)
+	out := strings.Join(state.matches, "\n")
+	if state.truncated {
+		if out != "" {
+			out += "\n"
+		}
+		noun := "matches"
+		if len(state.matches) == 1 {
+			noun = "match"
+		}
+		out += fmt.Sprintf(
+			"local_fs: grep truncated — %d %s shown, searched lines %d-%d of %d; %s. Narrow the pattern or continue with start_line: %d. %s",
+			len(state.matches), noun, start, state.lastLine, len(lines), state.reason(), state.lastLine+1, severityRecoverable)
+	}
+	return out, taskengine.DataTypeString, nil
+}
+
+type grepState struct {
+	matches    []string
+	size       int64
+	truncated  bool
+	hitCap     bool
+	lastLine   int
+	maxMatches int
+	budget     int64
+}
+
+func (s *grepState) scan(prefix string, lines []string, start, end int, match func(string) bool) bool {
+	s.lastLine = end
 	for lineNo := start; lineNo <= end; lineNo++ {
 		if lineNo < 1 || lineNo > len(lines) {
 			continue
 		}
 		line := lines[lineNo-1]
-		var matched bool
-		if useRegex {
-			matched = re.MatchString(line)
-		} else {
-			matched = strings.Contains(line, pattern)
-		}
-		if !matched {
+		if !match(line) {
 			continue
 		}
-		entry := fmt.Sprintf("%d: %s", lineNo, line)
-		if budget > 0 && size+int64(len(entry)+1) > budget {
-			truncated = true
-			lastLine = lineNo - 1
-			break
+		entry := fmt.Sprintf("%s%d: %s", prefix, lineNo, line)
+		if s.budget > 0 && s.size+int64(len(entry)+1) > s.budget {
+			s.truncated = true
+			s.lastLine = lineNo - 1
+			return false
 		}
-		matches = append(matches, entry)
-		size += int64(len(entry) + 1)
-		if len(matches) >= maxMatches {
-			truncated = true
-			hitCap = true
-			lastLine = lineNo
-			break
+		s.matches = append(s.matches, entry)
+		s.size += int64(len(entry) + 1)
+		if len(s.matches) >= s.maxMatches {
+			s.truncated = true
+			s.hitCap = true
+			s.lastLine = lineNo
+			return false
 		}
 	}
+	return true
+}
 
-	out := strings.Join(matches, "\n")
-	if truncated {
+func (s *grepState) reason() string {
+	if s.hitCap {
+		return fmt.Sprintf("hit the %d-match cap (raise _max_grep_matches in tools_policies.local_fs)", s.maxMatches)
+	}
+	return fmt.Sprintf("output capped at %d bytes (raise _max_output_bytes or _model_context_tokens in tools_policies.local_fs)", s.budget)
+}
+
+func (h *LocalFSTools) grepOutputBudget(ctx context.Context) int64 {
+	budget, unlimited := h.maxOutputBytesFromPolicy(ctx)
+	if unlimited {
+		return 0
+	}
+	if budget > 1024 {
+		budget -= 512
+	}
+	return budget
+}
+
+func hasGlobMeta(path string) bool {
+	return strings.ContainsAny(path, "*?[")
+}
+
+func splitGlobPath(path string) (dir, glob string) {
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	for i, part := range parts {
+		if hasGlobMeta(part) {
+			dir = strings.Join(parts[:i], "/")
+			if dir == "" {
+				dir = "."
+			}
+			return dir, strings.Join(parts[i:], "/")
+		}
+	}
+	return path, ""
+}
+
+func (h *LocalFSTools) grepTree(ctx context.Context, rootArg, glob string, match func(string) bool) (any, taskengine.DataType, error) {
+	if rootArg == "" {
+		rootArg = "."
+	}
+	absRoot, display, info, err := h.resolveTarget(ctx, "grep", filepath.Clean(rootArg))
+	if err != nil {
+		return nil, taskengine.DataTypeAny, err
+	}
+	if !info.IsDir() {
+		return nil, taskengine.DataTypeAny, recoverablef("local_fs: grep: %s is not a directory", display)
+	}
+
+	nameGlob := glob
+	matchRel := false
+	if i := strings.LastIndex(glob, "**/"); i >= 0 {
+		nameGlob = glob[i+3:]
+	} else if strings.Contains(glob, "/") {
+		matchRel = true
+	}
+
+	filter := h.entryFilterFor(ctx, absRoot)
+	maxDepth := h.maxFindDepthFromPolicy(ctx)
+	maxFiles := h.maxFindResultsFromPolicy(ctx)
+	baseRoot, baseErr := h.absAllowedDir(ctx)
+	if baseErr != nil {
+		baseRoot = absRoot
+	}
+	state := &grepState{maxMatches: h.maxGrepMatchesFromPolicy(ctx), budget: h.grepOutputBudget(ctx)}
+	scanned := 0
+	filesCapped := false
+
+	walkErr := filepath.WalkDir(absRoot, func(walkPath string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if state.truncated || filesCapped {
+			return filepath.SkipAll
+		}
+		rel, relErr := filepath.Rel(absRoot, walkPath)
+		if relErr != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			return nil
+		}
+		relFromBase := rel
+		if r, e := filepath.Rel(baseRoot, walkPath); e == nil {
+			relFromBase = filepath.ToSlash(r)
+		}
+		if d.IsDir() {
+			if filter.skip(relFromBase, d.Name(), true) {
+				return filepath.SkipDir
+			}
+			if strings.Count(rel, "/")+1 > maxDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filter.skip(relFromBase, d.Name(), false) {
+			return nil
+		}
+		if nameGlob != "" {
+			var ok bool
+			if matchRel {
+				ok, _ = filepath.Match(nameGlob, rel)
+			} else {
+				ok, _ = filepath.Match(nameGlob, d.Name())
+			}
+			if !ok {
+				return nil
+			}
+		}
+		if h.checkFileSizeLimit(ctx, walkPath) != nil || h.refuseBinary(ctx, "grep", rel, walkPath) != nil {
+			return nil
+		}
+		content, readErr := h.fileIO.ReadFile(ctx, walkPath)
+		if readErr != nil {
+			return nil
+		}
+		scanned++
+		lines := strings.Split(string(content), "\n")
+		state.scan(relFromBase+":", lines, 1, len(lines), match)
+		if scanned >= maxFiles {
+			filesCapped = true
+		}
+		return nil
+	})
+	if walkErr != nil {
+		return nil, taskengine.DataTypeAny, fmt.Errorf("local_fs: grep: %w", walkErr)
+	}
+
+	out := strings.Join(state.matches, "\n")
+	if out == "" && !state.truncated && !filesCapped {
+		return fmt.Sprintf("local_fs: grep: no matches in %d files under %s", scanned, display), taskengine.DataTypeString, nil
+	}
+	if state.truncated || filesCapped {
 		if out != "" {
 			out += "\n"
 		}
-		noun := "matches"
-		if len(matches) == 1 {
-			noun = "match"
-		}
-		reason := fmt.Sprintf("output capped at %d bytes (raise _max_output_bytes or _model_context_tokens in tools_policies.local_fs)", budget)
-		if hitCap {
-			reason = fmt.Sprintf("hit the %d-match cap (raise _max_grep_matches in tools_policies.local_fs)", maxMatches)
+		reason := state.reason()
+		if filesCapped && !state.truncated {
+			reason = fmt.Sprintf("stopped after %d files (raise _max_find_results in tools_policies.local_fs)", maxFiles)
 		}
 		out += fmt.Sprintf(
-			"local_fs: grep truncated — %d %s shown, searched lines %d-%d of %d; %s. Narrow the pattern or continue with start_line: %d. %s",
-			len(matches), noun, start, lastLine, len(lines), reason, lastLine+1, severityRecoverable)
+			"local_fs: grep truncated — %d matches shown from %d files under %s; %s. Narrow the pattern or the path. %s",
+			len(state.matches), scanned, display, reason, severityRecoverable)
 	}
 	return out, taskengine.DataTypeString, nil
 }

@@ -55,7 +55,7 @@ think = "{{var:think}}"
 # Bounds on the two-stage tool loop.
 # The main stage hands to recovery after this many traversals; recovery
 # summarises the failure rather than looping.
-main_rounds = 12
+main_rounds = 24
 recovery_rounds = 8
 
 retry_on_failure = 0
@@ -492,15 +492,15 @@ prefix_allowlist = [
   # already holds, which is the code the session is editing anyway.
   "go build", "go test", "go vet", "go list", "go doc", "go env", "go version",
   "go mod why", "go mod graph", "go mod verify",
-  "gofmt -l", "gofmt -d", "golangci-lint run", "staticcheck",
+  "gofmt -l", "gofmt -d", "gofmt -w", "go fmt", "go tool cover", "golangci-lint run", "staticcheck",
   "npm test", "npm run test", "npm run build", "npm run lint", "npm run typecheck",
   "npm run check", "npm run format:check", "npm ls", "npm outdated", "npm --version",
   "pnpm test", "pnpm run test", "pnpm run build", "pnpm run lint", "pnpm run typecheck", "pnpm ls",
   "yarn test", "yarn run test", "yarn run build", "yarn run lint", "yarn run typecheck",
   "bun test", "bun run test", "bun run build", "bun run lint", "bun run typecheck",
-  "tsc --noEmit", "tsc -p", "tsc --build", "eslint", "prettier --check", "vitest run", "jest", "node --version",
+  "tsc --noEmit", "tsc -p", "tsc --build", "eslint", "prettier --check", "prettier --write", "vitest run", "jest", "node --version",
   "pytest", "python -m pytest", "python3 -m pytest", "python -m unittest", "python3 -m unittest",
-  "ruff check", "ruff format --check", "mypy", "pyright", "flake8", "black --check",
+  "ruff check", "ruff format --check", "ruff format", "mypy", "pyright", "flake8", "black --check",
   "pip list", "pip show", "pip freeze", "python --version", "python3 --version",
   "cargo build", "cargo test", "cargo check", "cargo clippy", "cargo fmt --check", "cargo metadata", "cargo tree",
   "rustc --version", "cargo --version",

@@ -285,10 +285,22 @@ func TestUnit_GitTools_Restore(t *testing.T) {
 	assert.NotContains(t, status, "staged for commit")
 }
 
-func TestUnit_GitTools_NoRepositoryIsRefused(t *testing.T) {
+func TestUnit_GitTools_NoRepositoryStatusIsAPlainAnswer(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	res, _, err := execGitTool(t, localtools.NewGitTools(dir), "git_status", nil)
+	res, dataType, err := execGitTool(t, localtools.NewGitTools(dir), "git_status", nil)
+	require.NoError(t, err)
+	assert.Equal(t, taskengine.DataTypeString, dataType)
+	text, ok := res.(string)
+	require.True(t, ok)
+	assert.Contains(t, text, "not a git repository")
+	assert.Contains(t, text, "not under version control")
+}
+
+func TestUnit_GitTools_NoRepositoryIsRefusedForLog(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	res, _, err := execGitTool(t, localtools.NewGitTools(dir), "git_log", nil)
 	require.Error(t, err)
 	assert.Nil(t, res)
 	assert.Contains(t, err.Error(), "no git repository")

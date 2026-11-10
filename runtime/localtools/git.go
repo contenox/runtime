@@ -185,6 +185,19 @@ func (h *GitTools) baseDir(ctx context.Context) (dir string, bounded bool, err e
 	return "", false, errors.New("git: no working directory could be resolved")
 }
 
+type noRepositoryError struct {
+	tool string
+	path string
+}
+
+func (e *noRepositoryError) Error() string {
+	return fmt.Sprintf("%s: no git repository at %s or any parent directory — this workspace is not under version control %s", e.tool, e.path, severityRecoverable)
+}
+
+func (e *noRepositoryError) status() string {
+	return fmt.Sprintf("not a git repository: %s is not under version control (no .git in it or any parent directory). Other git tools need a repository; this folder has none.", e.path)
+}
+
 func findRepoRoot(start string) (string, bool) {
 	dir := start
 	for {
@@ -210,7 +223,7 @@ func (h *GitTools) openRepo(ctx context.Context, tool string) (*git.Repository, 
 	}
 	root, found := findRepoRoot(start)
 	if !found {
-		return nil, "", recoverablef("%s: no git repository at %s or any parent directory — this workspace is not under version control", tool, start)
+		return nil, "", &noRepositoryError{tool: tool, path: start}
 	}
 	if bounded && !vfs.Within(start, root) {
 		return nil, "", recoverablef(
@@ -454,6 +467,10 @@ func (h *GitTools) status(ctx context.Context) (any, taskengine.DataType, error)
 	const tool = "git_status"
 	repo, _, err := h.openRepo(ctx, tool)
 	if err != nil {
+		var noRepo *noRepositoryError
+		if errors.As(err, &noRepo) {
+			return noRepo.status(), taskengine.DataTypeString, nil
+		}
 		return nil, taskengine.DataTypeAny, err
 	}
 	wt, err := repo.Worktree()

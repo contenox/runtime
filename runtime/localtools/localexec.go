@@ -280,6 +280,12 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 		message := `local_shell: command is required; send either {"command": "git"} or {"command": "git", "args": ["status", "--short"]} (a plain input string is also accepted as the command)`
 		return "", nil, "", 0, false, "", argumentProblem(ctx, message, receivedShellArguments(tools, input))
 	}
+	if !useShell && len(argsSlice) == 0 && strings.ContainsAny(command, " \t") && !filepath.IsAbs(command) && resolveCommand(command).LookupErr != nil {
+		if parts := splitShellArgs(command); len(parts) > 1 && resolveCommand(parts[0]).LookupErr == nil {
+			command = parts[0]
+			argsSlice = parts[1:]
+		}
+	}
 	return command, argsSlice, cwd, timeout, useShell, stdin, nil
 }
 
