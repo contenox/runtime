@@ -161,6 +161,7 @@ jobs:
         with:
           name: contenox-runtime-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/contenox-runtime-*
+          retention-days: 1
 
   assemble:
     needs: [verify, build]
@@ -196,6 +197,7 @@ jobs:
         with:
           name: release-bundle
           path: release-assets/*
+          retention-days: 1
 
   release:
     needs: [verify, assemble]
