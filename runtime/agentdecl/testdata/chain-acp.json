@@ -86,7 +86,7 @@
           {
             "operator": "edge_traversed_at_least",
             "edge": "coding_chat->coding_tools",
-            "when": "12",
+            "when": "24",
             "goto": "coding_recovery"
           },
           {

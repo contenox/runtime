@@ -49,7 +49,7 @@ func TestUnit_ChainEquivalence_CompiledACPTreeMatchesTheHandWrittenChain(t *test
 	current := loadCurrentACPChain(t)
 	codingBudget := loopBudget(current, "coding_chat")
 	recoveryBudget := loopBudget(current, "coding_recovery")
-	require.Equal(t, "12", codingBudget)
+	require.Equal(t, "24", codingBudget)
 	require.Equal(t, "8", recoveryBudget)
 
 	cfg, err := agentdecl.Shipped()
