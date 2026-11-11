@@ -83,6 +83,12 @@ var fsToolDocs = map[string]fsToolDoc{
 			"This satisfies the read-before-mutate prerequisite for targeted sed edits on the same current file version, but not for write_file full-file overwrites — call read_file (full) before write_file on an existing file. " +
 			"Missing paths return a 'Did you mean:' suggestion.",
 	},
+	"read_image": {
+		terse: "Attach an image file (PNG, JPEG, GIF or WebP, up to 8 MiB) from the project so you can see it. Returns the file's type, size and dimensions as text plus the image itself. Use it for screenshots, diagrams and design files; read_file refuses them as binary.",
+		verbose: "Attach an image file from the project to the conversation so you can look at it. Accepts PNG, JPEG, GIF and WebP up to 8 MiB; anything else is refused with the detected type. " +
+			"The text result names the file, its type, size and pixel dimensions; the image itself is attached to the result and visible to you if the current model has vision. " +
+			"Use it on screenshots, diagrams, mockups and rendered output. For text files use read_file.",
+	},
 	"stat_file": {
 		terse: "Metadata for a file or directory: {name, size, sizeHuman, modTime, isDir, mode, executable, binary}. Reads at most ~512 bytes. Use before read_file when a path's type is unclear.",
 		verbose: "Return metadata for a file or directory. Returns JSON with {name, size (bytes), sizeHuman (e.g. \"48 MiB\"), modTime (RFC3339), isDir (bool), mode (Go permission string, e.g. \"-rwxr-xr-x\"), executable (bool: any executable bit set), binary (bool: best-effort content sniff of the first ~512 bytes — NUL byte or high invalid-UTF-8 density; always false for directories)}. " +
@@ -96,7 +102,7 @@ func (h *LocalFSTools) Supports(ctx context.Context) ([]string, error) {
 	return []string{
 		h.name,
 		"read_file", "write_file", "list_dir", "grep", "find_files",
-		"sed", "count_stats", "read_file_range", "stat_file",
+		"sed", "count_stats", "read_file_range", "stat_file", "read_image",
 	}, nil
 }
 
@@ -131,6 +137,9 @@ func (h *LocalFSTools) GetToolsForToolsByName(ctx context.Context, name string) 
 	doc := func(tool string) string { return fsToolDocs[tool].pick(v) }
 
 	allTools := []taskengine.Tool{
+		fsTool("read_image", doc("read_image"), map[string]any{
+			"path": fsProp("string", "Path to the image file, relative to the project root"),
+		}, "path"),
 		fsTool("read_file", doc("read_file"), map[string]any{
 			"path":       fsProp("string", "Path to the file, relative to the project root"),
 			"start_line": fsProp("integer", "Optional 1-based first line. Supply the value from a truncation notice to page forward."),

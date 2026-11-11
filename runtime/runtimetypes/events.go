@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
@@ -46,6 +47,7 @@ type EventPartition struct {
 
 type EventStore interface {
 	AppendEvent(ctx context.Context, event *Event) error
+	AppendEvents(ctx context.Context, events []*Event) error
 	ListEventsSince(ctx context.Context, workspaceID string, afterNID int64, limit int) ([]Event, error)
 	ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int) ([]Event, error)
 	GetEventsByType(ctx context.Context, workspaceID, eventType string, from, to time.Time, limit int) ([]Event, error)
@@ -61,6 +63,9 @@ type EventStore interface {
 type eventStore struct {
 	db  libdb.DBManager
 	now func() time.Time
+
+	mu      sync.Mutex
+	ensured map[string]bool
 }
 
 type EventStoreOption func(*eventStore)
@@ -77,7 +82,7 @@ func NewEventStore(db libdb.DBManager, opts ...EventStoreOption) EventStore {
 	if db == nil {
 		panic("SERVER BUG: runtimetypes.NewEventStore called with nil db")
 	}
-	s := &eventStore{db: db, now: time.Now}
+	s := &eventStore{db: db, now: time.Now, ensured: map[string]bool{}}
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -125,6 +130,12 @@ func (s *eventStore) EnsureEventPartitionExists(ctx context.Context, ts time.Tim
 	if !validEventPartitionTableName(table) {
 		return fmt.Errorf("%w: invalid partition table %q", ErrInvalidEventParameter, table)
 	}
+	s.mu.Lock()
+	known := s.ensured[period]
+	s.mu.Unlock()
+	if known {
+		return nil
+	}
 	exec := s.db.WithoutTransaction()
 	if err := execCreateIfNotExists(ctx, exec, fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
@@ -155,29 +166,79 @@ func (s *eventStore) EnsureEventPartitionExists(ctx context.Context, ts time.Tim
 	`, period, table, s.now().UTC()); err != nil {
 		return fmt.Errorf("event_log: register partition %s: %w", table, err)
 	}
+	s.mu.Lock()
+	s.ensured[period] = true
+	s.mu.Unlock()
 	return nil
 }
 
+func (s *eventStore) forgetPartition(period string) {
+	s.mu.Lock()
+	delete(s.ensured, period)
+	s.mu.Unlock()
+}
+
 func (s *eventStore) AppendEvent(ctx context.Context, event *Event) error {
-	if err := s.prepareEvent(ctx, event); err != nil {
-		return err
+	return s.AppendEvents(ctx, []*Event{event})
+}
+
+func (s *eventStore) AppendEvents(ctx context.Context, events []*Event) error {
+	if len(events) == 0 {
+		return nil
 	}
-	if err := s.EnsureEventPartitionExists(ctx, event.Time); err != nil {
-		return err
+	periods := map[string]time.Time{}
+	for _, event := range events {
+		if err := s.prepareEvent(ctx, event); err != nil {
+			return err
+		}
+		periods[EventPeriodKey(event.Time)] = event.Time
 	}
+	for _, ts := range periods {
+		if err := s.EnsureEventPartitionExists(ctx, ts); err != nil {
+			return err
+		}
+	}
+	err := s.appendInOneTransaction(ctx, events)
+	if err != nil && isMissingTable(err) {
+		for period, ts := range periods {
+			s.forgetPartition(period)
+			if ensureErr := s.EnsureEventPartitionExists(ctx, ts); ensureErr != nil {
+				return ensureErr
+			}
+		}
+		err = s.appendInOneTransaction(ctx, events)
+	}
+	return err
+}
+
+func (s *eventStore) appendInOneTransaction(ctx context.Context, events []*Event) error {
 	exec, commit, release, err := s.db.WithTransaction(ctx)
 	if err != nil {
 		return fmt.Errorf("event_log: append tx: %w", err)
 	}
 	defer func() { _ = release() }()
-	if err := appendPreparedEvent(ctx, exec, event); err != nil {
-		return err
+	for _, event := range events {
+		if err := appendPreparedEvent(ctx, exec, event); err != nil {
+			clearNIDs(events)
+			return err
+		}
 	}
 	if err := commit(ctx); err != nil {
-		event.NID = 0
+		clearNIDs(events)
 		return fmt.Errorf("event_log: append commit: %w", err)
 	}
 	return nil
+}
+
+func clearNIDs(events []*Event) {
+	for _, event := range events {
+		event.NID = 0
+	}
+}
+
+func isMissingTable(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "no such table") || strings.Contains(msg, "does not exist")
 }
 
 func (s *eventStore) prepareEvent(ctx context.Context, event *Event) error {
@@ -533,6 +594,7 @@ func (s *eventStore) PruneEventPartitionsBefore(ctx context.Context, t time.Time
 			return dropped, fmt.Errorf("event_log: prune commit %s: %w", p.Period, err)
 		}
 		_ = release()
+		s.forgetPartition(p.Period)
 		dropped = append(dropped, p.Period)
 	}
 	return dropped, nil

@@ -30,7 +30,7 @@ func (s *store) AppendJob(ctx context.Context, job Job) error {
 	if job.ID == "" {
 		job.ID = uuid.New().String()
 	}
-	job.CreatedAt = time.Now().UTC()
+	job.CreatedAt = s.now().UTC()
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO job_queue_v2
 		(id, task_type, payload, scheduled_for, valid_until, retry_count, created_at)
@@ -54,7 +54,7 @@ func (s *store) AppendJobs(ctx context.Context, jobs ...*Job) error {
 	if len(jobs) > MAXLIMIT {
 		return ErrAppendLimitExceeded
 	}
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	valueStrings := make([]string, 0, len(jobs))
 	valueArgs := make([]interface{}, 0, len(jobs)*7)
 

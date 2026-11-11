@@ -13,7 +13,7 @@ import (
 )
 
 func (s *store) AppendModel(ctx context.Context, model *Model) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	model.CreatedAt = now
 	model.UpdatedAt = now
 	if model.ID == "" {
@@ -144,7 +144,7 @@ func (s *store) ListAllModels(ctx context.Context) ([]*Model, error) {
 }
 
 func (s *store) UpdateModel(ctx context.Context, data *Model) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	data.UpdatedAt = now
 	if data.Model == "" {
 		return fmt.Errorf("model cannot be empty")

@@ -67,7 +67,7 @@ type MCPTool struct {
 }
 
 func (s *store) CreateMCPServer(ctx context.Context, srv *MCPServer) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	srv.CreatedAt = now
 	srv.UpdatedAt = now
 	if srv.ID == "" {
@@ -104,7 +104,7 @@ func (s *store) CreateMCPServer(ctx context.Context, srv *MCPServer) error {
 }
 
 func (s *store) UpsertMCPServerByName(ctx context.Context, srv *MCPServer) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	if srv.ID == "" {
 		srv.ID = uuid.NewString()
 	}
@@ -198,7 +198,7 @@ func (s *store) scanMCPServer(ctx context.Context, query string, arg any) (*MCPS
 }
 
 func (s *store) UpdateMCPServer(ctx context.Context, srv *MCPServer) error {
-	srv.UpdatedAt = time.Now().UTC()
+	srv.UpdatedAt = s.now().UTC()
 	argsJSON, err := json.Marshal(srv.Args)
 	if err != nil {
 		return fmt.Errorf("mcp: marshal args: %w", err)

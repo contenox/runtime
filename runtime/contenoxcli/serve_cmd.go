@@ -29,11 +29,13 @@ import (
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/chainagents"
 	"github.com/contenox/runtime/runtime/enginesvc"
+	"github.com/contenox/runtime/runtime/eventlog"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
 	"github.com/contenox/runtime/runtime/internal/fleetapi"
 	internaltools "github.com/contenox/runtime/runtime/internal/tools"
+	"github.com/contenox/runtime/runtime/internal/workspacetriggersapi"
 	"github.com/contenox/runtime/runtime/localfileservice"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/missionchanges"
@@ -57,7 +59,9 @@ import (
 	"github.com/contenox/runtime/runtime/toolsproviderservice"
 	"github.com/contenox/runtime/runtime/version"
 	"github.com/contenox/runtime/runtime/vfs"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 	"github.com/contenox/runtime/runtime/workspacegrants"
+	"github.com/contenox/runtime/runtime/workspacetriggers"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
@@ -361,8 +365,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	toolsProviderSvc := toolsproviderservice.New(db, toolsRepo, tracker)
 	connectors := connectorservice.New(db, toolsRepo)
 
-	taskEventSink := taskengine.NewKVJournalTaskEventSink(
-		taskengine.NewBusTaskEventSink(bus), kvMgr, tracker)
+	eventTriggers := eventlog.NewTriggerHolder()
+	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
+	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
+	sessionLookup := acpsvc.NewServeSessionLookup(db, workspaceFactory)
+	var taskEventSink taskengine.TaskEventSink = workspaceevents.NewTaskEventBridge(
+		taskengine.NewKVJournalTaskEventSink(taskengine.NewBusTaskEventSink(bus), kvMgr, tracker),
+		workspaceEvents,
+		func(ctx context.Context) (string, string) {
+			return sessionLookup(ctx, acpsvc.SessionIDFromContext(ctx))
+		},
+	)
+	hitlservice.SetDecisionObserver(hitlSvc, workspaceevents.ApprovalObserver(workspaceEvents, sessionLookup))
 	approvalCeiling, err := parseHITLApprovalCeiling(config.HITLApprovalTimeout)
 	if err != nil {
 		return err
@@ -405,6 +419,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("build engine: runtime state is not configured")
 	}
 	defer engine.Stop()
+	workspaceWatcher := newWorkspaceWatcher(workspaceEvents, workspaceFactory, workspaceLeaseDir(dbPath), workspaceID, nodeID, tracker)
+	workspaceWatcher.Start(ctx)
+	defer workspaceWatcher.Stop()
+	applyShippedEventRetention(ctx, store, tracker)
+	stopEventRetention := workspaceevents.StartRetention(ctx, eventLog, eventRetentionSetting(store), workspaceevents.DefaultRetentionSweep, tracker)
+	defer stopEventRetention()
 	if opts.EffectiveDefaultModel == "" {
 		fmt.Fprintln(os.Stderr, "contenox-runtime serve: no default-model configured; serving setup-only — configure a provider and model in the app, or run `contenox-runtime setup`.")
 	}
@@ -535,6 +555,12 @@ func runServe(cmd *cobra.Command, args []string) error {
 		fleetservice.WithPolicyResolver(policyResolver(contenoxDir)))
 	fleetRef.set(fleet)
 
+	triggerDispatcher := newTriggerDispatcher(workspaceEvents, eventLog, workspaceFactory, db, workspaceID, fleet, missions, tracker)
+	eventTriggers.Set(triggerDispatcher)
+	triggerDispatcher.Start(ctx)
+	defer triggerDispatcher.Stop()
+	defer eventTriggers.Drain(eventlog.DefaultDrainTimeout)
+
 	operatorInbox := operatorinbox.New(db)
 	reportRouter, err := reportrouter.New(reportrouter.Deps{
 		Bus: bus,
@@ -627,6 +653,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		ContenoxDir:           contenoxDir,
 		WorkspaceRoots:        workspaceFactory,
 		WorkspaceRootMutators: workspaceReloader.mutators(bus),
+		WorkspaceEvents:       workspaceEvents,
+		WorkspaceTriggers: &workspacetriggersapi.Deps{
+			WorkspaceID: workspaceID,
+			Events:      workspaceEvents,
+			Store:       workspacetriggers.Store{DB: db},
+			History:     workspacetriggers.History{DB: db, Log: eventLog, Store: workspacetriggers.Store{DB: db}},
+			Active:      triggerDispatcher.Active,
+			Check:       triggerCheck(agentRegistry, policyValidator),
+		},
 		HITLPolicySource:      hitlSource,
 		HITLDefaultPolicyName: acpDefaultPolicyName,
 		AgentsConfigApplied:   agentsConfigApplied(contenoxDir),

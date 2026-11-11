@@ -67,8 +67,11 @@ WSL or CI for the full suite when a change touches Linux-only behavior.
 - Tests that start containers (several services use a containerised database via
   testcontainers) need Docker; on Windows they fail with "rootless Docker is not
   supported" or are skipped when no healthy provider is found.
-- The Rust end-to-end suite (`make rust-e2e`) builds Unix PTY helpers and does not
-  compile on native Windows. Run it from WSL, Linux or macOS.
+- The Rust end-to-end suite (`make rust-e2e`) runs on native Windows as well as on Linux and
+  macOS, and the desktop ships on Windows, so run it on both. Only the terminal (PTY) helper
+  and `tests/sessions.rs`, which drives it, are Unix-only. On Windows point `CONTENOX_BIN` at
+  a built `bin/contenox-runtime.exe`; the harness gives each case its own `USERPROFILE`,
+  `APPDATA` and `LOCALAPPDATA`.
 
 ### Targets that need a Unix shell
 

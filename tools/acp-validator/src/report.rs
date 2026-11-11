@@ -1,4 +1,3 @@
-
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -60,7 +59,11 @@ pub fn print_table(results: &[CheckResult]) {
         .unwrap_or(4)
         .max("CHECK".len());
 
-    println!("{:<name_width$}  STATUS  DETAIL", "CHECK", name_width = name_width);
+    println!(
+        "{:<name_width$}  STATUS  DETAIL",
+        "CHECK",
+        name_width = name_width
+    );
     println!("{}", "-".repeat(name_width + 8 + 6));
     for result in results {
         let detail = result.detail.replace('\n', " | ");
@@ -77,7 +80,10 @@ pub fn print_table(results: &[CheckResult]) {
     let fail = results.iter().filter(|r| r.status == Status::Fail).count();
     let skip = results.iter().filter(|r| r.status == Status::Skip).count();
     println!();
-    println!("{pass} passed, {fail} failed, {skip} skipped ({} total)", results.len());
+    println!(
+        "{pass} passed, {fail} failed, {skip} skipped ({} total)",
+        results.len()
+    );
 }
 
 pub fn print_json(results: &[CheckResult]) {

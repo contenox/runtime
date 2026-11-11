@@ -2,7 +2,6 @@ package localtools
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/contenox/runtime/runtime/vfs"
 )
 
 type SQLDialect int
@@ -63,24 +63,19 @@ func sessionIDFromContext(ctx context.Context) string {
 	return s
 }
 
-func contentHash(content []byte) string {
-	sum := sha256.Sum256(content)
-	return fmt.Sprintf("%x", sum[:])
-}
-
 func rangeReadMarkerPath(absPath string) string { return "range:" + absPath }
 
 func fullHashMarkerPath(absPath, hash string) string  { return "fullhash:" + absPath + ":" + hash }
 func rangeHashMarkerPath(absPath, hash string) string { return "rangehash:" + absPath + ":" + hash }
 
 func (h *LocalFSTools) recordFullRead(ctx context.Context, absPath string, content []byte) {
-	hash := contentHash(content)
+	hash := vfs.ContentHash(content)
 	h.recordReadMarker(ctx, absPath)
 	h.recordReadMarker(ctx, fullHashMarkerPath(absPath, hash))
 }
 
 func (h *LocalFSTools) recordRangeRead(ctx context.Context, absPath string, content []byte) {
-	hash := contentHash(content)
+	hash := vfs.ContentHash(content)
 	h.recordReadMarker(ctx, rangeReadMarkerPath(absPath))
 	h.recordReadMarker(ctx, rangeHashMarkerPath(absPath, hash))
 }
@@ -242,14 +237,14 @@ func (h *LocalFSTools) requireReadBeforeMutation(ctx context.Context, absPath, d
 		if readErr != nil {
 			return mutationGate{exists: true}
 		}
-		return mutationGate{exists: true, content: content, hash: contentHash(content), verified: true}
+		return mutationGate{exists: true, content: content, hash: vfs.ContentHash(content), verified: true}
 	}
 
 	content, err := h.fileIO.ReadFile(ctx, absPath)
 	if err != nil {
 		return mutationGate{exists: true}
 	}
-	hash := contentHash(content)
+	hash := vfs.ContentHash(content)
 	allow := mutationGate{exists: true, content: content, hash: hash, verified: true}
 
 	deny := func(format string) mutationGate {
@@ -303,5 +298,5 @@ func (h *LocalFSTools) confirmUnchanged(ctx context.Context, absPath, expected s
 		}
 		return false, nil
 	}
-	return contentHash(current) == expected, current
+	return vfs.ContentHash(current) == expected, current
 }

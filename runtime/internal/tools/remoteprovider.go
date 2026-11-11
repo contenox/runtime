@@ -14,6 +14,7 @@ import (
 	"github.com/contenox/runtime/libbus"
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/mcpworker"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
@@ -171,6 +172,9 @@ func (p *PersistentRepo) execMCPTools(
 		return nil, taskengine.DataTypeAny, fmt.Errorf("mcp tools %q: %w", srv.Name, err)
 	}
 	if result != nil {
+		if imageResult, ok := localtools.DecodeMCPImageResult(result); ok {
+			return imageResult, taskengine.DataTypeString, nil
+		}
 		if s, ok := result.(string); ok {
 			return s, taskengine.DataTypeString, nil
 		}

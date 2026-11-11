@@ -41,6 +41,8 @@ type SimpleExec struct {
 	toolsProvider ToolsRepo
 	tracker       libtracker.ActivityTracker
 	eventSink     TaskEventSink
+
+	toolImagesKept ToolImagesKept
 }
 
 func NewExec(
@@ -48,6 +50,7 @@ func NewExec(
 	repo llmrepo.ModelRepo,
 	toolsProvider ToolsRepo,
 	tracker libtracker.ActivityTracker,
+	opts ...ExecOption,
 ) (TaskExecutor, error) {
 	if toolsProvider == nil {
 		return nil, fmt.Errorf("tools provider is nil")
@@ -55,12 +58,16 @@ func NewExec(
 	if repo == nil {
 		return nil, fmt.Errorf("repo executor is nil")
 	}
-	return &SimpleExec{
+	exe := &SimpleExec{
 		toolsProvider: toolsProvider,
 		repo:          repo,
 		tracker:       tracker,
 		eventSink:     taskEventSinkFromContext(ctx),
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(exe)
+	}
+	return exe, nil
 }
 
 func (exe *SimpleExec) publishStepChunk(ctx context.Context, meta llmrepo.Meta, content, thinking string) {
@@ -868,6 +875,12 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 
 			executedAny = true
 
+			var resultImages []ImagePart
+			if text, kept, ok := toolImageResultForModel(result); ok {
+				result = text
+				resultType = DataTypeString
+				resultImages = kept
+			}
 			content, marshalErr := serializeToolResultContent(result, resultType)
 			if marshalErr != nil {
 				taskErr = fmt.Errorf("failed to marshal tool %s result: %w", toolCall.Function.Name, marshalErr)
@@ -893,6 +906,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				ID:              uuid.NewString(),
 				Role:            "tool",
 				Content:         content,
+				Images:          resultImages,
 				ToolCallID:      toolCall.ID,
 				ToolResultError: toolExecErr != nil,
 				Timestamp:       time.Now().UTC(),
@@ -973,6 +987,11 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				chainContext.Debug,
 				currentTask.OutputTemplate,
 			)
+
+			if text, ok := toolImageResultWithoutModel(output); ok {
+				output = text
+				outputType = DataTypeString
+			}
 
 			toolExecErr := taskErr
 			if taskErr != nil {
@@ -1201,7 +1220,7 @@ func (exe *SimpleExec) executeLLM(
 		}
 	}
 
-	messagesC := providerMessagesFromEngine(prelude, input.Messages)
+	messagesC := providerMessagesFromEngine(prelude, keepNewestToolImages(input.Messages, exe.imagesKept(ctx)))
 
 	chatArgs := chatArgsForLLMCall(llmCall, tools)
 	toolSchemaBytes := 0
@@ -1824,6 +1843,50 @@ type toolDiff struct {
 
 type toolDiffProvider interface {
 	ToolDiff() (path string, oldText string, newText string, ok bool)
+}
+
+const (
+	maxToolResultImages     = 4
+	MaxToolResultImageBytes = 5 << 20
+)
+
+func boundToolResultImages(images []ImagePart) ([]ImagePart, string) {
+	kept := make([]ImagePart, 0, len(images))
+	dropped := 0
+	for _, img := range images {
+		if len(img.Data) == 0 || len(img.Data) > MaxToolResultImageBytes || len(kept) >= maxToolResultImages {
+			dropped++
+			continue
+		}
+		kept = append(kept, img)
+	}
+	if dropped == 0 {
+		return kept, ""
+	}
+	return kept, fmt.Sprintf("(%d image(s) were not attached: at most %d images of up to %d MiB each reach the model)", dropped, maxToolResultImages, MaxToolResultImageBytes>>20)
+}
+
+func toolImageResultForModel(result any) (string, []ImagePart, bool) {
+	img, ok := result.(*ToolImageResult)
+	if !ok || img == nil {
+		return "", nil, false
+	}
+	kept, note := boundToolResultImages(img.Images)
+	if note == "" {
+		return img.Text, kept, true
+	}
+	return strings.TrimSpace(img.Text + "\n" + note), kept, true
+}
+
+func toolImageResultWithoutModel(result any) (string, bool) {
+	img, ok := result.(*ToolImageResult)
+	if !ok || img == nil {
+		return "", false
+	}
+	if len(img.Images) == 0 {
+		return img.Text, true
+	}
+	return strings.TrimSpace(fmt.Sprintf("%s\n(%d image(s) were not attached: a tools task has no model to show them to)", img.Text, len(img.Images))), true
 }
 
 func serializeToolResultContent(result any, resultType DataType) (string, error) {

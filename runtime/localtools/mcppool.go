@@ -2,6 +2,7 @@ package localtools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/contenox/runtime/runtime/localtools/mcpoauth"
+	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/oauth2"
 )
@@ -482,10 +484,72 @@ func (p *MCPSessionPool) callTool(ctx context.Context, toolName string, args map
 			errors.New(toolErr),
 		)
 	}
+	if images := mcpCollectImages(result.Content); len(images) > 0 {
+		text := mcpCollectText(result.Content)
+		if result.StructuredContent != nil {
+			if b, err := json.Marshal(result.StructuredContent); err == nil {
+				text = strings.TrimSpace(text + "\n" + string(b))
+			}
+		}
+		return &MCPImageResult{Kind: MCPImageResultKind, Text: text, Images: images}, nil
+	}
 	if result.StructuredContent != nil {
 		return result.StructuredContent, nil
 	}
 	return mcpCollectText(result.Content), nil
+}
+
+const MCPImageResultKind = "contenox.image_result"
+
+type MCPImage struct {
+	MimeType string `json:"mime_type"`
+	Data     []byte `json:"data"`
+}
+
+type MCPImageResult struct {
+	Kind   string     `json:"kind"`
+	Text   string     `json:"text"`
+	Images []MCPImage `json:"images"`
+}
+
+func mcpCollectImages(contents []mcp.Content) []MCPImage {
+	var out []MCPImage
+	for _, c := range contents {
+		if ic, ok := c.(*mcp.ImageContent); ok && len(ic.Data) > 0 {
+			out = append(out, MCPImage{MimeType: ic.MIMEType, Data: ic.Data})
+		}
+	}
+	return out
+}
+
+func DecodeMCPImageResult(result any) (*taskengine.ToolImageResult, bool) {
+	if result == nil {
+		return nil, false
+	}
+	if direct, ok := result.(*MCPImageResult); ok {
+		return direct.toolResult(), true
+	}
+	m, ok := result.(map[string]any)
+	if !ok || m["kind"] != MCPImageResultKind {
+		return nil, false
+	}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return nil, false
+	}
+	var decoded MCPImageResult
+	if err := json.Unmarshal(raw, &decoded); err != nil || len(decoded.Images) == 0 {
+		return nil, false
+	}
+	return decoded.toolResult(), true
+}
+
+func (r *MCPImageResult) toolResult() *taskengine.ToolImageResult {
+	out := &taskengine.ToolImageResult{Text: r.Text}
+	for _, img := range r.Images {
+		out.Images = append(out.Images, taskengine.ImagePart{Data: img.Data, MimeType: img.MimeType})
+	}
+	return out
 }
 
 func (p *MCPSessionPool) ListTools(ctx context.Context) ([]*mcp.Tool, error) {

@@ -66,3 +66,23 @@ func TestUnit_LocalFileService_RejectsTraversalAndSymlinkEscape(t *testing.T) {
 	_, err = svc.Write(context.Background(), "out/new.txt", []byte("nope"), true)
 	require.ErrorIs(t, err, localfileservice.ErrInvalidPath)
 }
+
+func TestUnit_LocalFileService_MoveNeverReplacesAnotherFile(t *testing.T) {
+	ctx := context.Background()
+	svc, err := localfileservice.New(t.TempDir())
+	require.NoError(t, err)
+	_, err = svc.Write(ctx, "a.txt", []byte("a"), true)
+	require.NoError(t, err)
+	_, err = svc.Write(ctx, "b.txt", []byte("b"), true)
+	require.NoError(t, err)
+
+	_, err = svc.Move(ctx, "a.txt", "b.txt")
+	require.ErrorIs(t, err, libdb.ErrUniqueViolation)
+	data, _, err := svc.Read(ctx, "b.txt")
+	require.NoError(t, err)
+	require.Equal(t, "b", string(data))
+
+	moved, err := svc.Move(ctx, "a.txt", "A.txt")
+	require.NoError(t, err, "a case-only rename is a rename of the same file")
+	require.Equal(t, "A.txt", moved.Path)
+}

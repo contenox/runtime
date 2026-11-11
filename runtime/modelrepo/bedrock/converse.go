@@ -101,15 +101,37 @@ func buildConverseInput(m converseModel, messages []modelrepo.Message, cfg *mode
 			}
 		case "tool":
 			if !hasTools {
-				appendBlocks(types.ConversationRoleUser, []types.ContentBlock{
+				blocks := []types.ContentBlock{
 					&types.ContentBlockMemberText{Value: fmt.Sprintf("[tool result %s]\n%s", msg.ToolCallID, msg.Content)},
-				})
+				}
+				for _, img := range msg.Images {
+					format, ok := imageFormatFromMime(img.MimeType)
+					if !ok {
+						return nil, nil, fmt.Errorf("bedrock model %s: image type %q is not supported; Bedrock accepts image/png, image/jpeg, image/gif and image/webp", m.name, img.MimeType)
+					}
+					blocks = append(blocks, &types.ContentBlockMemberImage{Value: types.ImageBlock{
+						Format: format,
+						Source: &types.ImageSourceMemberBytes{Value: img.Data},
+					}})
+				}
+				appendBlocks(types.ConversationRoleUser, blocks)
 				continue
+			}
+			resultBlocks := []types.ToolResultContentBlock{&types.ToolResultContentBlockMemberText{Value: msg.Content}}
+			for _, img := range msg.Images {
+				format, ok := imageFormatFromMime(img.MimeType)
+				if !ok {
+					return nil, nil, fmt.Errorf("bedrock model %s: image type %q is not supported; Bedrock accepts image/png, image/jpeg, image/gif and image/webp", m.name, img.MimeType)
+				}
+				resultBlocks = append(resultBlocks, &types.ToolResultContentBlockMemberImage{Value: types.ImageBlock{
+					Format: format,
+					Source: &types.ImageSourceMemberBytes{Value: img.Data},
+				}})
 			}
 			appendBlocks(types.ConversationRoleUser, []types.ContentBlock{
 				&types.ContentBlockMemberToolResult{Value: types.ToolResultBlock{
 					ToolUseId: aws.String(msg.ToolCallID),
-					Content:   []types.ToolResultContentBlock{&types.ToolResultContentBlockMemberText{Value: msg.Content}},
+					Content:   resultBlocks,
 				}},
 			})
 		case "assistant", "model":

@@ -14,6 +14,7 @@ var realTools = map[string]bool{
 	"local_shell":     true,
 	"read_file":       true,
 	"read_file_range": true,
+	"read_image":      true,
 	"write_file":      true,
 	"edit_file":       true,
 

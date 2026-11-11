@@ -185,7 +185,7 @@ func (a *Agent) SetChainConfig(cfg ChainConfig) error {
 }
 
 func (s *store) CreateAgent(ctx context.Context, agent *Agent) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	agent.CreatedAt = now
 	agent.UpdatedAt = now
 	if agent.ID == "" {
@@ -238,7 +238,7 @@ func (s *store) scanAgent(ctx context.Context, query string, arg any) (*Agent, e
 }
 
 func (s *store) UpdateAgent(ctx context.Context, agent *Agent) error {
-	agent.UpdatedAt = time.Now().UTC()
+	agent.UpdatedAt = s.now().UTC()
 	configJSON := agent.ConfigJSON
 	if len(configJSON) == 0 {
 		configJSON = json.RawMessage("{}")

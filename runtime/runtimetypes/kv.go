@@ -21,7 +21,7 @@ func (s *store) SetWorkspaceKV(ctx context.Context, workspaceID string, key stri
 }
 
 func (s *store) setKVScoped(ctx context.Context, workspaceID string, key string, value json.RawMessage) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO kv (key, workspace_id, value, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -33,7 +33,7 @@ func (s *store) setKVScoped(ctx context.Context, workspaceID string, key string,
 }
 
 func (s *store) UpdateKV(ctx context.Context, key string, value json.RawMessage) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	result, err := s.Exec.ExecContext(ctx, `
         UPDATE kv
         SET value = $2, updated_at = $3

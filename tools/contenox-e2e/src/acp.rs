@@ -92,11 +92,9 @@ impl PromptTurn {
     pub fn tool_outputs(&self) -> String {
         let mut out = String::new();
         for update in self.updates.iter() {
-            for key in ["rawOutput"] {
-                if let Some(value) = update.get(key) {
-                    out.push_str(&render(value));
-                    out.push('\n');
-                }
+            if let Some(value) = update.get("rawOutput") {
+                out.push_str(&render(value));
+                out.push('\n');
             }
             if let Some(error) = update.pointer("/_meta/error") {
                 out.push_str(&render(error));
@@ -176,6 +174,7 @@ pub struct Acp {
     timeout: Duration,
     verdict: Verdict,
     commands: Vec<Value>,
+    config_options: Vec<Value>,
     permissions: Vec<Value>,
     client_calls: Vec<(String, Value)>,
     performs_writes: bool,
@@ -249,6 +248,7 @@ impl Acp {
             timeout: Duration::from_secs(120),
             verdict: Verdict::Allow,
             commands: Vec::new(),
+            config_options: Vec::new(),
             permissions: Vec::new(),
             client_calls: Vec::new(),
             performs_writes: true,
@@ -361,6 +361,11 @@ impl Acp {
             .and_then(Value::as_str)
             .context("session/new returned no sessionId")?
             .to_string();
+        self.config_options = result
+            .get("configOptions")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
 
         self.commands.clear();
         let mut seen = deferred;
@@ -372,13 +377,33 @@ impl Acp {
                 .unwrap_or(Value::Null);
             if update.get("sessionUpdate").and_then(Value::as_str)
                 == Some("available_commands_update")
+                && let Some(list) = update.get("availableCommands").and_then(Value::as_array)
             {
-                if let Some(list) = update.get("availableCommands").and_then(Value::as_array) {
-                    self.commands = list.clone();
-                }
+                self.commands = list.clone();
             }
         }
         Ok(session)
+    }
+
+    pub fn config_options(&self) -> &[Value] {
+        &self.config_options
+    }
+
+    pub fn config_values(&self, config_id: &str) -> Vec<String> {
+        self.config_options
+            .iter()
+            .filter(|option| option["id"] == config_id)
+            .flat_map(|option| option["options"].as_array().cloned().unwrap_or_default())
+            .filter_map(|choice| choice["value"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    pub fn set_config(&mut self, session: &str, config_id: &str, value: &str) -> Result<Value> {
+        self.call(
+            "session/set_config_option",
+            json!({"sessionId": session, "configId": config_id, "value": value}),
+        )?
+        .ok()
     }
 
     pub fn prompt(&mut self, session: &str, text: &str) -> Result<PromptTurn> {

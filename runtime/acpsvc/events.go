@@ -280,7 +280,7 @@ func summarizeToolCallArgs(toolName string, args map[string]any) string {
 			parts = append(parts, asStringSlice("args")...)
 		}
 		summary = strings.Join(parts, " ")
-	case "read_file", "read_file_range", "write_file", "stat_file", "list_dir", "delete_file":
+	case "read_file", "read_file_range", "read_image", "write_file", "stat_file", "list_dir", "delete_file":
 		summary = asString("path")
 	case "grep":
 		if p := asString("pattern"); p != "" {

@@ -8,7 +8,8 @@ PORT="${CONTENOX_APITEST_PORT:-32124}"
 TMP_ROOT="${CONTENOX_APITEST_TMPDIR:-}"
 
 if [[ -z "$TMP_ROOT" ]]; then
-  TMP_ROOT="$(mktemp -d)"
+  mkdir -p "$ROOT_DIR/tmp"
+  TMP_ROOT="$(mktemp -d "$ROOT_DIR/tmp/apitest.XXXXXX")"
   REMOVE_TMP=1
 else
   mkdir -p "$TMP_ROOT"
@@ -120,10 +121,16 @@ fi
 export CONTENOX_DEFAULT_MODEL="${CONTENOX_APITEST_DEFAULT_MODEL:-apitest-fixture-model}"
 export CONTENOX_DEFAULT_PROVIDER="${CONTENOX_APITEST_DEFAULT_PROVIDER:-ollama}"
 
+if ! "$PYTHON" -c 'import socket, sys; s = socket.socket(); sys.exit(0 if s.connect_ex((sys.argv[1], int(sys.argv[2]))) else 1)' "$HOST" "$PORT"; then
+  echo "something already listens on $HOST:$PORT; stop it or set CONTENOX_APITEST_PORT" >&2
+  exit 1
+fi
+
 HOME="$HOME_DIR" ADDR="$HOST" PORT="$PORT" TOKEN="" "$BIN" --data-dir "$DATA_DIR" --db "$DB_PATH" serve >"$LOG_FILE" 2>&1 &
 SERVER_PID="$!"
 
 "$PYTHON" - "$HOST" "$PORT" "$SERVER_PID" "$LOG_FILE" <<'PY'
+import os
 import pathlib
 import sys
 import time
@@ -140,17 +147,23 @@ while time.monotonic() < deadline:
                 sys.exit(0)
     except Exception:
         pass
-    try:
-        import os
-        os.kill(int(pid), 0)
-    except OSError:
-        break
+    if os.name != "nt":
+        try:
+            os.kill(int(pid), 0)
+        except OSError:
+            break
     time.sleep(0.25)
 
 print(f"contenox serve did not become ready at {url}", file=sys.stderr)
 print(pathlib.Path(log_file).read_text(errors="replace"), file=sys.stderr)
 sys.exit(1)
 PY
+
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+  echo "contenox serve exited while starting; whatever answers on $HOST:$PORT is not this run's server" >&2
+  cat "$LOG_FILE" >&2
+  exit 1
+fi
 
 export CONTENOX_API_URL="http://$HOST:$PORT/api"
 export CONTENOX_BEAM_ORIGIN="http://$HOST:$PORT"

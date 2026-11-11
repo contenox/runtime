@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, bail};
 use std::fs::File;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
@@ -125,10 +124,8 @@ fn build(root: &Path, out: &Path) -> Result<PathBuf> {
     let lock_path = dir.join(".contenox-e2e-build.lock");
     let lock =
         File::create(&lock_path).with_context(|| format!("create {}", lock_path.display()))?;
-    let locked = unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) } == 0;
-    if !locked {
-        bail!("could not lock {}", lock_path.display());
-    }
+    lock.lock()
+        .with_context(|| format!("could not lock {}", lock_path.display()))?;
 
     if is_current(root, out) {
         return Ok(out.to_path_buf());

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/vfs"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 )
+
+const AtomicTempPrefix = vfs.AtomicTempPrefix
 
 const listSizeNoticeThreshold = 1 << 20
 
@@ -191,42 +194,7 @@ func (h *LocalFSTools) writeFileDurable(ctx context.Context, absPath string, dat
 		return h.fileIO.WriteFile(ctx, absPath, data)
 	}
 
-	dir := filepath.Dir(absPath)
-	tmp, err := os.CreateTemp(dir, ".contenox-tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	cleanup := func() {
-		tmp.Close()
-		os.Remove(tmpName)
-	}
-
-	mode := os.FileMode(0644)
-	if info, statErr := os.Stat(absPath); statErr == nil {
-		mode = info.Mode().Perm()
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		cleanup()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		cleanup()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		cleanup()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
-		return err
-	}
-	if err := os.Rename(tmpName, absPath); err != nil {
-		os.Remove(tmpName)
-		return err
-	}
-	return nil
+	return vfs.WriteFileAtomic(absPath, data)
 }
 
 type listCollector struct {

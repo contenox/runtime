@@ -8,9 +8,16 @@ import (
 	apiframework "github.com/contenox/runtime/apiframework"
 	"github.com/contenox/runtime/runtime/localfileservice"
 	"github.com/contenox/runtime/runtime/vfs"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 )
 
-func AddWorkspaceRoutes(mux *http.ServeMux, factory *vfs.Factory, hitlFor PolicyEvaluatorFactory) error {
+type WorkspaceOption func(*workspaceHandler)
+
+func WithEvents(events workspaceevents.Service) WorkspaceOption {
+	return func(wh *workspaceHandler) { wh.events = events }
+}
+
+func AddWorkspaceRoutes(mux *http.ServeMux, factory *vfs.Factory, hitlFor PolicyEvaluatorFactory, opts ...WorkspaceOption) error {
 	if factory == nil {
 		return fmt.Errorf("localfileapi: workspace factory is nil")
 	}
@@ -19,6 +26,10 @@ func AddWorkspaceRoutes(mux *http.ServeMux, factory *vfs.Factory, hitlFor Policy
 		services: map[string]localfileservice.Service{},
 		filters:  defaultFilters(),
 		hitlFor:  hitlFor,
+		replaces: newReplaceStore(),
+	}
+	for _, opt := range opts {
+		opt(wh)
 	}
 	for _, root := range factory.Roots() {
 		if _, err := wh.serviceFor(root); err != nil {
@@ -36,6 +47,8 @@ func AddWorkspaceRoutes(mux *http.ServeMux, factory *vfs.Factory, hitlFor Policy
 	mux.HandleFunc("PUT /files/move", wh.wrap((*handler).movePath))
 	mux.HandleFunc("POST /folders", wh.wrap((*handler).createFolder))
 	mux.HandleFunc("DELETE /folders", wh.wrap((*handler).deleteFolder))
+	mux.HandleFunc("POST /workspace/replace", wh.replacePreview)
+	mux.HandleFunc("POST /workspace/replace/{id}/apply", wh.replaceApply)
 	return nil
 }
 
@@ -44,6 +57,9 @@ type workspaceHandler struct {
 
 	filters map[string]FileFilter
 	hitlFor PolicyEvaluatorFactory
+	events  workspaceevents.Service
+
+	replaces *replaceStore
 
 	mu       sync.Mutex
 	services map[string]localfileservice.Service
@@ -80,6 +96,6 @@ func (wh *workspaceHandler) wrap(fn func(*handler, http.ResponseWriter, *http.Re
 			return
 		}
 		view, _ := vfs.OpenView(svc.Root())
-		fn(&handler{service: svc, view: view, filters: wh.filters, hitlFor: wh.hitlFor}, w, r)
+		fn(&handler{service: svc, view: view, filters: wh.filters, hitlFor: wh.hitlFor, events: wh.events}, w, r)
 	}
 }

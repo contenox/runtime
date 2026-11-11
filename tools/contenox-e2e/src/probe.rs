@@ -95,7 +95,10 @@ impl Instance {
     pub fn mission_show(&self, id: &str) -> Result<MissionShow> {
         let out = self.run(["mission", "show", id]);
         if !out.success() {
-            bail!("contenox-runtime mission show {id} failed\n{}", out.render());
+            bail!(
+                "contenox-runtime mission show {id} failed\n{}",
+                out.render()
+            );
         }
         Ok(MissionShow {
             fields: labelled_fields(&out.stdout),
@@ -174,7 +177,12 @@ impl Instance {
             .cmd(["session", "list"])
             .cwd(dir.as_ref())
             .output()
-            .with_context(|| format!("contenox-runtime session list in {}", dir.as_ref().display()))?;
+            .with_context(|| {
+                format!(
+                    "contenox-runtime session list in {}",
+                    dir.as_ref().display()
+                )
+            })?;
         if !out.success() {
             bail!("contenox-runtime session list failed\n{}", out.render());
         }
@@ -187,7 +195,10 @@ impl Instance {
     pub fn sessions_all(&self) -> Result<Vec<WorkspaceSessionRow>> {
         let out = self.run(["session", "list", "--all"]);
         if !out.success() {
-            bail!("contenox-runtime session list --all failed\n{}", out.render());
+            bail!(
+                "contenox-runtime session list --all failed\n{}",
+                out.render()
+            );
         }
         let table = table_or_empty(
             &out.stdout,
@@ -247,7 +258,10 @@ impl Instance {
     pub fn state_steps(&self, request: &str) -> Result<Vec<StateStep>> {
         let out = self.run(["state", "show", request]);
         if !out.success() {
-            bail!("contenox-runtime state show {request} failed\n{}", out.render());
+            bail!(
+                "contenox-runtime state show {request} failed\n{}",
+                out.render()
+            );
         }
         let table = Table::parse(
             &out.stdout,
@@ -293,8 +307,12 @@ impl Instance {
                 out.render()
             );
         }
-        let captured: serde_json::Value = serde_json::from_str(&out.stdout)
-            .with_context(|| format!("contenox-runtime state show --raw emitted\n{}", out.render()))?;
+        let captured: serde_json::Value = serde_json::from_str(&out.stdout).with_context(|| {
+            format!(
+                "contenox-runtime state show --raw emitted\n{}",
+                out.render()
+            )
+        })?;
         let mut prompts = Vec::new();
         collect_system_prompts(&captured, &mut prompts);
         Ok(prompts)

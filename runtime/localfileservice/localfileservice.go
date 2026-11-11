@@ -29,6 +29,7 @@ type Entry struct {
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 	IsDirectory bool      `json:"isDirectory"`
+	ETag        string    `json:"etag,omitempty"`
 }
 
 type Service interface {
@@ -37,6 +38,7 @@ type Service interface {
 	Stat(ctx context.Context, relPath string) (*Entry, error)
 	Read(ctx context.Context, relPath string) ([]byte, *Entry, error)
 	Write(ctx context.Context, relPath string, data []byte, createOnly bool) (*Entry, error)
+	WriteIfMatch(ctx context.Context, relPath string, data []byte, ifMatch string) (*Entry, error)
 	Mkdir(ctx context.Context, relPath string) (*Entry, error)
 	Delete(ctx context.Context, relPath string) error
 	Move(ctx context.Context, fromPath, toPath string) (*Entry, error)
@@ -97,7 +99,7 @@ func (s *localService) Find(ctx context.Context, opts FindOptions, emit func(Ent
 			}
 			return nil
 		}
-		if !matchesAnyGlob(opts.Globs, rel, d.Name()) {
+		if !MatchesAnyGlob(opts.Globs, rel, d.Name()) {
 			return nil
 		}
 		info, ierr := d.Info()
@@ -124,7 +126,7 @@ func (s *localService) Find(ctx context.Context, opts FindOptions, emit func(Ent
 	return res, nil
 }
 
-func matchesAnyGlob(globs []string, rel, name string) bool {
+func MatchesAnyGlob(globs []string, rel, name string) bool {
 	for _, g := range globs {
 		target := name
 		if strings.ContainsRune(g, '/') {
@@ -281,6 +283,7 @@ func (s *localService) Read(ctx context.Context, relPath string) ([]byte, *Entry
 		return nil, nil, mapOSError(err)
 	}
 	entry := entryFromInfo(rel, info)
+	entry.ETag = ETag(data)
 	return data, &entry, nil
 }
 
@@ -293,6 +296,8 @@ func (s *localService) Write(ctx context.Context, relPath string, data []byte, c
 	if err != nil {
 		return nil, err
 	}
+	unlock := lockPath(abs)
+	defer unlock()
 	if createOnly {
 		if _, err := os.Stat(abs); err == nil {
 			return nil, fmt.Errorf("%w: file already exists", libdb.ErrUniqueViolation)
@@ -300,7 +305,7 @@ func (s *localService) Write(ctx context.Context, relPath string, data []byte, c
 			return nil, mapOSError(err)
 		}
 	}
-	if err := os.WriteFile(abs, data, 0644); err != nil {
+	if err := vfs.WriteFileAtomic(abs, data); err != nil {
 		return nil, mapOSError(err)
 	}
 	info, err := os.Stat(abs)
@@ -308,6 +313,7 @@ func (s *localService) Write(ctx context.Context, relPath string, data []byte, c
 		return nil, mapOSError(err)
 	}
 	entry := entryFromInfo(rel, info)
+	entry.ETag = ETag(data)
 	return &entry, nil
 }
 
@@ -349,6 +355,12 @@ func (s *localService) Move(ctx context.Context, fromPath, toPath string) (*Entr
 	toAbs, toRel, err := s.resolveForWrite(toPath)
 	if err != nil {
 		return nil, err
+	}
+	if existing, err := os.Lstat(toAbs); err == nil {
+		source, serr := os.Lstat(fromAbs)
+		if serr != nil || !os.SameFile(source, existing) {
+			return nil, fmt.Errorf("%w: %s already exists", libdb.ErrUniqueViolation, toRel)
+		}
 	}
 	if err := os.Rename(fromAbs, toAbs); err != nil {
 		return nil, mapOSError(err)

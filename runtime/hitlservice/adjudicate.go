@@ -151,6 +151,7 @@ func (s *service) RespondAsAgentBounded(ctx context.Context, askID, agentName st
 		return ErrApprovalAlreadyResolved
 	}
 	s.wake(askID, answer{approved: approved, by: agentActor(agentName)})
+	s.notifyDecision(ctx, askID, approved)
 	return nil
 }
 

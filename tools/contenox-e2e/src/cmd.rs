@@ -292,12 +292,21 @@ impl Running {
         self.stdin.take();
     }
 
+    #[cfg(unix)]
     pub fn signal(&self, signal: i32) {
         unsafe { libc::kill(self.child.id() as libc::pid_t, signal) };
     }
 
+    #[cfg(unix)]
     pub fn interrupt(&self) {
         self.signal(libc::SIGINT);
+    }
+
+    #[cfg(windows)]
+    pub fn interrupt(&self) {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &self.child.id().to_string(), "/T", "/F"])
+            .output();
     }
 
     pub fn kill(&mut self) {

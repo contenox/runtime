@@ -351,12 +351,27 @@ func buildOpenAIRequestForDialect(dialect modelrepo.ChatDialect, modelName strin
 	}
 
 	apiMsgs := make([]apiChatMessage, 0, len(messages))
+	var batchImages []apiContentPart
+	flushToolImages := func() {
+		if len(batchImages) == 0 {
+			return
+		}
+		apiMsgs = append(apiMsgs, apiChatMessage{Role: "user", Content: batchImages})
+		batchImages = nil
+	}
 	for _, msg := range messages {
+		if msg.Role != "tool" {
+			flushToolImages()
+		}
 		apiMsg := apiChatMessage{
 			Role:       msg.Role,
 			ToolCallID: msg.ToolCallID,
 		}
+		var toolImages []modelrepo.ImagePart
 		switch {
+		case msg.Role == "tool" && len(msg.Images) > 0:
+			apiMsg.Content = msg.Content
+			toolImages = msg.Images
 		case len(msg.Images) > 0, len(msg.Audio) > 0:
 			apiMsg.Content = openAIRichContent(msg)
 		case msg.Content == "" && len(msg.ToolCalls) > 0:
@@ -398,7 +413,12 @@ func buildOpenAIRequestForDialect(dialect modelrepo.ChatDialect, modelName strin
 			}
 		}
 		apiMsgs = append(apiMsgs, apiMsg)
+		if len(toolImages) > 0 {
+			follow := toolImagesAsUserMessage(modelrepo.Message{ToolCallID: msg.ToolCallID, Images: toolImages})
+			batchImages = append(batchImages, openAIRichContent(follow)...)
+		}
 	}
+	flushToolImages()
 	req.Messages = apiMsgs
 
 	return req, nameMap, nil

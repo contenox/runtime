@@ -1,5 +1,4 @@
-
-use contenox_e2e::{Acp, Instance, Script, ToolCall, Turn, Verdict};
+use contenox_e2e::{Acp, Instance, Script, ToolCall, Turn};
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -21,22 +20,11 @@ fn write_note(content: &str) -> Vec<Turn> {
     ]
 }
 
-fn picker<'a>(init: &'a Value, id: &str) -> &'a Value {
-    init.get("_meta")
-        .and_then(|meta| meta.get("contenox.workspaceConfigOptions"))
-        .and_then(Value::as_array)
-        .expect("initialize advertises the workspace config options")
-        .iter()
-        .find(|option| option["id"] == id)
-        .unwrap_or_else(|| panic!("no {id:?} picker in {init:#}"))
-}
-
 fn handshake(cx: &Instance, argv: &[&str]) -> (Acp, Value) {
     let mut acp = cx.acp(argv).expect("spawn the ACP surface");
     let init = acp.initialize().expect("initialize");
     (acp, init)
 }
-
 
 #[test]
 fn acp_speaks_the_protocol_over_stdio_and_answers_a_prompt() {
@@ -128,6 +116,16 @@ fn a_gated_write_asks_the_editors_permission_ui_and_shows_the_diff() {
     );
     let (mut acp, _) = handshake(&cx, &["acp"]);
     let session = acp.new_session(cx.work()).expect("session/new");
+    let envelopes = acp.config_values("hitl-policy");
+    let asking = envelopes
+        .iter()
+        .find(|value| value.contains("ask_always"))
+        .unwrap_or_else(|| {
+            panic!("the editor is offered an envelope that asks before writing: {envelopes:?}")
+        })
+        .clone();
+    acp.set_config(&session, "hitl-policy", &asking)
+        .expect("select the asking envelope");
 
     let turn = acp
         .prompt(&session, "write a note")
@@ -233,24 +231,6 @@ fn the_hardened_profile_never_offers_mission() {
     );
 }
 
-
-fn plant_flat_chain(cx: &Instance, at: std::path::PathBuf) -> std::path::PathBuf {
-    let source = cx.home_file(".generated/agent-acpx.json");
-    if let Some(parent) = at.parent() {
-        std::fs::create_dir_all(parent).expect("the destination directory");
-    }
-    std::fs::copy(&source, &at)
-        .unwrap_or_else(|err| panic!("copy {} to {}: {err}", source.display(), at.display()));
-    at
-}
-
-fn ran_the_flat_chain(cx: &Instance) {
-    let steps = cx.executed_tasks().expect("contenox-runtime state show");
-    assert_eq!(
-        steps[0].task, "chain-acpx-agent",
-        "the planted chain is the one that ran, got {steps:?}"
-    );
-}
 #[test]
 fn a_named_chain_path_that_is_missing_is_a_hard_error() {
     let cx = editor("acp-chain-missing", &Script::new().turn("never reached"));
@@ -266,7 +246,6 @@ fn a_named_chain_path_that_is_missing_is_a_hard_error() {
         .expect_stderr("CONTENOX_ACP_CHAIN_PATH");
 }
 
-
 #[test]
 fn an_editor_session_transcript_is_readable_from_the_cli_afterwards() {
     let cx = editor(
@@ -280,7 +259,9 @@ fn an_editor_session_transcript_is_readable_from_the_cli_afterwards() {
     acp.close()
         .expect("the agent exits when its client hangs up");
 
-    let rows = cx.sessions_all().expect("contenox-runtime session list --all");
+    let rows = cx
+        .sessions_all()
+        .expect("contenox-runtime session list --all");
     let row = rows
         .iter()
         .find(|row| row.name == session)

@@ -117,6 +117,8 @@ type service struct {
 	pending         map[string]chan answer
 	adjudicator     Adjudicator
 	approvalCeiling time.Duration
+
+	decisionObserver DecisionObserver
 }
 
 func New(src PolicySource, tenantID string, store KVReader, tracker libtracker.ActivityTracker) Service {
@@ -153,6 +155,30 @@ func SetApprovalCeiling(svc Service, ceiling time.Duration) {
 		s.approvalCeiling = ceiling
 		s.mu.Unlock()
 	}
+}
+
+type DecisionObserver func(ctx context.Context, approval runtimetypes.HITLApproval, approved bool)
+
+func SetDecisionObserver(svc Service, observer DecisionObserver) {
+	if s, ok := svc.(*service); ok {
+		s.mu.Lock()
+		s.decisionObserver = observer
+		s.mu.Unlock()
+	}
+}
+
+func (s *service) notifyDecision(ctx context.Context, approvalID string, approved bool) {
+	s.mu.Lock()
+	observer := s.decisionObserver
+	s.mu.Unlock()
+	if observer == nil || s.approvals == nil {
+		return
+	}
+	row, err := s.approvals.GetHITLApproval(ctx, approvalID)
+	if err != nil || row == nil {
+		return
+	}
+	observer(ctx, *row, approved)
 }
 
 func (s *service) ceiling() time.Duration {
@@ -403,6 +429,7 @@ func (s *service) RespondBy(ctx context.Context, approvalID string, approved boo
 		return ErrApprovalAlreadyResolved
 	}
 	s.wake(approvalID, answer{approved: approved, by: decidedBy})
+	s.notifyDecision(ctx, approvalID, approved)
 	return nil
 }
 
@@ -441,6 +468,7 @@ func (s *service) SweepExpired(ctx context.Context) (int, error) {
 		}
 		expired++
 		s.wake(row.ID, answer{approved: approved, by: DecidedByDeadline})
+		s.notifyDecision(ctx, row.ID, approved)
 	}
 	return expired, nil
 }

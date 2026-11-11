@@ -15,7 +15,7 @@ import (
 )
 
 func (s *store) CreateBackend(ctx context.Context, backend *Backend) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	backend.CreatedAt = now
 	backend.UpdatedAt = now
 	if backend.ID == "" {
@@ -68,7 +68,7 @@ func (s *store) GetBackend(ctx context.Context, id string) (*Backend, error) {
 }
 
 func (s *store) UpdateBackend(ctx context.Context, backend *Backend) error {
-	backend.UpdatedAt = time.Now().UTC()
+	backend.UpdatedAt = s.now().UTC()
 
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE llm_backends

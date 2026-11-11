@@ -1,6 +1,7 @@
 use crate::acp::Acp;
 use crate::binary::contenox_bin;
 use crate::cmd::{Cmd, CmdOutput, Running};
+#[cfg(unix)]
 use crate::pty::Pty;
 use crate::script::Script;
 use anyhow::{Context, Result, bail};
@@ -79,6 +80,14 @@ impl Instance {
         }
         env.push(("HOME".into(), Some(home.clone().into_os_string())));
         env.push(("USERPROFILE".into(), Some(home.clone().into_os_string())));
+        if cfg!(windows) {
+            for (name, dir) in [("APPDATA", "appdata"), ("LOCALAPPDATA", "localappdata")] {
+                let path = home.join(dir);
+                std::fs::create_dir_all(&path)
+                    .with_context(|| format!("create {}", path.display()))?;
+                env.push((name.into(), Some(path.into_os_string())));
+            }
+        }
         env.push(("TMPDIR".into(), Some(tmp.into_os_string())));
         env.push(("TERM".into(), Some("xterm-256color".into())));
         env.push(("COLORTERM".into(), Some("truecolor".into())));
@@ -159,6 +168,7 @@ impl Instance {
         self.cmd(args).start()
     }
 
+    #[cfg(unix)]
     pub fn pty<I, S>(&self, args: I) -> Result<Pty>
     where
         I: IntoIterator<Item = S>,
@@ -277,15 +287,21 @@ impl Drop for Instance {
 }
 
 fn guard_real_home(scratch: &Path) -> Result<()> {
-    let Some(real) = std::env::var_os("HOME") else {
-        return Ok(());
-    };
-    let real = PathBuf::from(real);
-    if real == scratch || scratch.starts_with(real.join(".contenox")) {
-        bail!(
-            "refusing to run: the scratch home {} is inside the real ~/.contenox",
-            scratch.display()
-        );
+    for name in ["HOME", "USERPROFILE"] {
+        let Some(real) = std::env::var_os(name) else {
+            continue;
+        };
+        let real = PathBuf::from(real);
+        if real == scratch
+            || scratch.starts_with(real.join(".contenox"))
+            || scratch.starts_with(real.join(".contenox-harness"))
+        {
+            bail!(
+                "refusing to run: the scratch home {} is inside the real home {}",
+                scratch.display(),
+                real.display()
+            );
+        }
     }
     Ok(())
 }

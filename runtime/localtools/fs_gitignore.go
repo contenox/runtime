@@ -179,3 +179,7 @@ func (f entryFilter) skip(rel string, base string, isDir bool) bool {
 	}
 	return false
 }
+
+func GitignoreIgnores(absRoot, rel string, isDir bool) bool {
+	return gitignoreFor(absRoot).Match(rel, isDir)
+}

@@ -2,8 +2,11 @@ package localfileapi
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/contenox/runtime/runtime/agentview"
 	"github.com/contenox/runtime/runtime/localfileservice"
 	"github.com/contenox/runtime/runtime/vfs"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 )
 
 func AddRoutes(mux *http.ServeMux, service localfileservice.Service) {
@@ -32,6 +36,50 @@ type handler struct {
 	view    *vfs.View
 	filters map[string]FileFilter
 	hitlFor PolicyEvaluatorFactory
+	events  workspaceevents.Service
+}
+
+func (h *handler) saved(r *http.Request, entry *localfileservice.Entry, extra map[string]any) {
+	if h.events == nil || entry == nil {
+		return
+	}
+	data := map[string]any{"etag": entry.ETag}
+	for k, v := range extra {
+		data[k] = v
+	}
+	raw, _ := json.Marshal(data)
+	subject := filepath.Join(h.service.Root(), filepath.FromSlash(entry.Path))
+	_, _ = h.events.Append(r.Context(), h.service.Root(), workspaceevents.Input{
+		Type:    workspaceevents.TypeEditorSaved,
+		Source:  workspaceevents.SourceEditor,
+		Subject: subject,
+		Data:    raw,
+	})
+}
+
+func writePreconditionRequired(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusPreconditionRequired)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{
+		"message": localfileservice.ErrPreconditionRequired.Error(),
+		"type":    "precondition_error",
+		"code":    "precondition_required",
+	}})
+}
+
+func writeConflict(w http.ResponseWriter, conflict *localfileservice.ConflictError) {
+	w.Header().Set("Content-Type", "application/json")
+	if conflict.Current != "" {
+		w.Header().Set("ETag", strconv.Quote(conflict.Current))
+	}
+	w.WriteHeader(http.StatusConflict)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{
+		"message":     conflict.Error(),
+		"type":        "conflict_error",
+		"code":        "file_changed",
+		"path":        conflict.Path,
+		"currentEtag": conflict.Current,
+	}})
 }
 
 type writeFileRequest struct {
@@ -51,6 +99,7 @@ type moveRequest struct {
 
 type fileContentResponse struct {
 	Path          string                 `json:"path"`
+	ETag          string                 `json:"etag"`
 	Content       string                 `json:"content"`
 	ContentBase64 string                 `json:"contentBase64,omitempty"`
 	Encoding      string                 `json:"encoding"`
@@ -119,8 +168,10 @@ func (h *handler) content(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := fileContentResponse{
 		Path:     meta.Path,
+		ETag:     meta.ETag,
 		Metadata: *meta,
 	}
+	w.Header().Set("ETag", strconv.Quote(meta.ETag))
 	if looksText(data) {
 		resp.Content = string(data)
 		resp.Encoding = "utf-8"
@@ -164,6 +215,8 @@ func (h *handler) createFile(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
+	h.saved(r, entry, nil)
+	w.Header().Set("ETag", strconv.Quote(entry.ETag))
 	_ = apiframework.Encode(w, r, http.StatusCreated, entry)
 }
 
@@ -178,11 +231,22 @@ func (h *handler) updateFile(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
 		return
 	}
-	entry, err := h.service.Write(r.Context(), req.Path, data, false)
+	entry, err := h.service.WriteIfMatch(r.Context(), req.Path, data, r.Header.Get("If-Match"))
+	if errors.Is(err, localfileservice.ErrPreconditionRequired) {
+		writePreconditionRequired(w)
+		return
+	}
+	var conflict *localfileservice.ConflictError
+	if errors.As(err, &conflict) {
+		writeConflict(w, conflict)
+		return
+	}
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
 		return
 	}
+	h.saved(r, entry, nil)
+	w.Header().Set("ETag", strconv.Quote(entry.ETag))
 	_ = apiframework.Encode(w, r, http.StatusOK, entry)
 }
 

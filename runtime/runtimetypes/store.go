@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -243,13 +244,28 @@ var SchemaSQLite string
 
 type store struct {
 	libdb.Exec
+	now func() time.Time
 }
 
-func New(exec libdb.Exec) Store {
+type StoreOption func(*store)
+
+func WithStoreClock(now func() time.Time) StoreOption {
+	return func(s *store) {
+		if now != nil {
+			s.now = now
+		}
+	}
+}
+
+func New(exec libdb.Exec, opts ...StoreOption) Store {
 	if exec == nil {
 		panic("SERVER BUG: store.New called with nil exec")
 	}
-	return &store{exec}
+	s := &store{Exec: exec, now: time.Now}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 const MaxRowsCount = 100000
@@ -308,8 +324,20 @@ func quiet() func() {
 func EachStore(t *testing.T, fn func(t *testing.T, ctx context.Context, s Store)) {
 	t.Helper()
 	EachDB(t, func(t *testing.T, ctx context.Context, exec libdb.Exec) {
-		fn(t, ctx, New(exec))
+		fn(t, ctx, New(exec, WithStoreClock(SteppingClock(time.Now().UTC(), time.Millisecond))))
 	})
+}
+
+func SteppingClock(start time.Time, step time.Duration) func() time.Time {
+	var mu sync.Mutex
+	next := start
+	return func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		now := next
+		next = next.Add(step)
+		return now
+	}
 }
 
 // EachDB is EachStore for tests that also need the raw executor (for example

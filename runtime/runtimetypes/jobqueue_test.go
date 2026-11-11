@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -236,16 +237,18 @@ func newTestUnit_JobQueue_Job(taskType string) *runtimetypes.Job {
 }
 
 func TestUnit_JobQueue_ListJobsPagination(t *testing.T) {
-	runtimetypes.EachStore(t, func(t *testing.T, ctx context.Context, s runtimetypes.Store) {
-
+	runtimetypes.EachDB(t, func(t *testing.T, ctx context.Context, exec libdb.Exec) {
+		s := runtimetypes.New(exec)
 		var jobs []*runtimetypes.Job
 		var jobIDs []string
 
+		base := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
 		totalJobs := 5
 		for i := range totalJobs {
 			job := newTestUnit_JobQueue_Job("list-paginate-test")
-			err := s.AppendJob(ctx, *job)
-			tick()
+			job.CreatedAt = base.Add(time.Duration(i) * time.Second)
+			_, err := exec.ExecContext(ctx, `INSERT INTO job_queue_v2 (id, task_type, payload, scheduled_for, valid_until, retry_count, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+				job.ID, job.TaskType, job.Payload, job.ScheduledFor, job.ValidUntil, job.RetryCount, job.CreatedAt)
 			require.NoError(t, err)
 
 			latestJobs, err := s.ListJobs(ctx, nil, 1)
@@ -256,10 +259,6 @@ func TestUnit_JobQueue_ListJobsPagination(t *testing.T) {
 			job.CreatedAt = latestJobs[0].CreatedAt
 			jobs = append(jobs, job)
 			jobIDs = append(jobIDs, job.ID)
-
-			if i < totalJobs-1 {
-				time.Sleep(1 * time.Millisecond)
-			}
 		}
 
 		limit := 2

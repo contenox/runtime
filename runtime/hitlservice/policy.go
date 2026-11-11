@@ -890,6 +890,7 @@ func defaultPolicy() *Policy {
 		Rules: append(secretDenyRules(), []Rule{
 			{Tools: "local_fs", Tool: "read_file", Action: ActionAllow},
 			{Tools: "local_fs", Tool: "read_file_range", Action: ActionAllow},
+			{Tools: "local_fs", Tool: "read_image", Action: ActionAllow},
 			{Tools: "local_fs", Tool: "list_dir", Action: ActionAllow},
 			{Tools: "local_fs", Tool: "grep", Action: ActionAllow},
 			{Tools: "local_fs", Tool: "stat_file", Action: ActionAllow},

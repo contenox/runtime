@@ -10,7 +10,6 @@ import (
 	"github.com/contenox/runtime/runtime/modelcontract"
 	"slices"
 	"strings"
-	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
 )
@@ -184,7 +183,7 @@ func (s *store) SetLLMProviderModelFacts(ctx context.Context, providerID string,
 		ON CONFLICT (provider_id) DO UPDATE SET
 			facts = excluded.facts,
 			updated_at = excluded.updated_at
-	`, providerID, string(raw), time.Now().UTC())
+	`, providerID, string(raw), s.now().UTC())
 	if err != nil {
 		return fmt.Errorf("store: set provider model facts: %w", err)
 	}

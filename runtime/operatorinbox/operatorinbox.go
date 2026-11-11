@@ -72,7 +72,7 @@ func (s *service) Add(ctx context.Context, item *Item) error {
 	}
 	callerID := item.ID != ""
 	if !callerID {
-		item.ID = uuid.NewString()
+		item.ID = uuid.Must(uuid.NewV7()).String()
 	}
 	if callerID {
 		var existing json.RawMessage

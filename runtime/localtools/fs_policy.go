@@ -226,6 +226,22 @@ func (h *LocalFSTools) maxReadBytesFromPolicy(ctx context.Context) (limit int64,
 	return n, false
 }
 
+func (h *LocalFSTools) explicitReadCap(ctx context.Context) (int64, bool) {
+	s, ok := h.policyString(ctx, "_max_read_bytes")
+	if !ok || s == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return n, true
+}
+
+func DefaultSkipDirNames() []string {
+	return append([]string(nil), defaultSkipDirNames...)
+}
+
 var defaultSkipDirNames = []string{
 	".git", ".hg", ".svn",
 	"node_modules", "bower_components", "Pods",

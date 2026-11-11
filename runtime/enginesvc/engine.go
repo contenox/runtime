@@ -13,6 +13,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/execservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
 	"github.com/contenox/runtime/runtime/internal/tools"
 	"github.com/contenox/runtime/runtime/llmrepo"
@@ -186,7 +187,9 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 
 	execCtx := taskengine.WithTaskEventSink(engineCtx, eventSink)
 
-	exec, err := taskengine.NewExec(execCtx, repo, toolsRepo, tracker)
+	exec, err := taskengine.NewExec(execCtx, repo, toolsRepo, tracker, taskengine.WithToolImagesKept(func(ctx context.Context) int {
+		return clikv.ToolImagesKept(ctx, runtimetypes.New(db.WithoutTransaction()))
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task executor: %w", err)
 	}

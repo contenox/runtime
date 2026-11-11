@@ -13,7 +13,7 @@ import (
 )
 
 func (s *store) CreateAffinityGroup(ctx context.Context, group *AffinityGroup) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	group.CreatedAt = now
 	group.UpdatedAt = now
 	if group.ID == "" {
@@ -55,7 +55,7 @@ func (s *store) GetAffinityGroupByName(ctx context.Context, name string) (*Affin
 }
 
 func (s *store) UpdateAffinityGroup(ctx context.Context, group *AffinityGroup) error {
-	group.UpdatedAt = time.Now().UTC()
+	group.UpdatedAt = s.now().UTC()
 
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE llm_affinity_group SET
@@ -186,7 +186,7 @@ func (s *store) AssignBackendToAffinityGroup(ctx context.Context, groupID, backe
 		INSERT INTO llm_affinity_group_backend_assignments
 		(group_id, backend_id, assigned_at)
 		VALUES ($1, $2, $3)`,
-		groupID, backendID, time.Now().UTC())
+		groupID, backendID, s.now().UTC())
 	return err
 }
 
@@ -261,7 +261,7 @@ func (s *store) ListAffinityGroupsForBackend(ctx context.Context, backendID stri
 }
 
 func (s *store) AssignModelToAffinityGroup(ctx context.Context, groupID, modelID string) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	_, err := s.Exec.ExecContext(ctx, `
 		INSERT INTO ollama_model_assignments
 		(model_id, llm_group_id, created_at, updated_at)

@@ -402,6 +402,11 @@ type ImagePart struct {
 	MimeType string `json:"mime_type" example:"image/png"`
 }
 
+type ToolImageResult struct {
+	Text   string
+	Images []ImagePart
+}
+
 type AudioPart struct {
 	Data     []byte `json:"data"`
 	MimeType string `json:"mime_type" example:"audio/wav"`

@@ -169,6 +169,14 @@ type openAIResponseInputContent struct {
 	ImageURL string `json:"image_url,omitempty"`
 }
 
+func toolImagesAsUserMessage(msg modelrepo.Message) modelrepo.Message {
+	label := "Image returned by the tool call above"
+	if msg.ToolCallID != "" {
+		label = "Image returned by tool call " + msg.ToolCallID
+	}
+	return modelrepo.Message{Role: "user", Content: label, Images: msg.Images}
+}
+
 func openAIResponsesImageContent(msg modelrepo.Message) []openAIResponseInputContent {
 	parts := make([]openAIResponseInputContent, 0, len(msg.Images)+1)
 	if msg.Content != "" {
@@ -300,6 +308,13 @@ func buildOpenAIResponsesRequestWithContinuation(modelName string, messages []mo
 				CallID: msg.ToolCallID,
 				Output: &msg.Content,
 			})
+			if len(msg.Images) > 0 {
+				input = append(input, openAIResponseInput{
+					Type:    "message",
+					Role:    "user",
+					Content: openAIResponsesImageContent(toolImagesAsUserMessage(msg)),
+				})
+			}
 			continue
 
 		case "assistant", "model":

@@ -87,7 +87,7 @@ func ResolvePath(baseURL string) (string, error) {
 	}
 	abs, err := filepath.Abs(raw)
 	if err != nil {
-		return "", fmt.Errorf("scripted-test script path %q is unusable: %w", raw, err)
+		return "", fmt.Errorf("scripted-test script path \"%s\" is unusable: %w", raw, err)
 	}
 	return abs, nil
 }
@@ -100,7 +100,7 @@ func Load(path string) (*Script, error) {
 
 	info, err := os.Stat(abs)
 	if err != nil {
-		return nil, fmt.Errorf("scripted-test script %q cannot be read: %w", abs, err)
+		return nil, fmt.Errorf("scripted-test script \"%s\" cannot be read: %w", abs, err)
 	}
 
 	cacheMu.Lock()
@@ -111,7 +111,7 @@ func Load(path string) (*Script, error) {
 
 	raw, err := os.ReadFile(abs)
 	if err != nil {
-		return nil, fmt.Errorf("scripted-test script %q cannot be read: %w", abs, err)
+		return nil, fmt.Errorf("scripted-test script \"%s\" cannot be read: %w", abs, err)
 	}
 	script, err := Parse(abs, raw)
 	if err != nil {
@@ -126,30 +126,30 @@ func Parse(path string, raw []byte) (*Script, error) {
 	trimmed := strings.TrimSpace(string(raw))
 	switch {
 	case trimmed == "":
-		return nil, fmt.Errorf("scripted-test script %q is empty", path)
+		return nil, fmt.Errorf("scripted-test script \"%s\" is empty", path)
 	case strings.HasPrefix(trimmed, "["):
 		if err := json.Unmarshal(raw, &doc.Turns); err != nil {
-			return nil, fmt.Errorf("scripted-test script %q is not a valid turn list: %w", path, err)
+			return nil, fmt.Errorf("scripted-test script \"%s\" is not a valid turn list: %w", path, err)
 		}
 	default:
 		if err := json.Unmarshal(raw, &doc); err != nil {
-			return nil, fmt.Errorf("scripted-test script %q is not a valid script: %w", path, err)
+			return nil, fmt.Errorf("scripted-test script \"%s\" is not a valid script: %w", path, err)
 		}
 	}
 
 	if len(doc.Turns) == 0 {
-		return nil, fmt.Errorf("scripted-test script %q declares no turns", path)
+		return nil, fmt.Errorf("scripted-test script \"%s\" declares no turns", path)
 	}
 	for i, turn := range doc.Turns {
 		if turn.Text == "" && turn.Thinking == "" && len(turn.ToolCalls) == 0 {
-			return nil, fmt.Errorf("scripted-test script %q turn %d is empty: give it \"text\", \"thinking\" or \"tool_calls\"", path, i)
+			return nil, fmt.Errorf("scripted-test script \"%s\" turn %d is empty: give it \"text\", \"thinking\" or \"tool_calls\"", path, i)
 		}
 		for j, call := range turn.ToolCalls {
 			if strings.TrimSpace(call.Name) == "" {
-				return nil, fmt.Errorf("scripted-test script %q turn %d tool call %d has no \"name\"", path, i, j)
+				return nil, fmt.Errorf("scripted-test script \"%s\" turn %d tool call %d has no \"name\"", path, i, j)
 			}
 			if _, err := callArguments(call); err != nil {
-				return nil, fmt.Errorf("scripted-test script %q turn %d tool call %q: %w", path, i, call.Name, err)
+				return nil, fmt.Errorf("scripted-test script \"%s\" turn %d tool call %q: %w", path, i, call.Name, err)
 			}
 		}
 	}

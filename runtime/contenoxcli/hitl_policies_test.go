@@ -44,7 +44,7 @@ func assertSeededSecretInvariant(t *testing.T, name, content string) {
 		"/home/u/funds.kdbx",
 	}
 	for _, path := range quarantined {
-		for _, tool := range []string{"read_file", "read_file_range", "grep", "stat_file", "count_stats"} {
+		for _, tool := range []string{"read_file", "read_file_range", "read_image", "grep", "stat_file", "count_stats"} {
 			r, err := svc.Evaluate(ctx, "local_fs", tool, map[string]any{"path": path})
 			require.NoError(t, err)
 			assert.Equal(t, hitlservice.ActionDeny, r.Action, "%s: local_fs.%s(%q) must be denied", name, tool, path)

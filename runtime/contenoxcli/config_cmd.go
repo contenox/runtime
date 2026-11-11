@@ -39,6 +39,8 @@ var validConfigKeys = map[string]string{
 	"default-oracle-chain":          "Chain that reviews asks as Oracle (e.g. chain-oracle-default.json). Empty or off = no Oracle.",
 	"default-oracle-policy":         "Envelope the Oracle chain runs under (default hitl-policy-oracle.json).",
 	"oracle-approves-tool-calls":    "Let Oracle rule on a mission's gated tool calls, not just its questions (true/false).",
+	clikv.ToolImagesKeptKey:         "Send only the newest N tool-result images (such as screenshots) to the model again on later calls. Empty or 0 = send them all.",
+	clikv.EventRetentionDaysKey:     "Days of workspace events to keep; older days are dropped. off or 0 keeps everything. Serve sets 30 when it was never set.",
 }
 
 var configCmd = &cobra.Command{
@@ -46,7 +48,7 @@ var configCmd = &cobra.Command{
 	Short: "Manage persistent CLI settings (default model, provider, agent, approval policy).",
 	Long: `Store and retrieve persistent CLI defaults backed by SQLite.
 
-Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy, locale, oracle-chat
+Global keys (shared across all projects): default-model, default-provider, default-alt-model, default-alt-provider, default-autocomplete-model, default-autocomplete-provider, default-max-tokens, default-think, telemetry-enabled, update-check, default-mission-agent, default-mission-policy, locale, oracle-chat, tool-images-kept, event-retention-days
 Workspace keys (scoped to current project): default-chain, hitl-policy-name
 
 Supported keys:
@@ -65,7 +67,9 @@ Supported keys:
   default-mission-agent          Default agent fired by /mission and 'mission fire' with no --agent
   default-mission-policy         Default mission envelope (HITL policy) when none is named
   locale                         Language tag agents see as {{var:locale}}, e.g. de-DE (empty = detected from the OS)
-  oracle-chat                    Let Oracle approve chat tool calls that are plainly part of your request (true/false, default true)`,
+  oracle-chat                    Let Oracle approve chat tool calls that are plainly part of your request (true/false, default true)
+  tool-images-kept               Send only the newest N tool-result images to the model again (empty or 0 = all)
+  event-retention-days           Days of workspace events to keep (off or 0 = keep everything)`,
 }
 
 var configSetCmd = &cobra.Command{
@@ -114,6 +118,18 @@ Examples:
 				return err
 			}
 			value = normalized
+		}
+		if key == clikv.EventRetentionDaysKey {
+			if _, _, err := clikv.ParseEventRetention(value); err != nil {
+				return err
+			}
+		}
+		if key == clikv.ToolImagesKeptKey {
+			n, err := clikv.ParseToolImagesKept(value)
+			if err != nil {
+				return err
+			}
+			value = strconv.Itoa(n)
 		}
 		if key == "default-think" {
 			normalized, err := reasoning.Normalize(value)

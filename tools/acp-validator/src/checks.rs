@@ -1,9 +1,8 @@
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr as _;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use agent_client_protocol::schema::ProtocolVersion;
@@ -11,8 +10,8 @@ use agent_client_protocol::schema::v1::{
     AuthenticateRequest, CancelNotification, ClientCapabilities, ContentBlock,
     CreateTerminalRequest, FileSystemCapabilities, Implementation, InitializeRequest,
     InitializeResponse, KillTerminalRequest, LogoutRequest, NewSessionRequest, PromptRequest,
-    ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest, RequestPermissionRequest,
-    RequestPermissionOutcome, RequestPermissionResponse, SelectedPermissionOutcome, SessionId,
+    ReadTextFileRequest, ReadTextFileResponse, ReleaseTerminalRequest, RequestPermissionOutcome,
+    RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome, SessionId,
     SessionNotification, SessionUpdate, SetSessionModeRequest, StopReason, TerminalOutputRequest,
     TextContent, WaitForTerminalExitRequest, WriteTextFileRequest, WriteTextFileResponse,
 };
@@ -125,11 +124,9 @@ fn terminal_not_supported() -> agent_client_protocol::Error {
 }
 
 fn client_capabilities() -> ClientCapabilities {
-    ClientCapabilities::new().fs(
-        FileSystemCapabilities::new()
-            .read_text_file(true)
-            .write_text_file(true),
-    )
+    ClientCapabilities::new().fs(FileSystemCapabilities::new()
+        .read_text_file(true)
+        .write_text_file(true))
 }
 
 pub async fn run_all(config: &Config) -> Vec<CheckResult> {
@@ -300,7 +297,10 @@ async fn drive_primary_checks(
         cx.send_request(
             InitializeRequest::new(ProtocolVersion::V1)
                 .client_capabilities(client_capabilities())
-                .client_info(Implementation::new("acp-validator", env!("CARGO_PKG_VERSION"))),
+                .client_info(Implementation::new(
+                    "acp-validator",
+                    env!("CARGO_PKG_VERSION"),
+                )),
         )
         .block_task(),
     )
@@ -325,7 +325,8 @@ async fn drive_primary_checks(
     let session_outcome = with_timeout(
         timeout,
         "session/new",
-        cx.send_request(NewSessionRequest::new(cwd.clone())).block_task(),
+        cx.send_request(NewSessionRequest::new(cwd.clone()))
+            .block_task(),
     )
     .await;
     if config.enabled("session_new") {
@@ -347,9 +348,7 @@ async fn drive_primary_checks(
         .map(|response| (response.session_id, response.modes));
 
     if config.enabled("session_new_additional_directories") {
-        results.push(
-            check_additional_directories(&cx, &init_response, &cwd, timeout).await,
-        );
+        results.push(check_additional_directories(&cx, &init_response, &cwd, timeout).await);
     }
 
     let Some((session_id, session_modes)) = session_id else {
@@ -393,9 +392,8 @@ async fn drive_primary_checks(
     }
 
     if config.enabled("fs_callbacks") {
-        results.push(
-            check_fs_callbacks(&cx, shared, &session_id, &config.fs_trigger, timeout).await,
-        );
+        results
+            .push(check_fs_callbacks(&cx, shared, &session_id, &config.fs_trigger, timeout).await);
     }
 
     if config.enabled("set_mode") {
@@ -410,9 +408,7 @@ async fn drive_primary_checks(
     }
 
     if config.enabled("cancel") {
-        results.push(
-            check_cancel(&cx, shared, &session_id, &config.cancel_trigger, timeout).await,
-        );
+        results.push(check_cancel(&cx, shared, &session_id, &config.cancel_trigger, timeout).await);
     }
 
     if config.enabled("auth") {
@@ -480,7 +476,8 @@ async fn run_version_negotiation_check(config: &Config) -> CheckResult {
             with_timeout(
                 config.timeout,
                 "initialize",
-                cx.send_request(InitializeRequest::new(bogus_version)).block_task(),
+                cx.send_request(InitializeRequest::new(bogus_version))
+                    .block_task(),
             )
             .await
             .map_err(agent_client_protocol::util::internal_error)
@@ -540,7 +537,8 @@ async fn check_additional_directories(
         timeout,
         "session/new (additionalDirectories)",
         cx.send_request(
-            NewSessionRequest::new(cwd.to_path_buf()).additional_directories(vec![extra_dir.clone()]),
+            NewSessionRequest::new(cwd.to_path_buf())
+                .additional_directories(vec![extra_dir.clone()]),
         )
         .block_task(),
     )
@@ -848,8 +846,13 @@ async fn check_fs_callbacks(
     }
 
     let turn_note = match outcome {
-        Ok(Ok(response)) => format!("prompt completed with stopReason={:?}", response.stop_reason),
-        Ok(Err(e)) => format!("fs callback(s) handled correctly, but the turn later errored for an unrelated reason: {e}"),
+        Ok(Ok(response)) => format!(
+            "prompt completed with stopReason={:?}",
+            response.stop_reason
+        ),
+        Ok(Err(e)) => format!(
+            "fs callback(s) handled correctly, but the turn later errored for an unrelated reason: {e}"
+        ),
         Err(_) => {
             return CheckResult::fail(
                 NAME,
@@ -863,15 +866,15 @@ async fn check_fs_callbacks(
 
     let violations = shared.fs_shape_violations.lock().unwrap().clone();
     let mut session_mismatches = Vec::new();
-    if let Some(req) = shared.fs_last_write.lock().unwrap().as_ref() {
-        if req.session_id != *session_id {
-            session_mismatches.push("fs/write_text_file.sessionId mismatch".to_string());
-        }
+    if let Some(req) = shared.fs_last_write.lock().unwrap().as_ref()
+        && req.session_id != *session_id
+    {
+        session_mismatches.push("fs/write_text_file.sessionId mismatch".to_string());
     }
-    if let Some(req) = shared.fs_last_read.lock().unwrap().as_ref() {
-        if req.session_id != *session_id {
-            session_mismatches.push("fs/read_text_file.sessionId mismatch".to_string());
-        }
+    if let Some(req) = shared.fs_last_read.lock().unwrap().as_ref()
+        && req.session_id != *session_id
+    {
+        session_mismatches.push("fs/read_text_file.sessionId mismatch".to_string());
     }
 
     if !violations.is_empty() || !session_mismatches.is_empty() {
@@ -918,17 +921,16 @@ async fn check_cancel(
         return CheckResult::fail(NAME, format!("failed to send session/cancel: {e}"));
     }
 
-    let permission_cancelled = if let Some(responder) =
-        shared.permission_pending.lock().unwrap().take()
-    {
-        responder
-            .respond(RequestPermissionResponse::new(
-                RequestPermissionOutcome::Cancelled,
-            ))
-            .is_ok()
-    } else {
-        false
-    };
+    let permission_cancelled =
+        if let Some(responder) = shared.permission_pending.lock().unwrap().take() {
+            responder
+                .respond(RequestPermissionResponse::new(
+                    RequestPermissionOutcome::Cancelled,
+                ))
+                .is_ok()
+        } else {
+            false
+        };
 
     *shared.permission_mode.lock().unwrap() = PermissionMode::AutoSelectFirst;
 
@@ -991,8 +993,11 @@ async fn check_set_mode(
     let result = with_timeout(
         timeout,
         "session/set_mode",
-        cx.send_request(SetSessionModeRequest::new(session_id.clone(), target_id.clone()))
-            .block_task(),
+        cx.send_request(SetSessionModeRequest::new(
+            session_id.clone(),
+            target_id.clone(),
+        ))
+        .block_task(),
     )
     .await;
 
@@ -1041,7 +1046,10 @@ async fn check_auth(
     if init_response.agent_capabilities.auth.logout.is_none() {
         return CheckResult::pass(
             NAME,
-            format!("authenticate({}) succeeded; logout capability not advertised", method_id.0),
+            format!(
+                "authenticate({}) succeeded; logout capability not advertised",
+                method_id.0
+            ),
         );
     }
 
@@ -1056,7 +1064,10 @@ async fn check_auth(
             NAME,
             format!("authenticate({}) succeeded; logout succeeded", method_id.0),
         ),
-        Err(e) => CheckResult::fail(NAME, format!("authenticate succeeded but logout failed: {e}")),
+        Err(e) => CheckResult::fail(
+            NAME,
+            format!("authenticate succeeded but logout failed: {e}"),
+        ),
     }
 }
 
@@ -1104,10 +1115,11 @@ async fn check_unknown_method(
         }
     };
 
-    let notification = match UntypedMessage::new("_validator/unknown_notification", serde_json::json!({})) {
-        Ok(n) => n,
-        Err(e) => return CheckResult::fail(NAME, format!("failed to build notification: {e}")),
-    };
+    let notification =
+        match UntypedMessage::new("_validator/unknown_notification", serde_json::json!({})) {
+            Ok(n) => n,
+            Err(e) => return CheckResult::fail(NAME, format!("failed to build notification: {e}")),
+        };
     if let Err(e) = cx.send_notification(notification) {
         return CheckResult::fail(NAME, format!("failed to send unknown notification: {e}"));
     }
@@ -1122,11 +1134,15 @@ async fn check_unknown_method(
     {
         Ok(_) => CheckResult::pass(
             NAME,
-            format!("{request_note}; connection survived an unknown notification (follow-up prompt succeeded)"),
+            format!(
+                "{request_note}; connection survived an unknown notification (follow-up prompt succeeded)"
+            ),
         ),
         Err(e) => CheckResult::fail(
             NAME,
-            format!("{request_note}; but the connection did not survive an unknown notification: {e}"),
+            format!(
+                "{request_note}; but the connection did not survive an unknown notification: {e}"
+            ),
         ),
     }
 }

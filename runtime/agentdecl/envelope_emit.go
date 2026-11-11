@@ -16,6 +16,7 @@ var axisTools = map[string][]toolRef{
 	AxisFilesRead: {
 		{localtools.LocalFSToolsName, "read_file"},
 		{localtools.LocalFSToolsName, "read_file_range"},
+		{localtools.LocalFSToolsName, "read_image"},
 		{localtools.LocalFSToolsName, "list_dir"},
 		{localtools.LocalFSToolsName, "grep"},
 		{localtools.LocalFSToolsName, "find_files"},

@@ -22,7 +22,7 @@ type ModelRegistryEntry struct {
 }
 
 func (s *store) CreateModelRegistryEntry(ctx context.Context, e *ModelRegistryEntry) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	e.CreatedAt = now
 	e.UpdatedAt = now
 	if e.ID == "" {
@@ -64,7 +64,7 @@ func (s *store) GetModelRegistryEntryByName(ctx context.Context, name string) (*
 }
 
 func (s *store) UpdateModelRegistryEntry(ctx context.Context, e *ModelRegistryEntry) error {
-	e.UpdatedAt = time.Now().UTC()
+	e.UpdatedAt = s.now().UTC()
 	result, err := s.Exec.ExecContext(ctx, `
 		UPDATE llm_model_registry
 		SET name = $2, source_url = $3, size_bytes = $4, updated_at = $5

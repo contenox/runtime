@@ -1,4 +1,3 @@
-
 mod checks;
 mod report;
 
@@ -9,7 +8,8 @@ use clap::Parser;
 
 const DEFAULT_CALLBACKS_TRIGGER: &str = r#"{"command":"run_scenario","scenario":"callbacks"}"#;
 
-const DEFAULT_STREAMING_TRIGGER: &str = r#"{"command":"run_scenario","scenario":"session_updates"}"#;
+const DEFAULT_STREAMING_TRIGGER: &str =
+    r#"{"command":"run_scenario","scenario":"session_updates"}"#;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -67,8 +67,14 @@ async fn main() -> std::process::ExitCode {
         agent_command: cli.agent.clone(),
         timeout: Duration::from_secs(cli.timeout),
         permission_trigger: cli.permission_trigger.clone(),
-        fs_trigger: cli.fs_trigger.clone().unwrap_or_else(|| cli.permission_trigger.clone()),
-        cancel_trigger: cli.cancel_trigger.clone().unwrap_or_else(|| cli.permission_trigger.clone()),
+        fs_trigger: cli
+            .fs_trigger
+            .clone()
+            .unwrap_or_else(|| cli.permission_trigger.clone()),
+        cancel_trigger: cli
+            .cancel_trigger
+            .clone()
+            .unwrap_or_else(|| cli.permission_trigger.clone()),
         streaming_trigger: cli.streaming_trigger.clone(),
         enabled,
     };

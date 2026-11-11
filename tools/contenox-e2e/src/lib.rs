@@ -3,6 +3,7 @@ pub mod binary;
 pub mod cmd;
 pub mod instance;
 pub mod probe;
+#[cfg(unix)]
 pub mod pty;
 pub mod script;
 pub mod table;
@@ -14,6 +15,7 @@ pub use instance::Instance;
 pub use probe::{
     ApprovalRow, BackendRow, MissionRow, MissionShow, SessionRow, StateStep, WorkspaceSessionRow,
 };
+#[cfg(unix)]
 pub use pty::Pty;
 pub use script::{Capabilities, Script, ToolCall, Turn, Usage};
 pub use table::Table;

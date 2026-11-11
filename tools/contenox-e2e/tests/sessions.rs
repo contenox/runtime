@@ -1,10 +1,8 @@
+#![cfg(unix)]
 
-use contenox_e2e::{Instance, Pty, Script, SessionRow, Table, ToolCall, Turn, WorkspaceSessionRow};
+use contenox_e2e::{Instance, Script, SessionRow, WorkspaceSessionRow};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
-
-const SLOW: Duration = Duration::from_secs(180);
 
 fn instance(label: &str, answer: &str) -> Instance {
     let cx = Instance::named(label).expect("scratch instance");
@@ -12,22 +10,6 @@ fn instance(label: &str, answer: &str) -> Instance {
     cx.scripted(&Script::new().turn(answer))
         .expect("scripted-test backend");
     cx
-}
-
-fn lands_reporting(summary: &str) -> Script {
-    Script::new()
-        .turn(
-            Turn::new()
-                .text("Filing what I found.")
-                .call(ToolCall::mission_report("result", summary)),
-        )
-        .turn(Turn::new().call(ToolCall::mission_finish("landed")))
-        .turn("Mission finished.")
-}
-
-fn rescript(cx: &Instance, script: &Script) {
-    cx.write_script("scripted.json", script)
-        .expect("rewrite the scripted dialog");
 }
 
 fn marked_project(cx: &Instance, name: &str) -> PathBuf {
@@ -51,15 +33,6 @@ fn marker_id(project: &Path) -> String {
         .unwrap_or_else(|| raw.trim().to_string())
 }
 
-fn chat(cx: &Instance, dir: &Path, message: &str) {
-    cx.cmd(["chat", message])
-        .cwd(dir)
-        .timeout(SLOW)
-        .output()
-        .expect("contenox-runtime chat")
-        .ok();
-}
-
 fn names(rows: &[SessionRow]) -> Vec<&str> {
     let mut out: Vec<&str> = rows.iter().map(|row| row.name.as_str()).collect();
     out.sort_unstable();
@@ -72,28 +45,10 @@ fn active(rows: &[SessionRow]) -> Option<&str> {
         .map(|row| row.name.as_str())
 }
 
-fn messages_of(rows: &[SessionRow], name: &str) -> u32 {
-    rows.iter()
-        .find(|row| row.name == name)
-        .unwrap_or_else(|| panic!("no session named {name:?} in {rows:?}"))
-        .messages
-}
-
 fn row_named<'a>(rows: &'a [WorkspaceSessionRow], name: &str) -> &'a WorkspaceSessionRow {
     rows.iter()
         .find(|row| row.name == name)
         .unwrap_or_else(|| panic!("no session named {name:?} in {rows:?}"))
-}
-
-fn only_unit_session(rows: &[WorkspaceSessionRow]) -> &WorkspaceSessionRow {
-    let units: Vec<&WorkspaceSessionRow> = rows
-        .iter()
-        .filter(|row| row.identity == "acp-client")
-        .collect();
-    match units.as_slice() {
-        [only] => only,
-        other => panic!("expected exactly one unit session, got {other:?}"),
-    }
 }
 
 #[test]
@@ -128,7 +83,6 @@ fn deleting_the_active_session_leaves_none_active() {
         .expect_failure()
         .expect_stderr("no active session");
 }
-
 
 #[test]
 fn a_plain_list_stays_in_this_workspace_while_list_all_reaches_the_database() {

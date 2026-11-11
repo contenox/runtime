@@ -64,7 +64,7 @@ func decodeAuthFlow(data string) (*AuthFlow, error) {
 }
 
 func (s *store) CreateRemoteTools(ctx context.Context, tools *RemoteTools) error {
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	tools.CreatedAt = now
 	tools.UpdatedAt = now
 	if tools.ID == "" {
@@ -220,7 +220,7 @@ func (s *store) GetRemoteToolsByName(ctx context.Context, name string) (*RemoteT
 }
 
 func (s *store) UpdateRemoteTools(ctx context.Context, tools *RemoteTools) error {
-	tools.UpdatedAt = time.Now().UTC()
+	tools.UpdatedAt = s.now().UTC()
 
 	headersJSON, err := json.Marshal(tools.Headers)
 	if err != nil {

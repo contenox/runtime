@@ -547,6 +547,30 @@ CREATE TABLE IF NOT EXISTS event_firings (
 CREATE INDEX IF NOT EXISTS idx_event_firings_ws_nid
     ON event_firings (workspace_id, nid DESC, trigger_name, status);
 
+CREATE TABLE IF NOT EXISTS event_listeners (
+    id              TEXT NOT NULL,
+    workspace_id    TEXT NOT NULL,
+    kind            TEXT NOT NULL,
+    target          TEXT NOT NULL,
+    owner           TEXT NOT NULL,
+    one_shot        BOOLEAN NOT NULL,
+    context_filters TEXT NOT NULL,
+    metadata        TEXT NOT NULL,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP NOT NULL,
+    PRIMARY KEY (workspace_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_listeners_owner
+    ON event_listeners (workspace_id, owner);
+
+CREATE TABLE IF NOT EXISTS event_listener_topics (
+    workspace_id TEXT NOT NULL,
+    event_type   TEXT NOT NULL,
+    listener_id  TEXT NOT NULL,
+    PRIMARY KEY (workspace_id, event_type, listener_id)
+);
+
 -- Gateway key ledger. Only the bearer's digest is stored, never the bearer; the
 -- allowance a bearer carries lives in its signed claims, so this table is
 -- identity and lifecycle, not policy.

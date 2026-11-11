@@ -681,7 +681,7 @@ func TestUnit_LocalFSTools_InjectedNamePlumbsThrough(t *testing.T) {
 	want := map[string]bool{
 		"read_file": true, "write_file": true, "list_dir": true, "grep": true,
 		"find_files": true,
-		"sed":        true, "count_stats": true, "read_file_range": true, "stat_file": true,
+		"sed":        true, "count_stats": true, "read_file_range": true, "stat_file": true, "read_image": true,
 	}
 	if len(tools) != len(want) {
 		t.Fatalf("expected %d tools, got %d", len(want), len(tools))

@@ -6,7 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -120,6 +125,11 @@ func (h *LocalFSTools) execDispatch(ctx context.Context, startTime time.Time, in
 			return nil, taskengine.DataTypeAny, err
 		}
 		return h.readFile(ctx, args)
+	case "read_image":
+		if err := rejectUnknownArgs("local_fs.read_image", args, "path"); err != nil {
+			return nil, taskengine.DataTypeAny, err
+		}
+		return h.readImage(ctx, args)
 	case "write_file":
 		if err := rejectUnknownArgs("local_fs.write_file", args, "path", "content"); err != nil {
 			return nil, taskengine.DataTypeAny, err
@@ -332,6 +342,47 @@ func (h *LocalFSTools) resolveTarget(ctx context.Context, tool, path string) (ab
 	return absPath, display, info, nil
 }
 
+var imageReadMimeTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
+
+func (h *LocalFSTools) readImage(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
+	path, ok := argString(args, "path")
+	if !ok {
+		return nil, taskengine.DataTypeAny, argumentProblem(ctx, "local_fs: path required for read_image", args)
+	}
+	absPath, display, info, err := h.resolveTarget(ctx, "read_image", path)
+	if err != nil {
+		return nil, taskengine.DataTypeAny, err
+	}
+	if info.IsDir() {
+		return nil, taskengine.DataTypeAny, recoverablef("local_fs: read_image: %s is a directory", display)
+	}
+	limit := int64(taskengine.MaxToolResultImageBytes)
+	if readLimit, set := h.explicitReadCap(ctx); set && readLimit < limit {
+		if info.Size() > readLimit {
+			return nil, taskengine.DataTypeAny, recoverablef("local_fs: read_image: %s is %s (%d bytes), over the %d-byte read cap; raise _max_read_bytes in tools_policies.local_fs to attach it", display, humanSize(info.Size()), info.Size(), readLimit)
+		}
+	}
+	if info.Size() > limit {
+		return nil, taskengine.DataTypeAny, recoverablef("local_fs: read_image: %s is %s; images up to %d MiB can be attached", display, humanSize(info.Size()), limit>>20)
+	}
+	data, err := h.fileIO.ReadFile(ctx, absPath)
+	if err != nil {
+		return nil, taskengine.DataTypeAny, fmt.Errorf("local_fs: read_image: %w", err)
+	}
+	mimeType := http.DetectContentType(data)
+	if !imageReadMimeTypes[mimeType] {
+		return nil, taskengine.DataTypeAny, recoverablef("local_fs: read_image: %s is %s, not a PNG, JPEG, GIF or WebP image; use read_file for text", display, mimeType)
+	}
+	text := fmt.Sprintf("%s: %s, %s", display, mimeType, humanSize(int64(len(data))))
+	if cfg, _, decodeErr := image.DecodeConfig(bytes.NewReader(data)); decodeErr == nil {
+		text += fmt.Sprintf(", %dx%d", cfg.Width, cfg.Height)
+	}
+	return &taskengine.ToolImageResult{
+		Text:   text,
+		Images: []taskengine.ImagePart{{Data: data, MimeType: mimeType}},
+	}, taskengine.DataTypeString, nil
+}
+
 func (h *LocalFSTools) readFile(ctx context.Context, args map[string]any) (any, taskengine.DataType, error) {
 	path, ok := argString(args, "path")
 	if !ok {
@@ -378,7 +429,7 @@ func (h *LocalFSTools) readFile(ctx context.Context, args map[string]any) (any, 
 	}
 
 	force, _ := argBool(args, "force")
-	hash := contentHash(content)
+	hash := vfs.ContentHash(content)
 	if !force && !h.readTrackingDisabled(ctx) && h.hasCurrentFullRead(ctx, absPath, hash) {
 		return fileUnchangedStub, taskengine.DataTypeString, nil
 	}
@@ -572,8 +623,8 @@ func (h *LocalFSTools) writeFile(ctx context.Context, args map[string]any) (any,
 		Written:   true,
 		OldBytes:  len(oldBytes),
 		NewBytes:  len(content),
-		OldSHA256: contentHash(oldBytes),
-		NewSHA256: contentHash([]byte(content)),
+		OldSHA256: vfs.ContentHash(oldBytes),
+		NewSHA256: vfs.ContentHash([]byte(content)),
 		OldText:   string(oldBytes),
 		NewText:   content,
 	}, taskengine.DataTypeJSON, nil
@@ -714,7 +765,7 @@ func (h *LocalFSTools) sed(ctx context.Context, args map[string]any) (any, taske
 		OldBytes:     len(content),
 		NewBytes:     len(newBytes),
 		OldSHA256:    gate.hash,
-		NewSHA256:    contentHash(newBytes),
+		NewSHA256:    vfs.ContentHash(newBytes),
 		OldText:      oldText,
 		NewText:      newContent,
 	}, taskengine.DataTypeJSON, nil

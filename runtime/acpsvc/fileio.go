@@ -118,6 +118,40 @@ func NewServeCwdResolver(db libdb.DBManager, roots *vfs.Factory) func(context.Co
 	}
 }
 
+func NewServeSessionLookup(db libdb.DBManager, roots *vfs.Factory) func(ctx context.Context, internalID string) (name, cwd string) {
+	return func(ctx context.Context, internalID string) (string, string) {
+		if roots == nil {
+			return "", ""
+		}
+		if db == nil || internalID == "" {
+			return "", roots.Default()
+		}
+		exec := db.WithoutTransaction()
+		var name string
+		if err := exec.QueryRowContext(ctx,
+			`SELECT name FROM message_indices WHERE id = $1`, internalID,
+		).Scan(&name); err != nil {
+			name = ""
+		}
+		stored := ""
+		if name != "" {
+			var rec sessionCwdRecord
+			if err := runtimetypes.New(exec).GetKV(ctx, acpSessionCwdKVPrefix+name, &rec); err == nil {
+				stored = rec.Cwd
+			}
+		}
+		resolved, err := vfs.ResolveSessionCwd(roots, stored, roots.Default())
+		if err != nil {
+			return name, roots.Default()
+		}
+		return name, resolved
+	}
+}
+
+func SessionIDFromContext(ctx context.Context) string {
+	return sessionIDFromCtx(ctx)
+}
+
 func serveSessionCwd(ctx context.Context, db libdb.DBManager, internalID string) string {
 	exec := db.WithoutTransaction()
 	var name string

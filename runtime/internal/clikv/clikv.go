@@ -3,7 +3,10 @@ package clikv
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
@@ -68,4 +71,46 @@ const UnofficialSignInsKey = "unofficial-sign-ins"
 
 func UnofficialSignIns(ctx context.Context, store runtimetypes.Store) bool {
 	return strings.EqualFold(Read(ctx, store, UnofficialSignInsKey), "true")
+}
+
+const ToolImagesKeptKey = "tool-images-kept"
+
+func ParseToolImagesKept(value string) (int, error) {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("%s must be a whole number of images, 0 or more (0 or empty sends every tool image again): got %q", ToolImagesKeptKey, value)
+	}
+	return n, nil
+}
+
+func ToolImagesKept(ctx context.Context, store runtimetypes.Store) int {
+	n, err := ParseToolImagesKept(Read(ctx, store, ToolImagesKeptKey))
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+const EventRetentionDaysKey = "event-retention-days"
+
+const ShippedEventRetentionDays = "30"
+
+func ParseEventRetention(value string) (time.Duration, bool, error) {
+	v := strings.TrimSpace(strings.ToLower(value))
+	if v == "" || v == "off" || v == "0" {
+		return 0, false, nil
+	}
+	days, err := strconv.Atoi(v)
+	if err != nil || days < 0 {
+		return 0, false, fmt.Errorf("%s must be a whole number of days, or off: got %q", EventRetentionDaysKey, value)
+	}
+	return time.Duration(days) * 24 * time.Hour, true, nil
+}
+
+func EventRetention(ctx context.Context, store runtimetypes.Store) (time.Duration, bool, error) {
+	return ParseEventRetention(Read(ctx, store, EventRetentionDaysKey))
 }

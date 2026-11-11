@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -100,26 +101,7 @@ func WriteConfigLayer(path, raw string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("agentdecl: create %s: %w", filepath.Dir(path), err)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".agents-toml-*")
-	if err != nil {
-		return fmt.Errorf("agentdecl: write %s: %w", path, err)
-	}
-	tmpName := tmp.Name()
-	if _, err := tmp.WriteString(raw); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("agentdecl: write %s: %w", path, err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("agentdecl: write %s: %w", path, err)
-	}
-	if err := os.Chmod(tmpName, 0o644); err != nil {
-		_ = os.Remove(tmpName)
-		return fmt.Errorf("agentdecl: write %s: %w", path, err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		_ = os.Remove(tmpName)
+	if err := vfs.WriteFileAtomic(path, []byte(raw)); err != nil {
 		return fmt.Errorf("agentdecl: write %s: %w", path, err)
 	}
 	return nil

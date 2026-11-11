@@ -56,3 +56,8 @@ cd tools/contenox-e2e && cargo test -- --test-threads=1
 # or, from the repo root:
 make rust-e2e
 ```
+
+The suite builds and runs on native Windows too. `tests/sessions.rs` and the `Pty` helper
+are Unix-only and are left out there; every other file runs on both. On Windows each
+case gets its own `HOME`, `USERPROFILE`, `APPDATA` and `LOCALAPPDATA`, and the suite refuses
+to run when its scratch home sits inside the real one.

@@ -47,6 +47,8 @@ import (
 	"github.com/contenox/runtime/runtime/internal/taskexecapi"
 	"github.com/contenox/runtime/runtime/internal/terminalapi"
 	"github.com/contenox/runtime/runtime/internal/toolsapi"
+	"github.com/contenox/runtime/runtime/internal/workspaceeventsapi"
+	"github.com/contenox/runtime/runtime/internal/workspacetriggersapi"
 	"github.com/contenox/runtime/runtime/localfileservice"
 	"github.com/contenox/runtime/runtime/mcpserverservice"
 	"github.com/contenox/runtime/runtime/missionchanges"
@@ -64,6 +66,7 @@ import (
 	"github.com/contenox/runtime/runtime/toolsproviderservice"
 	"github.com/contenox/runtime/runtime/version"
 	"github.com/contenox/runtime/runtime/vfs"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 )
 
 type Config struct {
@@ -109,6 +112,8 @@ type Dependencies struct {
 	ContenoxDir           string
 	WorkspaceRoots        *vfs.Factory
 	WorkspaceRootMutators *localfileapi.RootsMutators
+	WorkspaceEvents       workspaceevents.Service
+	WorkspaceTriggers     *workspacetriggersapi.Deps
 	Defaults              stateservice.RuntimeDefaults
 	TerminalService       terminalservice.Service
 	TerminalEnabled       bool
@@ -198,13 +203,19 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 	providerapi.AddProviderRoutes(mux, providerSvc)
 
 	if deps.WorkspaceRoots != nil {
-		if err := localfileapi.AddWorkspaceRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps)); err != nil {
+		if err := localfileapi.AddWorkspaceRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps), localfileapi.WithEvents(deps.WorkspaceEvents)); err != nil {
 			return fmt.Errorf("workspace files: %w", err)
 		}
 		localfileapi.AddWorkspaceRootsRoutes(mux, deps.WorkspaceRoots, deps.WorkspaceRootMutators)
 		localfileapi.AddWorkspaceSearchRoutes(mux, deps.WorkspaceRoots)
 		localfileapi.AddWorkspaceFindRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps))
 		accessapi.AddRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps))
+		if deps.WorkspaceEvents != nil {
+			workspaceeventsapi.AddRoutes(mux, deps.WorkspaceEvents)
+		}
+		if deps.WorkspaceTriggers != nil {
+			workspacetriggersapi.AddRoutes(mux, *deps.WorkspaceTriggers)
+		}
 	} else if deps.ProjectRoot != "" {
 		projectFiles, err := localfileservice.New(deps.ProjectRoot)
 		if err != nil {
