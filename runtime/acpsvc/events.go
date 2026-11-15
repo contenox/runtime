@@ -357,7 +357,7 @@ func toolKindFor(toolName string) libacp.ToolKind {
 // switch is a mode switch, and discarding working-tree changes is a delete.
 func gitToolKind(name string) (libacp.ToolKind, bool) {
 	switch name {
-	case "git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame":
+	case "git_status", "git_diff", "git_log", "git_show", "git_branch_list", "git_blame", "github_pulls", "github_pull", "github_files", "github_comments":
 		return libacp.ToolKindRead, true
 	case "git_add", "git_commit":
 		return libacp.ToolKindEdit, true

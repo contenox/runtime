@@ -31,6 +31,7 @@ const (
 )
 
 type GitTools struct {
+	github      *workspacePulls
 	allowedDir  string
 	name        string
 	cwdResolver func(context.Context) string
@@ -84,6 +85,8 @@ func (h *GitTools) execDispatch(ctx context.Context, input any, toolsCall *taske
 	}
 
 	switch toolName {
+	case "github_pulls", "github_pull", "github_files", "github_comments":
+		return h.github.read(ctx, toolName, args)
 	case "git_status":
 		if err := rejectUnknownArgs(toolName, args); err != nil {
 			return nil, taskengine.DataTypeAny, err
@@ -1177,6 +1180,7 @@ func (h *GitTools) GetToolsForToolsByName(ctx context.Context, name string) ([]t
 		}, "paths"),
 	}
 
+	allTools = append(allTools, h.github.tools(ctx)...)
 	if name == h.name {
 		return allTools, nil
 	}

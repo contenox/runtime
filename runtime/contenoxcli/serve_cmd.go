@@ -61,6 +61,7 @@ import (
 	"github.com/contenox/runtime/runtime/version"
 	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/contenox/runtime/runtime/workspaceevents"
+	"github.com/contenox/runtime/runtime/workspacegithub"
 	"github.com/contenox/runtime/runtime/workspacegrants"
 	"github.com/contenox/runtime/runtime/workspacetriggers"
 	"github.com/google/uuid"
@@ -314,6 +315,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	fleetRef := &fleetHolder{}
 	oracleStore := runtimetypes.New(db.WithoutTransaction())
 	oracleCfg := resolveOracleConfig(ctx, oracleStore, cmd)
+	eventTriggers := eventlog.NewTriggerHolder()
+	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
+	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
 	localTools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
@@ -326,6 +330,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			"", localtools.GitToolsName,
 			acpsvc.NewServeCwdResolver(db, workspaceFactory),
 			agentGitIdentity(db),
+			localtools.WithWorkspaceGitHub(workspacegithub.New(oracleStore, workspaceID, workspaceEvents), acpsvc.NewSessionEventCwdResolver(db)),
 		),
 		missiontools.ToolsProviderName: missiontools.New(missions, nil, missiontools.WithSupervision(
 			missionSupervision{missions: missions, hitl: hitlSvc},
@@ -363,9 +368,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		localTools[shellsession.ToolsProviderName] = shellsession.NewTools(shellSessions)
 	}
 
-	eventTriggers := eventlog.NewTriggerHolder()
-	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
-	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
 	eventTools := &eventtools.Provider{History: workspacetriggers.History{DB: db, Log: eventLog, Store: workspacetriggers.Store{DB: db}}, Check: triggerCheck(agentregistryservice.New(db), hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")), Events: workspaceEvents, Store: workspacetriggers.Store{DB: db}, WorkspaceID: workspaceID, Cwd: acpsvc.NewSessionEventCwdResolver(db)}
 	localTools["events"] = eventTools
 	toolsRepo := internaltools.NewPersistentRepo(localTools, db, http.DefaultClient, bus, tracker)

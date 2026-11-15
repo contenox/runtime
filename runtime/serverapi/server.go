@@ -67,6 +67,7 @@ import (
 	"github.com/contenox/runtime/runtime/version"
 	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/contenox/runtime/runtime/workspaceevents"
+	"github.com/contenox/runtime/runtime/workspacegithub"
 )
 
 type Config struct {
@@ -212,6 +213,7 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		accessapi.AddRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps))
 		if deps.WorkspaceEvents != nil {
 			workspaceeventsapi.AddRoutes(mux, deps.WorkspaceEvents)
+			workspacegithub.New(store, deps.WorkspaceID, deps.WorkspaceEvents).AddRoutes(mux)
 		}
 		if deps.WorkspaceTriggers != nil {
 			workspacetriggersapi.AddRoutes(mux, *deps.WorkspaceTriggers)

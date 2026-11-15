@@ -9,6 +9,7 @@ import (
 	"github.com/contenox/runtime/runtime/eventtools"
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/workspaceevents"
+	"github.com/contenox/runtime/runtime/workspacegithub"
 	"github.com/contenox/runtime/runtime/workspacegrants"
 	"github.com/contenox/runtime/runtime/workspacetriggers"
 	"io"
@@ -365,6 +366,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 			localtools.GitToolsName,
 			acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport }),
 			agentGitIdentity(db),
+			localtools.WithWorkspaceGitHub(workspacegithub.New(oracleStore, workspaceID, workspaceEvents), eventTools.Cwd),
 		),
 		"local_shell": localtools.NewLocalExecToolsWith(
 			acpsvc.NewACPCommandRunner(func() *acpsvc.Transport { return transport }),
