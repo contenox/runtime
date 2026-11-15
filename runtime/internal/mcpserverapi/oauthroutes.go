@@ -58,7 +58,6 @@ func (h *mcpServerHandler) oauthCallback(w http.ResponseWriter, r *http.Request)
 
 	srv, getErr := h.svc.GetByName(ctx, res.ServerName)
 	if getErr == nil {
-		h.publishDeleted(ctx, srv.Name)
 		h.publishCreated(ctx, srv)
 	}
 	http.Redirect(w, r, oauthRedirectURL(res, "success", ""), http.StatusFound)

@@ -104,11 +104,18 @@ func (h *mcpServerHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	srv.ID = id
+	previous, err := h.svc.Get(ctx, id)
+	if err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
+		return
+	}
 	if err := h.svc.Update(ctx, &srv); err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.UpdateOperation)
 		return
 	}
-	h.publishDeleted(ctx, srv.Name)
+	if previous.Name != srv.Name {
+		h.publishDeleted(ctx, previous.Name)
+	}
 	h.publishCreated(ctx, &srv)
 	_ = apiframework.Encode(w, r, http.StatusOK, srv)
 }
