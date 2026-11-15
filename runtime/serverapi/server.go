@@ -68,6 +68,7 @@ import (
 	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/contenox/runtime/runtime/workspaceevents"
 	"github.com/contenox/runtime/runtime/workspacegithub"
+	"github.com/contenox/runtime/runtime/workspaceingress"
 )
 
 type Config struct {
@@ -214,6 +215,13 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		if deps.WorkspaceEvents != nil {
 			workspaceeventsapi.AddRoutes(mux, deps.WorkspaceEvents)
 			workspacegithub.New(store, deps.WorkspaceID, deps.WorkspaceEvents).AddRoutes(mux)
+			origin := os.Getenv("CONTENOX_INGRESS_ORIGIN")
+			if origin == "" {
+				origin = "https://events.contenox.com"
+			}
+			receiver := workspaceingress.New(deps.DB, deps.WorkspaceID, deps.WorkspaceEvents, deps.WorkspaceRoots, origin)
+			receiver.AddRoutes(mux)
+			go receiver.Run(ctx)
 		}
 		if deps.WorkspaceTriggers != nil {
 			workspacetriggersapi.AddRoutes(mux, *deps.WorkspaceTriggers)

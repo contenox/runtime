@@ -732,3 +732,23 @@ CREATE INDEX IF NOT EXISTS idx_workspace_schedules_scope_id ON workspace_schedul
 CREATE INDEX IF NOT EXISTS idx_event_firings_status_page ON event_firings(workspace_id,status,nid DESC,trigger_name);
 
 CREATE INDEX IF NOT EXISTS idx_event_listener_types_by_id ON event_listener_topics(workspace_id,listener_id,event_type);
+
+CREATE TABLE IF NOT EXISTS ingress_bindings (
+    approval_url TEXT NOT NULL DEFAULT '',
+    scope TEXT PRIMARY KEY,
+    destination TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    token TEXT NOT NULL,
+    cursor BIGINT NOT NULL DEFAULT 0,
+    expired_through BIGINT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'paired'
+);
+CREATE TABLE IF NOT EXISTS ingress_receipts (
+    scope TEXT NOT NULL,
+    destination TEXT NOT NULL,
+    seq BIGINT NOT NULL,
+    delivery_id TEXT NOT NULL,
+    nid BIGINT NOT NULL,
+    PRIMARY KEY (scope, destination, seq),
+    UNIQUE (scope, destination, delivery_id)
+);
