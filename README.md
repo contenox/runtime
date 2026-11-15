@@ -4,8 +4,6 @@
 
 `contenox-runtime` is the command line, the [Agent Client Protocol](https://agentclientprotocol.com) server for editors, and the HTTP API the desktop app talks to. It reads your files, edits them, runs your tests, and asks before anything that reaches further. Sessions, settings, approvals and provider connections are SQLite files on your machine.
 
-![contenox-runtime in a terminal: the agent read the repository without a prompt and asks before running npm install](docs/screenshots/cli-approval.png)
-
 Docs: **[contenox.com](https://contenox.com)**. Made by Alexander Ertli.
 
 ---
