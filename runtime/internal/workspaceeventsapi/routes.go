@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ func AddRoutes(mux *http.ServeMux, service workspaceevents.Service) {
 func addRoutes(mux *http.ServeMux, service workspaceevents.Service, now func() time.Time) {
 	h := &handler{service: service, buckets: map[string]*bucket{}, now: now}
 	mux.HandleFunc("POST /workspace/events", h.post)
+	mux.HandleFunc("POST /workspace/events/{nid}/replay", h.replay)
 	mux.HandleFunc("GET /workspace/events", h.list)
 	mux.HandleFunc("GET /workspace/events/stream", h.stream)
 }
@@ -122,9 +124,13 @@ func (h *handler) post(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
+	source := workspaceevents.SourceEditor
+	if req.Type == workspaceevents.TypeEventFired {
+		source = workspaceevents.SourceHuman
+	}
 	event, err := h.service.Append(r.Context(), root, workspaceevents.Input{
 		Type:    req.Type,
-		Source:  workspaceevents.SourceEditor,
+		Source:  source,
 		Subject: req.Subject,
 		Data:    req.Data,
 	})
@@ -133,6 +139,41 @@ func (h *handler) post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = apiframework.Encode(w, r, http.StatusCreated, event)
+}
+
+func (h *handler) replay(w http.ResponseWriter, r *http.Request) {
+	root, err := h.service.GrantedRoot(requestRoot(r))
+	if err != nil {
+		_ = apiframework.Error(w, r, asAPIError(err), apiframework.CreateOperation)
+		return
+	}
+	nid, err := strconv.ParseInt(r.PathValue("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		_ = apiframework.Error(w, r, apiframework.UnprocessableEntity("expected a positive event number"), apiframework.CreateOperation)
+		return
+	}
+	if !h.allow(root) {
+		writeRateLimited(w)
+		return
+	}
+	rows, err := h.service.Since(r.Context(), root, nid-1, 1)
+	if err == nil {
+		switch {
+		case len(rows) == 0 || rows[0].NID != nid:
+			err = apiframework.NotFound("event not found in this project")
+		case rows[0].Type != workspaceevents.TypeEventFired:
+			err = apiframework.UnprocessableEntity("only published topics can be replayed")
+		default:
+			e := rows[0]
+			var replay workspaceevents.Event
+			replay, err = h.service.Append(r.Context(), root, workspaceevents.Input{Type: e.Type, Source: workspaceevents.SourceHuman, Subject: e.Subject, Data: e.Data, ReplayedFrom: nid})
+			if err == nil {
+				_ = apiframework.Encode(w, r, http.StatusCreated, replay)
+				return
+			}
+		}
+	}
+	_ = apiframework.Error(w, r, asAPIError(err), apiframework.CreateOperation)
 }
 
 func parseCursor(raw string) (int64, bool, error) {
@@ -167,7 +208,25 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	events, err := h.service.Since(r.Context(), root, since, limit)
+	var events []workspaceevents.Event
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		before, _, parseErr := parseCursor(raw)
+		if parseErr != nil || r.URL.Query().Has("since") {
+			_ = apiframework.Error(w, r, apiframework.UnprocessableEntity("before requires a non-negative cursor and cannot be combined with since"), apiframework.ListOperation)
+			return
+		}
+		query := runtimetypes.EventQuery{Text: r.URL.Query().Get("q"), Source: r.URL.Query().Get("source")}
+		if raw := r.URL.Query().Get("after"); raw != "" {
+			query.After, err = time.Parse(time.RFC3339Nano, raw)
+			if err != nil {
+				_ = apiframework.Error(w, r, apiframework.UnprocessableEntity("after requires an RFC3339 timestamp"), apiframework.ListOperation)
+				return
+			}
+		}
+		events, err = h.service.Recent(r.Context(), root, before, limit, query)
+	} else {
+		events, err = h.service.Since(r.Context(), root, since, limit)
+	}
 	if err != nil {
 		_ = apiframework.Error(w, r, asAPIError(err), apiframework.ListOperation)
 		return

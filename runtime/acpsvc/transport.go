@@ -2,6 +2,7 @@ package acpsvc
 
 import (
 	"context"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ import (
 )
 
 type Deps struct {
+	EventTools         taskengine.ToolsRepo
+	Events             workspaceevents.Service
 	Engine             *enginesvc.Engine
 	DB                 libdb.DBManager
 	ChainRegistry      *ChainRegistry
@@ -806,58 +809,30 @@ func sessionIDFromCtx(ctx context.Context) string {
 }
 
 func (t *Transport) sendInitialUsageUpdate(ctx context.Context, sid libacp.SessionID) {
-	t.sessionMu.Lock()
-	sess, hasSess := t.sessions[sid]
-	t.sessionMu.Unlock()
-
-	if hasSess && sess != nil {
-		if eff := sess.effectiveTokenLimit(); eff > 0 {
-			t.sendUpdate(ctx, libacp.SessionNotification{
-				SessionID: sid,
-				Update: libacp.SessionUpdate{
-					SessionUpdate: libacp.SessionUpdateUsageUpdate,
-					Size:          eff,
-				},
-			})
+	sess, ok := t.sessionFor(sid)
+	if !ok || sess == nil {
+		return
+	}
+	if _, external := sess.driver.(*externalDriver); external {
+		return
+	}
+	size := t.sessionContextLength(ctx, sess)
+	if t.deps.ChainRegistry != nil {
+		if chain := t.deps.ChainRegistry.Default(); chain != nil && chain.TokenLimit > 0 && (size <= 0 || int(chain.TokenLimit) < size) {
+			size = int(chain.TokenLimit)
+		}
+	}
+	var used int
+	if t.deps.DB != nil && sess.InternalSessionID != "" {
+		_ = runtimetypes.New(t.deps.DB.WithoutTransaction()).GetKV(ctx, "acp:context_used:"+sess.InternalSessionID, &used)
+	}
+	if size <= 0 {
+		if used == 0 {
 			return
 		}
+		size = taskengine.FallbackContextTokens
 	}
-
-	preferredModel := t.model()
-	t.sessionMu.Lock()
-	if entry, ok := t.sessions[sid]; ok && entry != nil {
-		preferredModel = entry.modelOrDefault(t.model())
-	}
-	t.sessionMu.Unlock()
-
-	for _, state := range t.runtimeStates(ctx) {
-		for _, pulled := range state.PulledModels {
-			if preferredModel != "" && pulled.Model == preferredModel && pulled.ContextLength > 0 {
-				t.sendUpdate(ctx, libacp.SessionNotification{
-					SessionID: sid,
-					Update: libacp.SessionUpdate{
-						SessionUpdate: libacp.SessionUpdateUsageUpdate,
-						Size:          pulled.ContextLength,
-					},
-				})
-				return
-			}
-		}
-	}
-	for _, state := range t.runtimeStates(ctx) {
-		for _, pulled := range state.PulledModels {
-			if pulled.ContextLength > 0 && (pulled.CanChat || pulled.CanPrompt) {
-				t.sendUpdate(ctx, libacp.SessionNotification{
-					SessionID: sid,
-					Update: libacp.SessionUpdate{
-						SessionUpdate: libacp.SessionUpdateUsageUpdate,
-						Size:          pulled.ContextLength,
-					},
-				})
-				return
-			}
-		}
-	}
+	t.sendUpdate(ctx, libacp.SessionNotification{SessionID: sid, Update: libacp.SessionUpdate{SessionUpdate: libacp.SessionUpdateUsageUpdate, Size: size, Used: used}})
 }
 
 func (t *Transport) knownPolicies(workspaceID string) []string {

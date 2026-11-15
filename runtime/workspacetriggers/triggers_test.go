@@ -2,6 +2,7 @@ package workspacetriggers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/eventlog"
+	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/vfs"
 	"github.com/contenox/runtime/runtime/workspaceevents"
@@ -242,7 +244,7 @@ func TestIntegration_History_NamesFiringsAfterTheTriggerIsRenamedOrDeleted(t *te
 
 	f.disk(t, f.ctx, "fs.modified", "pkg/a_test.go")
 	require.Eventually(t, func() bool { return len(fleet.started()) == 1 }, 3*time.Second, 20*time.Millisecond)
-	require.Eventually(t, func() bool { return len(f.firings(t)) == 1 }, 3*time.Second, 20*time.Millisecond)
+	require.Eventually(t, func() bool { rows := f.firings(t); return len(rows) == 1 && rows[0].MissionID != "" }, 3*time.Second, 20*time.Millisecond)
 
 	tr.Name = "renamed"
 	require.NoError(t, f.store.Update(f.ctx, f.scope, &tr))
@@ -424,4 +426,78 @@ func TestIntegration_Dispatcher_AWorkerRecoversAfterAnError(t *testing.T) {
 	f.disk(t, f.ctx, "fs.modified", "after_error_test.go")
 	require.Eventually(t, func() bool { return len(fleet.started()) == 1 }, 3*time.Second, 20*time.Millisecond,
 		"a failed pass is retried on the next tick")
+}
+func TestUnit_ScheduledTopicCatchesUpOnceAndStaysInProject(t *testing.T) {
+	f := newFixture(t)
+	schedules := workspaceevents.Schedules{DB: f.db}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	stored, err := schedules.Create(f.ctx, f.scope, workspaceevents.Schedule{Topic: "review.due", Every: "1s"}, now)
+	require.NoError(t, err)
+	due := now.Add(10 * time.Second)
+	published, err := schedules.Drain(f.ctx, f.scope, due)
+	require.NoError(t, err)
+	require.Len(t, published, 1)
+	require.Equal(t, workspaceevents.SourceSchedule, published[0].Source)
+	published, err = schedules.Drain(f.ctx, f.scope, due)
+	require.NoError(t, err)
+	require.Empty(t, published)
+	rows, err := f.events.Recent(f.ctx, f.root, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "review.due", rows[0].Subject)
+	disabled := false
+	require.NoError(t, schedules.Change(f.ctx, f.scope, stored.ID, &disabled))
+	published, err = schedules.Drain(f.ctx, f.scope, due.Add(time.Minute))
+	require.NoError(t, err)
+	require.Empty(t, published)
+	require.Error(t, schedules.Change(f.ctx, "another-root", stored.ID, nil))
+}
+
+func TestIntegration_FiringPagesPreserveSiblingTriggersAcrossCursors(t *testing.T) {
+	f := newFixture(t)
+	store, err := f.history.firingStore(f.scope)
+	require.NoError(t, err)
+	for _, id := range []string{"a", "b", "c"} {
+		ok, err := store.BeginEventFiring(f.ctx, id, 22, "request-"+id)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+	p, c, err := f.history.Page(f.ctx, f.scope, "", 2, 22, false)
+	require.NoError(t, err)
+	require.Len(t, p, 2)
+	require.Equal(t, "22/b", c)
+	p, c, err = f.history.Page(f.ctx, f.scope, c, 2, 22, false)
+	require.NoError(t, err)
+	require.Len(t, p, 1)
+	require.Equal(t, "c", p[0].TriggerID)
+	require.Empty(t, c)
+	waiting, err := f.history.WaitingPage(f.ctx, f.scope, "", 1)
+	require.NoError(t, err)
+	require.Len(t, waiting.Active, 1)
+	require.Equal(t, "22/a", waiting.NextCursor)
+}
+
+func TestIntegration_WaitingShowsAnOpenMissionBlocker(t *testing.T) {
+	f := newFixture(t)
+	rule := f.trigger(t, nil)
+	missions := missionservice.New(f.db)
+	m := &missionservice.Mission{Intent: "Review the change.", HITLPolicyName: "read_only"}
+	require.NoError(t, missions.Create(f.ctx, m))
+	store, err := f.history.firingStore(f.scope)
+	require.NoError(t, err)
+	id := RequestID(rule.ID, 17)
+	ok, err := store.BeginEventFiring(f.ctx, rule.ID, 17, id)
+	require.NoError(t, err)
+	require.True(t, ok)
+	data, err := json.Marshal(map[string]string{"missionId": m.ID, "triggerName": rule.Name})
+	require.NoError(t, err)
+	_, err = f.events.Append(f.ctx, f.root, workspaceevents.Input{Type: workspaceevents.TypeTriggerStarted, Source: workspaceevents.SourceTrigger, Subject: id, Data: data})
+	require.NoError(t, err)
+	require.NoError(t, missions.AddReport(f.ctx, m.ID, &missionservice.Report{Kind: missionservice.ReportKindBlocker, Summary: "The reviewer needs input."}))
+	waiting, err := f.history.Waiting(f.ctx, f.scope)
+	require.NoError(t, err)
+	require.Empty(t, waiting.Active)
+	require.Len(t, waiting.Parked, 1)
+	require.Equal(t, "The reviewer needs input.", waiting.Parked[0].Error)
+	require.Equal(t, runtimetypes.EventFiringStatusRunning, f.firings(t)[0].Status)
 }

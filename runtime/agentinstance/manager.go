@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/eventlog"
 	"io"
 	"os"
 	"sync"
@@ -189,7 +190,6 @@ func (m *manager) Start(ctx context.Context, agentName, cwd string) (string, err
 }
 
 func (m *manager) StartResolved(ctx context.Context, agent *runtimetypes.Agent, cwd string) (string, error) {
-	_ = ctx
 	if agent == nil {
 		return "", fmt.Errorf("agentinstance: agent is required")
 	}
@@ -209,7 +209,7 @@ func (m *manager) StartResolved(ctx context.Context, agent *runtimetypes.Agent, 
 		}
 		return m.bringUp(agent, spawner)
 	case runtimetypes.AgentKindChain:
-		spawner, err := m.chainSpawner(agent, cwd)
+		spawner, err := m.chainSpawner(ctx, agent, cwd)
 		if err != nil {
 			return "", err
 		}
@@ -219,7 +219,7 @@ func (m *manager) StartResolved(ctx context.Context, agent *runtimetypes.Agent, 
 	}
 }
 
-func (m *manager) chainSpawner(agent *runtimetypes.Agent, cwd string) (agenthost.Agent, error) {
+func (m *manager) chainSpawner(ctx context.Context, agent *runtimetypes.Agent, cwd string) (agenthost.Agent, error) {
 	cfg, err := agent.ChainConfig()
 	if err != nil {
 		return nil, fmt.Errorf("agentinstance: agent %q: %w", agent.Name, err)
@@ -234,13 +234,17 @@ func (m *manager) chainSpawner(agent *runtimetypes.Agent, cwd string) (agenthost
 			return nil, fmt.Errorf("agentinstance: agent %q: resolve this executable to run its chain: %w", agent.Name, err)
 		}
 	}
+	env := map[string]string{ChainPathEnvVar: cfg.Path}
+	for key, value := range eventlog.SpawnEnv(ctx) {
+		env[key] = value
+	}
 	return &agenthost.ExternalACPAgent{
 		Config: runtimetypes.ExternalACPConfig{
 			Transport: runtimetypes.ExternalACPTransportStdio,
 			Command:   self,
 			Args:      append([]string{ChainACPSubcommand}, m.chainArgs...),
 			Cwd:       cwd,
-			Env:       map[string]string{ChainPathEnvVar: cfg.Path},
+			Env:       env,
 		},
 		SelfSpawn: true,
 		Stderr:    m.stderr,

@@ -70,6 +70,12 @@ func (t *Turn) Detach(viewerID string) { t.ts.detach(viewerID) }
 func (t *Turn) Cancel() { t.ts.teardown() }
 
 func (r *Registry) Start(sid libacp.SessionID, fn TurnFunc, viewer Viewer) (*Turn, bool, error) {
+	return r.start(sid, fn, viewer, false)
+}
+func (r *Registry) StartIfIdle(sid libacp.SessionID, fn TurnFunc, viewer Viewer) (*Turn, bool, error) {
+	return r.start(sid, fn, viewer, true)
+}
+func (r *Registry) start(sid libacp.SessionID, fn TurnFunc, viewer Viewer, onlyIfIdle bool) (*Turn, bool, error) {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -77,6 +83,9 @@ func (r *Registry) Start(sid libacp.SessionID, fn TurnFunc, viewer Viewer) (*Tur
 	}
 	if ts, ok := r.sessions[sid]; ok && !ts.isFinished() {
 		r.mu.Unlock()
+		if onlyIfIdle {
+			return nil, false, errors.New("session already has a turn in flight")
+		}
 		if err := ts.attach(context.Background(), viewer); err != nil {
 			return nil, false, err
 		}

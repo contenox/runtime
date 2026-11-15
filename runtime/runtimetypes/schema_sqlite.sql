@@ -134,6 +134,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_message_indices_name
     ON message_indices (name, workspace_id)
     WHERE name IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS session_context_shifts (
+    session_id VARCHAR(255) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
+    at_ns BIGINT NOT NULL,
+    event_id TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (session_id, at_ns, event_id)
+);
+
 CREATE TABLE IF NOT EXISTS messages (
     id VARCHAR(255),
     idx_id VARCHAR(255) NOT NULL REFERENCES message_indices(id) ON DELETE CASCADE,
@@ -668,3 +676,29 @@ ALTER TABLE llm_backends ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE mcp_servers ADD COLUMN env_json                TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE mcp_servers ADD COLUMN workspace               TEXT NOT NULL DEFAULT '';
 ALTER TABLE remote_tools ADD COLUMN workspace TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS workspace_schedules (
+    id TEXT PRIMARY KEY,
+    scope TEXT NOT NULL,
+    definition TEXT NOT NULL,
+    due_ms BIGINT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+CREATE INDEX IF NOT EXISTS idx_workspace_schedules_due ON workspace_schedules(scope, enabled, due_ms);
+
+CREATE TABLE IF NOT EXISTS event_topic_catalog (
+ workspace_id TEXT NOT NULL,
+ subject TEXT NOT NULL,
+ period TEXT NOT NULL REFERENCES event_partitions(period) ON DELETE CASCADE,
+ total BIGINT NOT NULL,
+ last_time TIMESTAMP NOT NULL,
+ PRIMARY KEY(workspace_id,subject,period)
+);
+CREATE TABLE IF NOT EXISTS event_topic_catalog_ready (
+ period TEXT PRIMARY KEY REFERENCES event_partitions(period) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_listeners_owner_id ON event_listeners(workspace_id,owner,id);
+CREATE INDEX IF NOT EXISTS idx_workspace_schedules_scope_id ON workspace_schedules(scope,id);
+CREATE INDEX IF NOT EXISTS idx_event_firings_status_page ON event_firings(workspace_id,status,nid DESC,trigger_name);
+
+CREATE INDEX IF NOT EXISTS idx_event_listener_types_by_id ON event_listener_topics(workspace_id,listener_id,event_type);

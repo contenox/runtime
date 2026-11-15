@@ -319,11 +319,10 @@ func (s *service) DeleteConnection(ctx context.Context, id string) error {
 		return err
 	}
 	cancelLoginAttempt(backend.ID)
-	if err := backendservice.New(s.dbInstance).Delete(ctx, backend.ID); err != nil {
+	if err := backendservice.NewWithRuntimeState(s.dbInstance, s.state).Delete(ctx, backend.ID); err != nil {
 		return err
 	}
 	s.invalidateBackendCache(backend.ID)
-	s.afterChange(backend.ID)
 	return nil
 }
 
@@ -350,12 +349,12 @@ func (s *service) CheckConnection(ctx context.Context, id string) (*Connection, 
 	return s.GetConnection(ctx, backend.ID)
 }
 
-func (s *service) StartConnectionLogin(ctx context.Context, id string) (*LoginStart, error) {
+func (s *service) StartConnectionLogin(ctx context.Context, id string, renewal ...bool) (*LoginStart, error) {
 	backend, providerType, err := s.loginBackend(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return s.startLogin(ctx, providerType, backend)
+	return s.startLogin(ctx, providerType, backend, len(renewal) > 0 && renewal[0])
 }
 
 func (s *service) ConnectionLoginStatus(ctx context.Context, id string) (*LoginStatus, error) {

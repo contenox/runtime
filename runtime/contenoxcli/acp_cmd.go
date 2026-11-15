@@ -5,6 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/eventlog"
+	"github.com/contenox/runtime/runtime/eventtools"
+	"github.com/contenox/runtime/runtime/nativeturn"
+	"github.com/contenox/runtime/runtime/workspaceevents"
+	"github.com/contenox/runtime/runtime/workspacegrants"
+	"github.com/contenox/runtime/runtime/workspacetriggers"
 	"io"
 	"log/slog"
 	"os"
@@ -56,10 +62,10 @@ The chain executed for each session/prompt is loaded from ~/.contenox-harness/de
 contenox chain.
 
 The default model is read from the global 'default-model' / 'default-provider' configuration
-(set via 'contenox-runtime config set default-model …'). Logging goes to stderr; stdin/stdout are
+(set via 'contenox-runtime config set default-model â€¦'). Logging goes to stderr; stdin/stdout are
 reserved for the JSON-RPC stream.
 
-HITL is on by default — gated tool calls route through the ACP session/request_permission
+HITL is on by default â€” gated tool calls route through the ACP session/request_permission
 flow so the editor's UI controls approval. Pass --auto to disable (unattended/testing).
 
 The /mission slash command dispatches a mission in-process: the fired unit is a child
@@ -74,7 +80,7 @@ var acpxCmd = &cobra.Command{
 	Use:   "acpx",
 	Short: "Run as an ACP agent under the headless / untrusted-driver profile (OpenClaw).",
 	Long: `Same Agent Client Protocol server as 'acp', for drivers that are not the
-device owner — OpenClaw and other non-editor clients. It loads the hardened
+device owner â€” OpenClaw and other non-editor clients. It loads the hardened
 acpx envelope from agents.toml (local_shell denied, web mutations denied, web
 reads gated) and the chain compiled from agents/acpx.md (override with
 CONTENOX_ACPX_CHAIN_PATH).
@@ -221,7 +227,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	if parentCtx == nil {
 		parentCtx = context.Background()
 	}
-	ctx, stop := signal.NotifyContext(parentCtx, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(eventlog.InheritHop(parentCtx), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	defer func() { _ = modelrepo.Shutdown() }()
@@ -322,6 +328,16 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	defer bus.Close()
 	missions := missionservice.New(db, missionservice.WithEventPublisher(bus))
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	roots, err := vfs.NewFactory(append([]string{cwd}, workspacegrants.ReadGrants(ctx, runtimetypes.New(db.WithoutTransaction()))...)...)
+	if err != nil {
+		return err
+	}
+	eventLog := eventlog.NewService(db, nil, tracker)
+	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, roots, tracker)
 	acpHITL := hitlservice.NewWithDefaultPolicy(acpPolicySource(contenoxDir), runtimetypes.LocalTenantID, runtimetypes.New(db.WithoutTransaction()), tracker, profile.hitlPolicy)
 
 	oracleStore := runtimetypes.New(db.WithoutTransaction())
@@ -331,7 +347,9 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	}
 
 	fleetRef := &fleetHolder{}
+	eventTools := &eventtools.Provider{History: workspacetriggers.History{DB: db, Log: eventLog, Store: workspacetriggers.Store{DB: db}}, Check: triggerCheck(agentregistryservice.New(db), hitlservice.NewPolicyValidator(acpPolicySource(contenoxDir), runtimetypes.LocalTenantID, "")), Events: workspaceEvents, Store: workspacetriggers.Store{DB: db}, WorkspaceID: workspaceID, Cwd: acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport })}
 	tools := map[string]taskengine.ToolsRepo{
+		"events":   eventTools,
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
 		"webtools": localtools.NewWebCaller(tracker),
@@ -350,6 +368,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		),
 		"local_shell": localtools.NewLocalExecToolsWith(
 			acpsvc.NewACPCommandRunner(func() *acpsvc.Transport { return transport }),
+			localtools.WithLocalExecCwdResolver(acpsvc.NewACPCwdResolver(func() *acpsvc.Transport { return transport })),
 			localtools.WithLocalExecTracker(tracker),
 			localtools.WithLocalExecGate(acpLocalExecGate(enableHITL)),
 		),
@@ -456,6 +475,8 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		missionForward    *acpsvc.MissionForwardConfig
 		stopFleetTeardown func()
 	)
+	var sessionRouter *acpsvc.SessionRouter
+	var nativeTurns *nativeturn.Registry
 	isDispatchedUnit := strings.TrimSpace(os.Getenv(profile.chainEnv)) != ""
 	switch {
 	case !profile.embedFleet || isDispatchedUnit:
@@ -476,7 +497,14 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		if buildErr != nil {
 			return buildErr
 		}
-		missionFleet, missionAgents, stopFleetTeardown = fleet, agents, stop
+		missionFleet, missionAgents = fleet, agents
+		sessionRouter = acpsvc.NewSessionRouter()
+		nativeTurns = nativeturn.New(nativeturn.Config{})
+		watcher := newWorkspaceWatcher(workspaceEvents, roots, workspaceLeaseDir(dbPath), workspaceID, "acp", tracker)
+		dispatcher := newTriggerDispatcher(workspaceEvents, eventLog, roots, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(operatorinbox.New(db), sessionRouter))
+		watcher.Start(ctx)
+		dispatcher.Start(ctx)
+		stopFleetTeardown = func() { _ = nativeTurns.Close(); dispatcher.Stop(); watcher.Stop(); stop() }
 	}
 	fleetRef.set(missionFleet)
 	if stopFleetTeardown != nil {
@@ -484,6 +512,7 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	}
 
 	transportFactory := acpsvc.New(acpsvc.Deps{
+		Events: workspaceEvents, EventTools: eventTools, SessionRouter: sessionRouter, NativeTurns: nativeTurns,
 		Engine:                engine,
 		DB:                    db,
 		ChainRegistry:         chains,
@@ -735,7 +764,7 @@ func acpUpdateBanner(ctx context.Context, db libdb.DBManager, contenoxDir string
 		if !r.available {
 			return ""
 		}
-		return fmt.Sprintf("contenox-runtime %s is available (current: %s) — run `contenox-runtime update` to upgrade.", r.tag, CLIVersion())
+		return fmt.Sprintf("contenox-runtime %s is available (current: %s) â€” run `contenox-runtime update` to upgrade.", r.tag, CLIVersion())
 	case <-time.After(500 * time.Millisecond):
 		return ""
 	}

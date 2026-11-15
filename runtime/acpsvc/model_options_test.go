@@ -110,6 +110,7 @@ func TestUnit_ContextCapMinAcrossServingConnections(t *testing.T) {
 	}
 	require.Equal(t, 64000, contextCapFor(states, "any", "deepseek-chat"))
 	require.Equal(t, 128000, contextCapFor(states, "connection:d2", "deepseek-chat"))
+	require.Zero(t, contextCapFor(states, "connection:missing", "deepseek-chat"))
 }
 
 func TestUnit_ModelOptionCurrentEmptyWhenDefaultUnserved(t *testing.T) {

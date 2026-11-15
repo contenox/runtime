@@ -372,7 +372,7 @@ func TestManager_Chain_DefaultsToTheRunningExecutable(t *testing.T) {
 	mgr := New(svc)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	spawner, err := mgr.(*manager).chainSpawner(agent, "/tmp/chain-cwd")
+	spawner, err := mgr.(*manager).chainSpawner(context.Background(), agent, "/tmp/chain-cwd")
 	require.NoError(t, err)
 	require.Equal(t, self, spawner.(*agenthost.ExternalACPAgent).Config.Command)
 	require.Equal(t, "/tmp/chain-cwd", spawner.(*agenthost.ExternalACPAgent).Config.Cwd,

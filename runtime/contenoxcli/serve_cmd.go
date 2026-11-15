@@ -30,6 +30,7 @@ import (
 	"github.com/contenox/runtime/runtime/chainagents"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/eventlog"
+	"github.com/contenox/runtime/runtime/eventtools"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/compatapi"
@@ -115,7 +116,7 @@ MANDATORY for any non-loopback bind (--remote or a LAN ADDR). The
 token is resolved as: TOKEN env, else ~/.contenox-harness/serve-token.txt, else (with
 --remote) a freshly generated token saved there (0600); programmatic clients
 (contenox-runtime approvals/mission/fleet) discover the same file automatically. Serving
-is plain HTTP — put a TLS-terminating reverse proxy in front for untrusted
+is plain HTTP â€” put a TLS-terminating reverse proxy in front for untrusted
 networks. Chat needs a configured model; without one, serve still starts and
 reports what is missing through /api/setup-status so a client can configure it.`,
 	RunE: runServe,
@@ -126,7 +127,7 @@ func init() {
 		"Directory a browser client may choose as a session workspace (repeatable). The serve directory is always the default; these extend the allowlist. Also settable via WORKSPACE_ROOTS (OS path-list separated) or as `contenox-runtime serve [dir]...` positional arguments.")
 	registerOracleFlags(serveCmd)
 	serveCmd.Flags().Bool("remote", false,
-		"Serve on all network interfaces (0.0.0.0) so other machines on your LAN can reach the API. Auto-provisions a TOKEN (env, else ~/.contenox-harness/serve-token.txt, else generated and saved there) since a token is mandatory off loopback. A shorthand for ADDR=0.0.0.0; an explicit ADDR still wins. Plain HTTP — front with a TLS reverse proxy for untrusted networks.")
+		"Serve on all network interfaces (0.0.0.0) so other machines on your LAN can reach the API. Auto-provisions a TOKEN (env, else ~/.contenox-harness/serve-token.txt, else generated and saved there) since a token is mandatory off loopback. A shorthand for ADDR=0.0.0.0; an explicit ADDR still wins. Plain HTTP â€” front with a TLS reverse proxy for untrusted networks.")
 }
 
 func resolveServeAddr(remote bool, envAddr string) string {
@@ -208,7 +209,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			}
 			config.Token = gen
 			fmt.Fprintf(cmd.OutOrStdout(),
-				"serve token: generated and saved to %s (0600) — clients auto-discover it there; `cat` it to log in, or set TOKEN to override\n",
+				"serve token: generated and saved to %s (0600) â€” clients auto-discover it there; `cat` it to log in, or set TOKEN to override\n",
 				serveTokenPathHint())
 		}
 	}
@@ -338,6 +339,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	if opts.EffectiveEnableLocalExec {
 		execOpts := []localtools.LocalExecOption{
+			localtools.WithLocalExecCwdResolver(acpsvc.NewServeCwdResolver(db, workspaceFactory)),
 			localtools.WithLocalExecTracker(tracker),
 			localtools.WithLocalExecGate(localtools.GatePolicy),
 		}
@@ -361,13 +363,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		localTools[shellsession.ToolsProviderName] = shellsession.NewTools(shellSessions)
 	}
 
+	eventTriggers := eventlog.NewTriggerHolder()
+	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
+	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
+	eventTools := &eventtools.Provider{History: workspacetriggers.History{DB: db, Log: eventLog, Store: workspacetriggers.Store{DB: db}}, Check: triggerCheck(agentregistryservice.New(db), hitlservice.NewPolicyValidator(hitlSource, runtimetypes.LocalTenantID, "")), Events: workspaceEvents, Store: workspacetriggers.Store{DB: db}, WorkspaceID: workspaceID, Cwd: acpsvc.NewSessionEventCwdResolver(db)}
+	localTools["events"] = eventTools
 	toolsRepo := internaltools.NewPersistentRepo(localTools, db, http.DefaultClient, bus, tracker)
 	toolsProviderSvc := toolsproviderservice.New(db, toolsRepo, tracker)
 	connectors := connectorservice.New(db, toolsRepo)
 
-	eventTriggers := eventlog.NewTriggerHolder()
-	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
-	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
 	sessionLookup := acpsvc.NewServeSessionLookup(db, workspaceFactory)
 	var taskEventSink taskengine.TaskEventSink = workspaceevents.NewTaskEventBridge(
 		taskengine.NewKVJournalTaskEventSink(taskengine.NewBusTaskEventSink(bus), kvMgr, tracker),
@@ -426,7 +430,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	stopEventRetention := workspaceevents.StartRetention(ctx, eventLog, eventRetentionSetting(store), workspaceevents.DefaultRetentionSweep, tracker)
 	defer stopEventRetention()
 	if opts.EffectiveDefaultModel == "" {
-		fmt.Fprintln(os.Stderr, "contenox-runtime serve: no default-model configured; serving setup-only — configure a provider and model in the app, or run `contenox-runtime setup`.")
+		fmt.Fprintln(os.Stderr, "contenox-runtime serve: no default-model configured; serving setup-only â€” configure a provider and model in the app, or run `contenox-runtime setup`.")
 	}
 	stopCatalogRefresh := startCatalogRefresh(ctx, engine.State, catalogRefreshInterval)
 	defer stopCatalogRefresh()
@@ -555,13 +559,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 		fleetservice.WithPolicyResolver(policyResolver(contenoxDir)))
 	fleetRef.set(fleet)
 
-	triggerDispatcher := newTriggerDispatcher(workspaceEvents, eventLog, workspaceFactory, db, workspaceID, fleet, missions, tracker)
+	operatorInbox := operatorinbox.New(db)
+	triggerDispatcher := newTriggerDispatcher(workspaceEvents, eventLog, workspaceFactory, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(operatorInbox, sessionRouter))
 	eventTriggers.Set(triggerDispatcher)
 	triggerDispatcher.Start(ctx)
 	defer triggerDispatcher.Stop()
 	defer eventTriggers.Drain(eventlog.DefaultDrainTimeout)
 
-	operatorInbox := operatorinbox.New(db)
 	reportRouter, err := reportrouter.New(reportrouter.Deps{
 		Bus: bus,
 		Sessions: missionReportDeliverer{
@@ -591,6 +595,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		slog.Warn("contenox-runtime serve: /acp transport disabled: ACP chain registry unavailable", "error", err)
 	} else {
 		acpAgentFactory = acpsvc.New(acpsvc.Deps{
+			Events: workspaceEvents, EventTools: eventTools,
 			Engine:                engine,
 			DB:                    db,
 			ChainRegistry:         acpChains,
@@ -659,6 +664,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			Events:      workspaceEvents,
 			Store:       workspacetriggers.Store{DB: db},
 			History:     workspacetriggers.History{DB: db, Log: eventLog, Store: workspacetriggers.Store{DB: db}},
+			Sessions:    sessionRouter.EventSessions,
 			Active:      triggerDispatcher.Active,
 			Check:       triggerCheck(agentRegistry, policyValidator),
 		},
@@ -712,7 +718,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 			for _, u := range lanURLs(config.Port) {
 				fmt.Fprintf(cmd.OutOrStdout(), "  reachable on LAN: %s\n", u)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "  note: plain HTTP — the TOKEN travels in cleartext; front with a TLS reverse proxy on untrusted networks\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  note: plain HTTP â€” the TOKEN travels in cleartext; front with a TLS reverse proxy on untrusted networks\n")
 		}
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err

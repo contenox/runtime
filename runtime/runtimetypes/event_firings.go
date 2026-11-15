@@ -43,7 +43,11 @@ func (f EventFiring) Stranded(now time.Time) bool {
 }
 
 type EventFiringFilter struct {
-	SinceNID int64
+	BeforeNID    int64
+	AfterTrigger string
+	ExactNID     int64
+	Waiting      bool
+	SinceNID     int64
 
 	Status string
 
@@ -58,6 +62,7 @@ type EventFiringStore interface {
 	SetEventCursor(ctx context.Context, consumer string, nid int64) error
 
 	BeginEventFiring(ctx context.Context, triggerName string, nid int64, requestID string) (bool, error)
+	BeginEventFiringOnce(ctx context.Context, triggerName string, nid int64, requestID string) (bool, error)
 
 	FinishEventFiring(ctx context.Context, triggerName string, nid int64, status, errMsg string) error
 
@@ -111,6 +116,10 @@ func (s *eventFiringStore) SetEventCursor(ctx context.Context, consumer string, 
 	return s.cursors.SetCursor(ctx, s.exec, consumer, nid)
 }
 
+func (s *eventFiringStore) BeginEventFiringOnce(ctx context.Context, triggerName string, nid int64, requestID string) (bool, error) {
+	return s.firings.BeginFiringOnce(ctx, s.exec, triggerName, nid, requestID)
+}
+
 func (s *eventFiringStore) BeginEventFiring(ctx context.Context, triggerName string, nid int64, requestID string) (bool, error) {
 	return s.firings.BeginFiring(ctx, s.exec, triggerName, nid, requestID)
 }
@@ -121,7 +130,7 @@ func (s *eventFiringStore) FinishEventFiring(ctx context.Context, triggerName st
 
 func (s *eventFiringStore) ListEventFirings(ctx context.Context, f EventFiringFilter) ([]EventFiring, error) {
 	firings, err := s.firings.ListFirings(ctx, s.exec, libevents.FiringFilter{
-		SinceNID:    f.SinceNID,
+		SinceNID: f.SinceNID, BeforeNID: f.BeforeNID, AfterTrigger: f.AfterTrigger, ExactNID: f.ExactNID, Waiting: f.Waiting,
 		Status:      f.Status,
 		TriggerName: f.TriggerName,
 		Limit:       f.Limit,

@@ -94,6 +94,16 @@ func NewACPCwdResolver(transport func() *Transport) func(context.Context) string
 	}
 }
 
+func NewSessionEventCwdResolver(db libdb.DBManager) func(context.Context) string {
+	return func(ctx context.Context) string {
+		id := sessionIDFromCtx(ctx)
+		if id == "" {
+			return ""
+		}
+		return serveSessionCwd(ctx, db, id)
+	}
+}
+
 func NewServeCwdResolver(db libdb.DBManager, roots *vfs.Factory) func(context.Context) string {
 	defaultRoot := func() string {
 		if roots == nil {

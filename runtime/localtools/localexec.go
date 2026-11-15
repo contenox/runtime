@@ -46,6 +46,7 @@ type LocalExecTools struct {
 	gate            LocalExecGate
 	defaultTimeout  time.Duration
 	allowedDir      string
+	resolveCwd      func(context.Context) string
 	allowedCommands []string
 	deniedCommands  []string
 	toolDirs        []string
@@ -56,6 +57,10 @@ type LocalExecTools struct {
 }
 
 type LocalExecOption func(*LocalExecTools)
+
+func WithLocalExecCwdResolver(resolve func(context.Context) string) LocalExecOption {
+	return func(h *LocalExecTools) { h.resolveCwd = resolve }
+}
 
 func WithLocalExecTimeout(d time.Duration) LocalExecOption {
 	return func(h *LocalExecTools) {
@@ -209,14 +214,7 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 	if a := get("args"); a != "" {
 		argsSlice = splitShellArgs(a)
 	}
-	if d := get("cwd"); d != "" {
-		cwd = filepath.Clean(d)
-		absCwd, err := filepath.Abs(cwd)
-		if err != nil {
-			return "", nil, "", 0, false, "", fmt.Errorf("local_shell: cwd %q cannot be made absolute: %w", d, err)
-		}
-		cwd = absCwd
-	}
+	cwd = get("cwd")
 	if t := get("timeout"); t != "" {
 		d, err := time.ParseDuration(t)
 		if err != nil {
@@ -259,12 +257,7 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 			argsSlice = parsed
 		}
 		if d, ok := v["cwd"].(string); ok && cwd == "" {
-			cwd = filepath.Clean(d)
-			absCwd, err := filepath.Abs(cwd)
-			if err != nil {
-				return "", nil, "", 0, false, "", fmt.Errorf("local_shell: cwd %q cannot be made absolute: %w", d, err)
-			}
-			cwd = absCwd
+			cwd = d
 		}
 		if t, ok := v["timeout"].(string); ok {
 			d, err := time.ParseDuration(t)
@@ -285,6 +278,16 @@ func (h *LocalExecTools) parseArgs(ctx context.Context, tools *taskengine.ToolsC
 			command = parts[0]
 			argsSlice = parts[1:]
 		}
+	}
+	if !filepath.IsAbs(cwd) && h.resolveCwd != nil {
+		cwd = filepath.Join(h.resolveCwd(ctx), cwd)
+	}
+	if cwd != "" {
+		abs, err := filepath.Abs(cwd)
+		if err != nil {
+			return "", nil, "", 0, false, "", fmt.Errorf("local_shell: cwd %q cannot be made absolute: %w", cwd, err)
+		}
+		cwd = abs
 	}
 	return command, argsSlice, cwd, timeout, useShell, stdin, nil
 }

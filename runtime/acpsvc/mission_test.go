@@ -3,6 +3,7 @@ package acpsvc
 import (
 	"context"
 	"errors"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,7 +49,7 @@ func newMissionTestTransport(t *testing.T, disp *fakeDispatcher, res *fakeResolv
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	tr := &Transport{deps: Deps{DB: db}}
+	tr := &Transport{deps: Deps{DB: db, Events: workspaceevents.New("mission-test", nil, nil, nil, nil)}}
 	if disp != nil {
 		tr.deps.Fleet = disp
 	}

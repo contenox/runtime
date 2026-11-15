@@ -32,6 +32,7 @@ const (
 	TaskEventToolCallPending   TaskEventKind = "tool_call_pending"
 	TaskEventToolCall          TaskEventKind = "tool_call"
 	TaskEventPrint             TaskEventKind = "print"
+	TaskEventContextShift      TaskEventKind = "context_shift"
 	TaskEventTokenUsage        TaskEventKind = "token_usage"
 )
 
@@ -52,6 +53,7 @@ func AllTaskEventKinds() []TaskEventKind {
 		TaskEventToolCall,
 		TaskEventPrint,
 		TaskEventTokenUsage,
+		TaskEventContextShift,
 	}
 }
 
@@ -98,12 +100,24 @@ type TaskEvent struct {
 	ToolDiffOldText string `json:"tool_diff_old_text,omitempty"`
 	ToolDiffNewText string `json:"tool_diff_new_text,omitempty"`
 
-	TokenUsed int `json:"token_used,omitempty"`
-	TokenSize int `json:"token_size,omitempty"`
+	ContextShift *ContextShift `json:"context_shift,omitempty"`
+	TokenUsed    int           `json:"token_used,omitempty"`
+	TokenSize    int           `json:"token_size,omitempty"`
 
 	ChunkCount   int         `json:"chunk_count,omitempty"`
 	FinishReason string      `json:"finish_reason,omitempty"`
 	Usage        *TokenUsage `json:"usage,omitempty"`
+}
+
+type ContextShift struct {
+	Window        int `json:"window"`
+	Requested     int `json:"requested,omitempty"`
+	HistoryBudget int `json:"historyBudget"`
+	Reserve       int `json:"reserve"`
+	Before        int `json:"before"`
+	After         int `json:"after"`
+	Removed       int `json:"removed"`
+	Kept          int `json:"kept"`
 }
 
 type TaskEventScope struct {

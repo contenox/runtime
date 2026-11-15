@@ -2,6 +2,7 @@ package acpsvc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	libacp "github.com/contenox/runtime/libacp"
 	"github.com/contenox/runtime/runtime/project"
 	"github.com/contenox/runtime/runtime/reasoning"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/statetype"
 )
 
@@ -157,7 +159,7 @@ func (t *Transport) tokenLimitConfigOption(ctx context.Context, sess *sessionEnt
 	if cap > 0 {
 		desc += fmt.Sprintf(" Defaults to the model's maximum context window (%s).", formatTokenCountShort(cap))
 	} else {
-		desc += " 0 = chain default / unlimited (the model's context window is not reported)."
+		desc += " Uses the configured chain window or the runtime fallback when model capacity is unknown."
 	}
 	return libacp.SessionConfigOption{
 		ID:           configIDTokenLimit,
@@ -183,7 +185,7 @@ func tokenLimitConfigValues(cap, current int) libacp.SessionConfigValues {
 	if cap > 0 {
 		values = append(values, libacp.SessionConfigValue{Value: strconv.Itoa(cap), Name: "Model maximum (" + formatTokenCountShort(cap) + ")", Description: "The model's reported context window"})
 	}
-	values = append(values, libacp.SessionConfigValue{Value: "0", Name: "Chain default", Description: "Use the chain's token limit (or unlimited)"})
+	values = append(values, libacp.SessionConfigValue{Value: "0", Name: "Chain default", Description: "Use the default window for this session"})
 	seen := map[int]struct{}{0: {}}
 	if cap > 0 {
 		seen[cap] = struct{}{}
@@ -223,6 +225,15 @@ func formatTokenCountShort(n int) string {
 	return strconv.Itoa(n) + " tokens"
 }
 
+func (t *Transport) sessionContextLength(ctx context.Context, sess *sessionEntry) int {
+	requested := sess.effectiveTokenLimit()
+	cap := t.modelContextCap(ctx, sess)
+	if cap > 0 && (requested == 0 || requested > cap) {
+		return cap
+	}
+	return requested
+}
+
 func (t *Transport) modelContextCap(ctx context.Context, sess *sessionEntry) int {
 	if sess == nil {
 		return 0
@@ -237,23 +248,15 @@ func contextCapFor(states []statetype.BackendRuntimeState, prov, mod string) int
 	if mod == "" {
 		return 0
 	}
-	min := func(matches []statetype.BackendRuntimeState) int {
-		best := 0
-		for _, st := range matches {
-			for _, pm := range st.PulledModels {
-				if sameModelName(servedModelName(pm), mod) && pm.ContextLength > 0 && (best == 0 || pm.ContextLength < best) {
-					best = pm.ContextLength
-				}
+	best := 0
+	for _, st := range serving(states, prov, mod) {
+		for _, pm := range st.PulledModels {
+			if sameModelName(servedModelName(pm), mod) && pm.ContextLength > 0 && (best == 0 || pm.ContextLength < best) {
+				best = pm.ContextLength
 			}
 		}
-		return best
 	}
-	// any/"" and connection:ID selectors; the minimum is the safe budget when
-	// several connections serve the model.
-	if n := min(serving(states, prov, mod)); n > 0 {
-		return n
-	}
-	return min(serving(states, "", mod))
+	return best
 }
 
 func (t *Transport) hitlPolicyConfigValues(sess *sessionEntry) libacp.SessionConfigValues {
@@ -335,6 +338,9 @@ func (t *Transport) SetSessionConfigOption(ctx context.Context, req libacp.SetSe
 		return libacp.SetSessionConfigOptionResponse{}, err
 	}
 
+	if _, native := sess.driver.(*nativeDriver); native && t.conn != nil && (req.ConfigID == configIDTokenLimit || req.ConfigID == configIDModel) {
+		t.sendInitialUsageUpdate(ctx, req.SessionID)
+	}
 	reportChange(req.ConfigID, req.Value.AsString())
 	return libacp.SetSessionConfigOptionResponse{
 		ConfigOptions: t.sessionConfigOptions(ctx, sess),
@@ -387,12 +393,12 @@ func (t *Transport) setSessionConfigOption(ctx context.Context, sess *sessionEnt
 			}
 			requested = n
 		}
-		cap := t.modelContextCap(ctx, sess)
-		eff := requested
-		if cap > 0 && eff > cap {
-			eff = cap
+		if t.deps.DB != nil && sess.InternalSessionID != "" {
+			if err := runtimetypes.New(t.deps.DB.WithoutTransaction()).SetKV(ctx, "acp:context_limit:"+sess.InternalSessionID, json.RawMessage(strconv.Itoa(requested))); err != nil {
+				return err
+			}
 		}
-		sess.setEffectiveTokenLimit(eff)
+		sess.setEffectiveTokenLimit(requested)
 		return nil
 
 	case configIDWorkspaceRoot:

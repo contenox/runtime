@@ -21,7 +21,15 @@ func (t *Transport) publishEvent(ctx context.Context, sid libacp.SessionID, payl
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return
 	}
+	if ev.Kind == taskengine.TaskEventContextShift || ev.Kind == taskengine.TaskEventTokenUsage {
+		sess, _ := t.sessionFor(sid)
+		t.recordContextEvent(ctx, sess, ev)
+	}
 	switch ev.Kind {
+	case taskengine.TaskEventContextShift:
+		if ev.ContextShift != nil {
+			t.sendUpdate(ctx, contextShiftNotification(sid, ev))
+		}
 	case taskengine.TaskEventStepChunk:
 		if !taskengine.IsAssistantProseHandler(ev.TaskHandler) {
 			return

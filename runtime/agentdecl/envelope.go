@@ -44,6 +44,8 @@ const (
 	AxisShell           = "shell"
 	AxisNetworkRead     = "network.read"
 	AxisNetworkWrite    = "network.write"
+	AxisEventsFire      = "events.fire"
+	AxisEventsSubscribe = "events.subscribe"
 	AxisMissionsFire    = "missions.fire"
 	AxisMissionsAnswer  = "missions.answer"
 	axisSubstitutionOff = "off"
@@ -219,6 +221,8 @@ func parseEnvelope(name string, raw map[string]any) (Envelope, error) {
 			err = parseAxisTable(&env, "files", value, map[string]string{"read": AxisFilesRead, "write": AxisFilesWrite})
 		case "network":
 			err = parseAxisTable(&env, "network", value, map[string]string{"read": AxisNetworkRead, "write": AxisNetworkWrite})
+		case "events":
+			err = parseAxisTable(&env, "events", value, map[string]string{"fire": AxisEventsFire, "subscribe": AxisEventsSubscribe})
 		case "missions":
 			err = parseAxisTable(&env, "missions", value, map[string]string{"fire": AxisMissionsFire, "answer": AxisMissionsAnswer})
 		case "shell":
@@ -251,7 +255,7 @@ func parseEnvelope(name string, raw map[string]any) (Envelope, error) {
 
 var envelopeKeys = []string{
 	"extends", "description", "default_action", "files.read", "files.write", "shell",
-	"network.read", "network.write", "missions.fire", "missions.answer",
+	"events.fire", "events.subscribe", "network.read", "network.write", "missions.fire", "missions.answer",
 	"tools", "compute", "attention", "trusted_binaries", "always_deny", "always_allow",
 }
 

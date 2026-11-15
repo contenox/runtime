@@ -95,7 +95,7 @@ type Service interface {
 	DeleteConnection(ctx context.Context, id string) error
 	CheckConnection(ctx context.Context, id string) (*Connection, error)
 	ClearHiddenModels(ctx context.Context, id, model string) (*Connection, error)
-	StartConnectionLogin(ctx context.Context, id string) (*LoginStart, error)
+	StartConnectionLogin(ctx context.Context, id string, renewal ...bool) (*LoginStart, error)
 	ConnectionLoginStatus(ctx context.Context, id string) (*LoginStatus, error)
 	CancelConnectionLogin(ctx context.Context, id string) (*LoginStatus, error)
 	LogoutConnection(ctx context.Context, id string) error
@@ -523,13 +523,15 @@ func (s *service) StartLogin(ctx context.Context, providerType string) (*LoginSt
 		return nil, fmt.Errorf("read backend %q: %w", providerType, err)
 	}
 
-	return s.startLogin(ctx, providerType, backend)
+	return s.startLogin(ctx, providerType, backend, false)
 }
 
-func (s *service) startLogin(ctx context.Context, providerType string, backend *runtimetypes.Backend) (*LoginStart, error) {
+func (s *service) startLogin(ctx context.Context, providerType string, backend *runtimetypes.Backend, renew bool) (*LoginStart, error) {
 	auth := s.auth(backend)
-	if state, err := auth.Status(ctx, backend.ID); err == nil && state.State == "authenticated" {
-		return &LoginStart{Provider: providerType, ConnectionID: backend.ID, State: state.State, ExpiresAt: state.ExpiresAt}, nil
+	if !renew {
+		if state, err := auth.Status(ctx, backend.ID); err == nil && state.State == "authenticated" {
+			return &LoginStart{Provider: providerType, ConnectionID: backend.ID, State: state.State, ExpiresAt: state.ExpiresAt}, nil
+		}
 	}
 
 	loginMu.Lock()
@@ -568,7 +570,7 @@ func (s *service) startLogin(ctx context.Context, providerType string, backend *
 		loginMu.Unlock()
 		close(attempt.doneCh)
 		if err == nil {
-			s.invalidateBackendCache(backend.ID)
+			s.afterChange(backend.ID)
 		}
 	}()
 
@@ -622,7 +624,7 @@ func (s *service) loginStatus(ctx context.Context, providerType string, backend 
 
 	loginMu.Lock()
 	if attempt := loginAttempts[backend.ID]; attempt != nil {
-		if !attempt.done && attempt.device.Code != "" && out.State != "authenticated" {
+		if !attempt.done && attempt.device.Code != "" {
 			out.State = "login_pending"
 			out.URL = attempt.device.URL
 			out.Code = attempt.device.Code

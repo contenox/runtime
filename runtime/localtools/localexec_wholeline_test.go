@@ -3,6 +3,7 @@ package localtools_test
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -18,6 +19,19 @@ func (s *specCaptureRunner) Run(_ context.Context, spec localtools.CommandSpec, 
 	*s.spec = spec
 	_, _ = io.WriteString(stdout, "ok")
 	return 0, nil
+}
+
+func TestLocalExecSessionWorkingDirectory(t *testing.T) {
+	project := t.TempDir()
+	absolute := t.TempDir()
+	var spec localtools.CommandSpec
+	tool := localtools.NewLocalExecToolsWith(&specCaptureRunner{spec: &spec},
+		localtools.WithLocalExecCwdResolver(func(context.Context) string { return project }))
+	for input, want := range map[string]string{"": project, ".": project, "sub": filepath.Join(project, "sub"), absolute: absolute} {
+		_, _, err := tool.Exec(context.Background(), time.Now(), map[string]any{"command": "go", "cwd": input}, false, &taskengine.ToolsCall{})
+		require.NoError(t, err)
+		require.Equal(t, want, spec.Cwd)
+	}
 }
 
 func TestUnit_LocalExecTools_WholeLineCommandIsSplitIntoProgramAndArgs(t *testing.T) {

@@ -211,7 +211,7 @@ func parseRipgrepMatch(line []byte, previewCap int) ([]searchMatch, bool) {
 	if env.Type != "match" {
 		return nil, false
 	}
-	path := strings.TrimPrefix(env.Data.Path.Text, "./")
+	path := strings.TrimPrefix(filepath.ToSlash(env.Data.Path.Text), "./")
 	if path == "" {
 		return nil, false
 	}

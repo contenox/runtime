@@ -45,6 +45,7 @@ type DispatcherConfig struct {
 	Events      workspaceevents.Service
 	Roots       workspaceevents.Roots
 	Store       Store
+	Deliver     func(context.Context, Run, string) error
 	Starter     Starter
 	Missions    MissionState
 	Tracker     libtracker.ActivityTracker
@@ -196,12 +197,13 @@ func (d *Dispatcher) reconcile(ctx context.Context) {
 func (d *Dispatcher) startWorker(ctx context.Context, root string) {
 	workerCtx, cancel := context.WithCancel(ctx)
 	w := &rootWorker{
-		d:      d,
-		root:   root,
-		scope:  workspaceevents.Scope(d.cfg.WorkspaceID, root),
-		wake:   make(chan struct{}, 1),
-		cancel: cancel,
-		done:   make(chan struct{}),
+		sessionSlots: make(chan struct{}, 8),
+		d:            d,
+		root:         root,
+		scope:        workspaceevents.Scope(d.cfg.WorkspaceID, root),
+		wake:         make(chan struct{}, 1),
+		cancel:       cancel,
+		done:         make(chan struct{}),
 	}
 	d.mu.Lock()
 	d.workers[root] = w
@@ -240,13 +242,17 @@ func (d *Dispatcher) report(ctx context.Context, operation, root string, err err
 }
 
 type rootWorker struct {
-	d            *Dispatcher
-	root         string
-	scope        string
-	wake         chan struct{}
-	cancel       context.CancelFunc
-	done         chan struct{}
-	lastRunCheck time.Time
+	d             *Dispatcher
+	root          string
+	scope         string
+	wake          chan struct{}
+	cancel        context.CancelFunc
+	done          chan struct{}
+	lastRunCheck  time.Time
+	settleNID     int64
+	settleTrigger string
+	sessionSlots  chan struct{}
+	deliveries    sync.WaitGroup
 }
 
 func (w *rootWorker) nudge() {
@@ -258,6 +264,7 @@ func (w *rootWorker) nudge() {
 
 func (w *rootWorker) loop(ctx context.Context) {
 	defer close(w.done)
+	defer w.deliveries.Wait()
 	bus := make(chan []byte, 16)
 	if sub, err := w.d.cfg.Events.Subscribe(ctx, w.root, bus); err == nil {
 		defer func() { _ = sub.Unsubscribe() }()
@@ -291,6 +298,14 @@ func (w *rootWorker) firings() (runtimetypes.EventFiringStore, error) {
 
 func (w *rootWorker) pass(ctx context.Context) error {
 	cfg := w.d.cfg
+	schedules := workspaceevents.Schedules{DB: cfg.DB}
+	due, err := schedules.Drain(ctx, w.scope, cfg.Now())
+	if len(due) > 0 {
+		cfg.Events.AnnounceCommitted(ctx, w.root, due[len(due)-1])
+	}
+	if err != nil {
+		return err
+	}
 	firings, err := w.firings()
 	if err != nil {
 		return err
@@ -298,6 +313,13 @@ func (w *rootWorker) pass(ctx context.Context) error {
 	cursor, err := firings.GetEventCursor(ctx, CursorConsumer)
 	if err != nil {
 		return err
+	}
+	events, err := w.read(ctx, cursor)
+	if err != nil {
+		return err
+	}
+	if len(events) == 0 {
+		return w.checkRuns(ctx, firings)
 	}
 	list, err := cfg.Store.List(ctx, w.scope)
 	if err != nil {
@@ -311,15 +333,15 @@ func (w *rootWorker) pass(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	events, err := w.read(ctx, cursor)
+	now := cfg.Now()
+	windows, err := w.pauseWindows(ctx, recent, events)
 	if err != nil {
 		return err
 	}
-	now := cfg.Now()
 	p := planPass(planInput{
 		events:   events,
 		triggers: triggers,
-		paused:   pauseWindows(recent),
+		paused:   windows,
 		now:      now,
 		grace:    cfg.Grace,
 		maxRun:   cfg.MaxRun,
@@ -345,7 +367,12 @@ func (w *rootWorker) pass(ctx context.Context) error {
 			return err
 		}
 	}
-	if now.Sub(w.lastRunCheck) >= cfg.RunCheck {
+	return w.checkRuns(ctx, firings)
+}
+
+func (w *rootWorker) checkRuns(ctx context.Context, firings runtimetypes.EventFiringStore) error {
+	now := w.d.cfg.Now()
+	if now.Sub(w.lastRunCheck) >= w.d.cfg.RunCheck {
 		w.lastRunCheck = now
 		return w.settle(ctx, firings)
 	}
@@ -369,19 +396,30 @@ func (w *rootWorker) read(ctx context.Context, cursor int64) ([]workspaceevents.
 	return out, nil
 }
 
-func pauseWindows(firings []runtimetypes.EventFiring) []window {
+func (w *rootWorker) pauseWindows(ctx context.Context, firings []runtimetypes.EventFiring, events []workspaceevents.Event) ([]window, error) {
 	out := make([]window, 0, len(firings))
 	for _, f := range firings {
 		if f.Status == runtimetypes.EventFiringStatusRefused {
 			continue
 		}
-		if f.Status == runtimetypes.EventFiringStatusRunning {
-			out = append(out, window{start: f.CreatedAt})
-			continue
+		span := window{triggerID: f.TriggerName, start: f.CreatedAt}
+		if f.Status != runtimetypes.EventFiringStatusRunning {
+			span.end = f.UpdatedAt
 		}
-		out = append(out, window{start: f.CreatedAt, end: f.UpdatedAt})
+		for _, event := range events {
+			if event.Source != workspaceevents.SourceWatcher || !span.contains(event.Time, w.d.cfg.Grace, w.d.cfg.MaxRun) {
+				continue
+			}
+			rec, err := w.d.history.started(ctx, w.scope, f)
+			if err != nil {
+				return nil, err
+			}
+			span.hop = rec.Hop
+			break
+		}
+		out = append(out, span)
 	}
-	return out
+	return out, nil
 }
 
 func (w *rootWorker) refuse(ctx context.Context, firings runtimetypes.EventFiringStore, r refusal) error {
@@ -394,8 +432,22 @@ func (w *rootWorker) refuse(ctx context.Context, firings runtimetypes.EventFirin
 }
 
 func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiringStore, b *burst) (bool, error) {
+	if b.trigger.Target == "session" {
+		select {
+		case w.sessionSlots <- struct{}{}:
+		default:
+			return false, nil
+		}
+	}
 	requestID := RequestID(b.trigger.ID, b.lastNID)
-	claimed, err := firings.BeginEventFiring(ctx, b.trigger.ID, b.lastNID, requestID)
+	begin := firings.BeginEventFiring
+	if b.trigger.Target == "session" {
+		begin = firings.BeginEventFiringOnce
+	}
+	claimed, err := begin(ctx, b.trigger.ID, b.lastNID, requestID)
+	if b.trigger.Target == "session" && (err != nil || !claimed) {
+		<-w.sessionSlots
+	}
 	if err != nil {
 		return false, err
 	}
@@ -403,6 +455,27 @@ func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiri
 		return w.handled(ctx, firings, b.trigger.ID, b.lastNID)
 	}
 	runCtx := runtimetypes.WithEventHop(context.WithValue(ctx, libtracker.ContextKeyRequestID, requestID), b.hop+1)
+	if b.trigger.Target == "session" {
+		if err := w.record(runCtx, workspaceevents.TypeTriggerStarted, requestID, map[string]any{
+			"trigger": b.trigger.ID, "triggerName": b.trigger.Name, "nid": b.lastNID, "target": "session", "hop": b.hop + 1,
+		}); err != nil {
+			<-w.sessionSlots
+			return false, err
+		}
+		w.deliveries.Add(1)
+		go func() {
+			defer w.deliveries.Done()
+			defer func() { <-w.sessionSlots; w.nudge() }()
+			if err := w.deliverTarget(runCtx, firings, b, requestID); err != nil {
+				w.d.report(runCtx, "deliver_session", w.root, err)
+			}
+		}()
+		return true, nil
+	}
+	if b.trigger.Target == "notify" {
+		err := w.deliverTarget(runCtx, firings, b, requestID)
+		return err == nil, err
+	}
 	missionID, startErr := w.d.cfg.Starter.StartMission(runCtx, b.run(w.root))
 	if startErr != nil {
 		if err := firings.FinishEventFiring(context.WithoutCancel(ctx), b.trigger.ID, b.lastNID, runtimetypes.EventFiringStatusError, startErr.Error()); err != nil {
@@ -411,7 +484,7 @@ func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiri
 		return true, nil
 	}
 	if err := w.record(runCtx, workspaceevents.TypeTriggerStarted, requestID, map[string]any{
-		"trigger": b.trigger.ID, "triggerName": b.trigger.Name, "nid": b.lastNID, "missionId": missionID,
+		"trigger": b.trigger.ID, "triggerName": b.trigger.Name, "nid": b.lastNID, "missionId": missionID, "onDone": b.trigger.OnDone, "hop": b.hop + 1,
 	}); err != nil {
 		w.d.report(ctx, "record_start", w.root, fmt.Errorf("workspacetriggers: mission %s started for %s but its start was not recorded: %w", missionID, requestID, err))
 	}
@@ -427,7 +500,7 @@ func (w *rootWorker) handled(ctx context.Context, firings runtimetypes.EventFiri
 		return true, nil
 	}
 	rec, err := w.d.history.started(ctx, w.scope, f)
-	return rec.MissionID != "", err
+	return rec.MissionID != "" || rec.Target == "session", err
 }
 
 func findFiring(ctx context.Context, firings runtimetypes.EventFiringStore, triggerID string, nid int64) (runtimetypes.EventFiring, bool, error) {
@@ -444,9 +517,18 @@ func findFiring(ctx context.Context, firings runtimetypes.EventFiringStore, trig
 }
 
 func (w *rootWorker) settle(ctx context.Context, firings runtimetypes.EventFiringStore) error {
-	running, err := firings.ListEventFirings(ctx, runtimetypes.EventFiringFilter{Status: runtimetypes.EventFiringStatusRunning, Limit: runtimetypes.MaxEventFiringLimit})
+	const pageSize = 200
+	running, err := firings.ListEventFirings(ctx, runtimetypes.EventFiringFilter{Status: runtimetypes.EventFiringStatusRunning, Limit: pageSize, BeforeNID: w.settleNID, AfterTrigger: w.settleTrigger})
 	if err != nil {
 		return err
+	}
+	if len(running) == pageSize {
+		last := running[len(running)-1]
+		w.settleNID = last.NID
+		w.settleTrigger = last.TriggerName
+	} else {
+		w.settleNID = 0
+		w.settleTrigger = ""
 	}
 	var failures []error
 	for _, f := range running {
@@ -457,6 +539,14 @@ func (w *rootWorker) settle(ctx context.Context, firings runtimetypes.EventFirin
 		}
 		missionID := rec.MissionID
 		if missionID == "" {
+			if f.Stranded(w.d.cfg.Now()) {
+				rule, err := w.d.cfg.Store.Get(ctx, w.scope, f.TriggerName)
+				if err == nil && rule.Target == "session" {
+					if err := firings.FinishEventFiring(ctx, f.TriggerName, f.NID, "parked", "Session delivery was interrupted. Inspect the session before replaying."); err != nil {
+						failures = append(failures, err)
+					}
+				}
+			}
 			continue
 		}
 		outcome, err := w.d.cfg.Missions(ctx, missionID)
@@ -471,7 +561,15 @@ func (w *rootWorker) settle(ctx context.Context, firings runtimetypes.EventFirin
 		if !outcome.OK {
 			status, msg = runtimetypes.EventFiringStatusError, "mission "+outcome.Status
 		}
-		if err := firings.FinishEventFiring(context.WithoutCancel(ctx), f.TriggerName, f.NID, status, msg); err != nil {
+		if outcome.Status == "stuck" {
+			status = "parked"
+		}
+		if outcome.OK && rec.OnDone != "" {
+			if err := w.finishAndPublish(ctx, f, rec); err != nil {
+				failures = append(failures, err)
+				continue
+			}
+		} else if err := firings.FinishEventFiring(context.WithoutCancel(ctx), f.TriggerName, f.NID, status, msg); err != nil {
 			failures = append(failures, err)
 			continue
 		}
@@ -495,5 +593,58 @@ func (w *rootWorker) record(ctx context.Context, eventType, requestID string, da
 		Subject: requestID,
 		Data:    raw,
 	})
+	return err
+}
+
+func (w *rootWorker) finishAndPublish(ctx context.Context, f runtimetypes.EventFiring, rec startRecord) error {
+	now := w.d.cfg.Now().UTC()
+	payload, err := json.Marshal(map[string]any{"missionId": rec.MissionID, "trigger": f.TriggerName, "nid": f.NID, "status": "landed"})
+	if err != nil {
+		return err
+	}
+	event, err := workspaceevents.TopicRecord(w.scope, rec.OnDone, workspaceevents.SourceTrigger, payload, now)
+	if err != nil {
+		return err
+	}
+	event.Hop = rec.Hop
+	db := w.d.cfg.DB
+	if err = runtimetypes.NewEventStore(db).EnsureEventPartitionExists(ctx, now); err != nil {
+		return err
+	}
+	tx, commit, release, err := db.WithTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = release() }()
+	result, err := tx.ExecContext(ctx, "UPDATE event_firings SET status=$4,updated_at=$5 WHERE workspace_id=$1 AND trigger_name=$2 AND nid=$3 AND status=$6", w.scope, f.TriggerName, f.NID, runtimetypes.EventFiringStatusOK, now, runtimetypes.EventFiringStatusRunning)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil || changed == 0 {
+		return err
+	}
+	if err = runtimetypes.AppendEventInTransaction(ctx, tx, &event); err != nil {
+		return err
+	}
+	if err := commit(ctx); err != nil {
+		return err
+	}
+	w.d.cfg.Events.AnnounceCommitted(ctx, w.root, workspaceevents.Event{NID: event.NID, Type: event.Type, Source: event.Source, Subject: event.Subject, Time: now, Data: payload, Hop: event.Hop})
+	return nil
+}
+
+func (w *rootWorker) deliverTarget(runCtx context.Context, firings runtimetypes.EventFiringStore, b *burst, requestID string) error {
+	var outcome error
+	if w.d.cfg.Deliver == nil {
+		outcome = fmt.Errorf("target unavailable")
+	} else {
+		outcome = w.d.cfg.Deliver(runCtx, b.run(w.root), requestID)
+	}
+	status, message := runtimetypes.EventFiringStatusOK, ""
+	if outcome != nil {
+		status, message = runtimetypes.EventFiringStatusRefused, outcome.Error()
+	}
+	err := firings.FinishEventFiring(context.WithoutCancel(runCtx), b.trigger.ID, b.lastNID, status, message)
 	return err
 }

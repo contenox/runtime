@@ -96,6 +96,15 @@ func TestUnit_CancelLogin_DoesNotSignOutAnEstablishedSession(t *testing.T) {
 
 	// A re-login attempt is in flight on top of a still-valid session.
 	cancelled := pendingAttempt(t, conn.ID)
+	start, err := svc.StartConnectionLogin(ctx, conn.ID, true)
+	require.NoError(t, err)
+	require.Equal(t, "login_pending", start.State)
+	require.Equal(t, "ABCD-1234", start.Code)
+	require.Equal(t, conn.ID, start.ConnectionID)
+	pending, err := svc.ConnectionLoginStatus(ctx, conn.ID)
+	require.NoError(t, err)
+	require.Equal(t, "login_pending", pending.State)
+	require.Equal(t, start.Code, pending.Code)
 	status, err := svc.CancelConnectionLogin(ctx, conn.ID)
 	require.NoError(t, err)
 	require.Equal(t, "authenticated", status.State)

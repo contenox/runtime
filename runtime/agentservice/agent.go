@@ -296,9 +296,10 @@ func (a *agent) buildChatInput(ctx context.Context, req PromptRequest) (any, tas
 		msgs, err := a.chatMgr().ListMessages(ctx, a.deps.DB.WithoutTransaction(), req.SessionID)
 		if err != nil {
 			sessionReportErr(err)
-		} else {
-			history = msgs
+			sessionEnd()
+			return nil, taskengine.DataTypeAny, fmt.Errorf("load session history: %w", err)
 		}
+		history = msgs
 		sessionEnd()
 	}
 

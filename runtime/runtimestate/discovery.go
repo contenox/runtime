@@ -25,6 +25,19 @@ type backendRun struct {
 	job  backendJob
 }
 
+func (s *State) ForgetBackend(id string) {
+	before := s.signature()
+	defer s.notifyIfChanged(before)
+	s.backendMu.Lock()
+	running := s.backendRuns[id]
+	s.backendMu.Unlock()
+	if running != nil {
+		<-running.done
+	}
+	s.providerCache.Delete(id)
+	s.state.Delete(id)
+}
+
 // AnyProvider is the reserved provider selector meaning "every connection that
 // serves the model". It matches all connections and never raises an
 // ambiguous-route error.

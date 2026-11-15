@@ -173,7 +173,7 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 	}
 
 	store := runtimetypes.New(deps.DB.WithoutTransaction())
-	backendSvc := backendservice.New(deps.DB)
+	backendSvc := backendservice.NewWithRuntimeState(deps.DB, deps.State)
 	stateSvc := stateservice.New(deps.State, deps.DB, deps.WorkspaceID)
 
 	agentSvc := agentregistryservice.New(deps.DB)

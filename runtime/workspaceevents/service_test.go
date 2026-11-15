@@ -295,3 +295,38 @@ func TestUnit_TaskEventBridge_NeverStoresACommandLine(t *testing.T) {
 	}
 	require.Equal(t, []string{"curl", "env", "gh.exe"}, subjects)
 }
+func TestUnit_TopicPublisherAndPayload(t *testing.T) {
+	f := newFixture(t)
+	input := workspaceevents.Input{Type: workspaceevents.TypeEventFired, Source: workspaceevents.SourceAgent, Subject: "review.requested", Data: json.RawMessage(`{"doc":"review.md"}`)}
+	event, err := f.service.Append(f.ctx, f.rootA, input)
+	require.NoError(t, err)
+	require.Equal(t, input.Source, event.Source)
+	records, err := f.service.Since(f.ctx, f.rootA, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, records, 1)
+	require.Equal(t, event.NID, records[0].NID)
+	require.JSONEq(t, string(input.Data), string(records[0].Data))
+	input.Source = workspaceevents.SourceWatcher
+	_, err = f.service.Append(f.ctx, f.rootA, input)
+	require.ErrorIs(t, err, workspaceevents.ErrSourceMismatch)
+	input.Source = workspaceevents.SourceHuman
+	input.Subject = "review/../../outside"
+	_, err = f.service.Append(f.ctx, f.rootA, input)
+	require.ErrorIs(t, err, workspaceevents.ErrInvalidSubject)
+}
+
+func TestUnit_ParseScheduleInterval(t *testing.T) {
+	for input, want := range map[string]time.Duration{"1s": time.Second, "1000ms": time.Second, "1h30m": 90 * time.Minute, "24h": 24 * time.Hour} {
+		t.Run(input, func(t *testing.T) {
+			got, err := workspaceevents.ParseScheduleInterval(input)
+			require.NoError(t, err)
+			require.Equal(t, want, got)
+		})
+	}
+	for _, input := range []string{"", "0", "-2s", "999ms", "1d", "15"} {
+		t.Run("invalid_"+input, func(t *testing.T) {
+			_, err := workspaceevents.ParseScheduleInterval(input)
+			require.ErrorIs(t, err, workspaceevents.ErrSchedule)
+		})
+	}
+}

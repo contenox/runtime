@@ -5,11 +5,13 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/acpsvc"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/eventlog"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/internal/workspacetriggersapi"
 	"github.com/contenox/runtime/runtime/missionservice"
+	"github.com/contenox/runtime/runtime/operatorinbox"
 	"github.com/contenox/runtime/runtime/workspaceevents"
 	"github.com/contenox/runtime/runtime/workspacetriggers"
 )
@@ -51,8 +53,13 @@ type policyChecker interface {
 
 func triggerCheck(agents agentregistryservice.Service, policies policyChecker) workspacetriggersapi.CheckFunc {
 	return func(ctx context.Context, t workspacetriggers.Trigger) error {
-		if _, err := agentregistryservice.ResolveForSpawn(ctx, agents, t.AgentName); err != nil {
-			return err
+		if t.Target == "notify" {
+			return nil
+		}
+		if t.Target != "session" {
+			if _, err := agentregistryservice.ResolveForSpawn(ctx, agents, t.AgentName); err != nil {
+				return err
+			}
 		}
 		if policies != nil {
 			if err := policies.ValidatePolicy(ctx, t.HITLPolicyName); err != nil {
@@ -63,7 +70,7 @@ func triggerCheck(agents agentregistryservice.Service, policies policyChecker) w
 	}
 }
 
-func newTriggerDispatcher(events workspaceevents.Service, log eventlog.Service, roots workspaceevents.Roots, db libdb.DBManager, workspaceID string, fleet fleetservice.Service, missions missionservice.Service, tracker libtracker.ActivityTracker) *workspacetriggers.Dispatcher {
+func newTriggerDispatcher(events workspaceevents.Service, log eventlog.Service, roots workspaceevents.Roots, db libdb.DBManager, workspaceID string, fleet fleetservice.Service, missions missionservice.Service, tracker libtracker.ActivityTracker, deliver func(context.Context, workspacetriggers.Run, string) error) *workspacetriggers.Dispatcher {
 	return workspacetriggers.NewDispatcher(workspacetriggers.DispatcherConfig{
 		WorkspaceID: workspaceID,
 		DB:          db,
@@ -71,8 +78,17 @@ func newTriggerDispatcher(events workspaceevents.Service, log eventlog.Service, 
 		Events:      events,
 		Roots:       roots,
 		Store:       workspacetriggers.Store{DB: db},
-		Starter:     fleetStarter{fleet: fleet},
-		Missions:    missionState(missions),
-		Tracker:     tracker,
+		Deliver:     deliver, Starter: fleetStarter{fleet: fleet},
+		Missions: missionState(missions),
+		Tracker:  tracker,
 	})
+}
+
+func deliverWorkspaceEvent(operatorInbox operatorinbox.Service, sessionRouter *acpsvc.SessionRouter) func(context.Context, workspacetriggers.Run, string) error {
+	return func(ctx context.Context, run workspacetriggers.Run, id string) error {
+		if run.Trigger.Target == "notify" {
+			return operatorInbox.Add(ctx, &operatorinbox.Item{ID: id, Reason: operatorinbox.ReasonWorkspaceEvent, Intent: run.Intent(), Report: missionservice.Report{ID: id, Kind: missionservice.ReportKindFinding, Summary: run.Trigger.Name, Detail: run.Intent()}})
+		}
+		return sessionRouter.PromptWorkspaceEvent(ctx, run.Trigger.SessionID, run.Root, run.Trigger.SessionMode, run.Trigger.HITLPolicyName, run.Intent())
+	}
 }

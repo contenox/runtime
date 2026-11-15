@@ -312,7 +312,7 @@ func (p *providerManager) clearHiddenModels(w http.ResponseWriter, r *http.Reque
 
 func (p *providerManager) startConnectionLogin(w http.ResponseWriter, r *http.Request) {
 	id := apiframework.GetPathParam(r, "id", "Connection (backend) ID.")
-	start, err := p.providerService.StartConnectionLogin(r.Context(), id)
+	start, err := p.providerService.StartConnectionLogin(r.Context(), id, r.URL.Query().Get("renew") == "true")
 	if err != nil {
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return

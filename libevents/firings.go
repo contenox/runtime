@@ -36,7 +36,11 @@ func (f Firing) Stranded(now time.Time, staleClaim time.Duration) bool {
 }
 
 type FiringFilter struct {
-	SinceNID int64
+	BeforeNID    int64
+	AfterTrigger string
+	ExactNID     int64
+	Waiting      bool
+	SinceNID     int64
 
 	Status string
 
@@ -79,6 +83,14 @@ func NewFiringStore(cfg Config, scope string, staleClaim time.Duration, opts ...
 func (s *FiringStore) StaleClaim() time.Duration { return s.staleClaim }
 
 func (s *FiringStore) BeginFiring(ctx context.Context, exec libdb.Exec, triggerName string, nid int64, requestID string) (bool, error) {
+	claimed, err := s.BeginFiringOnce(ctx, exec, triggerName, nid, requestID)
+	if err != nil || claimed {
+		return claimed, err
+	}
+	return s.reclaimFiring(ctx, exec, triggerName, nid, requestID, s.now().UTC())
+}
+
+func (s *FiringStore) BeginFiringOnce(ctx context.Context, exec libdb.Exec, triggerName string, nid int64, requestID string) (bool, error) {
 	now := s.now().UTC()
 	res, err := exec.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO %s (%s, trigger_name, nid, status, error, request_id, created_at, updated_at)
@@ -93,10 +105,7 @@ func (s *FiringStore) BeginFiring(ctx context.Context, exec libdb.Exec, triggerN
 	if err != nil {
 		return false, err
 	}
-	if affected == 1 {
-		return true, nil
-	}
-	return s.reclaimFiring(ctx, exec, triggerName, nid, requestID, now)
+	return affected == 1, nil
 }
 
 func (s *FiringStore) reclaimFiring(ctx context.Context, exec libdb.Exec, triggerName string, nid int64, requestID string, now time.Time) (bool, error) {
@@ -157,6 +166,17 @@ func (s *FiringStore) ListFirings(ctx context.Context, exec libdb.Exec, f Firing
 	}
 	args := []any{s.scope}
 	where := s.cfg.ScopeColumn + " = $1"
+	if f.Waiting {
+		where += " AND status IN ('running','parked')"
+	}
+	if f.ExactNID > 0 {
+		args = append(args, f.ExactNID)
+		where += fmt.Sprintf(" AND nid=$%d", len(args))
+	}
+	if f.BeforeNID > 0 {
+		args = append(args, f.BeforeNID, f.AfterTrigger)
+		where += fmt.Sprintf(" AND nid <= $%[1]d AND (nid < $%[1]d OR trigger_name > $%[2]d)", len(args)-1, len(args))
+	}
 	if f.SinceNID > 0 {
 		args = append(args, f.SinceNID)
 		where += fmt.Sprintf(" AND nid > $%d", len(args))

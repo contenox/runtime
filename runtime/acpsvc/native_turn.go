@@ -42,6 +42,7 @@ func (v *nativeTurnViewer) Deliver(ctx context.Context, ev nativeturn.Event) err
 type nativeEventTranslator struct {
 	emit              func(ctx context.Context, n libacp.SessionNotification)
 	tokenSizeFallback func() int
+	recordContext     func(context.Context, taskengine.TaskEvent)
 	seq               map[string]int
 	open              map[string]int
 }
@@ -60,7 +61,14 @@ func (tr *nativeEventTranslator) publish(ctx context.Context, sid libacp.Session
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		return
 	}
+	if tr.recordContext != nil && (ev.Kind == taskengine.TaskEventContextShift || ev.Kind == taskengine.TaskEventTokenUsage) {
+		tr.recordContext(ctx, ev)
+	}
 	switch ev.Kind {
+	case taskengine.TaskEventContextShift:
+		if ev.ContextShift != nil {
+			tr.emit(ctx, contextShiftNotification(sid, ev))
+		}
 	case taskengine.TaskEventStepChunk:
 		if !taskengine.IsAssistantProseHandler(ev.TaskHandler) {
 			return
@@ -126,15 +134,26 @@ func (tr *nativeEventTranslator) publish(ctx context.Context, sid libacp.Session
 
 func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, images []taskengine.ImagePart, audio []taskengine.AudioPart, droppedWhy droppedReasons, droppedContentKinds []string) (libacp.PromptResponse, error) {
 	t := d.t
-	_ = ctx
+	policy, _ := ctx.Value(eventTurnPolicy{}).(string)
 
 	viewer := newNativeTurnViewer(t, req.SessionID)
 	turnFn := func(turnCtx context.Context, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
+		if policy != "" {
+			turnCtx = context.WithValue(turnCtx, eventTurnPolicy{}, policy)
+			turnCtx = runtimetypes.WithEventHop(turnCtx, runtimetypes.EventHopFromContext(ctx))
+		}
 		return d.runNativeTurn(turnCtx, req, sess, input, images, audio, droppedWhy, droppedContentKinds, emit)
 	}
 
-	turn, _, err := t.deps.NativeTurns.Start(req.SessionID, turnFn, viewer)
+	start := t.deps.NativeTurns.Start
+	if policy != "" {
+		start = t.deps.NativeTurns.StartIfIdle
+	}
+	turn, _, err := start(req.SessionID, turnFn, viewer)
 	if err != nil {
+		if policy != "" {
+			return libacp.PromptResponse{}, err
+		}
 		return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil
 	}
 
@@ -143,6 +162,12 @@ func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptR
 		turn.Detach(viewer.ID())
 		resp, err := nativeResultToResponse(turn.Result())
 		return withDroppedContentMeta(resp, droppedContentKinds, droppedWhy), err
+	case <-ctx.Done():
+		turn.Detach(viewer.ID())
+		if policy != "" {
+			turn.Cancel()
+		}
+		return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil
 	case <-t.connCtx.Done():
 		turn.Detach(viewer.ID())
 		return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil
@@ -169,7 +194,11 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	// Journaled ahead of anything the turn produces.
 	announceDroppedContent(turnCtx, req.SessionID, droppedContentKinds, droppedWhy, emit)
 
-	if policyName := t.resolveSessionHITLPolicy(sess); policyName != "" {
+	policyName := t.resolveSessionHITLPolicy(sess)
+	if eventPolicy, ok := turnCtx.Value(eventTurnPolicy{}).(string); ok {
+		policyName = eventPolicy
+	}
+	if policyName != "" {
 		turnCtx = hitlservice.WithPolicyName(turnCtx, policyName)
 	}
 	if sess.MissionID != "" {
@@ -180,6 +209,7 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	}
 
 	translator := newNativeEventTranslator(emit, sess.effectiveTokenLimit)
+	translator.recordContext = func(ctx context.Context, ev taskengine.TaskEvent) { t.recordContextEvent(ctx, sess, ev) }
 	rawCh := make(chan []byte, 64)
 	var drainEvents func()
 	if bus := t.deps.Engine.Bus; bus != nil && reqID != "" {
@@ -227,34 +257,7 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 		}
 	}
 
-	contextLen := sess.effectiveTokenLimit()
-	if contextLen == 0 {
-		currentModel := sess.modelOrDefault(t.model())
-		for _, state := range t.runtimeStates(turnCtx) {
-			for _, pulled := range state.PulledModels {
-				if pulled.Model == currentModel && pulled.ContextLength > 0 {
-					contextLen = pulled.ContextLength
-					break
-				}
-			}
-			if contextLen > 0 {
-				break
-			}
-		}
-		if contextLen == 0 {
-			for _, state := range t.runtimeStates(turnCtx) {
-				for _, pulled := range state.PulledModels {
-					if pulled.ContextLength > 0 && (pulled.CanChat || pulled.CanPrompt) {
-						contextLen = pulled.ContextLength
-						break
-					}
-				}
-				if contextLen > 0 {
-					break
-				}
-			}
-		}
-	}
+	contextLen := t.sessionContextLength(turnCtx, sess)
 
 	resp, err := d.agent.Prompt(turnCtx, agentservice.PromptRequest{
 		SessionID:      sess.InternalSessionID,

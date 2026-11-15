@@ -44,6 +44,10 @@ func (t *Transport) persistSessionModelFor(ctx context.Context, sess *sessionEnt
 }
 
 func (t *Transport) restoreSessionModel(ctx context.Context, store runtimetypes.Store, sid libacp.SessionID, entry *sessionEntry) {
+	var limit int
+	if err := store.GetKV(ctx, "acp:context_limit:"+entry.InternalSessionID, &limit); err == nil {
+		entry.setEffectiveTokenLimit(limit)
+	}
 	var rec sessionModelRecord
 	if err := store.GetKV(ctx, acpSessionModelKVPrefix+string(sid), &rec); err != nil {
 		return

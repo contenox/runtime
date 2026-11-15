@@ -3,6 +3,7 @@ package runtimetypes_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -145,6 +146,12 @@ func TestUnit_Events_ListEventsSinceSpansPartitionsInNIDOrder(t *testing.T) {
 	e3 := &runtimetypes.Event{WorkspaceID: testEventWS, Type: "test.events.span", Time: time.Date(2026, 8, 1, 23, 59, 0, 0, time.UTC)}
 	require.NoError(t, store.AppendEvent(ctx, e3))
 
+	newest, err := store.ListRecentEvents(ctx, testEventWS, 0, 1)
+	require.NoError(t, err)
+	require.Equal(t, e3.NID, newest[0].NID)
+	middle, err := store.ListRecentEvents(ctx, testEventWS, e3.NID, 1)
+	require.NoError(t, err)
+	require.Equal(t, e2.NID, middle[0].NID)
 	all, err := store.ListEventsSince(ctx, testEventWS, 0, 100)
 	require.NoError(t, err)
 	require.Len(t, all, 3)
@@ -425,4 +432,62 @@ func TestUnit_Events_WorkspaceIsolation(t *testing.T) {
 
 	noWS := &runtimetypes.Event{Type: "q.report"}
 	require.ErrorIs(t, store.AppendEvent(ctx, noWS), runtimetypes.ErrEventMissingRequiredField)
+}
+
+func TestIntegration_EventPagesAtOneMillionRows(t *testing.T) {
+	if testing.Short() {
+		t.Skip("million-event scale fixture")
+	}
+	ctx, db := eventDB(t)
+	store := runtimetypes.NewEventStore(db)
+	now := time.Now().UTC()
+	require.NoError(t, store.EnsureEventPartitionExists(ctx, now))
+	parts, err := store.ListEventPartitions(ctx)
+	require.NoError(t, err)
+	require.Len(t, parts, 1)
+	table := parts[0].TableName
+	exec := db.WithoutTransaction()
+	_, err = exec.ExecContext(ctx, "DELETE FROM event_topic_catalog_ready")
+	require.NoError(t, err)
+	_, err = exec.ExecContext(ctx, fmt.Sprintf(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<1000000) INSERT INTO %s(nid,workspace_id,type,source,subject,time) SELECT i,'scale','event.fired','agent',printf('topic.%%05d',i%%10000),$1 FROM n`, table), now)
+	require.NoError(t, err)
+	_, err = exec.ExecContext(ctx, "UPDATE event_nid_seq SET last_nid=1000000 WHERE id=1")
+	require.NoError(t, err)
+	start := time.Now()
+	topics, err := runtimetypes.EventSubjects(ctx, db, "scale", "", 100)
+	require.NoError(t, err)
+	require.Len(t, topics, 100)
+	require.Equal(t, 100, topics[0].Count)
+	t.Logf("existing data catalog migration plus first topic page %s", time.Since(start))
+	start = time.Now()
+	topics, err = runtimetypes.EventSubjects(ctx, db, "scale", "topic.09899", 100)
+	require.NoError(t, err)
+	require.Len(t, topics, 100)
+	require.Equal(t, "topic.09900", topics[0].Topic)
+	t.Logf("deep topic page %s", time.Since(start))
+	start = time.Now()
+	page, err := store.ListRecentEvents(ctx, "scale", 10001, 100)
+	require.NoError(t, err)
+	require.Len(t, page, 100)
+	require.Equal(t, int64(10000), page[0].NID)
+	require.Equal(t, int64(9901), page[99].NID)
+	t.Logf("deep event page %s", time.Since(start))
+	for _, query := range []string{fmt.Sprintf("SELECT nid FROM %s WHERE workspace_id='scale' AND nid<10001 ORDER BY nid DESC LIMIT 100", table), "SELECT subject,SUM(total),MAX(last_time) FROM event_topic_catalog WHERE workspace_id='scale' AND subject>'topic.09899' GROUP BY subject ORDER BY subject LIMIT 100"} {
+		rows, err := exec.QueryContext(ctx, "EXPLAIN QUERY PLAN "+query)
+		require.NoError(t, err)
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			require.NoError(t, rows.Scan(&id, &parent, &unused, &detail))
+			require.Contains(t, detail, "SEARCH")
+			t.Log(detail)
+		}
+		require.NoError(t, rows.Err())
+		rows.Close()
+	}
+	event := &runtimetypes.Event{WorkspaceID: "scale", Type: "event.fired", Subject: "topic.09900", Time: now}
+	require.NoError(t, store.AppendEvent(ctx, event))
+	topics, err = runtimetypes.EventSubjects(ctx, db, "scale", "topic.09899", 1)
+	require.NoError(t, err)
+	require.Equal(t, 101, topics[0].Count)
 }

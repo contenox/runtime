@@ -18,8 +18,9 @@ const inboxKVPrefix = "fleet:operator_inbox:"
 type Reason string
 
 const (
-	ReasonOperatorFired Reason = "operator_fired"
-	ReasonParentGone    Reason = "parent_gone"
+	ReasonOperatorFired  Reason = "operator_fired"
+	ReasonWorkspaceEvent Reason = "workspace_event"
+	ReasonParentGone     Reason = "parent_gone"
 )
 
 type Item struct {
@@ -64,7 +65,7 @@ func (s *service) Add(ctx context.Context, item *Item) error {
 	if item == nil {
 		return fmt.Errorf("item is required")
 	}
-	if item.MissionID == "" {
+	if item.MissionID == "" && item.Reason != ReasonWorkspaceEvent {
 		return fmt.Errorf("missionId is required")
 	}
 	if err := validateReason(item.Reason); err != nil {
@@ -115,7 +116,7 @@ func (s *service) List(ctx context.Context, limit int) ([]*Item, error) {
 
 func validateReason(r Reason) error {
 	switch r {
-	case ReasonOperatorFired, ReasonParentGone:
+	case ReasonWorkspaceEvent, ReasonOperatorFired, ReasonParentGone:
 		return nil
 	default:
 		return fmt.Errorf("invalid inbox reason %q: must be one of operator_fired|parent_gone", r)

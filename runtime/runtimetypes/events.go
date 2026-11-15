@@ -39,6 +39,10 @@ type Event struct {
 	Hop         int             `json:"hop"`
 }
 
+type EventQuery struct {
+	Text, Source, Type, Subject string
+	After                       time.Time
+}
 type EventPartition struct {
 	Period    string
 	TableName string
@@ -49,7 +53,7 @@ type EventStore interface {
 	AppendEvent(ctx context.Context, event *Event) error
 	AppendEvents(ctx context.Context, events []*Event) error
 	ListEventsSince(ctx context.Context, workspaceID string, afterNID int64, limit int) ([]Event, error)
-	ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int) ([]Event, error)
+	ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int, filter ...EventQuery) ([]Event, error)
 	GetEventsByType(ctx context.Context, workspaceID, eventType string, from, to time.Time, limit int) ([]Event, error)
 	GetEventsBySource(ctx context.Context, workspaceID, eventType string, from, to time.Time, eventSource string, limit int) ([]Event, error)
 	GetEventsBySubject(ctx context.Context, workspaceID, eventType string, from, to time.Time, subject string, limit int) ([]Event, error)
@@ -153,6 +157,8 @@ func (s *eventStore) EnsureEventPartitionExists(ctx context.Context, ts time.Tim
 	}
 	for _, stmt := range []string{
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_%s_ws_nid ON %s(workspace_id, nid)`, table, table),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_%s_ws_subject ON %s(workspace_id,type,subject,nid)`, table, table),
+		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_%s_ws_source ON %s(workspace_id,source,nid)`, table, table),
 		fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_%s_ws_type ON %s(workspace_id, type)`, table, table),
 	} {
 		if err := execCreateIfNotExists(ctx, exec, stmt); err != nil {
@@ -165,6 +171,9 @@ func (s *eventStore) EnsureEventPartitionExists(ctx context.Context, ts time.Tim
 		ON CONFLICT (period) DO NOTHING
 	`, period, table, s.now().UTC()); err != nil {
 		return fmt.Errorf("event_log: register partition %s: %w", table, err)
+	}
+	if err := buildTopicCatalog(ctx, s.db, EventPartition{Period: period, TableName: table}); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	s.ensured[period] = true
@@ -297,6 +306,12 @@ func appendPreparedEvent(ctx context.Context, exec libdb.Exec, event *Event) err
 	`, table), nid, event.WorkspaceID, event.Type, event.Source, event.Subject, event.Time, string(event.Data), event.Hop); err != nil {
 		return fmt.Errorf("event_log: append: %w", err)
 	}
+	if event.Type == "event.fired" {
+		_, err := exec.ExecContext(ctx, `INSERT INTO event_topic_catalog(workspace_id,subject,period,total,last_time) VALUES ($1,$2,$3,1,$4) ON CONFLICT(workspace_id,subject,period) DO UPDATE SET total=event_topic_catalog.total+1,last_time=CASE WHEN excluded.last_time>event_topic_catalog.last_time THEN excluded.last_time ELSE event_topic_catalog.last_time END`, event.WorkspaceID, event.Subject, EventPeriodKey(event.Time), event.Time)
+		if err != nil {
+			return err
+		}
+	}
 	event.NID = nid
 	return nil
 }
@@ -362,8 +377,17 @@ func (s *eventStore) ListEventsSince(ctx context.Context, workspaceID string, af
 		if maxNID == nil || *maxNID <= afterNID {
 			continue
 		}
+		if len(events) == limit {
+			var minNID *int64
+			if err := exec.QueryRowContext(ctx, fmt.Sprintf("SELECT MIN(nid) FROM %s WHERE workspace_id=$1 AND nid>$2", p.TableName), workspaceID, afterNID).Scan(&minNID); err != nil {
+				return nil, err
+			}
+			if minNID == nil || *minNID >= events[limit-1].NID {
+				continue
+			}
+		}
 		rows, err := exec.QueryContext(ctx, fmt.Sprintf(`
-			SELECT %s FROM %s
+   SELECT %s FROM %s
 			WHERE workspace_id = $1 AND nid > $2
 			ORDER BY nid ASC
 			LIMIT $3
@@ -376,15 +400,15 @@ func (s *eventStore) ListEventsSince(ctx context.Context, workspaceID string, af
 			return nil, err
 		}
 		events = append(events, batch...)
-	}
-	sort.Slice(events, func(i, j int) bool { return events[i].NID < events[j].NID })
-	if len(events) > limit {
-		events = events[:limit]
+		sort.Slice(events, func(i, j int) bool { return events[i].NID < events[j].NID })
+		if len(events) > limit {
+			events = events[:limit]
+		}
 	}
 	return events, nil
 }
 
-func (s *eventStore) ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int) ([]Event, error) {
+func (s *eventStore) ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int, filter ...EventQuery) ([]Event, error) {
 	if err := requireEventWorkspace(workspaceID); err != nil {
 		return nil, err
 	}
@@ -397,16 +421,59 @@ func (s *eventStore) ListRecentEvents(ctx context.Context, workspaceID string, b
 	}
 	exec := s.db.WithoutTransaction()
 	events := []Event{}
-	for _, p := range parts {
+	for i := len(parts) - 1; i >= 0; i-- {
+		p := parts[i]
 		if !validEventPartitionTableName(p.TableName) {
 			return nil, fmt.Errorf("%w: registry names invalid table %q", ErrInvalidEventParameter, p.TableName)
 		}
-		rows, err := exec.QueryContext(ctx, fmt.Sprintf(`
-			SELECT %s FROM %s
-			WHERE workspace_id = $1 AND ($2 = 0 OR nid < $2)
-			ORDER BY nid DESC
-			LIMIT $3
-		`, eventColumns, p.TableName), workspaceID, beforeNID, limit)
+		if len(events) == limit {
+			query := fmt.Sprintf("SELECT MAX(nid) FROM %s WHERE workspace_id=$1", p.TableName)
+			args := []any{workspaceID}
+			if beforeNID > 0 {
+				query += " AND nid<$2"
+				args = append(args, beforeNID)
+			}
+			var max *int64
+			if err := exec.QueryRowContext(ctx, query, args...).Scan(&max); err != nil {
+				return nil, err
+			}
+			if max == nil || *max <= events[limit-1].NID {
+				continue
+			}
+		}
+		conditions := "workspace_id = $1"
+		args := []any{workspaceID, limit}
+		if beforeNID > 0 {
+			conditions += " AND nid < $3"
+			args = append(args, beforeNID)
+		}
+		if len(filter) > 0 {
+			q := filter[0]
+			add := func(column string, value any, operator string) {
+				args = append(args, value)
+				conditions += fmt.Sprintf(" AND %s %s $%d", column, operator, len(args))
+			}
+			if q.Source != "" {
+				add("source", q.Source, "=")
+			}
+			if q.Subject != "" {
+				add("subject", q.Subject, "=")
+			}
+			if q.Type != "" {
+				add("type", q.Type, "=")
+			}
+			if !q.After.IsZero() {
+				if p.Period < EventPeriodKey(q.After) {
+					continue
+				}
+				add("time", q.After.UTC(), ">=")
+			}
+			if q.Text != "" {
+				args = append(args, "%"+strings.ToLower(q.Text)+"%")
+				conditions += fmt.Sprintf(" AND (LOWER(subject) LIKE $%[1]d OR LOWER(type) LIKE $%[1]d)", len(args))
+			}
+		}
+		rows, err := exec.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s ORDER BY nid DESC LIMIT $2", eventColumns, p.TableName, conditions), args...)
 		if err != nil {
 			return nil, fmt.Errorf("event_log: list recent in %s: %w", p.TableName, err)
 		}
@@ -415,10 +482,10 @@ func (s *eventStore) ListRecentEvents(ctx context.Context, workspaceID string, b
 			return nil, err
 		}
 		events = append(events, batch...)
-	}
-	sort.Slice(events, func(i, j int) bool { return events[i].NID > events[j].NID })
-	if len(events) > limit {
-		events = events[:limit]
+		sort.Slice(events, func(i, j int) bool { return events[i].NID > events[j].NID })
+		if len(events) > limit {
+			events = events[:limit]
+		}
 	}
 	return events, nil
 }
@@ -548,7 +615,11 @@ func (s *eventStore) DeleteEventsByTypeInRange(ctx context.Context, workspaceID,
 	if err != nil {
 		return err
 	}
-	exec := s.db.WithoutTransaction()
+	exec, commit, release, err := s.db.WithTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = release() }()
 	for _, p := range parts {
 		if !validEventPartitionTableName(p.TableName) {
 			return fmt.Errorf("%w: registry names invalid table %q", ErrInvalidEventParameter, p.TableName)
@@ -559,8 +630,17 @@ func (s *eventStore) DeleteEventsByTypeInRange(ctx context.Context, workspaceID,
 		`, p.TableName), workspaceID, eventType, from, to); err != nil {
 			return fmt.Errorf("event_log: delete %q in %s: %w", eventType, p.TableName, err)
 		}
+		if eventType == "event.fired" {
+			if _, err := exec.ExecContext(ctx, "DELETE FROM event_topic_catalog WHERE workspace_id=$1 AND period=$2", workspaceID, p.Period); err != nil {
+				return err
+			}
+			query := fmt.Sprintf("INSERT INTO event_topic_catalog(workspace_id,subject,period,total,last_time) SELECT workspace_id,subject,$2,COUNT(*),MAX(time) FROM %s WHERE workspace_id=$1 AND type='event.fired' AND EXISTS(SELECT 1 FROM event_topic_catalog_ready WHERE period=$2) GROUP BY workspace_id,subject", p.TableName)
+			if _, err := exec.ExecContext(ctx, query, workspaceID, p.Period); err != nil {
+				return err
+			}
+		}
 	}
-	return nil
+	return commit(ctx)
 }
 
 func (s *eventStore) PruneEventPartitionsBefore(ctx context.Context, t time.Time) ([]string, error) {
@@ -634,4 +714,95 @@ func scanEventRows(rows *sql.Rows) ([]Event, error) {
 		return nil, fmt.Errorf("event_log: rows error: %w", err)
 	}
 	return events, nil
+}
+
+type SubjectActivity struct {
+	Topic string
+	Count int
+	Last  time.Time
+}
+
+func buildTopicCatalog(ctx context.Context, db libdb.DBManager, p EventPartition) error {
+	if !validEventPartitionTableName(p.TableName) {
+		return fmt.Errorf("invalid partition %q", p.TableName)
+	}
+	tx, commit, release, err := db.WithTransaction(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = release() }()
+	result, err := tx.ExecContext(ctx, "INSERT INTO event_topic_catalog_ready(period) VALUES ($1) ON CONFLICT(period) DO NOTHING", p.Period)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		query := fmt.Sprintf("INSERT INTO event_topic_catalog(workspace_id,subject,period,total,last_time) SELECT workspace_id,subject,$1,COUNT(*),MAX(time) FROM %s WHERE type='event.fired' GROUP BY workspace_id,subject", p.TableName)
+		if _, err = tx.ExecContext(ctx, query, p.Period); err != nil {
+			return err
+		}
+	}
+	return commit(ctx)
+}
+
+func EventSubjects(ctx context.Context, db libdb.DBManager, scope, after string, limit int) ([]SubjectActivity, error) {
+	if err := requireEventWorkspace(scope); err != nil {
+		return nil, err
+	}
+	exec := db.WithoutTransaction()
+	rows, err := exec.QueryContext(ctx, "SELECT period,table_name FROM event_partitions WHERE period NOT IN (SELECT period FROM event_topic_catalog_ready)")
+	if err != nil {
+		return nil, err
+	}
+	var missing []EventPartition
+	for rows.Next() {
+		var p EventPartition
+		if err := rows.Scan(&p.Period, &p.TableName); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		missing = append(missing, p)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range missing {
+		if err := buildTopicCatalog(ctx, db, p); err != nil {
+			return nil, err
+		}
+	}
+	rows, err = exec.QueryContext(ctx, "SELECT subject,SUM(total),MAX(last_time) FROM event_topic_catalog WHERE workspace_id=$1 AND subject>$2 GROUP BY subject ORDER BY subject LIMIT $3", scope, after, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SubjectActivity{}
+	for rows.Next() {
+		var item SubjectActivity
+		var last any
+		if err := rows.Scan(&item.Topic, &item.Count, &last); err != nil {
+			return nil, err
+		}
+		switch v := last.(type) {
+		case time.Time:
+			item.Last = v
+		case string:
+			for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999 -0700 MST", "2006-01-02 15:04:05.999999999+00:00", "2006-01-02 15:04:05.999999999"} {
+				item.Last, err = time.Parse(layout, v)
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }

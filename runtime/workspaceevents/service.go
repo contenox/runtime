@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -22,6 +23,9 @@ import (
 )
 
 const (
+	SourceHuman    = "human"
+	SourceAgent    = "agent"
+	SourceSchedule = "schedule"
 	SourceEditor   = "editor"
 	SourceWatcher  = "watcher"
 	SourceTool     = "tool"
@@ -31,6 +35,7 @@ const (
 )
 
 const (
+	TypeEventFired = "event.fired"
 	TypeFSCreated  = "fs.created"
 	TypeFSModified = "fs.modified"
 	TypeFSDeleted  = "fs.deleted"
@@ -78,7 +83,23 @@ type typeSpec struct {
 	coalesce    bool
 }
 
+var topicName = regexp.MustCompile(`^[A-Za-z0-9_-]+([.][A-Za-z0-9_-]+)*$`)
+
+func ValidTopic(name string) bool { return len(name) <= MaxSubjectBytes && topicName.MatchString(name) }
+func TopicRecord(scope, topic, source string, payload json.RawMessage, at time.Time) (runtimetypes.Event, error) {
+	if !ValidTopic(topic) {
+		return runtimetypes.Event{}, ErrInvalidSubject
+	}
+	data, err := normalizeData(payload)
+	if err != nil {
+		return runtimetypes.Event{}, err
+	}
+	raw, err := json.Marshal(topicRecord{Payload: data})
+	return runtimetypes.Event{WorkspaceID: scope, Type: TypeEventFired, Source: source, Subject: topic, Time: at, Data: raw}, err
+}
+
 var eventTypes = map[string]typeSpec{
+	TypeEventFired: {},
 	TypeFSCreated:  {source: SourceWatcher, pathSubject: true},
 	TypeFSModified: {source: SourceWatcher, pathSubject: true},
 	TypeFSDeleted:  {source: SourceWatcher, pathSubject: true},
@@ -105,20 +126,22 @@ var eventTypes = map[string]typeSpec{
 }
 
 type Event struct {
-	NID     int64           `json:"nid"`
-	Type    string          `json:"type"`
-	Source  string          `json:"source"`
-	Subject string          `json:"subject,omitempty"`
-	Time    time.Time       `json:"time"`
-	Data    json.RawMessage `json:"data"`
-	Hop     int             `json:"hop,omitempty"`
+	ReplayedFrom int64           `json:"replayedFrom,omitempty"`
+	NID          int64           `json:"nid"`
+	Type         string          `json:"type"`
+	Source       string          `json:"source"`
+	Subject      string          `json:"subject,omitempty"`
+	Time         time.Time       `json:"time"`
+	Data         json.RawMessage `json:"data"`
+	Hop          int             `json:"hop,omitempty"`
 }
 
 type Input struct {
-	Type    string
-	Source  string
-	Subject string
-	Data    json.RawMessage
+	ReplayedFrom int64
+	Type         string
+	Source       string
+	Subject      string
+	Data         json.RawMessage
 }
 
 type Roots interface {
@@ -127,10 +150,12 @@ type Roots interface {
 }
 
 type Service interface {
+	AnnounceCommitted(context.Context, string, Event)
 	GrantedRoot(candidate string) (string, error)
 	Append(ctx context.Context, root string, in Input) (Event, error)
 	AppendBatch(ctx context.Context, root string, ins []Input) ([]Event, error)
 	Since(ctx context.Context, root string, afterNID int64, limit int) ([]Event, error)
+	Recent(ctx context.Context, root string, beforeNID int64, limit int, filter ...runtimetypes.EventQuery) ([]Event, error)
 	Latest(ctx context.Context, root string) (int64, error)
 	Subscribe(ctx context.Context, root string, ch chan<- []byte) (libbus.Subscription, error)
 }
@@ -255,7 +280,17 @@ func (s *service) prepare(granted string, in Input) (pendingEvent, *Event, error
 	if !ok {
 		return pendingEvent{}, nil, fmt.Errorf("%w: %q", ErrUnknownType, in.Type)
 	}
-	if strings.TrimSpace(in.Source) != spec.source {
+	source := strings.TrimSpace(in.Source)
+	if eventType == TypeEventFired {
+		switch source {
+		case SourceHuman, SourceAgent, SourceSchedule, SourceTrigger:
+		default:
+			return pendingEvent{}, nil, fmt.Errorf("%w: invalid topic publisher %q", ErrSourceMismatch, source)
+		}
+		if !topicName.MatchString(strings.TrimSpace(in.Subject)) {
+			return pendingEvent{}, nil, fmt.Errorf("%w: use a topic such as build.finished", ErrInvalidSubject)
+		}
+	} else if source != spec.source {
 		return pendingEvent{}, nil, fmt.Errorf("%w: %s is a %s event", ErrSourceMismatch, eventType, spec.source)
 	}
 	subject := strings.TrimSpace(in.Subject)
@@ -274,6 +309,12 @@ func (s *service) prepare(granted string, in Input) (pendingEvent, *Event, error
 		return pendingEvent{}, nil, err
 	}
 
+	if eventType == TypeEventFired {
+		data, err = json.Marshal(topicRecord{Payload: data, ReplayedFrom: in.ReplayedFrom})
+		if err != nil {
+			return pendingEvent{}, nil, err
+		}
+	}
 	scope := s.scope(granted)
 	coalesceKey := scope + "\x00" + eventType + "\x00" + subject
 	if spec.coalesce {
@@ -288,7 +329,7 @@ func (s *service) prepare(granted string, in Input) (pendingEvent, *Event, error
 		stored: &runtimetypes.Event{
 			WorkspaceID: scope,
 			Type:        eventType,
-			Source:      spec.source,
+			Source:      source,
 			Subject:     subject,
 			Data:        data,
 		},
@@ -328,7 +369,7 @@ func (s *service) Append(ctx context.Context, root string, in Input) (Event, err
 		return Event{}, err
 	}
 	event := s.recorded(p)
-	s.announce(ctx, granted, event)
+	s.AnnounceCommitted(ctx, granted, event)
 	return event, nil
 }
 
@@ -372,11 +413,11 @@ func (s *service) appendBatch(ctx context.Context, root string, ins []Input) ([]
 	for _, p := range pending {
 		out = append(out, s.recorded(p))
 	}
-	s.announce(ctx, granted, out[len(out)-1])
+	s.AnnounceCommitted(ctx, granted, out[len(out)-1])
 	return out, errors.Join(rejected...)
 }
 
-func (s *service) announce(ctx context.Context, root string, event Event) {
+func (s *service) AnnounceCommitted(ctx context.Context, root string, event Event) {
 	if s.bus == nil {
 		return
 	}
@@ -402,6 +443,22 @@ func (s *service) Since(ctx context.Context, root string, afterNID int64, limit 
 		afterNID = 0
 	}
 	rows, err := s.log.ListEventsSince(ctx, s.scope(granted), afterNID, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Event, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, fromStored(row))
+	}
+	return out, nil
+}
+
+func (s *service) Recent(ctx context.Context, root string, beforeNID int64, limit int, filter ...runtimetypes.EventQuery) ([]Event, error) {
+	granted, err := s.GrantedRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.log.ListRecentEvents(ctx, s.scope(granted), beforeNID, limit, filter...)
 	if err != nil {
 		return nil, err
 	}
@@ -438,9 +495,23 @@ func (s *service) Subscribe(ctx context.Context, root string, ch chan<- []byte) 
 	return s.bus.Stream(ctx, Subject(s.workspaceID, granted), ch)
 }
 
+type topicRecord struct {
+	Payload      json.RawMessage `json:"payload"`
+	ReplayedFrom int64           `json:"replayedFrom,omitempty"`
+}
+
 func fromStored(row runtimetypes.Event) Event {
+	var replayedFrom int64
+	if row.Type == TypeEventFired {
+		var record topicRecord
+		if err := json.Unmarshal(row.Data, &record); err == nil && record.Payload != nil {
+			row.Data = record.Payload
+			replayedFrom = record.ReplayedFrom
+		}
+	}
+
 	return Event{
-		NID:     row.NID,
+		ReplayedFrom: replayedFrom, NID: row.NID,
 		Type:    row.Type,
 		Source:  row.Source,
 		Subject: row.Subject,

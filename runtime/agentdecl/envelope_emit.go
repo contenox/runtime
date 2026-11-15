@@ -28,8 +28,10 @@ var axisTools = map[string][]toolRef{
 		{localtools.LocalFSToolsName, "edit_file"},
 		{localtools.LocalFSToolsName, "sed"},
 	},
-	AxisShell:        {{localtools.LocalExecToolsName, localtools.LocalExecToolsName}},
-	AxisMissionsFire: {{missiontools.ToolsProviderName, missiontools.ToolNameStartMission}},
+	AxisShell:           {{localtools.LocalExecToolsName, localtools.LocalExecToolsName}},
+	AxisEventsFire:      {{"events", "event_fire"}},
+	AxisEventsSubscribe: {{"events", "subscription_create"}, {"events", "watch_create"}, {"events", "subscription_delete"}, {"events", "schedule_create"}, {"events", "schedule_update"}, {"events", "schedule_delete"}},
+	AxisMissionsFire:    {{missiontools.ToolsProviderName, missiontools.ToolNameStartMission}},
 }
 
 var reservedAxisTools = map[string][]toolRef{
@@ -82,7 +84,7 @@ func (env Envelope) transpile(opts transpileOptions) (TranspiledEnvelope, error)
 		return fail(err)
 	}
 	rules = append(rules, grantRules...)
-	for _, axis := range []string{AxisFilesRead, AxisFilesWrite} {
+	for _, axis := range []string{AxisEventsFire, AxisEventsSubscribe, AxisFilesRead, AxisFilesWrite} {
 		grantRules, err := env.grantRules(axis)
 		if err != nil {
 			return fail(err)

@@ -3,6 +3,7 @@ package workspacetriggers
 import (
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ const (
 )
 
 var allowedEvents = map[string]bool{
+	"event.fired":  true,
 	"fs.created":   true,
 	"fs.modified":  true,
 	"fs.deleted":   true,
@@ -31,14 +33,20 @@ var allowedEvents = map[string]bool{
 }
 
 func AllowedEvents() []string {
-	return []string{"fs.created", "fs.modified", "fs.deleted", "fs.moved", "editor.saved"}
+	return []string{"fs.created", "fs.modified", "fs.deleted", "fs.moved", "editor.saved", "event.fired"}
 }
 
 type Trigger struct {
+	CreatedBy      string    `json:"createdBy,omitempty"`
+	OnDone         string    `json:"onDone,omitempty"`
+	Target         string    `json:"target,omitempty"`
+	SessionID      string    `json:"sessionId,omitempty"`
+	SessionMode    string    `json:"sessionMode,omitempty"`
 	ID             string    `json:"id"`
 	Root           string    `json:"root"`
 	Name           string    `json:"name"`
 	Events         []string  `json:"events"`
+	TopicGlob      string    `json:"topicGlob,omitempty"`
 	PathGlob       string    `json:"pathGlob"`
 	DebounceMs     int       `json:"debounceMs"`
 	AgentName      string    `json:"agentName"`
@@ -66,14 +74,21 @@ func (t *Trigger) Normalize() error {
 	t.HITLPolicyName = strings.TrimSpace(t.HITLPolicyName)
 	t.Prompt = strings.TrimSpace(t.Prompt)
 	t.PathGlob = strings.TrimSpace(t.PathGlob)
+	t.TopicGlob = strings.TrimSpace(t.TopicGlob)
 	switch {
+	case t.OnDone != "" && (!workspaceevents.ValidTopic(t.OnDone) || (t.Target != "" && t.Target != "mission")):
+		return fmt.Errorf("%w: onDone requires a mission and a valid completion topic", ErrInvalidTrigger)
 	case t.Name == "":
 		return fmt.Errorf("%w: name is required", ErrInvalidTrigger)
 	case len(t.Name) > MaxNameLength:
 		return fmt.Errorf("%w: name exceeds %d characters", ErrInvalidTrigger, MaxNameLength)
-	case t.AgentName == "":
+	case t.Target != "" && t.Target != "mission" && t.Target != "session" && t.Target != "notify":
+		return fmt.Errorf("%w: choose mission, session or notify", ErrInvalidTrigger)
+	case t.Target == "session" && (t.SessionID == "" || (t.SessionMode != "continue" && t.SessionMode != "new")):
+		return fmt.Errorf("%w: choose a live session and its new or continue mode", ErrInvalidTrigger)
+	case (t.Target == "" || t.Target == "mission") && t.AgentName == "":
 		return fmt.Errorf("%w: agentName is required: a trigger starts a mission with a named agent", ErrInvalidTrigger)
-	case t.HITLPolicyName == "":
+	case t.Target != "notify" && t.HITLPolicyName == "":
 		return fmt.Errorf("%w: hitlPolicyName is required: a triggered mission must name its envelope", ErrInvalidTrigger)
 	case t.Prompt == "":
 		return fmt.Errorf("%w: prompt is required: it is what the mission is asked to do", ErrInvalidTrigger)
@@ -99,6 +114,16 @@ func (t *Trigger) Normalize() error {
 		}
 	}
 	t.Events = events
+	if seen["event.fired"] {
+		if len(events) != 1 || t.PathGlob != "" || t.TopicGlob == "" {
+			return fmt.Errorf("%w: a topic subscription requires topicGlob and only event.fired", ErrInvalidTrigger)
+		}
+		if _, err := compileGlob(t.TopicGlob); err != nil {
+			return err
+		}
+	} else if t.TopicGlob != "" {
+		return fmt.Errorf("%w: topicGlob requires event.fired", ErrInvalidTrigger)
+	}
 	if t.DebounceMs == 0 {
 		t.DebounceMs = int(DefaultDebounce / time.Millisecond)
 	}
@@ -112,16 +137,24 @@ func (t *Trigger) Normalize() error {
 }
 
 type Run struct {
-	Trigger Trigger
-	Root    string
-	Event   string
-	Paths   []string
-	More    int
+	TopicEvent *workspaceevents.Event
+	Trigger    Trigger
+	Root       string
+	Event      string
+	Paths      []string
+	More       int
 }
 
 const maxIntentPathBytes = 2000
 
 func (r Run) Intent() string {
+	if e := r.TopicEvent; e != nil {
+		payload := strconv.Quote(string(e.Data))
+		if len(payload) > maxIntentPathBytes {
+			payload = fmt.Sprintf("see event %d in the workspace log", e.NID)
+		}
+		return fmt.Sprintf("%s Trigger %q received topic %q (event %d). Event data: %s", r.Trigger.Prompt, r.Trigger.Name, e.Subject, e.NID, payload)
+	}
 	quoted := make([]string, 0, len(r.Paths))
 	more, used := r.More, 0
 	for _, p := range r.Paths {

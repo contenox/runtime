@@ -126,3 +126,54 @@ fn a_burst_of_test_edits_starts_one_mission_under_the_named_envelope() {
         "a change while the triggered mission runs does not fire again"
     );
 }
+
+#[test]
+fn a_scheduled_topic_wakes_its_mission_once_and_replay_is_a_new_event() {
+    let served = with_noop_agent();
+    let rule = served.json("POST", "/api/workspace/triggers", Some(&json!({
+        "name":"nightly reviewer","events":["event.fired"],"topicGlob":"review.due",
+        "agentName":NOOP_AGENT,"hitlPolicyName":ENVELOPE,"prompt":"Review the requested document."
+    })),201);
+    let preview = served.json(
+        "GET",
+        "/api/workspace/triggers/preview?type=event.fired&subject=review.due",
+        None,
+        200,
+    );
+    assert_eq!(preview["triggers"][0]["id"], rule["id"]);
+    let timer = served.json(
+        "POST",
+        "/api/workspace/schedules",
+        Some(&json!({"topic":"review.due","every":"2s","payload":{"file":"REVIEW.md"}})),
+        201,
+    );
+    let id = rule["id"].as_str().unwrap();
+    let firing = wait_until("scheduled mission", || {
+        firings(&served, id)
+            .into_iter()
+            .find(|f| f["missionId"].is_string())
+    });
+    served.json(
+        "PUT",
+        &format!("/api/workspace/schedules/{}", timer["id"].as_str().unwrap()),
+        Some(&json!({"enabled":false})),
+        200,
+    );
+    let mission = served.json(
+        "GET",
+        &format!("/api/missions/{}", firing["missionId"].as_str().unwrap()),
+        None,
+        200,
+    );
+    assert!(mission["intent"].as_str().unwrap().contains("REVIEW.md"));
+    assert_eq!(mission["hitlPolicyName"], ENVELOPE);
+    let replay = served.json(
+        "POST",
+        &format!("/api/workspace/events/{}/replay", firing["nid"]),
+        None,
+        201,
+    );
+    assert_eq!(replay["replayedFrom"], firing["nid"]);
+    assert_eq!(replay["data"]["file"], "REVIEW.md");
+    assert!(replay["nid"].as_i64() > firing["nid"].as_i64());
+}

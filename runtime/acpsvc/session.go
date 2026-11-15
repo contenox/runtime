@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -174,8 +175,15 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 	_, reportChange, end := t.tracker().Start(ctx, "replay", "acp_session", "session_id", string(sessionID), "message_count", len(messages))
 	defer end()
 
+	nextShift, stop := iter.Pull(t.contextShiftHistory(ctx, sessionID))
+	defer stop()
+	shift, hasShift := nextShift()
 	var users, assistantText, toolCalls, toolResults int
 	for i, m := range messages {
+		for hasShift && !shift.Timestamp.After(m.Timestamp) {
+			t.sendUpdate(ctx, contextShiftNotification(sessionID, shift))
+			shift, hasShift = nextShift()
+		}
 		messageID := fmt.Sprintf("replay-%d", i)
 		switch m.Role {
 		case "user":
@@ -244,6 +252,9 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 			})
 			toolResults++
 		}
+	}
+	for ; hasShift; shift, hasShift = nextShift() {
+		t.sendUpdate(ctx, contextShiftNotification(sessionID, shift))
 	}
 	reportChange(string(sessionID), map[string]any{
 		"user":         users,

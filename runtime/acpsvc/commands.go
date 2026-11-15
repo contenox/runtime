@@ -2,7 +2,9 @@ package acpsvc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/contenox/runtime/runtime/workspaceevents"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +26,12 @@ import (
 
 func allACPCommands() []libacp.AvailableCommand {
 	return []libacp.AvailableCommand{
+		{Name: "events", Description: "List topics, describe a topic, or show recent events.", Input: &libacp.AvailableCommandInput{Hint: "[topic | recent 3m]"}},
+		{Name: "subscribe", Description: "Subscribe a mission, session or inbox to a topic or file change.", Input: &libacp.AvailableCommandInput{Hint: "topic|watch pattern target policy prompt"}},
+		{Name: "subscriptions", Description: "List workspace subscriptions."},
+		{Name: "schedules", Description: "List, create, pause or delete project schedules.", Input: &libacp.AvailableCommandInput{Hint: "[new topic every 1h | pause id | resume id | delete id]"}},
+		{Name: "waiting", Description: "Show unsettled workspace firings."},
+		{Name: "event", Description: "Publish a project event.", Input: &libacp.AvailableCommandInput{Hint: "<topic> [JSON object]"}},
 		{Name: "help", Description: "List the available commands."},
 		{Name: "doctor", Description: "Check provider/model/backend readiness (read-only — no test prompt is sent)."},
 		{Name: "clear", Description: "Clear this session's conversation history."},
@@ -50,6 +58,9 @@ func (t *Transport) acpCommandsFor(workspaceID string) []libacp.AvailableCommand
 	capable := t.hasMissionCapability()
 	out := make([]libacp.AvailableCommand, 0, len(all))
 	for _, c := range all {
+		if eventCommands[c.Name] && t.deps.Events == nil {
+			continue
+		}
 		if missionCommandNames[c.Name] || c.Name == planCommandName {
 			if !capable {
 				continue
@@ -97,6 +108,22 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 		err error
 	)
 	switch name {
+	case "events", "subscribe", "subscriptions", "schedules", "waiting":
+		out, err = t.handleEventOperation(ctx, sess, name, args)
+	case "event":
+		if t.deps.Events == nil {
+			err = fmt.Errorf("workspace events are unavailable")
+			break
+		}
+		topic, payload, _ := strings.Cut(strings.TrimSpace(args), " ")
+		sess.mu.Lock()
+		root := sess.Cwd
+		sess.mu.Unlock()
+		var event workspaceevents.Event
+		event, err = t.deps.Events.Append(ctx, root, workspaceevents.Input{Type: workspaceevents.TypeEventFired, Source: workspaceevents.SourceHuman, Subject: topic, Data: json.RawMessage(payload)})
+		if err == nil {
+			out = fmt.Sprintf("Published %s (event %d).", event.Subject, event.NID)
+		}
 	case "help":
 		out = t.handleHelp()
 	case "doctor":
@@ -143,6 +170,9 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 		})
 	}
 	t.persistCommandTurn(ctx, sess, name, args, out)
+	if eventCommands[name] {
+		t.sendAvailableCommands(ctx, sid)
+	}
 	if commandUpdatesSessionModel(name) {
 		sess.setModelSelection(t.provider(), t.model())
 		t.persistSessionModelFor(ctx, sess)
@@ -208,14 +238,37 @@ func commandUpdatesConfigOptions(name string) bool {
 
 func (t *Transport) sendAvailableCommands(ctx context.Context, sid libacp.SessionID) {
 	workspaceID := ""
+	var topics []string
 	if sess, ok := t.sessionFor(sid); ok {
 		workspaceID = t.sessionWorkspaceID(sess)
+		if t.deps.Events != nil {
+			rows, _ := t.deps.Events.Recent(ctx, sess.Cwd, 0, 100, runtimetypes.EventQuery{Type: workspaceevents.TypeEventFired})
+			seen := map[string]bool{}
+			for _, e := range rows {
+				if e.Type == workspaceevents.TypeEventFired && !seen[e.Subject] {
+					topics = append(topics, e.Subject)
+					seen[e.Subject] = true
+				}
+			}
+		}
 	}
+	commands := t.acpCommandsFor(workspaceID)
+	var agents, policies []string
+	if t.deps.Events != nil {
+		agents = t.missionAgentNames(ctx)
+		policies = t.missionEnvelopeNames(workspaceID)
+	}
+	for i, c := range commands {
+		if c.Name == "event" || c.Name == "subscribe" || c.Name == "events" || c.Name == "schedules" {
+			commands[i].Meta = eventCompletionMeta(c.Name, topics, agents, policies)
+		}
+	}
+
 	t.sendUpdate(ctx, libacp.SessionNotification{
 		SessionID: sid,
 		Update: libacp.SessionUpdate{
 			SessionUpdate:     libacp.SessionUpdateAvailableCommands,
-			AvailableCommands: t.acpCommandsFor(workspaceID),
+			AvailableCommands: commands,
 		},
 	})
 }
@@ -526,4 +579,36 @@ func (t *Transport) persistConfig(ctx context.Context, key, value string) error 
 		return fmt.Errorf("persist %s: %w", key, err)
 	}
 	return nil
+}
+
+func eventCompletionMeta(name string, topics, agents, policies []string) json.RawMessage {
+	fields := map[string]libacp.CommandCompletion{}
+	set := func(key, hint string, values ...string) {
+		fields[key] = libacp.CommandCompletion{Values: values, Hint: hint}
+	}
+	switch name {
+	case "event":
+		set("arg:0", "Choose or type a topic.", topics...)
+		set("arg:1", "Optional JSON payload, for example {}.")
+	case "events":
+		set("arg:0", "Inspect a topic or recent activity.", append([]string{"recent"}, topics...)...)
+		set("arg:0=recent", "Time window in minutes.", "3m", "15m", "60m")
+	case "subscribe":
+		set("arg:0", "What should wake the target?", "topic", "watch")
+		set("arg:0=topic", "Choose or type a topic pattern.", topics...)
+		set("arg:0=watch", "Project-relative file pattern.", "**/*_test.go", "**/*.md")
+		set("arg:2", "Choose the target.", append([]string{"this-session", "new-session", "inbox"}, agents...)...)
+		set("arg:2=inbox", "Message to put in the inbox.")
+		set("arg:3", "Choose a permission set.", policies...)
+		set("arg:4", "Describe what should happen.")
+	case "schedules":
+		set("arg:0", "Manage scheduled events.", "new", "pause", "resume", "delete")
+		set("arg:0=new", "Topic to publish.", topics...)
+		set("arg:2", "Choose the timing.", "at", "every", "cron")
+		set("arg:2=every", "Interval.", "1h", "24h")
+		set("arg:2=at", "Enter an RFC3339 time.")
+		set("arg:2=cron", "Enter a five-field cron expression.")
+	}
+	raw, _ := json.Marshal(libacp.CommandCompletionMeta{Completions: fields})
+	return raw
 }

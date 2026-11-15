@@ -18,7 +18,7 @@ type Service interface {
 	Append(ctx context.Context, event *runtimetypes.Event) error
 	AppendBatch(ctx context.Context, events []*runtimetypes.Event) error
 	ListEventsSince(ctx context.Context, workspaceID string, afterNID int64, limit int) ([]runtimetypes.Event, error)
-	ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int) ([]runtimetypes.Event, error)
+	ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int, filter ...runtimetypes.EventQuery) ([]runtimetypes.Event, error)
 	GetEventsByType(ctx context.Context, workspaceID, eventType string, from, to time.Time, limit int) ([]runtimetypes.Event, error)
 	GetEventsBySource(ctx context.Context, workspaceID, eventType string, from, to time.Time, eventSource string, limit int) ([]runtimetypes.Event, error)
 	GetEventsBySubject(ctx context.Context, workspaceID, eventType string, from, to time.Time, subject string, limit int) ([]runtimetypes.Event, error)
@@ -180,8 +180,8 @@ func (s *service) ListEventsSince(ctx context.Context, workspaceID string, after
 	return s.store.ListEventsSince(ctx, workspaceID, afterNID, limit)
 }
 
-func (s *service) ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int) ([]runtimetypes.Event, error) {
-	return s.store.ListRecentEvents(ctx, workspaceID, beforeNID, limit)
+func (s *service) ListRecentEvents(ctx context.Context, workspaceID string, beforeNID int64, limit int, filter ...runtimetypes.EventQuery) ([]runtimetypes.Event, error) {
+	return s.store.ListRecentEvents(ctx, workspaceID, beforeNID, limit, filter...)
 }
 
 func (s *service) GetEventsByType(ctx context.Context, workspaceID, eventType string, from, to time.Time, limit int) ([]runtimetypes.Event, error) {

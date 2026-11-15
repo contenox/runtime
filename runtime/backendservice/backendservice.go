@@ -26,6 +26,7 @@ type Service interface {
 
 type service struct {
 	dbInstance libdb.DBManager
+	state      *runtimestate.State
 }
 
 type duplicateBackendError struct {
@@ -44,6 +45,10 @@ func (e duplicateBackendError) Unwrap() error {
 
 func New(db libdb.DBManager) Service {
 	return &service{dbInstance: db}
+}
+
+func NewWithRuntimeState(db libdb.DBManager, state *runtimestate.State) Service {
+	return &service{dbInstance: db, state: state}
 }
 
 func (s *service) Create(ctx context.Context, backend *runtimetypes.Backend) error {
@@ -117,7 +122,13 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if err := store.DeleteBackend(ctx, id); err != nil {
 		return err
 	}
-	return commit(ctx)
+	if err := commit(ctx); err != nil {
+		return err
+	}
+	if s.state != nil {
+		s.state.ForgetBackend(id)
+	}
+	return nil
 }
 
 func (s *service) List(ctx context.Context, createdAtCursor *time.Time, limit int) ([]*runtimetypes.Backend, error) {

@@ -200,3 +200,29 @@ func TestUnit_Glob_MatchesProjectPaths(t *testing.T) {
 	_, err = compileGlob("{a,b")
 	require.ErrorIs(t, err, ErrInvalidTrigger)
 }
+func TestUnit_TopicFiringsCarryEachPublishedEvent(t *testing.T) {
+	tr := planTrigger(t, func(tr *Trigger) { tr.Events = []string{"event.fired"}; tr.PathGlob = ""; tr.TopicGlob = "review.*" })
+	first := ev(101, 0, "event.fired", "review.requested")
+	first.Data = []byte(`{"file":"REVIEW.md"}`)
+	second := ev(102, time.Millisecond, "event.fired", "review.done")
+	other := ev(103, 2*time.Millisecond, "event.fired", "build.done")
+	p := planAt(time.Second, []compiledTrigger{tr}, nil, first, second, other)
+	require.Len(t, p.due, 2)
+	require.Contains(t, p.due[0].run("/project").Intent(), "REVIEW.md")
+	require.Contains(t, p.due[0].run("/project").Intent(), "101")
+	require.Equal(t, int64(102), p.due[1].topic.NID)
+}
+
+func TestUnit_FileWakeInheritsHopFromAnotherSubscription(t *testing.T) {
+	rule := planTrigger(t, nil)
+	event := ev(5, time.Second, "fs.modified", "a_test.go")
+	event.Source = workspaceevents.SourceWatcher
+	windows := []window{{triggerID: "review", start: planEpoch, hop: DefaultMaxHop + 1}}
+	result := planAt(3*time.Second, []compiledTrigger{rule}, windows, event)
+	require.Len(t, result.refused, 1)
+	require.Empty(t, result.due)
+	windows[0].hop = 1
+	result = planAt(3*time.Second, []compiledTrigger{rule}, windows, event)
+	require.Len(t, result.due, 1)
+	require.Equal(t, 1, result.due[0].hop)
+}

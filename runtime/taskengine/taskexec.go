@@ -136,6 +136,18 @@ func (exe *SimpleExec) countTokensAndCheckLimit(ctx context.Context, modelName s
 	return tokenCount, nil
 }
 
+func (exe *SimpleExec) countMessageTokens(ctx context.Context, model string, msg Message) (int, error) {
+	text := msg.Content
+	if len(msg.CallTools) > 0 {
+		calls, err := json.Marshal(msg.CallTools)
+		if err != nil {
+			return 0, err
+		}
+		text += "\n" + string(calls)
+	}
+	return exe.repo.CountTokens(ctx, model, text)
+}
+
 func (exe *SimpleExec) countChatHistoryTokens(ctx context.Context, modelName string, history ChatHistory, ctxLength int) (int, error) {
 	if ctxLength <= 0 {
 		return 0, nil
@@ -151,7 +163,7 @@ func (exe *SimpleExec) countChatHistoryTokens(ctx context.Context, modelName str
 
 	totalTokens := 0
 	for _, msg := range history.Messages {
-		tokenCount, err := exe.repo.CountTokens(ctx, modelName, msg.Content)
+		tokenCount, err := exe.countMessageTokens(ctx, modelName, msg)
 		if err != nil {
 			return 0, fmt.Errorf("token count failed for message: %w", err)
 		}
@@ -182,14 +194,17 @@ func requestedContextRequirement(ctx context.Context, actualTokens int) int {
 	return actualTokens
 }
 
-func (exe *SimpleExec) shiftMessagesToFit(ctx context.Context, modelName string, msgs []Message, budget int) ([]Message, int, error) {
+func (exe *SimpleExec) shiftMessagesToFit(ctx context.Context, modelName string, msgs []Message, window, overhead, reserve int, count func(context.Context, string, Message) (int, error)) ([]Message, int, error) {
+	budget := window - overhead - reserve
+	before := overhead
 	toks := make([]int, len(msgs))
 	for i, m := range msgs {
-		n, err := exe.repo.CountTokens(ctx, modelName, m.Content)
+		n, err := count(ctx, modelName, m)
 		if err != nil {
 			return nil, 0, fmt.Errorf("token count failed: %w", err)
 		}
 		toks[i] = n
+		before += n
 	}
 
 	type unit struct {
@@ -233,15 +248,20 @@ func (exe *SimpleExec) shiftMessagesToFit(ctx context.Context, modelName string,
 			keepUnit[k] = true
 		}
 	}
+	keptRecent := false
 	for k := len(units) - 1; k >= 0; k-- {
 		if units[k].system {
 			continue
 		}
 		if used+units[k].tokens > budget {
+			if !keptRecent {
+				return nil, 0, ErrContextLengthExceeded
+			}
 			break
 		}
 		keepUnit[k] = true
 		used += units[k].tokens
+		keptRecent = true
 	}
 
 	keepIdx := make([]bool, len(msgs))
@@ -266,11 +286,17 @@ func (exe *SimpleExec) shiftMessagesToFit(ctx context.Context, modelName string,
 
 	total := 0
 	for _, m := range out {
-		n, err := exe.repo.CountTokens(ctx, modelName, m.Content)
+		n, err := count(ctx, modelName, m)
 		if err != nil {
 			return nil, 0, fmt.Errorf("token count failed: %w", err)
 		}
 		total += n
+	}
+	if len(out) < len(msgs) && exe.eventSink.Wants(TaskEventContextShift) {
+		ev := NewTaskEvent(ctx, TaskEventContextShift)
+		ev.ModelName = modelName
+		ev.ContextShift = &ContextShift{Window: window, Requested: RequestedContextLengthFromContext(ctx), HistoryBudget: budget, Reserve: reserve, Before: before, After: total + overhead, Removed: len(msgs) - len(out), Kept: len(out)}
+		publishTaskEventBestEffort(ctx, nil, exe.eventSink, ev)
 	}
 	return out, total, nil
 }
@@ -292,14 +318,22 @@ func GetPrimaryModel(llmCall *LLMExecutionConfig) string {
 	return "default"
 }
 
+func routeMessageText(msg Message) string {
+	role := strings.TrimSpace(msg.Role)
+	if role == "" {
+		role = "message"
+	}
+	return role + ": " + strings.TrimSpace(msg.Content)
+}
+
+func (exe *SimpleExec) countRouteTokens(ctx context.Context, model string, msg Message) (int, error) {
+	return exe.repo.CountTokens(ctx, model, routeMessageText(msg))
+}
+
 func routeHistoryPrompt(history ChatHistory) string {
 	lines := make([]string, 0, len(history.Messages))
 	for _, msg := range history.Messages {
-		role := strings.TrimSpace(msg.Role)
-		if role == "" {
-			role = "message"
-		}
-		lines = append(lines, role+": "+strings.TrimSpace(msg.Content))
+		lines = append(lines, routeMessageText(msg))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -574,7 +608,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				routeOutputReserve := reserveOutputTokens(currentTask.ExecuteConfig, ctxLength)
 				budget := ctxLength - sysTokens - routeOutputReserve
 				if budget > 0 {
-					slid, _, slideErr := exe.shiftMessagesToFit(taskCtx, modelName, history.Messages, budget)
+					slid, _, slideErr := exe.shiftMessagesToFit(taskCtx, modelName, history.Messages, ctxLength, sysTokens, routeOutputReserve, exe.countRouteTokens)
 					if slideErr != nil {
 						return nil, DataTypeAny, "", fmt.Errorf("route task %s: %w", currentTask.ID, slideErr)
 					}
@@ -1140,7 +1174,7 @@ func (exe *SimpleExec) executeLLM(
 	} else {
 		var total int
 		for _, m := range input.Messages {
-			cnt, err := exe.repo.CountTokens(ctx, modelName, m.Content)
+			cnt, err := exe.countMessageTokens(ctx, modelName, m)
 			if err != nil {
 				reportErr(fmt.Errorf("token count failed: %w", err))
 				return nil, DataTypeAny, "", meta, fmt.Errorf("token count failed: %w", err)
@@ -1152,7 +1186,7 @@ func (exe *SimpleExec) executeLLM(
 
 	preludeTokens := 0
 	for _, m := range prelude {
-		cnt, err := exe.repo.CountTokens(ctx, modelName, m.Content)
+		cnt, err := exe.countMessageTokens(ctx, modelName, m)
 		if err != nil {
 			reportErr(fmt.Errorf("token count failed: %w", err))
 			return nil, DataTypeAny, "", meta, fmt.Errorf("token count failed: %w", err)
@@ -1184,7 +1218,8 @@ func (exe *SimpleExec) executeLLM(
 	}
 
 	trimFired := false
-	if ctxLength > 0 && totalTokens > ctxLength {
+	reserve := reserveOutputTokens(llmCall, ctxLength)
+	if ctxLength > 0 && (totalTokens > ctxLength || (llmCall.Shift && totalTokens > ctxLength-reserve)) {
 		if !llmCall.Shift {
 			err := fmt.Errorf("%w: total token count %d (messages: %d, tools: %d) > %d", ErrContextLengthExceeded,
 				totalTokens, messagesTokens, toolTokens, ctxLength)
@@ -1192,9 +1227,7 @@ func (exe *SimpleExec) executeLLM(
 			return nil, DataTypeAny, "", meta, err
 		}
 		trimFired = true
-		reserve := reserveOutputTokens(llmCall, ctxLength)
-		budget := ctxLength - toolTokens - preludeTokens - reserve
-		slid, slidTokens, err := exe.shiftMessagesToFit(ctx, modelName, input.Messages, budget)
+		slid, slidTokens, err := exe.shiftMessagesToFit(ctx, modelName, input.Messages, ctxLength, toolTokens+preludeTokens, reserve, exe.countMessageTokens)
 		if err != nil {
 			wrapped := fmt.Errorf("%w: irreducible context after shift (tools: %d, prelude: %d, reserve: %d, limit: %d)",
 				ErrContextLengthExceeded, toolTokens, preludeTokens, reserve, ctxLength)
@@ -1356,6 +1389,19 @@ func (exe *SimpleExec) executeLLM(
 			return nil, DataTypeAny, "", meta, err
 		}
 	}
+	used := totalTokens + outputTokensCount
+	usage := resp.Usage
+	if usage == nil {
+		usage = meta.Usage
+	}
+	if usage != nil && usage.TotalTokens > 0 {
+		used = usage.TotalTokens
+	}
+	if exe.eventSink.Wants(TaskEventTokenUsage) {
+		ev := NewTaskEvent(ctx, TaskEventTokenUsage)
+		ev.ModelName, ev.TokenUsed, ev.TokenSize = meta.ModelName, used, ctxLength
+		publishTaskEventBestEffort(ctx, nil, exe.eventSink, ev)
+	}
 	input.OutputTokens = outputTokensCount
 	input.FinishReason = resp.FinishReason
 
@@ -1414,6 +1460,7 @@ func (exe *SimpleExec) streamChatOnce(
 			Thinking:     res.Thinking,
 		},
 		ToolCalls:    res.ToolCalls,
+		Usage:        res.Usage,
 		FinishReason: res.FinishReason,
 	}
 	return true, chunkCount, out, meta, nil

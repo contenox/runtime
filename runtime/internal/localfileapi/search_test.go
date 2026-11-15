@@ -219,7 +219,7 @@ func TestUnit_Search_StreamsMatchesThenDone(t *testing.T) {
 		paths[m.Path] = m.Preview
 	}
 	require.Contains(t, paths, "a.txt")
-	require.Contains(t, paths, filepath.Join("sub", "b.txt"))
+	require.Contains(t, paths, "sub/b.txt")
 	require.Contains(t, paths["sub/b.txt"], "hello")
 }
 

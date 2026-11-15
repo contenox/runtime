@@ -19,6 +19,10 @@ import (
 const ListenerOwner = "workspace-trigger"
 
 type listenerTarget struct {
+	OnDone         string `json:"onDone,omitempty"`
+	Target         string `json:"target,omitempty"`
+	SessionID      string `json:"sessionId,omitempty"`
+	SessionMode    string `json:"sessionMode,omitempty"`
 	Root           string `json:"root"`
 	AgentName      string `json:"agentName"`
 	HITLPolicyName string `json:"hitlPolicyName"`
@@ -26,6 +30,8 @@ type listenerTarget struct {
 }
 
 type listenerMeta struct {
+	CreatedBy  string    `json:"createdBy,omitempty"`
+	TopicGlob  string    `json:"topicGlob,omitempty"`
 	Name       string    `json:"name"`
 	PathGlob   string    `json:"pathGlob"`
 	DebounceMs int       `json:"debounceMs"`
@@ -51,11 +57,11 @@ func (s Store) listeners(scope string) (*libevents.ListenerStore, error) {
 }
 
 func toListener(t Trigger) (*libevents.Listener, error) {
-	target, err := json.Marshal(listenerTarget{Root: t.Root, AgentName: t.AgentName, HITLPolicyName: t.HITLPolicyName, Prompt: t.Prompt})
+	target, err := json.Marshal(listenerTarget{OnDone: t.OnDone, Target: t.Target, SessionID: t.SessionID, SessionMode: t.SessionMode, Root: t.Root, AgentName: t.AgentName, HITLPolicyName: t.HITLPolicyName, Prompt: t.Prompt})
 	if err != nil {
 		return nil, fmt.Errorf("workspacetriggers: encode target: %w", err)
 	}
-	meta, err := json.Marshal(listenerMeta{Name: t.Name, PathGlob: t.PathGlob, DebounceMs: t.DebounceMs, Enabled: t.Enabled, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt})
+	meta, err := json.Marshal(listenerMeta{CreatedBy: t.CreatedBy, TopicGlob: t.TopicGlob, Name: t.Name, PathGlob: t.PathGlob, DebounceMs: t.DebounceMs, Enabled: t.Enabled, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt})
 	if err != nil {
 		return nil, fmt.Errorf("workspacetriggers: encode metadata: %w", err)
 	}
@@ -86,11 +92,11 @@ func fromListener(l *libevents.Listener) (Trigger, error) {
 		return Trigger{}, fmt.Errorf("workspacetriggers: trigger %s metadata: %w", l.ID, err)
 	}
 	return Trigger{
-		ID:             l.ID,
-		Root:           target.Root,
-		Name:           meta.Name,
-		Events:         append([]string(nil), l.Types...),
-		PathGlob:       meta.PathGlob,
+		CreatedBy: meta.CreatedBy, OnDone: target.OnDone, ID: l.ID, Target: target.Target, SessionID: target.SessionID, SessionMode: target.SessionMode,
+		Root:     target.Root,
+		Name:     meta.Name,
+		Events:   append([]string(nil), l.Types...),
+		PathGlob: meta.PathGlob, TopicGlob: meta.TopicGlob,
 		DebounceMs:     meta.DebounceMs,
 		AgentName:      target.AgentName,
 		HITLPolicyName: target.HITLPolicyName,
@@ -194,6 +200,7 @@ func (s Store) Update(ctx context.Context, scope string, t *Trigger) error {
 	} else if taken {
 		return fmt.Errorf("%w: %s", ErrNameTaken, t.Name)
 	}
+	t.CreatedBy = current.CreatedBy
 	t.Root = current.Root
 	t.CreatedAt = current.CreatedAt
 	t.UpdatedAt = s.now()
@@ -244,4 +251,75 @@ func (s Store) Delete(ctx context.Context, scope, id string) error {
 		return fmt.Errorf("workspacetriggers: delete: %w", err)
 	}
 	return nil
+}
+
+func (s Store) Page(ctx context.Context, scope, cursor string, limit int) ([]Trigger, string, error) {
+	rows, err := s.DB.WithoutTransaction().QueryContext(ctx, `SELECT l.id,l.target,l.metadata,t.event_type FROM
+ (SELECT workspace_id,id,target,metadata FROM event_listeners WHERE workspace_id=$1 AND owner=$2 AND id>$3 ORDER BY id LIMIT $4) l
+ LEFT JOIN event_listener_topics t ON t.workspace_id=l.workspace_id AND t.listener_id=l.id ORDER BY l.id,t.event_type`, scope, ListenerOwner, cursor, limit+1)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	out := []Trigger{}
+	for rows.Next() {
+		var l libevents.Listener
+		var typ sql.NullString
+		if err := rows.Scan(&l.ID, &l.Target, &l.Metadata, &typ); err != nil {
+			return nil, "", err
+		}
+		if len(out) == 0 || out[len(out)-1].ID != l.ID {
+			if len(out) == limit {
+				return out, out[len(out)-1].ID, nil
+			}
+			t, err := fromListener(&l)
+			if err != nil {
+				return nil, "", err
+			}
+			out = append(out, t)
+		}
+		if typ.Valid {
+			out[len(out)-1].Events = append(out[len(out)-1].Events, typ.String)
+		}
+	}
+	return out, "", rows.Err()
+}
+
+func (s Store) MatchPage(ctx context.Context, scope, eventType, subject, cursor string, limit int) ([]Trigger, string, error) {
+	out := []Trigger{}
+	for {
+		rules, next, err := s.Page(ctx, scope, cursor, 100)
+		if err != nil {
+			return nil, "", err
+		}
+		matches, err := Matching(rules, eventType, subject)
+		if err != nil {
+			return nil, "", err
+		}
+		out = append(out, matches...)
+		if len(out) > limit {
+			return out[:limit], out[limit-1].ID, nil
+		}
+		if next == "" {
+			return out, "", nil
+		}
+		cursor = next
+	}
+}
+
+func (s Store) EachPage(ctx context.Context, scope string, visit func([]Trigger) error) error {
+	cursor := ""
+	for {
+		rules, next, err := s.Page(ctx, scope, cursor, 200)
+		if err != nil {
+			return err
+		}
+		if err := visit(rules); err != nil {
+			return err
+		}
+		if next == "" {
+			return nil
+		}
+		cursor = next
+	}
 }

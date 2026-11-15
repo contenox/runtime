@@ -452,6 +452,8 @@ network.write = "approve"
 # rest wait for a human, the count is durable per mission, and whatever the unit
 # then DOES stays gated by this same envelope.
 missions.fire = "allow"
+events.fire = "allow"
+events.subscribe = "approve"
 missions.answer = "allow"
 
 [envelopes.default.files.read]

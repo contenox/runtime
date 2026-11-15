@@ -209,34 +209,7 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		}
 	}
 
-	contextLen := sess.effectiveTokenLimit()
-	if contextLen == 0 {
-		currentModel := sess.modelOrDefault(t.model())
-		for _, state := range t.runtimeStates(promptCtx) {
-			for _, pulled := range state.PulledModels {
-				if pulled.Model == currentModel && pulled.ContextLength > 0 {
-					contextLen = pulled.ContextLength
-					break
-				}
-			}
-			if contextLen > 0 {
-				break
-			}
-		}
-		if contextLen == 0 {
-			for _, state := range t.runtimeStates(promptCtx) {
-				for _, pulled := range state.PulledModels {
-					if pulled.ContextLength > 0 && (pulled.CanChat || pulled.CanPrompt) {
-						contextLen = pulled.ContextLength
-						break
-					}
-				}
-				if contextLen > 0 {
-					break
-				}
-			}
-		}
-	}
+	contextLen := t.sessionContextLength(promptCtx, sess)
 
 	resp, err := d.agent.Prompt(promptCtx, agentservice.PromptRequest{
 		SessionID:      sess.InternalSessionID,

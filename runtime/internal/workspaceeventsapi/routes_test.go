@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -229,4 +230,18 @@ func TestUnit_WorkspaceEventsAPI_StreamReplaysThenFollowsLive(t *testing.T) {
 	require.Equal(t, workspaceevents.TypeToolWrote, got.Type)
 	require.Equal(t, "c.txt", got.Subject)
 	require.Equal(t, got.NID, replay.next(t).NID)
+}
+func TestUnit_TopicPostAndRecentHistory(t *testing.T) {
+	f := newAPIFixture(t)
+	for _, name := range []string{"build.done", "review.done"} {
+		resp := f.post(t, f.rootA, `{"type":"event.fired","subject":"`+name+`","data":{"file":"notes.md"}}`)
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+	}
+	latest := f.list(t, f.rootA, url.Values{"before": {"0"}, "limit": {"1"}})
+	require.Len(t, latest.Events, 1)
+	require.Equal(t, "review.done", latest.Events[0].Subject)
+	require.Equal(t, workspaceevents.SourceHuman, latest.Events[0].Source)
+	page := f.list(t, f.rootA, url.Values{"before": {fmt.Sprint(latest.Cursor)}})
+	require.Len(t, page.Events, 1)
+	require.Equal(t, "build.done", page.Events[0].Subject)
 }

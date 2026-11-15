@@ -27,7 +27,11 @@ func compileTriggers(list []Trigger) ([]compiledTrigger, error) {
 		if !t.Enabled {
 			continue
 		}
-		glob, err := compileGlob(t.PathGlob)
+		pattern := t.PathGlob
+		if t.TopicGlob != "" {
+			pattern = t.TopicGlob
+		}
+		glob, err := compileGlob(pattern)
 		if err != nil {
 			bad = append(bad, fmt.Errorf("trigger %s: %w", t.Name, err))
 			continue
@@ -49,11 +53,14 @@ func (t compiledTrigger) maxDelay() time.Duration {
 }
 
 type window struct {
-	start time.Time
-	end   time.Time
+	hop       int
+	triggerID string
+	start     time.Time
+	end       time.Time
 }
 
 type burst struct {
+	topic    *workspaceevents.Event
 	trigger  Trigger
 	firstNID int64
 	lastNID  int64
@@ -68,6 +75,9 @@ type burst struct {
 
 func newBurst(t compiledTrigger, e workspaceevents.Event) *burst {
 	b := &burst{trigger: t.Trigger, firstNID: e.NID, first: e.Time, event: e.Type, seen: map[string]bool{}}
+	if e.Type == workspaceevents.TypeEventFired {
+		b.topic = &e
+	}
 	b.add(e)
 	return b
 }
@@ -97,7 +107,7 @@ func (b *burst) run(root string) Run {
 	if event == "changes" {
 		event = "file changes"
 	}
-	return Run{Trigger: b.trigger, Root: root, Event: event, Paths: b.paths, More: b.more}
+	return Run{TopicEvent: b.topic, Trigger: b.trigger, Root: root, Event: event, Paths: b.paths, More: b.more}
 }
 
 type refusal struct {
@@ -122,18 +132,19 @@ type plan struct {
 	settledThrough int64
 }
 
-func pausedAt(windows []window, at time.Time, grace, maxRun time.Duration) bool {
+func (w window) contains(at time.Time, grace, maxRun time.Duration) bool {
+	if at.Before(w.start) {
+		return false
+	}
+	if w.end.IsZero() {
+		return at.Sub(w.start) < maxRun
+	}
+	return at.Before(w.end.Add(grace))
+}
+
+func pausedAt(windows []window, triggerID string, at time.Time, grace, maxRun time.Duration) bool {
 	for _, w := range windows {
-		if at.Before(w.start) {
-			continue
-		}
-		if w.end.IsZero() {
-			if at.Sub(w.start) < maxRun {
-				return true
-			}
-			continue
-		}
-		if at.Before(w.end.Add(grace)) {
+		if (w.triggerID == "" || w.triggerID == triggerID) && w.contains(at, grace, maxRun) {
 			return true
 		}
 	}
@@ -146,15 +157,29 @@ func planPass(in planInput) plan {
 	order := []string{}
 	for _, e := range in.events {
 		out.settledThrough = e.NID
-		if e.Subject == "" || !allowedEvents[e.Type] || pausedAt(in.paused, e.Time, in.grace, in.maxRun) {
+		if e.Subject == "" || !allowedEvents[e.Type] {
 			continue
+		}
+		if e.Source == workspaceevents.SourceWatcher {
+			for _, w := range in.paused {
+				if w.hop > e.Hop && w.contains(e.Time, in.grace, in.maxRun) {
+					e.Hop = w.hop
+				}
+			}
 		}
 		for _, t := range in.triggers {
 			if !t.events[e.Type] || !t.glob.MatchString(e.Subject) || e.Time.Before(t.CreatedAt) {
 				continue
 			}
+			if e.Type != workspaceevents.TypeEventFired && pausedAt(in.paused, t.ID, e.Time, in.grace, in.maxRun) {
+				continue
+			}
 			if e.Hop > in.maxHop {
 				out.refused = append(out.refused, refusal{trigger: t.Trigger, nid: e.NID, hop: e.Hop})
+				continue
+			}
+			if e.Type == workspaceevents.TypeEventFired {
+				out.due = append(out.due, newBurst(t, e))
 				continue
 			}
 			b := open[t.ID]
@@ -193,4 +218,36 @@ func planPass(in planInput) plan {
 	}
 	sort.Slice(out.due, func(i, j int) bool { return out.due[i].lastNID < out.due[j].lastNID })
 	return out
+}
+
+func Matching(rules []Trigger, eventType, subject string) ([]Trigger, error) {
+	compiled, err := compileTriggers(rules)
+	if err != nil {
+		return nil, err
+	}
+	out := []Trigger{}
+	for _, t := range compiled {
+		if t.events[eventType] && t.glob.MatchString(subject) {
+			out = append(out, t.Trigger)
+		}
+	}
+	return out, nil
+}
+
+func CountTopicSubscribers(rules []Trigger, counts map[string]int) error {
+	compiled, err := compileTriggers(rules)
+	if err != nil {
+		return err
+	}
+	for _, rule := range compiled {
+		if !rule.events[workspaceevents.TypeEventFired] {
+			continue
+		}
+		for topic := range counts {
+			if rule.glob.MatchString(topic) {
+				counts[topic]++
+			}
+		}
+	}
+	return nil
 }
