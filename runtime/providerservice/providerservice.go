@@ -14,6 +14,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libkvstore"
 	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/runtime/internal/models/contenoxauth"
 	"github.com/contenox/runtime/runtime/internal/models/copilotauth"
 	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
@@ -98,6 +99,7 @@ type Service interface {
 	StartConnectionLogin(ctx context.Context, id string, renewal ...bool) (*LoginStart, error)
 	ConnectionLoginStatus(ctx context.Context, id string) (*LoginStatus, error)
 	CancelConnectionLogin(ctx context.Context, id string) (*LoginStatus, error)
+	Subscription(ctx context.Context, id string) (contenoxauth.Subscription, error)
 	LogoutConnection(ctx context.Context, id string) error
 }
 
@@ -160,6 +162,7 @@ var providerDefaultsByType = map[string]providerDefaults{
 	ProviderTypeVertexGoogle:  {Type: ProviderTypeVertexGoogle, RequiresBaseURL: true, RecommendedAPIKeyEnv: "GOOGLE_APPLICATION_CREDENTIALS"},
 	ProviderTypeDeepSeek:      {Type: ProviderTypeDeepSeek, DefaultBaseURL: "https://api.deepseek.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DEEPSEEK_API_KEY"},
 	ProviderTypeAlibabaCloud:  {Type: ProviderTypeAlibabaCloud, DefaultBaseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "DASHSCOPE_API_KEY"},
+	contenoxauth.ProviderType: {Type: contenoxauth.ProviderType, DefaultBaseURL: contenoxauth.BaseURL, RequiresLogin: true},
 	ProviderTypeOpenAICodex:   {Type: ProviderTypeOpenAICodex, DefaultBaseURL: modelauth.BaseURL, RequiresLogin: true},
 	ProviderTypeGitHubCopilot: {Type: ProviderTypeGitHubCopilot, DefaultBaseURL: copilotauth.BaseURL, RequiresLogin: true, Unofficial: true},
 }
@@ -708,4 +711,15 @@ func (s *service) auth(backend *runtimetypes.Backend) loginauth.Authenticator {
 		return a
 	}
 	return modelauth.New(s.dbInstance)
+}
+
+func (s *service) Subscription(ctx context.Context, id string) (contenoxauth.Subscription, error) {
+	backend, err := s.store().GetBackend(ctx, id)
+	if err != nil {
+		return contenoxauth.Subscription{}, err
+	}
+	if backend.Type != contenoxauth.ProviderType {
+		return contenoxauth.Subscription{}, ErrInvalidProvider
+	}
+	return contenoxauth.New(s.dbInstance).Subscription(ctx, id)
 }

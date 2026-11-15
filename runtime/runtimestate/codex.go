@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/contenox/runtime/runtime/internal/models/contenoxauth"
 	"github.com/contenox/runtime/runtime/internal/models/copilotauth"
 	"github.com/contenox/runtime/runtime/internal/models/loginauth"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
@@ -27,7 +28,9 @@ func (s *State) processLoginBackend(ctx context.Context, backend *runtimetypes.B
 		return
 	}
 	if status.State == "login_required" {
-		if strings.EqualFold(backend.Type, copilotauth.ProviderType) {
+		if strings.EqualFold(backend.Type, contenoxauth.ProviderType) {
+			state.setError(contenoxauth.ErrLoginRequired)
+		} else if strings.EqualFold(backend.Type, copilotauth.ProviderType) {
 			state.setError(copilotauth.ErrLoginRequired)
 		} else {
 			state.setError(modelauth.ErrLoginRequired)

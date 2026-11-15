@@ -25,6 +25,15 @@ func AddProviderRoutes(mux *http.ServeMux, providerService providerservice.Servi
 	mux.HandleFunc("GET /providers/connections", p.listConnections)
 	mux.HandleFunc("POST /providers/{providerType}/connections", p.createConnection)
 	mux.HandleFunc("PATCH /providers/connections/{id}", p.updateConnection)
+	mux.HandleFunc("GET /providers/connections/{id}/subscription", func(w http.ResponseWriter, r *http.Request) {
+		details, err := providerService.Subscription(r.Context(), r.PathValue("id"))
+		if err != nil {
+			_ = apiframework.Error(w, r, err, apiframework.GetOperation)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		_ = apiframework.Encode(w, r, http.StatusOK, details)
+	})
 	mux.HandleFunc("POST /providers/connections/{id}/check", p.checkConnection)
 	mux.HandleFunc("DELETE /providers/connections/{id}/hidden-models", p.clearHiddenModels)
 	mux.HandleFunc("POST /providers/connections/{id}/login", p.startConnectionLogin)

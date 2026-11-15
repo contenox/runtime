@@ -13,6 +13,7 @@ import (
 )
 
 type bedrockProvider struct {
+	hosted          bool
 	id              string
 	region          string
 	credBlob        string
@@ -53,10 +54,20 @@ func NewBedrockProvider(region, credBlob, modelName string, cap modelrepo.Capabi
 	}
 }
 
-func (p *bedrockProvider) GetBackendIDs() []string { return []string{"bedrock:" + p.region} }
-func (p *bedrockProvider) ModelName() string       { return p.model.name }
-func (p *bedrockProvider) GetID() string           { return p.id }
-func (p *bedrockProvider) GetType() string         { return "bedrock" }
+func (p *bedrockProvider) GetBackendIDs() []string {
+	if p.hosted {
+		return []string{"contenox"}
+	}
+	return []string{"bedrock:" + p.region}
+}
+func (p *bedrockProvider) ModelName() string { return p.model.name }
+func (p *bedrockProvider) GetID() string     { return p.id }
+func (p *bedrockProvider) GetType() string {
+	if p.hosted {
+		return "contenox"
+	}
+	return "bedrock"
+}
 func (p *bedrockProvider) GetContextLength() int   { return p.contextLength }
 func (p *bedrockProvider) GetMaxOutputTokens() int { return p.maxOutputTokens }
 func (p *bedrockProvider) CanChat() bool           { return p.canChat }
