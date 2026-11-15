@@ -10,7 +10,7 @@ Docs: **[contenox.com](https://contenox.com)**. Made by Alexander Ertli.
 
 ## Install
 
-With the desktop app from the [Microsoft Store](https://apps.microsoft.com/detail/9N6NVBHR71XD) or the Linux packages, `contenox-runtime` is already on your PATH. On macOS and with the Windows `.exe` installer, choose **File → Install ‘contenox-runtime’ Command in PATH** in the app. On its own:
+With the desktop app, choose **File → Install ‘contenox-runtime’ Command in PATH**. On its own:
 
 ```powershell
 irm https://contenox.com/install.ps1 | iex

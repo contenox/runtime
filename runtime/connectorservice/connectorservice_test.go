@@ -134,7 +134,7 @@ func TestUnit_ListDescribesScopesAndStatus(t *testing.T) {
 	tools := &fakeTools{
 		names: []string{"local_shell", "everywhere", "project", "acp-aaaa-mine", "remote", "api"},
 		tools: map[string][]taskengine.Tool{"local_shell": {tool("run")}, "everywhere": {tool("read"), tool("write")}, "project": {tool("q")}, "acp-aaaa-mine": {tool("m")}, "api": {tool("send")}},
-		fail:  map[string]error{"remote": errors.New("mcp oauth not authenticated")},
+		fail:  map[string]error{"remote": errors.New("list-tools skipped after previous failure: authentication required; run 'contenox-runtime mcp auth remote'")},
 	}
 	svc := New(db, tools)
 

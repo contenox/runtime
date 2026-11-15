@@ -300,7 +300,7 @@ func (s *service) probe(ctx context.Context, c *Connector) {
 	tools, err := s.tools.GetToolsForToolsByName(tctx, c.Name)
 	c.Tools = []Tool{}
 	if err != nil {
-		c.Status, c.Problem = classify(err)
+		c.Status, c.Problem = classify(err, c.AuthType)
 		return
 	}
 	c.Status = StatusReady
@@ -309,13 +309,14 @@ func (s *service) probe(ctx context.Context, c *Connector) {
 	}
 }
 
-func classify(err error) (string, string) {
+func classify(err error, authType string) (string, string) {
 	msg := strings.TrimSpace(err.Error())
+	lower := strings.ToLower(msg)
 	if len(msg) > 400 {
 		msg = msg[:397] + "..."
 	}
-	lower := strings.ToLower(msg)
-	if strings.Contains(lower, "not authenticated") || (strings.Contains(lower, "oauth") && strings.Contains(lower, "token")) {
+	if strings.Contains(lower, "not authenticated") || (strings.Contains(lower, "oauth") && strings.Contains(lower, "token")) ||
+		(authType == "oauth" && strings.Contains(lower, "authentication required")) {
 		return StatusNeedsSignIn, msg
 	}
 	return StatusUnavailable, msg

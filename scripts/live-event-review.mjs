@@ -101,22 +101,35 @@ async function until(label, read) {
   } while (Date.now() < deadline);
   throw new Error("Timed out: " + label);
 }
-try {
-  await new Promise((resolve, reject) => {
-    ws.onopen = resolve;
-    ws.onerror = reject;
+async function verifySchedule() {
+  const clock = await session();
+  await ask(clock, "Use subscription_create to subscribe this chat to clock.review, target session, continue, permission set default. Set the saved prompt to: Call the events.event_fire tool now with topic clock.confirmed and payload {origin: clock.review}. Inspect the tool response and give the event number it returned. Register the subscription now and wait.");
+  const rule = (await api("workspace/triggers" + query)).triggers.find(r => r.topicGlob === "clock.review");
+  assert.ok(rule, "Scheduled agent must be subscribed before creating the schedule");
+  const at = new Date(Date.now() + 5000).toISOString();
+  await api("workspace/schedules" + query, "POST", { topic: "clock.review", at });
+  const wake = await until("scheduled agent acknowledgement", async () => {
+    const { events } = await api("workspace/events" + query + "&before=0&limit=100");
+    const scheduled = events.find(e => e.subject === "clock.review" && e.source === "schedule");
+    const confirmed = events.find(e => e.subject === "clock.confirmed" && e.source === "agent");
+    const { firings } = await api("workspace/triggers/firings" + query);
+    const firing = firings.find(f => f.triggerId === rule.id && f.status === "ok");
+    return scheduled && confirmed && firing && { scheduled, confirmed, firing };
   });
-  await rpc("initialize", { protocolVersion: 1, clientCapabilities: {} });
+  console.log(JSON.stringify(wake, null, 2));
+}
+
+async function verifyReview() {
   const author = await session(),
     reviewer = await session();
   await Promise.all([
     ask(
       author,
-      "Create a file subscription named Author for REVIEW.md, target session, continue, permission set default. When woken, read REVIEW.md and publish review.verified with the finding. Only register now.",
+      "Create a file subscription named Author for REVIEW.md, target session, continue, permission set default. Set the saved prompt to: Read REVIEW.md and use event_fire to publish review.verified with the finding. Only register now.",
     ),
     ask(
       reviewer,
-      "Create a topic subscription named Reviewer for review.requested, target session, continue, permission set default. When woken, read add.js, review correctness and write your finding to REVIEW.md. Only register now.",
+      "Create a topic subscription named Reviewer for review.requested, target session, continue, permission set default. Set the saved prompt to: Read add.js, review correctness and use write_file to save the finding in REVIEW.md. Only register now.",
     ),
   ]);
   const rules = (await api("workspace/triggers" + query)).triggers;
@@ -124,6 +137,8 @@ try {
     rules.filter((r) => r.target === "session" && r.enabled).length,
     2,
   );
+  assert.ok(rules.some(r => r.pathGlob === "REVIEW.md" && !r.topicGlob), "Author must watch REVIEW.md on disk");
+  assert.ok(rules.some(r => r.topicGlob === "review.requested" && !r.pathGlob), "Reviewer must listen for review.requested");
   await ask(
     author,
     'Use event_list with subscribedOnly true and event_recent for the last 3 minutes. Then use event_fire to publish review.requested with payload {"file":"add.js"}.',
@@ -162,6 +177,16 @@ try {
       name + " missing from ACP tool calls",
     );
   console.log(JSON.stringify({ root, ...evidence }, null, 2));
+}
+
+try {
+  await new Promise((resolve, reject) => {
+    ws.onopen = resolve;
+    ws.onerror = reject;
+  });
+  await rpc("initialize", { protocolVersion: 1, clientCapabilities: {} });
+  if (process.argv.includes("--schedule")) await verifySchedule();
+  else await verifyReview();
 } finally {
   ws.close();
   await api("workspace/roots?path=" + encodeURIComponent(root), "DELETE");

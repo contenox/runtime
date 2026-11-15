@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,14 +50,22 @@ func (*Provider) GetToolsForToolsByName(_ context.Context, name string) ([]taske
 		return nil, fmt.Errorf("unknown tools %q", name)
 	}
 	field := map[string]string{"type": "string"}
-	triggerProps := map[string]any{"name": field, "topicGlob": field, "pathGlob": field, "agentName": field, "hitlPolicyName": field, "prompt": field, "target": field, "sessionMode": field, "onDone": field, "debounceMs": map[string]any{"type": "integer", "minimum": 250, "maximum": 600000}}
+	triggerProps := map[string]any{
+		"name": field, "agentName": field, "hitlPolicyName": field,
+		"prompt": map[string]string{"type": "string", "description": "Instructions the agent must execute when it wakes. Include the requested actions, filenames and any completion topic. For example: Read REVIEW.md and use event_fire to publish review.received with the verdict."},
+		"target": field, "sessionMode": field, "onDone": field,
+		"pathGlob":   map[string]string{"type": "string", "description": "Project-relative filename or glob. For a change to REVIEW.md use REVIEW.md here."},
+		"debounceMs": map[string]any{"type": "integer", "minimum": 250, "maximum": 600000},
+	}
+	topicProps := maps.Clone(triggerProps)
+	topicProps["topicGlob"] = map[string]string{"type": "string", "description": "Name or pattern of an explicitly published topic, for example review.requested. For filesystem changes use pathGlob."}
 	return []taskengine.Tool{
 		tool("schedule_create", "Publish a topic once at an RFC3339 time, at a repeating interval, or with a five-field cron expression. A matching subscription wakes the agent.", map[string]any{"topic": field, "at": field, "every": field, "cron": field, "timezone": field, "payload": map[string]string{"type": "object"}}, "topic"),
 		tool("schedule_list", "List schedules with their topics, next fire times and enabled state.", map[string]any{"cursor": field}),
 		tool("schedule_update", "Pause or resume a schedule.", map[string]any{"id": field, "enabled": map[string]string{"type": "boolean"}}, "id", "enabled"),
 		tool("schedule_delete", "Delete a workspace schedule.", map[string]any{"id": field}, "id"),
-		tool("watch_create", "Wake a mission, this session, or the inbox for matching file changes.", triggerProps, "name", "pathGlob", "prompt"),
-		tool("subscription_create", "For a topicGlob or pathGlob, choose target mission (agentName), session (this conversation, sessionMode continue or new), or notify (inbox). A mission or session requires hitlPolicyName. onDone optionally publishes a topic when a mission lands.", triggerProps, "name", "prompt"),
+		tool("watch_create", "Subscribe to a file appearing or changing. For example, wake this conversation when REVIEW.md is written with pathGlob REVIEW.md, target session, sessionMode continue and hitlPolicyName default.", triggerProps, "name", "pathGlob", "prompt"),
+		tool("subscription_create", "Wake an agent when a named topic is published. Choose exactly one topicGlob or pathGlob. Use watch_create for file changes. Choose target mission (agentName), session (this conversation, sessionMode continue or new), or notify (inbox). A mission or session requires hitlPolicyName. onDone optionally publishes a topic when a mission lands.", topicProps, "name", "prompt"),
 		tool("subscription_delete", "Remove a subscription in this project by its ID.", map[string]any{"id": field}, "id"),
 		tool("event_fire", "Publish a named event to this project. Matching subscriptions may start work.", map[string]any{"topic": map[string]string{"type": "string"}, "payload": map[string]string{"type": "object"}}, "topic"),
 		tool("event_get", "Read a workspace event and its full payload by event number.", map[string]any{"nid": map[string]any{"type": "integer", "minimum": 1}}, "nid"),
