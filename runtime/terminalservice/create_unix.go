@@ -13,6 +13,7 @@ import (
 	"github.com/contenox/runtime/runtime/terminalstore"
 	"github.com/creack/pty"
 	"github.com/google/uuid"
+	"golang.org/x/sys/unix"
 )
 
 func (s *service) Create(ctx context.Context, principal string, req CreateRequest) (*CreateResponse, error) {
@@ -66,6 +67,14 @@ func (s *service) Create(ctx context.Context, principal string, req CreateReques
 		_ = tty.Close()
 		_ = cmd.Process.Kill()
 		return nil, fmt.Errorf("terminalservice: pty resize: %w", err)
+	}
+	// pty's ioctl helpers call Fd, which switches the descriptor to blocking
+	// mode. Reads must remain interruptible when an attachment is cancelled.
+	if err := unix.SetNonblock(int(tty.Fd()), true); err != nil {
+		_ = tty.Close()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		return nil, fmt.Errorf("terminalservice: nonblocking pty: %w", err)
 	}
 
 	id := uuid.NewString()

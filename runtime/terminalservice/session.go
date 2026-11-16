@@ -21,12 +21,14 @@ type session struct {
 	busy                  atomic.Bool
 	attachMu              sync.Mutex
 	attachCancel          context.CancelFunc
+	attachDone            chan struct{}
 	attachGen             atomic.Uint64
 	lastActivityNanos     atomic.Int64
 }
 
 func (s *session) acquireAttach(parent context.Context) (context.Context, context.CancelFunc, func()) {
 	s.attachMu.Lock()
+	previousDone := s.attachDone
 	if s.attachCancel != nil {
 		s.attachCancel()
 		s.attachCancel = nil
@@ -34,19 +36,28 @@ func (s *session) acquireAttach(parent context.Context) (context.Context, contex
 	ctx, cancel := context.WithCancel(parent)
 	gen := s.attachGen.Add(1)
 	s.attachCancel = cancel
+	done := make(chan struct{})
+	s.attachDone = done
 	s.busy.Store(true)
 	s.touch()
 	s.attachMu.Unlock()
+	// The old attachment must clear its read deadline before the next reader
+	// starts using the same terminal descriptor.
+	if previousDone != nil {
+		<-previousDone
+	}
 
 	release := func() {
 		s.touch()
 		s.attachMu.Lock()
 		if s.attachGen.Load() == gen {
 			s.attachCancel = nil
+			s.attachDone = nil
 			s.busy.Store(false)
 		}
 		s.attachMu.Unlock()
 		cancel()
+		close(done)
 	}
 	return ctx, cancel, release
 }

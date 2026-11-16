@@ -3,9 +3,11 @@
 package terminalservice
 
 import (
+	"bufio"
 	"context"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ func setupTerminalService(t *testing.T, maxSessions int) (context.Context, Servi
 	}
 	svc, err := New(cfg, db, "node-test", "ws-test")
 	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, svc.CloseAll(ctx)) })
 	return ctx, svc
 }
 
@@ -98,27 +101,42 @@ func TestAttach_SecondConnectionPreemptsFirst(t *testing.T) {
 		_ = svc.Attach(context.Background(), principal, out.ID, firstConn, nil)
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	sess := svc.(*service).localByID(out.ID)
+	require.Eventually(t, func() bool { return sess.busy.Load() }, time.Second, time.Millisecond)
 
 	secondConn, secondPeer := net.Pipe()
 	secondDone := make(chan error, 1)
 	go func() {
-		defer secondPeer.Close()
 		secondDone <- svc.Attach(context.Background(), principal, out.ID, secondConn, nil)
 	}()
-
-	select {
-	case err := <-secondDone:
-		require.NoError(t, err)
-	case <-time.After(500 * time.Millisecond):
-		require.NoError(t, secondConn.Close())
-		require.NoError(t, <-secondDone)
-	}
+	t.Cleanup(func() { _ = secondPeer.Close() })
 
 	select {
 	case <-firstExited:
 	case <-time.After(2 * time.Second):
 		t.Fatal("first attach did not exit after preempt")
+	}
+
+	// Resizing must not turn the replacement terminal reader back into a
+	// blocking syscall. The replacement must also carry actual shell output.
+	require.NoError(t, svc.UpdateGeometry(ctx, principal, out.ID, 100, 30))
+	require.NoError(t, secondPeer.SetDeadline(time.Now().Add(2*time.Second)))
+	_, err = secondPeer.Write([]byte("printf 'terminal-%s\\n' reconnected\n"))
+	require.NoError(t, err)
+	reader := bufio.NewReader(secondPeer)
+	for {
+		line, err := reader.ReadString('\n')
+		require.NoError(t, err)
+		if strings.Contains(line, "terminal-reconnected") {
+			break
+		}
+	}
+	require.NoError(t, secondPeer.Close())
+	select {
+	case err := <-secondDone:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("replacement attach did not exit after disconnect")
 	}
 }
 

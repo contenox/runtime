@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/runtime/terminalstore"
-	"github.com/creack/pty"
 )
 
 func (s *service) Attach(ctx context.Context, principal, id string, conn io.ReadWriteCloser, resizeCh <-chan ResizeMsg) error {
@@ -80,7 +79,7 @@ func (s *service) Attach(ctx context.Context, principal, id string, conn io.Read
 						return
 					}
 					if msg.Cols > 0 && msg.Rows > 0 {
-						if err := pty.Setsize(tty, &pty.Winsize{Rows: uint16(msg.Rows), Cols: uint16(msg.Cols)}); err != nil {
+						if err := setPTYSize(tty, msg.Cols, msg.Rows); err != nil {
 							slog.Debug("terminal pty resize", "error", err)
 						}
 					}
