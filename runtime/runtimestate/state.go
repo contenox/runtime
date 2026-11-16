@@ -358,7 +358,7 @@ func (s *State) processBackend(ctx context.Context, backend *runtimetypes.Backen
 		s.processGeminiBackend(ctx, backend, declaredModels)
 	case "openai", "anthropic":
 		s.processOpenAIBackend(ctx, backend, declaredModels)
-	case "contenox", "openai-codex", "github-copilot":
+	case "openai-codex", "github-copilot":
 		s.processLoginBackend(ctx, backend, declaredModels)
 	case "vertex-google":
 		s.processVertexBackend(ctx, backend, declaredModels)

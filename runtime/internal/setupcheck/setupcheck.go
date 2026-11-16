@@ -595,8 +595,6 @@ func backendHint(backend runtimetypes.Backend, kind backendErrorKind) string {
 		switch modelrepo.CanonicalBackendType(backend.Type) {
 		case "openai", "anthropic", "mistral", "gemini":
 			return fmt.Sprintf("Save credentials on Cloud providers, or re-add backend %q after exporting the provider API key.", backend.Name)
-		case "contenox":
-			return "Sign in with Contenox again under Backends."
 		case "openai-codex":
 			return fmt.Sprintf("Backend %q uses a ChatGPT subscription sign-in. Sign in again on Cloud providers.", backend.Name)
 		case "vertex-google":
@@ -615,8 +613,6 @@ func backendHint(backend runtimetypes.Backend, kind backendErrorKind) string {
 		switch modelrepo.CanonicalBackendType(backend.Type) {
 		case "openai", "anthropic", "mistral", "gemini":
 			return fmt.Sprintf("The stored API key for backend %q was rejected. Update the key on Cloud providers.", backend.Name)
-		case "contenox":
-			return "Sign in with Contenox again under Backends."
 		case "openai-codex":
 			return fmt.Sprintf("The ChatGPT sign-in for backend %q expired or was revoked. Sign in again on Cloud providers.", backend.Name)
 		case "vertex-google":
@@ -731,7 +727,7 @@ func modelNamePresent(available []string, wanted string) bool {
 
 func providerFixPath(provider string) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "openrouter", "contenox", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openrouter", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	default:
 		return "/backends?tab=backends"
@@ -740,7 +736,7 @@ func providerFixPath(provider string) string {
 
 func providerFixPathForChecks(provider string, checks []BackendCheck) string {
 	switch modelrepo.CanonicalBackendType(provider) {
-	case "openai", "contenox", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
+	case "openai", "openai-codex", "deepseek", "alibaba-cloud", "anthropic", "mistral", "bedrock", "gemini", "vertex-google":
 		return "/backends?tab=cloud-providers"
 	case "ollama":
 		if anyHostedOllamaCheck(checks) {

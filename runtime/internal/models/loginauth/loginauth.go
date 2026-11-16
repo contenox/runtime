@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	libdb "github.com/contenox/runtime/libdbexec"
-	"github.com/contenox/runtime/runtime/internal/models/contenoxauth"
 	"github.com/contenox/runtime/runtime/internal/models/copilotauth"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -22,7 +21,7 @@ type Authenticator interface {
 
 func Supports(providerType string) bool {
 	switch strings.ToLower(strings.TrimSpace(providerType)) {
-	case modelauth.ProviderType, copilotauth.ProviderType, contenoxauth.ProviderType:
+	case modelauth.ProviderType, copilotauth.ProviderType:
 		return true
 	}
 	return false
@@ -30,8 +29,6 @@ func Supports(providerType string) bool {
 
 func For(db libdb.DBManager, providerType string) (Authenticator, bool) {
 	switch strings.ToLower(strings.TrimSpace(providerType)) {
-	case contenoxauth.ProviderType:
-		return contenoxauth.New(db), true
 	case modelauth.ProviderType:
 		return modelauth.New(db), true
 	case copilotauth.ProviderType:
@@ -41,7 +38,7 @@ func For(db libdb.DBManager, providerType string) (Authenticator, bool) {
 }
 
 func IsLoginRequired(err error) bool {
-	return errors.Is(err, contenoxauth.ErrLoginRequired) || errors.Is(err, modelauth.ErrLoginRequired) || errors.Is(err, copilotauth.ErrLoginRequired)
+	return errors.Is(err, modelauth.ErrLoginRequired) || errors.Is(err, copilotauth.ErrLoginRequired)
 }
 
 func IsNotAllowed(err error) bool {
@@ -52,16 +49,10 @@ func DeleteCredentials(ctx context.Context, exec libdb.Exec, id string) error {
 	if err := modelauth.DeleteCredentials(ctx, exec, id); err != nil {
 		return err
 	}
-	if err := contenoxauth.DeleteCredentials(ctx, exec, id); err != nil {
-		return err
-	}
 	return copilotauth.DeleteCredentials(ctx, exec, id)
 }
 
 func CredentialGeneration(ctx context.Context, store runtimetypes.Store, providerType, id string) (string, error) {
-	if strings.EqualFold(providerType, contenoxauth.ProviderType) {
-		return contenoxauth.CredentialGeneration(ctx, store, id)
-	}
 	if strings.EqualFold(providerType, copilotauth.ProviderType) {
 		return copilotauth.CredentialGeneration(ctx, store, id)
 	}
