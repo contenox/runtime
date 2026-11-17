@@ -1,0 +1,584 @@
+syntax = "proto3";
+
+package contenox.v1;
+
+import "contenox/v1/contract.proto";
+import "contenox/v1/workers.proto";
+
+option go_package = "github.com/contenox/runtime/internal/protocol/v1;protocolv1";
+
+// InferenceRequest is the request of every action _contenox/inference answers.
+// action selects the operation, and the remaining fields carry the inputs of
+// whichever action was selected: one request message carries every action's
+// inputs because one method string carries every action. An action that needs
+// an input the payload does not carry is refused, never defaulted.
+//
+// Requests select a configuration, role, model acquisition or automatic setup action.
+message InferenceRequest {
+  InferenceAcquisitionRequest acquisition = 1;
+  InferenceNativePrerequisite native_prerequisite = 2;
+  InferenceModelRegistration registration = 3;
+  InferencePlan plan = 4;
+  InferenceRecommendationRequest recommendation = 5;
+  repeated InferenceRouteProposal proposals = 6;
+  WorkerOptions options = 7;
+  repeated string selected_roles = 8;
+  string credential_source = 9;
+  string credential_file = 10;
+  string action = 11;
+  string role = 12;
+  string provider = 13;
+  string model = 14;
+  string completion_mode = 15;
+  string id = 16;
+  string name = 17;
+  string url = 18;
+  string api_key = 19;
+  string api_key_env = 20;
+  string origin = 21;
+  string operation_id = 22;
+  reserved 23;
+  bool enabled = 24;
+  bool inherit = 25;
+  bool refresh = 26;
+  int32 alternative = 27;
+  // pool_id and share select the memory pool configure-ceiling bounds on the
+  // native connection id names, and the share of its total bytes local
+  // inference may hold there.
+  string pool_id = 28;
+  double share = 29;
+}
+
+// InferenceAcquisitionRequest selects the host that receives a complete model
+// bundle: target is "local" or "connection", and connection_id names the saved
+// connection a "connection" target acquires on.
+message InferenceAcquisitionRequest {
+  string target = 1;
+  string connection_id = 2;
+  string model = 3;
+}
+
+// InferenceNativePrerequisite selects the native backend to install. backend is
+// "llama" or "openvino"; nothing else is installed on a guess.
+message InferenceNativePrerequisite {
+  string backend = 1;
+}
+
+// InferenceModelRegistration is one operator-stated model declaration,
+// scoped to the connection that serves it.
+message InferenceModelRegistration {
+  string connection_id = 1;
+  string model = 2;
+  InferenceModelFacts facts = 3;
+}
+
+// InferenceModelFacts is the declaration an operator states about a model.
+// Every member is an explicit statement: an absent one leaves the model's
+// observed facts in force rather than overriding them with an empty value.
+// The JSON names are the store's own snake_case names, which is the wire the
+// operator-stated declaration already travels as.
+message InferenceModelFacts {
+  bool registered = 1;
+  string completion_mode = 2 [json_name = "completion_mode"];
+  string fim_format = 3 [json_name = "fim_format"];
+  string next_edit_format = 4 [json_name = "next_edit_format"];
+  bool audio_extension = 5 [json_name = "audio_extension"];
+  int32 context_length = 6 [json_name = "context_length"];
+  int32 max_output_tokens = 7 [json_name = "max_output_tokens"];
+  repeated string capabilities = 8;
+  InferenceModelPricing pricing = 9;
+}
+
+// InferenceModelPricing is the upstream provider's rate card for one model, in
+// US dollars. PerImage prices one image attachment and PerAudioMebibyte one
+// mebibyte of inline audio.
+message InferenceModelPricing {
+  double input_per_million = 1 [json_name = "input_per_million"];
+  double cache_read_per_million = 2 [json_name = "cache_read_per_million"];
+  double cache_write_per_million = 3 [json_name = "cache_write_per_million"];
+  double output_per_million = 4 [json_name = "output_per_million"];
+  double per_image = 5 [json_name = "per_image"];
+  double per_audio_mebibyte = 6 [json_name = "per_audio_mebibyte"];
+}
+
+// InferenceRecommendationRequest chooses the candidates one role review may
+// recommend from and the constraints each role is reviewed against. ceilings
+// replace, per connection and pool, the device ceilings that connection's
+// owner reports, so a plan can be previewed under limits not yet saved.
+message InferenceRecommendationRequest {
+  string mode = 1;
+  string origin = 2;
+  repeated InferenceRoleConstraint constraints = 3;
+  repeated InferencePoolCeiling ceilings = 4;
+}
+
+// InferenceRoleConstraint is one role's reviewed requirement. importance is an
+// autosetup importance token; empty plans the role at normal importance.
+message InferenceRoleConstraint {
+  string role = 1;
+  string policy = 2;
+  string connection_id = 3;
+  repeated string allowed_connections = 4;
+  string inputs = 5;
+  string execution_mode = 6;
+  string importance = 7;
+}
+
+// InferencePoolCeiling bounds what local inference may hold on one
+// connection's memory pool, as a share of the pool's total bytes, greater than
+// 0 and at most 1.
+message InferencePoolCeiling {
+  string connection_id = 1;
+  string pool_id = 2;
+  double share = 3;
+}
+
+// InferencePlan is a reviewed automatic setup: the hardware it was evaluated
+// against, the models it may use, and the per-role outcome. The JSON names are
+// the engine projection's own names, which is the payload the IDE already
+// reviews. ceilings are the device ceilings a role recommendation was planned
+// under.
+message InferencePlan {
+  repeated InferenceRolePlan roles = 1;
+  string mode = 2;
+  repeated InferencePoolEstimate baseline = 3;
+  repeated ModelDescriptor models = 4;
+  InferenceHardware hardware = 5;
+  ModelDescriptor model = 6;
+  string backend = 7;
+  bool reused = 8;
+  int32 estimated_hot_context = 9;
+  string fingerprint = 10;
+  repeated InferencePlannedRole assignments = 11;
+  repeated InferencePoolCeiling ceilings = 12;
+}
+
+// InferencePlannedRole is one required IDE capability served by the reviewed
+// automatic plan.
+message InferencePlannedRole {
+  string role = 1;
+  string provider = 2;
+  string model = 3;
+}
+
+// InferenceRolePlan keeps one role's result available even when another role is
+// unresolved: state is the review's own token, selected is the reviewed
+// candidate, alternatives are the other eligible ones, and repairs names what
+// an unresolved role needs.
+message InferenceRolePlan {
+  InferenceRoleConstraint constraint = 1;
+  string state = 2;
+  InferenceRoleCandidate selected = 3;
+  repeated InferenceRoleCandidate alternatives = 4;
+  repeated string repairs = 5;
+}
+
+// InferenceRoleCandidate describes an editable route, its prerequisites and its
+// conservative allocation estimate.
+message InferenceRoleCandidate {
+  InferenceRouteProposal route = 1;
+  ModelDescriptor artifact = 2;
+  WorkerOptions execution_settings = 3;
+  repeated InferencePoolEstimate pools = 4;
+  string completion_mode = 5;
+  string connection_id = 6;
+  string endpoint = 7;
+  string scheduling = 8;
+  string reason = 9;
+  string review_error = 10;
+  int32 thread_limit = 11;
+  int32 context_tokens = 12;
+  bool native = 13;
+  bool installed = 14;
+  bool shared_memory = 15;
+  bool verified = 16;
+}
+
+// InferencePoolEstimate scopes a reservation to its owner's host and physical
+// memory pool.
+message InferencePoolEstimate {
+  string host = 1;
+  string pool_id = 2;
+  int64 bytes = 3;
+  int64 available_bytes = 4;
+  int64 ceiling_bytes = 5;
+}
+
+// InferenceHardware describes one conservative memory pool; system RAM and
+// device memory are never added together. Detection does not establish driver
+// or model compatibility, and live modeld capacity remains authoritative.
+//
+// The engine type carries no JSON tags, so its members reach the wire as Go
+// field names; json_name preserves them rather than inventing a second
+// convention beside the payload.
+message InferenceHardware {
+  int64 memory_bytes = 1 [json_name = "MemoryBytes"];
+  string preferred_backend = 2 [json_name = "PreferredBackend"];
+  string kind = 3 [json_name = "Kind"];
+  string label = 4 [json_name = "Label"];
+  int64 total_bytes = 5 [json_name = "TotalBytes"];
+  int64 available_bytes = 6 [json_name = "AvailableBytes"];
+  bool known = 7 [json_name = "Known"];
+  int64 system_total_bytes = 8 [json_name = "SystemTotalBytes"];
+  int64 system_available_bytes = 9 [json_name = "SystemAvailableBytes"];
+  repeated InferenceHardwareDevice devices = 10 [json_name = "Devices"];
+  string summary = 11 [json_name = "Summary"];
+}
+
+// InferenceHardwareDevice records one observed device. Shared memory is backed
+// by system RAM and is not added to the selected device budget.
+message InferenceHardwareDevice {
+  string vendor = 1 [json_name = "Vendor"];
+  string name = 2 [json_name = "Name"];
+  string kind = 3 [json_name = "Kind"];
+  int64 total_bytes = 4 [json_name = "TotalBytes"];
+  int64 available_bytes = 5 [json_name = "AvailableBytes"];
+  bool memory_known = 6 [json_name = "MemoryKnown"];
+  string source = 7 [json_name = "Source"];
+  int64 shared_total_bytes = 8 [json_name = "SharedTotalBytes"];
+  int64 shared_available_bytes = 9 [json_name = "SharedAvailableBytes"];
+  bool shared_memory_known = 10 [json_name = "SharedMemoryKnown"];
+}
+
+// ModelDescriptor describes one downloadable model and its backend
+// requirements, as the curated catalogue declares it. It is the element of the
+// catalogue action's bare array answer and of every model list an automatic
+// plan carries.
+message ModelDescriptor {
+  InferenceCompletionProfile completion = 1;
+  InferenceNextEditProfile next_edit = 2 [json_name = "nextEdit"];
+  InferenceEmbeddingProfile embedding = 3;
+  InferenceLayerKVProfile auto_kv_profile = 4 [json_name = "autoKVProfile"];
+  string id = 5;
+  string name = 6;
+  string origin = 7;
+  string released_at = 8;
+  string license = 9;
+  string source_url = 10;
+  string source_sha256 = 11;
+  string repo = 12;
+  string revision = 13;
+  string backend = 14;
+  string tokenizer_companion_id = 15;
+  string tool_protocol = 16;
+  string reasoning_protocol = 17;
+  string reasoning_format = 18;
+  string family = 19;
+  string display_label = 20;
+  string use_case = 21;
+  string agentic_tier = 22;
+  string agentic_evidence = 23;
+  string mmproj_url = 24;
+  string chat_template_url = 25;
+  string notes = 26;
+  int64 size_bytes = 27;
+  int64 mmproj_size_bytes = 28;
+  int32 auto_context_limit = 29;
+  int32 recommended_vram_gb = 30;
+  bool curated = 31;
+  bool auto_eligible = 32;
+  bool vision = 33;
+  // auto_acquirable reports whether the artifact's licence lets setup download
+  // and assign it on the user's behalf.
+  bool auto_acquirable = 34;
+  // serves_roles lists the inference roles the artifact's curated execution
+  // contracts qualify it for.
+  repeated string serves_roles = 35;
+}
+
+// InferenceCompletionProfile declares a code-completion execution contract and
+// its curated evidence.
+message InferenceCompletionProfile {
+  string fim_format = 1;
+  string mode = 2;
+  string evidence = 3;
+  int32 context_tokens = 4;
+}
+
+// InferenceNextEditProfile declares an edit-prediction contract and its
+// curation evidence.
+message InferenceNextEditProfile {
+  string format = 1;
+  string evidence = 2;
+  int32 context_tokens = 3;
+}
+
+// InferenceEmbeddingProfile declares a retrieval model's execution and input
+// contract.
+message InferenceEmbeddingProfile {
+  string pooling = 1;
+  string query_prefix = 2;
+  string document_prefix = 3;
+  string evidence = 4;
+  int32 context_tokens = 5;
+  int32 dimension = 6;
+  bool normalize = 7;
+}
+
+
+// InferenceLayerKVProfile conservatively estimates hot KV storage before
+// download. The engine type carries no JSON tags, so its members reach the wire
+// as Go field names.
+message InferenceLayerKVProfile {
+  int32 global_layers = 1 [json_name = "GlobalLayers"];
+  int32 windowed_layers = 2 [json_name = "WindowedLayers"];
+  int32 window = 3 [json_name = "Window"];
+  int64 per_layer_kv_bytes = 4 [json_name = "PerLayerKVBytes"];
+}
+
+// InferenceResult is the answer to every action _contenox/inference answers
+// with an object: the configuration snapshot with the members the requested
+// action populated. One result message carries every answer because one method
+// string carries every action. An unpopulated member is the declared null, not
+// a member the answer omitted.
+message InferenceResult {
+  ServiceContract acquisition_contract = 1;
+  ServiceContract registration_contract = 2;
+  ServiceContract configuration_contract = 3;
+  ServiceContract completion_contract = 4;
+  ServiceContract editor_contract = 5;
+  InferenceProviderResult provider_result = 6;
+  InferenceAutomaticSetup automatic_setup = 7;
+  InferenceReadiness readiness = 8;
+  reserved 9, 10;
+  InferenceProposalRevision proposal_revision = 11;
+  repeated InferenceRole roles = 12;
+  repeated InferenceAvailableModel models = 13;
+  repeated InferenceProviderConnection providers = 14;
+  repeated InferenceProviderCapability provider_types = 15;
+  repeated InferenceRouteProposal reviewed_proposals = 16;
+  reserved 17;
+  reserved 18;
+  reserved "license";
+  // ceilings are the device ceilings the connection's owner enforces after a
+  // configure-ceiling, one entry per bounded pool.
+  repeated InferencePoolCeiling ceilings = 19;
+}
+
+// InferenceRole is one inference role's effective assignment and whether its
+// current configuration was verified.
+message InferenceRole {
+  InferenceVerification verification = 1;
+  string assignment_state = 2;
+  string connection_id = 3;
+  string revision = 4;
+  string inputs = 5;
+  string id = 6;
+  string name = 7;
+  string provider = 8;
+  string model = 9;
+  string state = 10;
+  string detail = 11;
+  string problem = 12;
+  bool inherited = 13;
+  bool enabled = 14;
+  // source names which path saved the assignment: user or planner;
+  // empty for a role saved before the source was recorded.
+  string source = 15;
+}
+
+// InferenceVerification records the route and result proven by a real
+// capability request. verified_at is the RFC 3339 instant the verification
+// completed.
+message InferenceVerification {
+  repeated InferenceSessionExecution native_executions = 1;
+  string inputs = 2;
+  string configuration_revision = 3;
+  string role_revision = 4;
+  string role = 5;
+  string provider = 6;
+  string model = 7;
+  string fingerprint = 8;
+  string verified_at = 9;
+  string sample = 10;
+  int32 dimension = 11;
+}
+
+// InferenceSessionExecution is one resolved native execution: what was
+// requested, what the owner resolved, and the capacity decision it made.
+message InferenceSessionExecution {
+  WorkerLaunchConfig requested = 1;
+  WorkerLaunchConfig resolved = 2;
+  WorkerModelInfo capacity = 3;
+  string owner_epoch = 4;
+  string worker_identity = 5;
+  string model_name = 6;
+  string digest = 7;
+  string backend = 8;
+  string device_selector = 9;
+}
+
+// InferenceProviderResult reports a saved connection and, separately from
+// persistence, whether its model discovery finished.
+message InferenceProviderResult {
+  string id = 1;
+  string discovery_error = 2;
+}
+
+// InferenceAvailableModel reports a model advertised by a connected provider.
+message InferenceAvailableModel {
+  repeated string declared_capabilities = 1;
+  repeated string advertised_capabilities = 2;
+  repeated string adapter_capabilities = 3;
+  string digest = 4;
+  string native_backend = 5;
+  string provider = 6;
+  string name = 7;
+  string fim_format = 8;
+  string next_edit_format = 9;
+  string completion_mode = 10;
+  int32 context_tokens = 11;
+  bool registered = 12;
+  bool vision = 13;
+  bool audio = 14;
+  bool chat = 15;
+  bool embed = 16;
+  bool prompt = 17;
+  bool autocomplete = 18;
+  bool next_edit = 19;
+}
+
+// InferenceProviderConnection is one saved provider connection and how its
+// credentials and discovery stand.
+message InferenceProviderConnection {
+  repeated string registration_capabilities = 1;
+  string credential_source = 2;
+  string authorization_state = 3;
+  string authorization_error = 4;
+  string discovery_state = 5;
+  string revision = 6;
+  string selector = 7;
+  string id = 8;
+  string name = 9;
+  string type = 10;
+  string url = 11;
+  string state = 12;
+  string error = 13;
+}
+
+// InferenceProviderCapability describes one provider type a connection may
+// name, without exposing credentials.
+message InferenceProviderCapability {
+  repeated InferenceCredentialSource credential_sources = 1;
+  repeated string autocomplete_formats = 2;
+  repeated string next_edit_formats = 3;
+  string default_credential_source = 4;
+  InferenceProviderOnboarding onboarding = 5;
+  string provider = 6;
+  string label = 7;
+  string description = 8;
+  string auth_kind = 9;
+  string default_base_url = 10;
+  string endpoint_hint = 11;
+  string recommended_api_key_env = 12;
+  bool requires_base_url = 13;
+  bool requires_secret_config = 14;
+}
+
+// InferenceCredentialSource is one supported credential source.
+message InferenceCredentialSource {
+  string id = 1;
+  string label = 2;
+}
+
+// InferenceProviderOnboarding is the official setup material a surface shows
+// for one provider type.
+message InferenceProviderOnboarding {
+  repeated InferenceProviderEndpoint endpoints = 1;
+  string api_key_url = 2;
+  string api_key_label = 3;
+  string setup_url = 4;
+  string pricing_url = 5;
+  string instructions = 6;
+  string availability = 7;
+}
+
+// InferenceProviderEndpoint is an editable endpoint preset and its official
+// setup instructions.
+message InferenceProviderEndpoint {
+  string name = 1;
+  string url = 2;
+  string setup_url = 3;
+}
+
+// InferenceReadiness is the setup readiness one action answers: where the
+// effective defaults came from, what each registered backend does, and every
+// issue with the route that fixes it.
+message InferenceReadiness {
+  repeated InferenceReadinessIssue issues = 1;
+  repeated InferenceBackendCheck backend_checks = 2;
+  map<string, string> resolved_from = 3;
+  string default_model = 4;
+  string default_provider = 5;
+  string default_chain = 6;
+  string hitl_policy_name = 7;
+  int32 default_max_output_tokens = 8;
+  int32 backend_count = 9;
+  int32 reachable_backend_count = 10;
+}
+
+// InferenceReadinessIssue describes one setup problem, how to fix it, and the
+// native repair action that addresses it.
+message InferenceReadinessIssue {
+  InferenceRepairAction repair = 1;
+  string code = 2;
+  string severity = 3;
+  string category = 4;
+  string message = 5;
+  string fix_path = 6;
+  string cli_command = 7;
+}
+
+// InferenceRepairAction identifies a native product action that can address an
+// issue. An empty target selects the action's own default.
+message InferenceRepairAction {
+  string kind = 1;
+  string target = 2;
+}
+
+// InferenceBackendCheck reports the runtime status of one registered backend.
+message InferenceBackendCheck {
+  repeated string chat_models = 1;
+  string id = 2;
+  string name = 3;
+  string type = 4;
+  string base_url = 5;
+  string status = 6;
+  string error = 7;
+  string hint = 8;
+  int32 model_count = 9;
+  int32 chat_model_count = 10;
+  bool reachable = 11;
+  bool default_provider = 12;
+}
+
+// InferenceAutomaticSetup carries the reviewed automatic plan beside the state
+// it is in and the hot context it would hold.
+message InferenceAutomaticSetup {
+  InferencePlan plan = 1;
+  ServiceContract contract = 2;
+  string state = 3;
+  int32 hot_context = 4;
+}
+
+// InferenceRouteProposal is one reviewed role assignment with the revisions it
+// was reviewed against and the execution settings it would save.
+message InferenceRouteProposal {
+  WorkerOptions settings = 1;
+  string inputs = 2;
+  string role = 3;
+  string provider = 4;
+  string model = 5;
+  string role_revision = 6;
+  string connection_revision = 7;
+  string fingerprint = 8;
+  string settings_change = 9;
+}
+
+// InferenceProposalRevision reports why a reviewed group needs another review,
+// with the proposals and the execution that were rejected.
+message InferenceProposalRevision {
+  InferenceSessionExecution execution = 1;
+  repeated InferenceRouteProposal proposals = 2;
+  string reason = 3;
+}

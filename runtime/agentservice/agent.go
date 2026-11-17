@@ -12,6 +12,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/chatservice"
 	"github.com/contenox/runtime/runtime/enginesvc"
+	"github.com/contenox/runtime/runtime/llmrepo"
 	"github.com/contenox/runtime/runtime/messagestore"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/sessionservice"
@@ -173,6 +174,7 @@ func (a *agent) Prompt(ctx context.Context, req PromptRequest) (*PromptResponse,
 
 	if req.SessionID != "" {
 		ctx = context.WithValue(ctx, runtimetypes.SessionIDContextKey, req.SessionID)
+		ctx = llmrepo.WithPersistedSession(ctx, req.SessionID)
 	}
 
 	var earlyUserMessageID string

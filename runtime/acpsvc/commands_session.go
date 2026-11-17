@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/contenox/runtime/runtime/homedir"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +11,8 @@ import (
 
 	libacp "github.com/contenox/runtime/libacp"
 	"github.com/contenox/runtime/runtime/chatservice"
+	"github.com/contenox/runtime/runtime/homedir"
+	"github.com/contenox/runtime/runtime/llmrepo"
 	"github.com/contenox/runtime/runtime/taskengine"
 )
 
@@ -61,6 +62,7 @@ func (t *Transport) handleCompact(ctx context.Context, _ libacp.SessionID, sess 
 	templateVars := t.chainTemplateVars(sess)
 	templateVars["chain"] = chain.ID
 	execCtx := taskengine.WithTemplateVars(ctx, templateVars)
+	execCtx = llmrepo.WithPersistedSession(execCtx, sess.InternalSessionID)
 
 	compacted, err := chatservice.CompactHistory(execCtx, t.deps.Engine.TaskService, chain, history, keep)
 	if err != nil {

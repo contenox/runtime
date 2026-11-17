@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
@@ -43,6 +42,7 @@ type providerConfig struct {
 }
 
 var providerConfigs = map[string]providerConfig{
+	"modeld": {name: "Contenox native (Modeld)", defaultModel: "qwen2.5-coder-7b"},
 	"ollama": {
 		name:         "Ollama (local)",
 		defaultModel: "qwen3:8b", // suggestion printed by init only; never a runtime default
@@ -84,46 +84,6 @@ var providerConfigs = map[string]providerConfig{
 		defaultModel: "gemini-flash-latest",
 		envKey:       "",
 	},
-}
-
-func pruneLegacyLocalBackends(ctx context.Context, db libdb.DBManager) (int, error) {
-	store := runtimetypes.New(db.WithoutTransaction())
-	backends, err := store.ListBackends(ctx, nil, runtimetypes.MAXLIMIT)
-	if err != nil {
-		return 0, fmt.Errorf("list backends: %w", err)
-	}
-	removed := 0
-	for _, backend := range backends {
-		if !modelrepo.IsLocalBackendType(backend.Type) {
-			continue
-		}
-		if err := store.DeleteBackend(ctx, backend.ID); err != nil {
-			return removed, fmt.Errorf("delete legacy backend %q: %w", backend.Name, err)
-		}
-		removed++
-	}
-	return removed, nil
-}
-
-func pruneLegacyLocalBackendsFromHome(out io.Writer) {
-	dbPath, err := globalDBPath()
-	if err != nil {
-		return
-	}
-	ctx := libtracker.WithNewRequestID(context.Background())
-	db, err := OpenDBAt(ctx, dbPath)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	removed, err := pruneLegacyLocalBackends(ctx, db)
-	if err != nil {
-		fmt.Fprintf(out, "  warning: could not prune legacy local backends: %v\n", err)
-		return
-	}
-	if removed > 0 {
-		fmt.Fprintf(out, "  Removed %d legacy local backend(s)\n", removed)
-	}
 }
 
 func hasBackendOfType(providerType string) bool {
@@ -177,7 +137,6 @@ func RunGlobalInit(out io.Writer) error {
 		return err
 	}
 	seedGlobalMissionDefaults(out)
-	pruneLegacyLocalBackendsFromHome(out)
 	return nil
 }
 
@@ -203,7 +162,7 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 
 	pc, ok := providerConfigs[provider]
 	if !ok {
-		return fmt.Errorf("unknown provider %q — valid options: ollama, openai, openrouter, gemini, anthropic, mistral, bedrock, vertex-google", provider)
+		return fmt.Errorf("unknown provider %q — valid options: modeld, ollama, openai, openrouter, gemini, anthropic, mistral, bedrock, vertex-google", provider)
 	}
 	if err := os.MkdirAll(contenoxDir, 0750); err != nil {
 		return fmt.Errorf("failed to create .contenox directory: %w", err)
@@ -275,7 +234,6 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	}
 
 	seedGlobalMissionDefaults(out)
-	pruneLegacyLocalBackendsFromHome(out)
 
 	fmt.Fprintln(out, "Done.")
 	fmt.Fprintln(out, "")
@@ -341,6 +299,12 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 	fmt.Fprintln(out, "")
 	chatStep := 3
 	switch provider {
+	case "modeld":
+		fmt.Fprintln(out, "  1. Check the native worker: contenox-runtime modeld status")
+		fmt.Fprintf(out, "  2. Download a model: contenox-runtime model pull %s\n", pc.defaultModel)
+		fmt.Fprintln(out, "  3. Run contenox-runtime setup and choose Contenox native.")
+		fmt.Fprintln(out, "")
+		chatStep = 4
 	case "vertex-google":
 		fmt.Fprintln(out, "  1. Authenticate with Google Cloud:")
 		fmt.Fprintln(out, "       export GOOGLE_CLOUD_PROJECT=my-project-id")
@@ -440,8 +404,8 @@ func RunInit(out, errOut io.Writer, force, update bool, provider string, conteno
 		fmt.Fprintln(out, "       contenox-runtime backend add ollama-cloud --type ollama --url https://ollama.com/api --api-key-env OLLAMA_API_KEY")
 		fmt.Fprintln(out, "  Get an Ollama API key for direct cloud access: https://ollama.com/settings/keys")
 		fmt.Fprintln(out, "")
-		fmt.Fprintln(out, "  Optional: run fully local GGUF models via the llama provider:")
-		fmt.Fprintln(out, "       contenox-runtime init llama")
+		fmt.Fprintln(out, "  Optional: run native models with Modeld:")
+		fmt.Fprintln(out, "       contenox-runtime init modeld")
 		fmt.Fprintln(out, "")
 		chatStep = 4
 	default:

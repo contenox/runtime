@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
+	shared "github.com/contenox/runtime/runtime/clikv"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
-const Prefix = "cli."
+const Prefix = shared.Prefix
 
 var workspaceScopedKeys = map[string]bool{
 	"default-chain":    true,
@@ -47,12 +48,7 @@ func SetHITLPolicy(ctx context.Context, store runtimetypes.Store, name string) e
 }
 
 func SetString(ctx context.Context, store runtimetypes.Store, key, value string) error {
-	v := strings.TrimSpace(value)
-	data, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	return store.SetKV(ctx, Prefix+key, json.RawMessage(data))
+	return shared.SetString(ctx, store, key, value)
 }
 
 func WriteConfig(ctx context.Context, store runtimetypes.Store, workspaceID, key, value string) error {

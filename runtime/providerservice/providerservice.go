@@ -24,6 +24,7 @@ import (
 
 const (
 	ProviderTypeLocal         = "local"
+	ProviderTypeModeld        = "modeld"
 	ProviderTypeOllama        = "ollama"
 	ProviderTypeOpenAI        = "openai"
 	ProviderTypeAnthropic     = "anthropic"
@@ -149,7 +150,8 @@ type providerDefaults struct {
 }
 
 var providerDefaultsByType = map[string]providerDefaults{
-	ProviderTypeLocal:         {Type: ProviderTypeLocal, RequiresBaseURL: true},
+	ProviderTypeLocal:         {Type: ProviderTypeLocal, DefaultBaseURL: "local"},
+	ProviderTypeModeld:        {Type: ProviderTypeModeld, DefaultBaseURL: "local"},
 	ProviderTypeOllama:        {Type: ProviderTypeOllama, DefaultBaseURL: "http://127.0.0.1:11434", RecommendedAPIKeyEnv: "OLLAMA_API_KEY"},
 	ProviderTypeOpenAI:        {Type: ProviderTypeOpenAI, DefaultBaseURL: "https://api.openai.com/v1", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "OPENAI_API_KEY"},
 	ProviderTypeAnthropic:     {Type: ProviderTypeAnthropic, DefaultBaseURL: "https://api.anthropic.com", RequiresSecretConfig: true, RecommendedAPIKeyEnv: "ANTHROPIC_API_KEY"},

@@ -13,6 +13,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/llmresolver"
 	"github.com/contenox/runtime/runtime/internal/models/ollamatokenizer"
 	libmodelprovider "github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 	"github.com/contenox/runtime/runtime/runtimestate"
 )
 
@@ -193,6 +194,7 @@ type ModelConfig struct {
 }
 
 type ModelManagerConfig struct {
+	Workers               *modeldconn.Workers
 	EmbeddingDefault      func(context.Context) (ModelConfig, error)
 	DefaultPromptModel    ModelConfig
 	DefaultEmbeddingModel ModelConfig
@@ -272,7 +274,9 @@ func (e *modelManager) PromptExecute(
 	systemInstruction string, temperature float32, prompt string,
 	args ...libmodelprovider.PromptArgument,
 ) (string, Meta, error) {
+	ctx = modeldconn.WithWorkers(ctx, e.config.Workers)
 	if req.WorkerRole != "" {
+		ctx = modeldconn.WithWorkerRole(ctx, req.WorkerRole)
 	}
 	if err := validateRequest(req); err != nil {
 		return "", Meta{}, fmt.Errorf("invalid request: %w", err)
@@ -316,7 +320,9 @@ func (e *modelManager) Chat(
 	req Request,
 	messages []libmodelprovider.Message, opts ...libmodelprovider.ChatArgument,
 ) (libmodelprovider.ChatResult, Meta, error) {
+	ctx = modeldconn.WithWorkers(ctx, e.config.Workers)
 	if req.WorkerRole != "" {
+		ctx = modeldconn.WithWorkerRole(ctx, req.WorkerRole)
 	}
 	if err := validateRequest(req); err != nil {
 		return libmodelprovider.ChatResult{}, Meta{}, fmt.Errorf("invalid request: %w", err)
@@ -363,6 +369,7 @@ func (e *modelManager) Embed(
 	embedReq EmbedRequest,
 	prompt string,
 ) ([]float64, Meta, error) {
+	ctx = modeldconn.WithWorkerRole(modeldconn.WithWorkers(ctx, e.config.Workers), "embedding")
 	if prompt == "" {
 		return nil, Meta{}, fmt.Errorf("%w: prompt cannot be empty", ErrInvalidRequest)
 	}
@@ -428,7 +435,9 @@ func (e *modelManager) Stream(
 	messages []libmodelprovider.Message,
 	opts ...libmodelprovider.ChatArgument,
 ) (<-chan *libmodelprovider.StreamParcel, Meta, error) {
+	ctx = modeldconn.WithWorkers(ctx, e.config.Workers)
 	if req.WorkerRole != "" {
+		ctx = modeldconn.WithWorkerRole(ctx, req.WorkerRole)
 	}
 	if len(messages) == 0 {
 		return nil, Meta{}, fmt.Errorf("%w: messages cannot be empty", ErrInvalidRequest)

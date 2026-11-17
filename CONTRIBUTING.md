@@ -41,6 +41,8 @@ not on your `PATH` or if another `contenox-runtime` comes first. Other local too
 such as the desktop app, find the runtime only by the name `contenox-runtime` on
 `PATH`. Stop a running runtime before reinstalling on Windows (the file is locked).
 
+Modeld developers can build, install, and exercise the native worker using the [native build guide](docs/development/modeld-build.md). Use `make modeld-test` for the portable transport and worker suites.
+
 ## Tests and checks
 
 ```sh

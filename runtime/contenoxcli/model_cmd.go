@@ -57,7 +57,10 @@ Examples:
   contenox-runtime model list`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := libtracker.WithNewRequestID(context.Background())
+		if local, _ := cmd.Flags().GetBool("local"); local {
+			return printNativeModels(cmd)
+		}
+		ctx := libtracker.WithNewRequestID(cmd.Context())
 		db, _, err := openBackendDB(cmd)
 		if err != nil {
 			return err
@@ -172,7 +175,7 @@ func printLiveModels(ctx context.Context, db libdb.DBManager, out, errW io.Write
 		fmt.Fprintf(out, "\n%s is unreachable: %s\n", u.backend, u.reason)
 	}
 	if !any {
-		fmt.Fprintln(out, "\nNo loadable models found on any live backend. For installed local artifacts, run: contenox-runtime model local")
+		fmt.Fprintln(out, "\nNo loadable models found on any live backend. For installed local artifacts, run: contenox-runtime model list --local")
 	}
 	if preferredModel != "" {
 		fmt.Fprintln(out, "\n* = default model (contenox-runtime config set default-model <name>)")

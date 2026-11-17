@@ -183,6 +183,7 @@ type Store interface {
 	SetKV(ctx context.Context, key string, value json.RawMessage) error
 	UpdateKV(ctx context.Context, key string, value json.RawMessage) error
 	GetKV(ctx context.Context, key string, out interface{}) error
+	GetKVRevision(ctx context.Context, key string) (KVRevision, error)
 	DeleteKV(ctx context.Context, key string) error
 	ListKV(ctx context.Context, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error)
 	ListKVPrefix(ctx context.Context, prefix string, createdAtCursor *time.Time, limit int, afterID ...string) ([]*KV, error)

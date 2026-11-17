@@ -9,6 +9,7 @@ import (
 
 	"github.com/contenox/runtime/runtime/internal/llmresolver"
 	"github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/statetype"
 )
@@ -198,14 +199,14 @@ func OverlayEffectiveDefaults(res Result, model, provider string) Result {
 }
 
 func ResolveMaxOutputTokens(states []statetype.BackendRuntimeState, provider, model string) int {
-	provider = modelrepo.CanonicalBackendType(provider)
+	provider = strings.TrimSpace(provider)
 	model = strings.TrimSpace(model)
 	if provider == "" || model == "" {
 		return 0
 	}
 	normalizedModel := llmresolver.NormalizeModelName(model)
 	for _, state := range states {
-		if strings.TrimSpace(state.Error) != "" || !providerTypeMatches(provider, state.Backend.Type) {
+		if strings.TrimSpace(state.Error) != "" || !matchesSelectedBackend(provider, state.Backend) {
 			continue
 		}
 		for _, pulled := range state.PulledModels {
@@ -227,13 +228,17 @@ func ResolveMaxOutputTokens(states []statetype.BackendRuntimeState, provider, mo
 	return 0
 }
 
-func providerTypeMatches(provider, backendType string) bool {
-	provider = modelrepo.CanonicalBackendType(provider)
-	backendType = modelrepo.CanonicalBackendType(backendType)
-	if provider == backendType {
+func matchesSelectedBackend(provider string, backend runtimetypes.Backend) bool {
+	if strings.TrimSpace(provider) == "" {
+		return false
+	}
+	if runtimestate.MatchesBackend(provider, backend) {
 		return true
 	}
-	return provider == "vertex" && strings.HasPrefix(backendType, "vertex-")
+	provider = modelrepo.CanonicalBackendType(provider)
+	backendType := modelrepo.CanonicalBackendType(backend.Type)
+	return (modelrepo.IsLocalBackendType(provider) && modelrepo.IsLocalBackendType(backendType)) ||
+		(provider == "vertex" && strings.HasPrefix(backendType, "vertex-"))
 }
 
 func blockingIssue(iss Issue) bool {
@@ -291,15 +296,7 @@ func addDefaultProviderIssues(r *Result) {
 		return
 	}
 
-	localDefault := modelrepo.IsLocalBackendType(defaultProvider)
-	matchesDefault := func(check BackendCheck) bool {
-		if localDefault {
-			return modelrepo.IsLocalBackendType(check.Type)
-		}
-		return modelrepo.CanonicalBackendType(check.Type) == defaultProvider
-	}
-
-	defaultChecks := filterBackendChecks(r.BackendChecks, matchesDefault)
+	defaultChecks := filterBackendChecks(r.BackendChecks, func(check BackendCheck) bool { return check.DefaultProvider })
 	if len(defaultChecks) == 0 && r.BackendCount > 0 {
 		addIssue(r, Issue{
 			Code:       "default_provider_backend_missing",
@@ -315,6 +312,7 @@ func addDefaultProviderIssues(r *Result) {
 		return
 	}
 
+	defaultProvider = defaultChecks[0].Type
 	reachableChecks := filterBackendChecks(defaultChecks, func(check BackendCheck) bool { return check.Reachable })
 	fixPath := providerFixPathForChecks(defaultProvider, defaultChecks)
 	if len(reachableChecks) == 0 {
@@ -425,7 +423,7 @@ func buildBackendChecks(registered []runtimetypes.Backend, states []statetype.Ba
 			Name:            backend.Name,
 			Type:            backend.Type,
 			BaseURL:         backend.BaseURL,
-			DefaultProvider: modelrepo.CanonicalBackendType(backend.Type) == modelrepo.CanonicalBackendType(defaultProvider),
+			DefaultProvider: matchesSelectedBackend(defaultProvider, backend),
 			Status:          "pending",
 			Hint:            pendingBackendHint(backend),
 		}
@@ -762,10 +760,8 @@ func providerAddCommand(provider string) string {
 		return "contenox-runtime backend add alibaba --type alibaba-cloud --api-key-env DASHSCOPE_API_KEY"
 	case "openai-codex":
 		return "contenox-runtime backend add chatgpt --type openai-codex && contenox-runtime backend login chatgpt"
-	case "llama":
-		return "contenox-runtime backend add llama --type llama --url ~/.contenox-harness/models/llama"
-	case "openvino":
-		return "contenox-runtime backend add openvino --type openvino --url ~/.contenox-harness/models/openvino"
+	case "llama", "openvino", "modeld", "local":
+		return "contenox-runtime backend add native-local --type modeld --url local"
 	case "vertex-google":
 		return fmt.Sprintf("gcloud auth application-default login && contenox-runtime backend add %s --type %s --url \"https://us-central1-aiplatform.googleapis.com/v1/projects/$GOOGLE_CLOUD_PROJECT/locations/us-central1\"", provider, provider)
 	case "bedrock":
@@ -783,6 +779,8 @@ func noChatModelsCommand(provider string) string {
 		return "contenox-runtime model list   # Gemini models from AI Studio metadata; set default-model to a gemini-* name"
 	case "bedrock":
 		return "Enable the model in the AWS Bedrock console (Model access), then: contenox-runtime model list   # Bedrock returns AccessDeniedException until the model is enabled for your account"
+	case "llama", "openvino", "modeld", "local":
+		return "contenox-runtime model list --local   # use contenox-runtime pull <name> to install a native model"
 	default:
 		return "contenox-runtime model list   # if empty, pull a chat model (e.g. ollama pull " + DefaultOllamaSuggestModel + ")"
 	}
@@ -796,10 +794,8 @@ func primaryDiagnosticCommand(provider string) string {
 		return "gcloud auth application-default print-access-token   # verify ADC is working; also check GOOGLE_CLOUD_PROJECT is set"
 	case "bedrock":
 		return "aws sts get-caller-identity   # verify AWS creds resolve; then check model access in the Bedrock console"
-	case "llama":
-		return "contenox-runtime model local   # confirm installed GGUF artifacts; start modeld in llama mode, then run 'contenox-runtime model list'"
-	case "openvino":
-		return "contenox-runtime model local   # confirm installed OpenVINO IR artifacts; start modeld in openvino mode, then run 'contenox-runtime model list'"
+	case "llama", "openvino", "modeld", "local":
+		return "contenox-runtime modeld status"
 	default:
 		return "contenox-runtime backend list   # verify URL, then inspect runtime errors on the backend"
 	}

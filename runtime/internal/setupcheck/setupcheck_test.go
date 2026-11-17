@@ -368,3 +368,23 @@ func TestSystem_Evaluate_defaultModelNotAvailable(t *testing.T) {
 		t.Fatalf("expected available model in message, got %#v", found)
 	}
 }
+
+func TestUnit_Evaluate_NativeConnectionSelector(t *testing.T) {
+	local := runtimetypes.Backend{ID: "local-node", Name: "native", Type: "modeld", BaseURL: "local"}
+	remote := runtimetypes.Backend{ID: "remote-node", Name: "other", Type: "modeld", BaseURL: "remote:9999"}
+	result := Evaluate(Input{
+		DefaultModel: "resident", DefaultProvider: "connection:local-node",
+		States: []statetype.BackendRuntimeState{
+			{ID: remote.ID, Backend: remote, PulledModels: []statetype.ModelPullStatus{{Model: "resident", CanChat: true, MaxOutputTokens: 32}}},
+			{ID: local.ID, Backend: local, PulledModels: []statetype.ModelPullStatus{{Model: "resident", CanChat: true, MaxOutputTokens: 128}}},
+		},
+	})
+	if !result.Ready() || result.DefaultMaxOutputTokens != 128 {
+		t.Fatalf("selected local model readiness: %+v", result)
+	}
+	for _, check := range result.BackendChecks {
+		if check.DefaultProvider != (check.ID == local.ID) {
+			t.Fatalf("wrong default connection: %+v", check)
+		}
+	}
+}

@@ -1,0 +1,121 @@
+version: '3'
+
+vars:
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  EXE: '{{if eq OS "windows"}}.exe{{end}}'
+  BIN: '{{.BIN_DIR}}/contenox-runtime{{.EXE}}'
+
+tasks:
+  build:
+    desc: Build the Runtime CLI
+    cmds:
+      - go build -o "{{.BIN}}" ./cmd/contenox
+    env:
+      CGO_ENABLED: '0'
+
+  modeld:build:
+    desc: Build the native modeld worker using the existing dependency pipe
+    cmds:
+      - make -C {{.ROOT_DIR}} build-modeld {{.CLI_ARGS}}
+
+  modeld:package:
+    desc: Package modeld against a prepared native dependency bundle
+    cmds:
+      - make -C {{.ROOT_DIR}} package-modeld-release {{.CLI_ARGS}}
+
+  modeld:companions:
+    desc: Regenerate the embedded tokenizer companion index from the curated catalog
+    cmds:
+      - go run ./cmd/modeld-companions index --assets internal/modeld/modelstore/assets
+
+  modeld:companion:
+    desc: Build one curated model's tokenizer companion from its pinned model snapshot
+    requires:
+      vars: [MODEL, MODEL_DIR]
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/.build
+      - go run ./cmd/modeld-companions require --model {{.MODEL | shellQuote}} > {{.ROOT_DIR}}/.build/companion-requirement.json
+      - >-
+        python3 {{.ROOT_DIR}}/scripts/build-openvino-literal-source-companion.py
+        --requirement {{.ROOT_DIR}}/.build/companion-requirement.json
+        --model-dir {{.MODEL_DIR | shellQuote}}
+        --assets {{.ROOT_DIR}}/internal/modeld/modelstore/assets
+      - go run ./cmd/modeld-companions index --assets internal/modeld/modelstore/assets
+
+  modeld:release:
+    desc: Build and gate the native modeld worker for this host
+    cmds:
+      - cmd: bash {{.ROOT_DIR}}/scripts/modeld-release-container.sh
+        platforms: [linux]
+      - cmd: bash {{.ROOT_DIR}}/scripts/modeld-release-darwin.sh
+        platforms: [darwin]
+      - cmd: pwsh -NoProfile -File {{.ROOT_DIR}}/scripts/modeld-release-windows.ps1 -CudaVersion {{.CUDA_VERSION | default "12.9"}}
+        platforms: [windows]
+
+  modeld:deps:publish:
+    desc: Publish the completed native dependency bundle for this Windows host
+    platforms: [windows]
+    cmds:
+      - pwsh -NoProfile -File {{.ROOT_DIR}}/scripts/modeld-release-windows.ps1 -PublishCompletedDependenciesOnly
+
+  modeld:release:publish:
+    desc: 'Publish an explicit native worker archive immutably and merge the installer index'
+    requires:
+      vars: [MODELD_RELEASE_ARCHIVE, MODELD_RELEASE_S3_URI, MODELD_PUBLIC_BASE_URL]
+    cmds:
+      - >-
+        python3 {{.ROOT_DIR}}/scripts/modeld-publish.py
+        {{.MODELD_RELEASE_ARCHIVE | shellQuote}}
+        --store {{.MODELD_RELEASE_S3_URI | shellQuote}}
+        --public-base-url {{.MODELD_PUBLIC_BASE_URL | shellQuote}}
+
+  modeld:check:
+    desc: Compile modeld control paths across the release matrix (no native inference)
+    cmds:
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o {{.BIN_DIR}}/modeld-check-linux-amd64 {{.ROOT_DIR}}/cmd/modeld
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o {{.BIN_DIR}}/modeld-check-linux-arm64 {{.ROOT_DIR}}/cmd/modeld
+      - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o {{.BIN_DIR}}/modeld-check-darwin-arm64 {{.ROOT_DIR}}/cmd/modeld
+      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o {{.BIN_DIR}}/modeld-check-windows-amd64.exe {{.ROOT_DIR}}/cmd/modeld
+
+  dev-install:
+    desc: Build and install the complete local system (CLI plus packaged modeld)
+    deps: [build]
+    cmds:
+      - cmd: |
+          set -eu
+          cuda_bin=""
+          if command -v nvcc >/dev/null 2>&1; then
+            cuda_bin=$(dirname "$(command -v nvcc)")
+          elif [ -x /usr/local/cuda/bin/nvcc ]; then
+            cuda_bin=/usr/local/cuda/bin
+          fi
+          if [ -n "$cuda_bin" ] && [ -z "${NVCC_CCBIN:-}" ] && command -v g++-14 >/dev/null 2>&1; then
+            export NVCC_CCBIN=$(command -v g++-14)
+          fi
+          export TMPDIR=${TMPDIR:-/var/tmp}
+          PATH="${cuda_bin:+$cuda_bin:}$PATH" make -C {{.ROOT_DIR}} package-modeld
+          bash {{.ROOT_DIR}}/scripts/dev-install.sh --cli {{.BIN}} --modeld {{.ROOT_DIR}}/bin/dist
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File {{.ROOT_DIR}}/scripts/dev-install.ps1 -Source {{.BIN}}
+        platforms: [windows]
+
+  # POSIX symlinks into ~/.local/bin; Windows copies into a directory it also
+  # registers on the user PATH, because Windows has no conventional bin dir
+  # that is already there. See scripts/dev-install.ps1 for why it copies.
+  dev-link:
+    desc: Put only bin/contenox-runtime on your PATH (fast CLI development loop)
+    deps: [build]
+    cmds:
+      - cmd: 'bash {{.ROOT_DIR}}/scripts/dev-install.sh --cli {{.BIN}}'
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File {{.ROOT_DIR}}/scripts/dev-install.ps1 -Source {{.BIN}}
+        platforms: [windows]
+
+  dev-unlink:
+    desc: Remove the installed CLI from your PATH
+    cmds:
+      - cmd: 'bash {{.ROOT_DIR}}/scripts/dev-install.sh --uninstall'
+        platforms: [linux, darwin]
+      - cmd: powershell -NoProfile -ExecutionPolicy Bypass -File {{.ROOT_DIR}}/scripts/dev-install.ps1 -Uninstall
+        platforms: [windows]
+

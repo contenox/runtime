@@ -22,8 +22,8 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/term v0.45.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/grpc v1.80.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478
+	google.golang.org/grpc v1.80.0
 	modernc.org/sqlite v1.45.0
 )
 
@@ -36,6 +36,8 @@ require (
 	gvisor.dev/gvisor v0.0.0-20260224225140-573d5e7127a8
 	mvdan.cc/sh/v3 v3.14.1
 )
+
+require golang.org/x/text v0.41.0 // indirect
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
@@ -150,7 +152,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/shirou/gopsutil/v4 v4.25.10 // indirect
+	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.39.0

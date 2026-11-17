@@ -514,7 +514,9 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 	}
 
 	transportFactory := acpsvc.New(acpsvc.Deps{
-		Events: workspaceEvents, EventTools: eventTools, SessionRouter: sessionRouter, NativeTurns: nativeTurns,
+		CompletionChain: completionChain,
+		OpenInference:   inferenceSetupFactory(db, bus, engine, nil, tracker, workspaceID),
+		Events:          workspaceEvents, EventTools: eventTools, SessionRouter: sessionRouter, NativeTurns: nativeTurns,
 		Engine:                engine,
 		DB:                    db,
 		ChainRegistry:         chains,

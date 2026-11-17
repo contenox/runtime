@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/contenox/runtime/runtime/connectorservice"
 	"net/http"
 	"os"
 	"strings"
@@ -17,10 +16,13 @@ import (
 	"github.com/contenox/runtime/runtime/agentidentity"
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/agentservice"
+	"github.com/contenox/runtime/runtime/autosetup"
 	"github.com/contenox/runtime/runtime/backendservice"
+	"github.com/contenox/runtime/runtime/connectorservice"
 	"github.com/contenox/runtime/runtime/externalagents"
 	"github.com/contenox/runtime/runtime/fleetservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/inferencesetup"
 	"github.com/contenox/runtime/runtime/internal/accessapi"
 	"github.com/contenox/runtime/runtime/internal/agentidentityapi"
 	"github.com/contenox/runtime/runtime/internal/agentregistryapi"
@@ -33,6 +35,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/externalagentsapi"
 	"github.com/contenox/runtime/runtime/internal/fleetapi"
 	"github.com/contenox/runtime/runtime/internal/hitlpolicyapi"
+	"github.com/contenox/runtime/runtime/internal/localaiapi"
 	"github.com/contenox/runtime/runtime/internal/localfileapi"
 	"github.com/contenox/runtime/runtime/internal/mcpserverapi"
 	"github.com/contenox/runtime/runtime/internal/missionapi"
@@ -53,8 +56,10 @@ import (
 	"github.com/contenox/runtime/runtime/mcpserverservice"
 	"github.com/contenox/runtime/runtime/missionchanges"
 	"github.com/contenox/runtime/runtime/missionservice"
+	"github.com/contenox/runtime/runtime/modelacquisition"
 	"github.com/contenox/runtime/runtime/modelregistry"
 	"github.com/contenox/runtime/runtime/modelregistryservice"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 	"github.com/contenox/runtime/runtime/operatorinbox"
 	"github.com/contenox/runtime/runtime/providerservice"
 	"github.com/contenox/runtime/runtime/runtimestate"
@@ -168,7 +173,6 @@ func New(ctx context.Context, mux *http.ServeMux, nodeInstanceID, tenancy string
 }
 
 func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Config, deps Dependencies) error {
-	_ = ctx
 	if deps.DB == nil || deps.State == nil {
 		return nil
 	}
@@ -196,7 +200,28 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 
 	registrySvc := modelregistryservice.New(deps.DB)
 	registry := modelregistry.New(registrySvc)
-	modelregistryapi.AddRoutes(mux, registrySvc, registry, backendSvc, store)
+	acquisitionBus := deps.PubSub
+	if acquisitionBus == nil {
+		acquisitionBus = libbus.NewInMem()
+	}
+	acquisitionTracker := deps.Tracker
+	if acquisitionTracker == nil {
+		acquisitionTracker = libtracker.NoopTracker{}
+	}
+	setup, err := inferencesetup.New(deps.DB, deps.State, acquisitionBus, inferencesetup.RuntimeModelFactory{DB: deps.DB, State: deps.State, Bus: acquisitionBus, Tracker: acquisitionTracker})
+	if err != nil {
+		return err
+	}
+	acquisition, err := modelacquisition.New(deps.DB, setup, deps.State, registry, modelacquisition.StoreInstaller{}, modeldconn.DataRootFromContext(ctx), acquisitionTracker)
+	if err != nil {
+		return err
+	}
+	modelregistryapi.AddRoutes(mux, registrySvc, registry, acquisition, deps.DB)
+	preparation, err := autosetup.New(deps.DB, acquisitionTracker)
+	if err != nil {
+		return err
+	}
+	localaiapi.AddRoutes(ctx, mux, deps.DB, setup, preparation, acquisition)
 
 	setupapi.AddSetupRoutes(mux, stateSvc, deps.Auth)
 	shellenvapi.AddShellEnvRoutes(mux, shellenvservice.New(deps.DB), deps.Auth)

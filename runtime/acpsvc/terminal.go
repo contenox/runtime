@@ -40,6 +40,27 @@ type terminalRunResult struct {
 
 func (t *Transport) handleExtRequest(ctx context.Context, method string, params json.RawMessage) (json.RawMessage, *libacp.Error) {
 	switch method {
+	case extMethodAutocomplete:
+		return t.handleAutocomplete(ctx, params)
+	case extMethodNextEdit:
+		return t.handleNextEdit(ctx, params)
+	case "_contenox/inference":
+		return t.handleInference(ctx, params)
+	case "_contenox/workers/inspect":
+		return t.handleWorkerInspect(ctx, params)
+	case "_contenox/workers/stop":
+		return t.handleWorkerStop(ctx, params)
+	case "_contenox/workers/restart":
+		return t.handleWorkerRestart(ctx, params)
+	case "_contenox/workers/inventory":
+		return t.handleWorkerInventory(ctx, params)
+	case "_contenox/workers/status":
+		return t.handleWorkerStatus(ctx, params)
+	case "_contenox/workers/configure":
+		return t.handleWorkerConfigure(ctx, params)
+	case "_contenox/workers/admission":
+		return t.handleWorkerAdmission(ctx, params)
+
 	case ExtMethodWorkspaceConfigOptions:
 		return t.handleWorkspaceConfigOptions(ctx)
 	case extMethodTerminalRun:

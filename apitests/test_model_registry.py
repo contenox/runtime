@@ -68,7 +68,7 @@ def test_model_registry_download_validation(api, base_url):
     reason="Set APITEST_RUN_DOWNLOAD=1 to run real model download smoke tests.",
 )
 def test_model_registry_download_curated_model(api, base_url):
-    model_name = os.environ.get("APITEST_DOWNLOAD_MODEL", "tiny")
+    model_name = os.environ.get("APITEST_DOWNLOAD_MODEL", "qwen2.5-coder-0.5b-fim")
     response = api.post(_registry_url(base_url, "download"), json={"name": model_name}, timeout=600)
     assert_status_code(response, 200)
     assert response.json() in ("downloaded", "already downloaded")

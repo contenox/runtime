@@ -1,33 +1,23 @@
 package modelregistryapi
 
 import (
-	"context"
+	"errors"
 	"fmt"
-	"github.com/contenox/runtime/runtime/homedir"
-	"io"
-	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
-	apiframework "github.com/contenox/runtime/apiframework"
-	"github.com/contenox/runtime/runtime/backendservice"
-	"github.com/contenox/runtime/runtime/internal/clikv"
+	"github.com/contenox/runtime/apiframework"
+	"github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/autosetup"
+	"github.com/contenox/runtime/runtime/modelacquisition"
 	"github.com/contenox/runtime/runtime/modelregistry"
 	"github.com/contenox/runtime/runtime/modelregistryservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/google/uuid"
 )
 
-func AddRoutes(
-	mux *http.ServeMux,
-	svc modelregistryservice.Service,
-	reg modelregistry.Registry,
-	backendSvc backendservice.Service,
-	store runtimetypes.Store,
-) {
-	h := &handler{svc: svc, reg: reg, backendSvc: backendSvc, store: store}
+func AddRoutes(mux *http.ServeMux, svc modelregistryservice.Service, reg modelregistry.Registry, acquisition *modelacquisition.Service, db libdbexec.DBManager) {
+	h := &handler{svc: svc, reg: reg, acquisition: acquisition, db: db}
 	mux.HandleFunc("POST /model-registry", h.create)
 	mux.HandleFunc("GET /model-registry", h.list)
 	mux.HandleFunc("POST /model-registry/download", h.download)
@@ -37,10 +27,10 @@ func AddRoutes(
 }
 
 type handler struct {
-	svc        modelregistryservice.Service
-	reg        modelregistry.Registry
-	backendSvc backendservice.Service
-	store      runtimetypes.Store
+	svc         modelregistryservice.Service
+	reg         modelregistry.Registry
+	acquisition *modelacquisition.Service
+	db          libdbexec.DBManager
 }
 
 type downloadRequest struct {
@@ -129,112 +119,30 @@ func (h *handler) download(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		_ = apiframework.Error(w, r, fmt.Errorf("%w: name is required", apiframework.ErrUnprocessableEntity), apiframework.CreateOperation)
 		return
 	}
 
-	desc, err := h.reg.Resolve(ctx, req.Name)
+	result := "already downloaded"
+	err = h.acquisition.Pull(ctx, req.Name, func(progress modelacquisition.DownloadProgress) error {
+		if progress.Downloaded > 0 {
+			result = "downloaded"
+		}
+		return ctx.Err()
+	})
 	if err != nil {
+		var unknown *modelacquisition.UnknownModelError
+		if errors.As(err, &unknown) {
+			err = fmt.Errorf("%w: %s", apiframework.ErrNotFound, err)
+		}
 		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		_ = apiframework.Error(w, r, fmt.Errorf("resolve home directory: %w", err), apiframework.CreateOperation)
+	if err := autosetup.SetInitialModel(ctx, h.db, req.Name); err != nil {
+		_ = apiframework.Error(w, r, err, apiframework.CreateOperation)
 		return
 	}
-
-	modelDir := filepath.Join(homeDir, homedir.DirName, "models", req.Name)
-	if err := os.MkdirAll(modelDir, 0755); err != nil {
-		_ = apiframework.Error(w, r, fmt.Errorf("create model directory: %w", err), apiframework.CreateOperation)
-		return
-	}
-
-	destPath := filepath.Join(modelDir, "model.gguf")
-	if _, statErr := os.Stat(destPath); statErr == nil {
-		h.ensureLocalSetup(ctx, req.Name, homeDir)
-		_ = apiframework.Encode(w, r, http.StatusOK, "already downloaded")
-		return
-	}
-
-	dlResp, err := http.Get(desc.SourceURL) //nolint:gosec
-	if err != nil {
-		_ = apiframework.Error(w, r, fmt.Errorf("download failed: %w", err), apiframework.CreateOperation)
-		return
-	}
-	defer dlResp.Body.Close()
-	if dlResp.StatusCode != http.StatusOK {
-		_ = apiframework.Error(w, r, fmt.Errorf("download failed: HTTP %s", dlResp.Status), apiframework.CreateOperation)
-		return
-	}
-
-	f, err := os.Create(destPath)
-	if err != nil {
-		_ = apiframework.Error(w, r, fmt.Errorf("create file: %w", err), apiframework.CreateOperation)
-		return
-	}
-	if _, err := io.Copy(f, dlResp.Body); err != nil {
-		f.Close()
-		_ = os.Remove(destPath)
-		_ = apiframework.Error(w, r, fmt.Errorf("write file: %w", err), apiframework.CreateOperation)
-		return
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		_ = os.Remove(destPath)
-		_ = apiframework.Error(w, r, fmt.Errorf("sync file: %w", err), apiframework.CreateOperation)
-		return
-	}
-	f.Close()
-
-	_ = h.svc.Create(ctx, &runtimetypes.ModelRegistryEntry{
-		ID:        uuid.NewString(),
-		Name:      req.Name,
-		SourceURL: desc.SourceURL,
-		SizeBytes: desc.SizeBytes,
-	})
-
-	h.ensureLocalSetup(ctx, req.Name, homeDir)
-
-	_ = apiframework.Encode(w, r, http.StatusOK, "downloaded")
-}
-
-func (h *handler) ensureLocalSetup(ctx context.Context, modelName, homeDir string) {
-	backends, err := h.backendSvc.List(ctx, nil, 100)
-	if err != nil {
-		slog.Warn("modelregistryapi: failed to list backends for local setup", "err", err)
-	} else {
-		hasLocal := false
-		for _, b := range backends {
-			if strings.EqualFold(b.Type, "local") {
-				hasLocal = true
-				break
-			}
-		}
-		if !hasLocal {
-			modelsDir := filepath.Join(homeDir, ".contenox", "models")
-			if createErr := h.backendSvc.Create(ctx, &runtimetypes.Backend{
-				ID:      uuid.NewString(),
-				Name:    "local",
-				Type:    "local",
-				BaseURL: modelsDir,
-			}); createErr != nil {
-				slog.Warn("modelregistryapi: failed to create local backend", "err", createErr)
-			}
-		}
-	}
-
-	if provider := clikv.Read(ctx, h.store, "default-provider"); provider == "" || strings.EqualFold(provider, "ollama") {
-		if setErr := clikv.SetString(ctx, h.store, "default-provider", "local"); setErr != nil {
-			slog.Warn("modelregistryapi: failed to set default-provider", "err", setErr)
-		}
-	}
-
-	if model := clikv.Read(ctx, h.store, "default-model"); model == "" {
-		if setErr := clikv.SetString(ctx, h.store, "default-model", modelName); setErr != nil {
-			slog.Warn("modelregistryapi: failed to set default-model", "err", setErr)
-		}
-	}
+	_ = apiframework.Encode(w, r, http.StatusOK, result)
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	libdb "github.com/contenox/runtime/libdbexec"
+	"github.com/google/uuid"
 )
 
 func (s *store) SetKV(ctx context.Context, key string, value json.RawMessage) error {
@@ -23,11 +24,11 @@ func (s *store) SetWorkspaceKV(ctx context.Context, workspaceID string, key stri
 func (s *store) setKVScoped(ctx context.Context, workspaceID string, key string, value json.RawMessage) error {
 	now := s.now().UTC()
 	_, err := s.Exec.ExecContext(ctx, `
-		INSERT INTO kv (key, workspace_id, value, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO kv (key, workspace_id, value, created_at, updated_at, revision, generation)
+		VALUES ($1, $2, $3, $4, $5, 0, $6)
 		ON CONFLICT (key, workspace_id) DO UPDATE
-		SET value = $3, updated_at = $5`,
-		key, workspaceID, value, now, now,
+		SET value = $3, updated_at = $5, revision = kv.revision + 1`,
+		key, workspaceID, value, now, now, uuid.NewString(),
 	)
 	return err
 }
@@ -36,7 +37,7 @@ func (s *store) UpdateKV(ctx context.Context, key string, value json.RawMessage)
 	now := s.now().UTC()
 	result, err := s.Exec.ExecContext(ctx, `
         UPDATE kv
-        SET value = $2, updated_at = $3
+        SET value = $2, updated_at = $3, revision = revision + 1
         WHERE key = $1 AND workspace_id = ''`,
 		key, value, now,
 	)
@@ -157,4 +158,21 @@ func (s *store) ListKVPrefix(ctx context.Context, prefix string, createdAtCursor
 
 func (s *store) EstimateKVCount(ctx context.Context) (int64, error) {
 	return s.estimateCount(ctx, "kv")
+}
+
+// KVRevision identifies a value's generation without reading its contents.
+// Generation distinguishes deletion and recreation even at the same clock tick.
+type KVRevision struct {
+	Generation string    `json:"generation"`
+	CreatedAt  time.Time `json:"createdAt"`
+	Revision   int64     `json:"revision"`
+}
+
+func (s *store) GetKVRevision(ctx context.Context, key string) (KVRevision, error) {
+	var result KVRevision
+	err := s.Exec.QueryRowContext(ctx, `SELECT created_at, revision, generation FROM kv WHERE key = $1 AND workspace_id = ''`, key).Scan(&result.CreatedAt, &result.Revision, &result.Generation)
+	if errors.Is(err, sql.ErrNoRows) {
+		return KVRevision{}, libdb.ErrNotFound
+	}
+	return result, err
 }

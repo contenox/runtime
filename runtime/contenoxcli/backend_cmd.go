@@ -97,6 +97,8 @@ Examples:
 
 func defaultBaseURLForType(typ string) (string, error) {
 	switch typ {
+	case "modeld":
+		return "local", nil
 	case "ollama":
 		return "http://localhost:11434", nil
 	case "openai":
@@ -130,6 +132,7 @@ var backendAddCmd = &cobra.Command{
 	Long: `Register a named LLM backend endpoint in the local SQLite database.
 
 The --type flag determines which provider protocol is used.
+  modeld                        Native inference on this machine or a configured worker endpoint.
   ollama                        Local daemon (requires 'ollama serve') or hosted Ollama Cloud (use
                                 --url https://ollama.com/api and --api-key-env OLLAMA_API_KEY).
   openai                        api.openai.com (requires --api-key-env).
@@ -368,8 +371,8 @@ func globalContenoxDir() (string, error) {
 }
 
 func init() {
-	backendAddCmd.Flags().String("type", "ollama", "Backend type: ollama, openai, openai-codex, openrouter, deepseek, alibaba-cloud, anthropic, mistral, gemini, vllm, bedrock, vertex-google")
-	backendAddCmd.Flags().String("url", "", "Base URL of the backend (auto-inferred for openai/openai-codex/openrouter/deepseek/alibaba-cloud/anthropic/mistral/gemini if omitted; set https://ollama.com/api for hosted Ollama)")
+	backendAddCmd.Flags().String("type", "ollama", "Backend type: modeld, ollama, openai, openai-codex, openrouter, deepseek, alibaba-cloud, anthropic, mistral, gemini, vllm, bedrock, vertex-google")
+	backendAddCmd.Flags().String("url", "", "Backend endpoint. Modeld defaults to local and accepts host:port for a remote worker. Cloud APIs with fixed endpoints use their default URL. Use https://ollama.com/api for hosted Ollama.")
 
 	backendAddCmd.Flags().String("api-key-env", "", "Name of the environment variable holding the API key (preferred over --api-key)")
 	backendAddCmd.Flags().String("api-key", "", "API key literal — prefer --api-key-env to avoid leaking into shell history")

@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package contenox.v1;
+
+option go_package = "github.com/contenox/runtime/internal/protocol/v1;protocolv1";
+
+// AutocompleteRequest is the request of _contenox/autocomplete: the source
+// around the cursor, the document it came from, and the optional peers the
+// runtime's own template renders. provider and model override the role
+// assignment for this request only; empty uses the configured autocomplete role.
+message AutocompleteRequest {
+  string prefix = 1;
+  string suffix = 2;
+  string language_id = 3;
+  string uri = 4;
+  string provider = 5;
+  string model = 6;
+  int32 max_tokens = 7;
+  repeated AutocompleteContext code_context = 8;
+}
+
+// AutocompleteContext is one peer file the request carries as read-only context.
+message AutocompleteContext {
+  string path = 1;
+  string content = 2;
+}
+
+// AutocompleteResult is the answer to _contenox/autocomplete. kind is an
+// AutocompleteOutcome token; cancelled is a result value, never an error, so a
+// superseded request is distinguishable from a failed one.
+//
+// mode is the completion mode the runtime resolved for the configured role, and
+// fingerprint identifies the configuration assignment the completion was made
+// under: a shell that sees the fingerprint change knows the answer came from a
+// different assignment than the one it is showing.
+message AutocompleteResult {
+  string kind = 1;
+  string completion = 2;
+  string mode = 3;
+  string fingerprint = 4;
+}
+
+// AutocompleteOutcome is the closed set of answers a completion request has.
+enum AutocompleteOutcome {
+  AUTOCOMPLETE_OUTCOME_UNSPECIFIED = 0;
+  AUTOCOMPLETE_OUTCOME_COMPLETION = 1;
+  AUTOCOMPLETE_OUTCOME_CANCELLED = 2;
+}
+
+// NextEditRequest is the request of _contenox/next_edit: one versioned document,
+// the region a prediction may replace, and the history and context the model
+// reads. client_id and document_id identify the editor document a later request
+// supersedes; version is the caller's document version and comes back on the
+// result so a stale answer is recognisable.
+message NextEditRequest {
+  string client_id = 1;
+  string document_id = 2;
+  int32 version = 3;
+  string path = 4;
+  string before = 5;
+  string current = 6;
+  // cursor, start and end are byte offsets into current, as the editor computes
+  // them.
+  int32 cursor = 7;
+  int32 start = 8;
+  int32 end = 9;
+  repeated NextEditHistory history = 10;
+  repeated NextEditContextFile context = 11;
+}
+
+// NextEditHistory is one earlier replacement the prediction may learn from.
+message NextEditHistory {
+  string path = 1;
+  string before = 2;
+  string after = 3;
+}
+
+// NextEditContextFile is one read-only peer file the prediction may read.
+message NextEditContextFile {
+  string path = 1;
+  string text = 2;
+}
+
+// NextEditResult is the answer to _contenox/next_edit. kind is a
+// NextEditOutcome token; a cancelled prediction carries no edits and is a result
+// value, never an error. Each edit replaces a half-open byte range of the
+// versioned document it was predicted against.
+message NextEditResult {
+  string kind = 1;
+  int32 version = 2;
+  repeated NextEditTextEdit edits = 3;
+  string fingerprint = 4;
+}
+
+// NextEditOutcome is the closed set of answers a prediction has.
+enum NextEditOutcome {
+  NEXT_EDIT_OUTCOME_UNSPECIFIED = 0;
+  NEXT_EDIT_OUTCOME_EDITS = 1;
+  NEXT_EDIT_OUTCOME_CANCELLED = 2;
+}
+
+// NextEditTextEdit is one replacement: a half-open byte range of the document,
+// the text that range held and the text that replaces it.
+message NextEditTextEdit {
+  int32 start = 1;
+  int32 end = 2;
+  string old_text = 3;
+  string new_text = 4;
+}

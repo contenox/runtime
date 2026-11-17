@@ -1,0 +1,64 @@
+diff --git a/tools/mtmd/clip.cpp b/tools/mtmd/clip.cpp
+index d2226b3be..1e34adf0d 100644
+--- a/tools/mtmd/clip.cpp
++++ b/tools/mtmd/clip.cpp
+@@ -180,7 +180,14 @@ struct clip_ctx {
+         if (!backend_cpu) {
+             throw std::runtime_error("failed to initialize CPU backend");
+         }
+-        if (ctx_params.use_gpu) {
++        if (ctx_params.use_gpu && ctx_params.device != nullptr) {
++            backend = ggml_backend_dev_init(ctx_params.device, nullptr);
++            if (!backend) {
++                ggml_backend_free(backend_cpu);
++                backend_cpu = nullptr;
++                throw std::runtime_error("failed to initialize the explicitly selected projector device");
++            }
++        } else if (ctx_params.use_gpu) {
+             auto * backend_name = std::getenv("MTMD_BACKEND_DEVICE");
+             if (backend_name != nullptr) {
+                 backend = ggml_backend_init_by_name(backend_name, nullptr);
+diff --git a/tools/mtmd/clip.h b/tools/mtmd/clip.h
+index 967093a81..c8ebc1e52 100644
+--- a/tools/mtmd/clip.h
++++ b/tools/mtmd/clip.h
+@@ -56,6 +56,7 @@ struct clip_context_params {
+     bool no_alloc;
+     mtmd_progress_callback progress_callback;
+     void * progress_callback_user_data;
++    ggml_backend_dev_t device;
+ };
+ 
+ struct clip_init_result {
+diff --git a/tools/mtmd/mtmd.cpp b/tools/mtmd/mtmd.cpp
+index 724538b58..5691354ff 100644
+--- a/tools/mtmd/mtmd.cpp
++++ b/tools/mtmd/mtmd.cpp
+@@ -253,6 +253,7 @@ mtmd_context_params mtmd_context_params_default() {
+         /* batch_max_tokens  */ 1024,
+         /* progress_callback */ nullptr,
+         /* progress_callback_user_data */ nullptr,
++        nullptr,
+     };
+     return params;
+ }
+@@ -349,6 +350,7 @@ struct mtmd_context {
+             /* no_alloc          */ no_alloc,
+             /* progress_callback */ ctx_params.progress_callback,
+             /* progress_callback_user_data */ ctx_params.progress_callback_user_data,
++            ctx_params.device,
+         };
+ 
+         auto res = clip_init(mmproj_fname, ctx_clip_params);
+diff --git a/tools/mtmd/mtmd.h b/tools/mtmd/mtmd.h
+index 25d51ef58..377191dd9 100644
+--- a/tools/mtmd/mtmd.h
++++ b/tools/mtmd/mtmd.h
+@@ -112,6 +112,7 @@ struct mtmd_context_params {
+     // If it returns false, model loading is immediately aborted.
+     mtmd_progress_callback progress_callback;
+     void * progress_callback_user_data;
++    ggml_backend_dev_t device;
+ };
+ 
+ MTMD_API const char * mtmd_default_marker(void);

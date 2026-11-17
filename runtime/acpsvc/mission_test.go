@@ -254,6 +254,7 @@ func TestUnit_MissionCommandIsParsedRegardlessOfCapability(t *testing.T) {
 
 func TestUnit_AcpCommands_WithMissionCapability_IncludesMission(t *testing.T) {
 	tr, _ := newMissionTestTransport(t, &fakeDispatcher{}, &fakeResolver{})
+	wireTestInference(t, tr)
 	cmds := tr.acpCommands()
 
 	if !containsCommand(cmds, "mission") {
@@ -271,6 +272,7 @@ func TestUnit_AcpCommands_WithMissionCapability_IncludesMission(t *testing.T) {
 
 func TestUnit_AcpCommands_WithoutMissionCapability_ExcludesMission(t *testing.T) {
 	tr, _ := newMissionTestTransport(t, nil, nil)
+	wireTestInference(t, tr)
 	cmds := tr.acpCommands()
 
 	if containsCommand(cmds, "mission") {

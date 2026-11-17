@@ -122,6 +122,8 @@ make rust-e2e            # Rust and cargo
 
 The desktop app that bundles this runtime lives in [contenox/harness](https://github.com/contenox/harness).
 
+For built-in native inference, see the [Modeld operator guide](docs/modeld.md) and [native build and test guide](docs/development/modeld-build.md).
+
 ## License
 
 Apache-2.0.

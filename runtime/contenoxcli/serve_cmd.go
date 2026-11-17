@@ -233,12 +233,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	defer db.Close()
 
-	if removed, pruneErr := pruneLegacyLocalBackends(dbCtx, db); pruneErr != nil {
-		slog.Warn("could not prune legacy local backends", "error", pruneErr)
-	} else if removed > 0 {
-		slog.Info("pruned legacy local backends", "count", removed)
-	}
-
 	injectGlobalShellEnv := newLiveGlobalShellEnv(shellenvservice.New(db), 3*time.Second)
 	sandboxShellScrub, sandboxTerminalScrub := resolveSandboxScrubs(config, injectGlobalShellEnv)
 
@@ -597,7 +591,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		slog.Warn("contenox-runtime serve: /acp transport disabled: ACP chain registry unavailable", "error", err)
 	} else {
 		acpAgentFactory = acpsvc.New(acpsvc.Deps{
-			Events: workspaceEvents, EventTools: eventTools,
+			CompletionChain: completionChain,
+			OpenInference:   inferenceSetupFactory(db, bus, engine, nil, tracker, workspaceID),
+			Events:          workspaceEvents, EventTools: eventTools,
 			Engine:                engine,
 			DB:                    db,
 			ChainRegistry:         acpChains,

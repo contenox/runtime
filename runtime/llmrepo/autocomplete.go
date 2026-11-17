@@ -5,15 +5,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/contenox/runtime/internal/remedy"
 	"github.com/contenox/runtime/runtime/internal/llmresolver"
-	"github.com/contenox/runtime/runtime/internal/remedy"
 	"github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 )
 
 func (e *modelManager) Autocomplete(ctx context.Context, req Request, input modelrepo.AutocompleteRequest) (modelrepo.AutocompleteResult, Meta, error) {
 	if ctx == nil {
 		return modelrepo.AutocompleteResult{}, Meta{}, errors.New("autocomplete context is required")
 	}
+	ctx = modeldconn.WithWorkerRole(modeldconn.WithWorkers(ctx, e.config.Workers), "autocomplete")
 	input.SessionKey = effectiveSessionKey(ctx, req)
 	if err := input.Validate(); err != nil {
 		return modelrepo.AutocompleteResult{}, Meta{}, err

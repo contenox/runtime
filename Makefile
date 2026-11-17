@@ -13,6 +13,8 @@ BIN := $(PROJECT_ROOT)bin/contenox-runtime$(EXE)
 
 ifeq ($(or $(MAKECMDGOALS),help),help)
 $(info Developer targets (PowerShell, cmd and Unix shells):)
+$(info   modeld-test         run the portable Modeld worker, transport and Runtime client suites)
+$(info   modeld-help         list native inference build, test and package targets)
 $(info   build              build bin/contenox-runtime (.exe on Windows))
 $(info   build-windows      cross-build bin/contenox-runtime-windows-amd64.exe)
 $(info   test               go test ./...)
@@ -78,7 +80,7 @@ release-assets:
 	@for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do \
 		goos=$${target%/*}; goarch=$${target#*/}; ext=""; \
 		if [ "$$goos" = "windows" ]; then ext=".exe"; fi; \
-		CGO_ENABLED=0 GOOS=$$goos GOARCH=$$goarch go build -o "$(DIST)/contenox-runtime-$$goos-$$goarch$$ext" $(PROJECT_ROOT)cmd/contenox || exit 1; \
+		CGO_ENABLED=0 GOOS=$$goos GOARCH=$$goarch go build -ldflags="-X github.com/contenox/runtime/internal/modeldinstall.DefaultBaseURL=https://github.com/contenox/runtime/releases/download/$(VERSION)" -o "$(DIST)/contenox-runtime-$$goos-$$goarch$$ext" $(PROJECT_ROOT)cmd/contenox || exit 1; \
 	done
 	@cd $(DIST) && sha256sum $$(find . -maxdepth 1 -type f -name 'contenox-runtime-*' -printf '%f\n' | LC_ALL=C sort) > SHA256SUMS
 	@cd $(DIST) && sha256sum -c SHA256SUMS
@@ -111,3 +113,14 @@ dev-install:
 
 dev-uninstall:
 	go run -C $(PROJECT_ROOT) ./tools/devtool uninstall
+
+# Load the native dependency probes only when a Modeld target is requested.
+ifneq ($(filter %modeld modeld-% build-modeld% package-modeld% check-modeld% deps-modeld% push-modeld% pull-modeld% bundle-modeld% build-llamacpp-runtime bundle-llama-libs deps-llamacpp-ref deps-openvino test-llamacpp-direct,$(filter-out modeld-test,$(MAKECMDGOALS))),)
+include $(PROJECT_ROOT)Makefile.modeld
+.DEFAULT_GOAL := help
+endif
+
+.PHONY: modeld-test
+modeld-test:
+	go test -C $(PROJECT_ROOT) -timeout 15m ./cmd/modeld ./cmd/modeld-companions ./internal/modeld/... ./internal/modeldinstall ./internal/transport/... ./runtime/modelrepo/modeld ./runtime/modelrepo/modeldconn ./runtime/modeldprobe ./runtime/modelregistry ./runtime/modelhardware ./runtime/modelacquisition ./runtime/modeldmanagement ./runtime/modelworkers ./runtime/autosetup ./runtime/inferencesetup ./runtime/internal/localaiapi
+	go test -C $(PROJECT_ROOT) -timeout 5m -run "TestSystem_Modeld_|TestUnit_Modeld_|TestIntegration_InferenceACP|TestUnit_Worker(Status|Inspect)" ./runtime/contenoxcli ./runtime/acpsvc

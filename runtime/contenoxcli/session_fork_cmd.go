@@ -10,6 +10,7 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/chatservice"
+	"github.com/contenox/runtime/runtime/llmrepo"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/spf13/cobra"
@@ -72,7 +73,7 @@ func runSessionFork(cmd *cobra.Command, args []string) error {
 
 	newMessages := history
 	if summary {
-		newMessages, err = summarizeForFork(ctx, cmd, db, contenoxDir, history, keep)
+		newMessages, err = summarizeForFork(llmrepo.WithPersistedSession(ctx, activeID), cmd, db, contenoxDir, history, keep)
 		if err != nil {
 			return err
 		}

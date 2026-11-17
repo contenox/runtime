@@ -8,6 +8,7 @@ import (
 	"time"
 
 	libmodelprovider "github.com/contenox/runtime/runtime/modelrepo"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 )
 
 type sessionKeyContextKeyType struct{}
@@ -32,6 +33,17 @@ func DeriveSessionKey(sessionID string) string {
 	}
 	sum := sha256.Sum256([]byte("contenox-session-cache-key:" + sessionID))
 	return hex.EncodeToString(sum[:])
+}
+
+// WithPersistedSession uses the opaque cache key for provider calls and the
+// local session ID for usage accounting.
+func WithPersistedSession(ctx context.Context, sessionID string) context.Context {
+	if sessionID == "" {
+		return ctx
+	}
+	key := DeriveSessionKey(sessionID)
+	ctx = modeldconn.WithPersistedNamespace(ctx, key)
+	return WithUsageSession(WithSessionKey(ctx, key), sessionID)
 }
 
 func effectiveSessionKey(ctx context.Context, req Request) string {

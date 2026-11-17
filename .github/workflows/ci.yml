@@ -74,6 +74,9 @@ jobs:
       - name: Unit tests
         run: make test-unit
 
+      - name: Modeld protocol and worker lifecycle
+        run: make modeld-test
+
       - name: Dispatch release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.version.outputs.changed == 'true'
         env:

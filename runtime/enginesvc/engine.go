@@ -2,6 +2,7 @@ package enginesvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/mcpworker"
 	"github.com/contenox/runtime/runtime/missiontools"
+	"github.com/contenox/runtime/runtime/modelworkers"
 	"github.com/contenox/runtime/runtime/ollamatokenizer"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
@@ -165,7 +167,24 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 
 	tokenizer := ollamatokenizer.NewEstimateTokenizer()
 
+	workers, err := modelworkers.NewConfigured(engineCtx, db)
+	if err != nil {
+		return nil, err
+	}
+	engine.Workers = workers
+	closeWorkers := func() {
+		if err := workers.Close(); err != nil {
+			slog.Error("closing Modeld clients", "error", err)
+		}
+	}
+	defer func() {
+		if !success {
+			closeWorkers()
+		}
+	}()
 	repo, err := llmrepo.NewModelManager(state, tokenizer, llmrepo.ModelManagerConfig{
+		Workers:               workers,
+		EmbeddingDefault:      embeddingDefault(db, llmrepo.ModelConfig{Name: cfg.DefaultModel, Provider: cfg.DefaultProvider}),
 		DefaultPromptModel:    llmrepo.ModelConfig{Name: cfg.DefaultModel, Provider: cfg.DefaultProvider},
 		DefaultEmbeddingModel: llmrepo.ModelConfig{Name: cfg.DefaultModel, Provider: cfg.DefaultProvider},
 		DefaultChatModel:      llmrepo.ModelConfig{Name: cfg.DefaultModel, Provider: cfg.DefaultProvider},
@@ -211,6 +230,7 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	}
 	taskService := execservice.NewTasksEnv(engineCtx, envExec, toolsRepo)
 
+	engine.Models = repo
 	engine.TaskService = taskService
 	engine.Tracker = tracker
 	engine.TaskEventSink = eventSink
@@ -220,10 +240,41 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	oldStop := engine.Stop
 	engine.Stop = func() {
 		mgr.StopAll()
+		closeWorkers()
 		oldStop()
 	}
 	success = true
 	return engine, nil
+}
+
+// embeddingDefault resolves an explicitly assigned embedding role on each request.
+func embeddingDefault(db libdbexec.DBManager, fallback llmrepo.ModelConfig) func(context.Context) (llmrepo.ModelConfig, error) {
+	return func(ctx context.Context) (llmrepo.ModelConfig, error) {
+		store := runtimetypes.New(db.WithoutTransaction())
+		var model llmrepo.ModelConfig
+		read := func(key string, out *string) error {
+			err := store.GetKV(ctx, clikv.Prefix+key, out)
+			if errors.Is(err, libdbexec.ErrNotFound) {
+				return nil
+			}
+			return err
+		}
+		if err := read("default-embedding-model", &model.Name); err != nil {
+			return model, err
+		}
+		if model.Name == "" {
+			return fallback, nil
+		}
+		var enabled string
+		if err := read("inference.enabled.embedding", &enabled); err != nil {
+			return model, err
+		}
+		if enabled == "disabled" {
+			return model, errors.New("embedding role is turned off")
+		}
+		err := read("default-embedding-provider", &model.Provider)
+		return model, err
+	}
 }
 
 func buildTools(engineCtx context.Context, cfg Config, db libdbexec.DBManager, tracker libtracker.ActivityTracker, bus libbus.Messenger) (*mcpworker.Manager, []string, taskengine.ToolsRepo, error) {

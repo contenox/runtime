@@ -1,0 +1,10 @@
+{
+  "starcoder2-7b-fim-60af611c55a9-v2": {
+    "archive": "starcoder2-7b-fim-60af611c55a9-v2.tar.gz",
+    "archiveSha256": "ce4b800ff7de2d268b6459c202cfa3dac2b2ee0cfe899aae0feec56e42d4fa92",
+    "modelRepo": "OpenVINO/starcoder2-7b-int4-ov",
+    "modelRevision": "60af611c55a94e4ce5c11c63eff2401642474d93",
+    "kind": "fim",
+    "format": "starcoder"
+  }
+}

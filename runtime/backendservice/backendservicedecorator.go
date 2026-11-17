@@ -14,6 +14,18 @@ type activityTrackerDecorator struct {
 	tracker libtracker.ActivityTracker
 }
 
+func (d *activityTrackerDecorator) SaveConnection(ctx context.Context, request SaveConnectionRequest) (*runtimetypes.Backend, error) {
+	reportErr, reportChange, end := d.tracker.Start(ctx, "save", "backend", "backendID", request.ID)
+	defer end()
+	backend, err := d.service.SaveConnection(ctx, request)
+	if err != nil {
+		reportErr(err)
+	} else {
+		reportChange(backend.ID, map[string]any{"revision": backend.Revision})
+	}
+	return backend, err
+}
+
 func (d *activityTrackerDecorator) Create(ctx context.Context, backend *runtimetypes.Backend) error {
 	reportErrFn, reportChangeFn, endFn := d.tracker.Start(
 		ctx,

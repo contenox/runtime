@@ -146,12 +146,13 @@ func completeEnvSetup(ctx context.Context, db libdb.DBManager) error {
 		}
 	}
 
-	if err := registerSetupBackend(ctx, db, sp.key, apiKey, baseURL); err != nil {
+	selector, err := registerSetupConnection(ctx, db, sp.key, apiKey, baseURL)
+	if err != nil {
 		return err
 	}
 
 	store := runtimetypes.New(db.WithoutTransaction())
-	if err := clikv.WriteConfig(ctx, store, "global", "default-provider", sp.key); err != nil {
+	if err := clikv.WriteConfig(ctx, store, "global", "default-provider", selector); err != nil {
 		return fmt.Errorf("persist default-provider: %w", err)
 	}
 	if model != "" {

@@ -15,11 +15,15 @@ import (
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentinstance"
+	"github.com/contenox/runtime/runtime/agentservice"
+	"github.com/contenox/runtime/runtime/codecompletion"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/inferencesetup"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/locale"
 	"github.com/contenox/runtime/runtime/nativeturn"
+	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/shellsession"
 	"github.com/contenox/runtime/runtime/statetype"
@@ -28,6 +32,8 @@ import (
 )
 
 type Deps struct {
+	CompletionChain    func() (*taskengine.TaskChainDefinition, error)
+	OpenInference      func(context.Context) (*inferencesetup.Service, *runtimestate.State, func(), error)
 	EventTools         taskengine.ToolsRepo
 	Events             workspaceevents.Service
 	Engine             *enginesvc.Engine
@@ -135,9 +141,14 @@ type sessionDriver interface {
 }
 
 type Transport struct {
-	deps         Deps
-	conn         *libacp.AgentSideConnection
-	connectionID string
+	acAgent                            agentservice.Agent
+	completion                         *codecompletion.Service
+	completionMode, completionClientID string
+	nextEdit                           *codecompletion.NextEditService
+	nextEditClientID                   string
+	deps                               Deps
+	conn                               *libacp.AgentSideConnection
+	connectionID                       string
 
 	connCtx    context.Context
 	connCancel context.CancelFunc
@@ -386,8 +397,10 @@ func (t *Transport) chainTemplateVars(sess *sessionEntry) map[string]string {
 		vars["max_tokens"] = maxTokens
 	}
 	vars["locale"] = t.sessionLocale(sess)
-	if cwd := strings.TrimSpace(sess.Cwd); cwd != "" {
-		vars["cwd"] = cwd
+	if sess != nil {
+		if cwd := strings.TrimSpace(sess.Cwd); cwd != "" {
+			vars["cwd"] = cwd
+		}
 	}
 	return vars
 }

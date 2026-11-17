@@ -155,7 +155,8 @@ jobs:
           if [ "$GOOS" = "windows" ]; then
             EXT=".exe"
           fi
-          go build -o "dist/contenox-runtime-${GOOS}-${GOARCH}${EXT}" ./cmd/contenox
+          WORKER_INDEX="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ needs.verify.outputs.version }}"
+          go build -ldflags="-X github.com/contenox/runtime/internal/modeldinstall.DefaultBaseURL=${WORKER_INDEX}" -o "dist/contenox-runtime-${GOOS}-${GOARCH}${EXT}" ./cmd/contenox
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

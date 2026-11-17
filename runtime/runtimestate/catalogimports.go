@@ -7,6 +7,7 @@ import (
 	_ "github.com/contenox/runtime/runtime/modelrepo/deepseek"
 	_ "github.com/contenox/runtime/runtime/modelrepo/gemini"
 	_ "github.com/contenox/runtime/runtime/modelrepo/mistral"
+	_ "github.com/contenox/runtime/runtime/modelrepo/modeld"
 	_ "github.com/contenox/runtime/runtime/modelrepo/ollama"
 	_ "github.com/contenox/runtime/runtime/modelrepo/openai"
 	_ "github.com/contenox/runtime/runtime/modelrepo/scriptedtest"

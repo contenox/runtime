@@ -61,7 +61,7 @@ def test_backend_rejects_unknown_type(api, base_url):
         json={
             "name": unique_name("apitest-backend"),
             "baseUrl": "http://127.0.0.1:11434",
-            "type": "local",
+            "type": "unknown-provider",
         },
         timeout=15,
     )

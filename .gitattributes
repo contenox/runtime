@@ -2,3 +2,10 @@
 /.yarn/releases/*    binary
 /.yarn/plugins/**/*  binary
 /.pnp.*              binary linguist-generated
+
+# Native builds may use a Windows checkout from WSL or MSYS2.
+/Makefile*                           text eol=lf
+/mk/*.mk                             text eol=lf
+/scripts/modeld-*.sh                 text eol=lf
+/scripts/dev-install.sh               text eol=lf
+/scripts/llama-projector-device.patch text eol=lf

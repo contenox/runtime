@@ -48,7 +48,7 @@ func (s *store) CountBackendsByTypeAndURL(ctx context.Context, typ, baseURL, exc
 func (s *store) GetBackend(ctx context.Context, id string) (*Backend, error) {
 	var backend Backend
 	err := s.Exec.QueryRowContext(ctx, `
-		SELECT id, name, base_url, type, created_at, updated_at
+		SELECT id, name, base_url, type, created_at, updated_at, revision
 		FROM llm_backends
 		WHERE id = $1`,
 		id,
@@ -59,6 +59,7 @@ func (s *store) GetBackend(ctx context.Context, id string) (*Backend, error) {
 		&backend.Type,
 		&backend.CreatedAt,
 		&backend.UpdatedAt,
+		&backend.Revision,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -75,7 +76,7 @@ func (s *store) UpdateBackend(ctx context.Context, backend *Backend) error {
 		SET name = $2,
 			base_url = $3,
 			type = $4,
-			updated_at = $5
+			updated_at = $5, revision = revision + 1
 		WHERE id = $1`,
 		backend.ID,
 		backend.Name,
@@ -107,7 +108,7 @@ func (s *store) DeleteBackend(ctx context.Context, id string) error {
 
 func (s *store) ListAllBackends(ctx context.Context) ([]*Backend, error) {
 	rows, err := s.Exec.QueryContext(ctx, `
-        SELECT id, name, base_url, type, created_at, updated_at
+        SELECT id, name, base_url, type, created_at, updated_at, revision
         FROM llm_backends
         ORDER BY created_at DESC, id DESC;
     `)
@@ -126,6 +127,7 @@ func (s *store) ListAllBackends(ctx context.Context) ([]*Backend, error) {
 			&backend.Type,
 			&backend.CreatedAt,
 			&backend.UpdatedAt,
+			&backend.Revision,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan backend: %w", err)
 		}
@@ -143,7 +145,7 @@ func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, li
 	if limit > MAXLIMIT {
 		return nil, ErrLimitParamExceeded
 	}
-	const columns = `SELECT id, name, base_url, type, created_at, updated_at
+	const columns = `SELECT id, name, base_url, type, created_at, updated_at, revision
         FROM llm_backends`
 	const order = ` ORDER BY created_at DESC, id DESC`
 	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
@@ -164,6 +166,7 @@ func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, li
 			&backend.Type,
 			&backend.CreatedAt,
 			&backend.UpdatedAt,
+			&backend.Revision,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan backend: %w", err)
 		}
@@ -180,7 +183,7 @@ func (s *store) ListBackends(ctx context.Context, createdAtCursor *time.Time, li
 func (s *store) GetBackendByName(ctx context.Context, name string) (*Backend, error) {
 	var backend Backend
 	err := s.Exec.QueryRowContext(ctx, `
-		SELECT id, name, base_url, type, created_at, updated_at
+		SELECT id, name, base_url, type, created_at, updated_at, revision
 		FROM llm_backends
 		WHERE name = $1`,
 		name,
@@ -191,6 +194,7 @@ func (s *store) GetBackendByName(ctx context.Context, name string) (*Backend, er
 		&backend.Type,
 		&backend.CreatedAt,
 		&backend.UpdatedAt,
+		&backend.Revision,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {

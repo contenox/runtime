@@ -10,8 +10,10 @@ import (
 	"github.com/contenox/runtime/runtime/execservice"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
+	"github.com/contenox/runtime/runtime/llmrepo"
 	"github.com/contenox/runtime/runtime/localtools"
 	"github.com/contenox/runtime/runtime/mcpworker"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/taskengine"
 )
@@ -58,6 +60,8 @@ type Config struct {
 }
 
 type Engine struct {
+	Models        llmrepo.ModelRepo
+	Workers       *modeldconn.Workers
 	TaskService   execservice.TasksEnvService
 	Tracker       libtracker.ActivityTracker
 	Bus           libbus.Messenger

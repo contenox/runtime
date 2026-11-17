@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/contenox/runtime/internal/settings"
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/internal/clikv"
@@ -104,6 +105,11 @@ Examples:
 		key, value := args[0], args[1]
 		if _, ok := validConfigKeys[key]; !ok {
 			return fmt.Errorf("unknown key %q — valid keys: %s", key, validConfigKeyList())
+		}
+		if key == settings.DeviceCeilings {
+			if _, err := settings.ParseDeviceCeilings(value); err != nil {
+				return err
+			}
 		}
 		if key == locale.Key {
 			normalized, err := stateservice.NormalizeLocale(value)
@@ -277,6 +283,9 @@ func openConfigDBWithWorkspace(cmd *cobra.Command) (libdb.DBManager, runtimetype
 }
 
 func init() {
+	for _, spec := range settings.All() {
+		validConfigKeys[spec.Key] = spec.Meaning
+	}
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configGetCmd)
 	configCmd.AddCommand(configListCmd)

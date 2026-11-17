@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package contenox.v1;
+
+option go_package = "github.com/contenox/runtime/internal/protocol/v1;protocolv1";
+
+// ServiceContract is a service's readable contract: the operations it exposes
+// and the inputs each operation accepts. A surface renders this instead of
+// restating the capability.
+message ServiceContract {
+  string id = 1;
+  string summary = 2;
+  string description = 3;
+  repeated ContractOperation operations = 4;
+}
+
+// ContractOperation describes one callable operation.
+message ContractOperation {
+  string id = 1;
+  string summary = 2;
+  string description = 3;
+  repeated ContractInput inputs = 4;
+}
+
+// ContractInput describes one named operation input.
+message ContractInput {
+  string id = 1;
+  string summary = 2;
+  string type = 3;
+  bool required = 4;
+  repeated string values = 5;
+}

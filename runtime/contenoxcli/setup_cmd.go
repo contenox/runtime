@@ -13,6 +13,7 @@ import (
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
+	"github.com/contenox/runtime/runtime/autosetup"
 	"github.com/contenox/runtime/runtime/backendservice"
 	"github.com/contenox/runtime/runtime/internal/clikv"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
@@ -29,7 +30,7 @@ var setupCmd = &cobra.Command{
 	Short: "Interactive wizard to configure your LLM provider and model.",
 	Long: `Run the setup wizard to pick an LLM provider (Ollama, OpenAI, ChatGPT
 subscription, DeepSeek, Alibaba Cloud Model Studio, OpenRouter, Google Gemini, or
-Google Vertex AI), enter
+Google Vertex AI, or native Modeld), enter
 credentials, and set defaults. For other providers, such as Anthropic, Mistral,
 or AWS Bedrock, use 'contenox-runtime backend add'.
 
@@ -60,6 +61,7 @@ var setupProviders = []setupProvider{
 	{key: "openrouter", label: "OpenRouter (300+ models, one API key — deepseek, qwen, llama, gemini, gpt and more)", defaultModel: "deepseek/deepseek-chat-v3-5", envKey: "OPENROUTER_API_KEY", needsAPIKey: true},
 	{key: "gemini", label: "Google Gemini", defaultModel: "gemini-flash-latest", envKey: "GEMINI_API_KEY", needsAPIKey: true},
 	{key: "vertex-google", label: "Google Vertex AI (Gemini via gcloud ADC)", defaultModel: "gemini-flash-latest", needsAPIKey: false, needsBaseURL: true, baseURLHint: "https://us-central1-aiplatform.googleapis.com/v1/projects/YOUR_PROJECT/locations/us-central1"},
+	{key: "modeld", label: "Contenox native (modeld)", defaultModel: "qwen2.5-coder-7b"},
 }
 
 var errSetupNoInput = errors.New("setup: no input received (interactive); nothing changed")
@@ -187,6 +189,9 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 
 	model := sp.defaultModel
 	switch sp.key {
+	case "modeld":
+		model = promptModeldModel(cmd.Context(), out, scanner, model)
+		baseURL = "local"
 	case "ollama":
 		model = promptOllamaModel(out, scanner, model)
 	default:
@@ -204,12 +209,13 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 	}
 	defer db.Close()
 
-	if err := registerSetupBackend(ctx, db, sp.key, apiKey, baseURL); err != nil {
+	provider, err := registerSetupConnection(ctx, db, sp.key, apiKey, baseURL)
+	if err != nil {
 		return err
 	}
 
 	store := runtimetypes.New(db.WithoutTransaction())
-	_ = clikv.WriteConfig(ctx, store, "global", "default-provider", sp.key)
+	_ = clikv.WriteConfig(ctx, store, "global", "default-provider", provider)
 	if model != "" {
 		_ = clikv.WriteConfig(ctx, store, "global", "default-model", model)
 	}
@@ -222,7 +228,7 @@ func runSetup(cmd *cobra.Command, out io.Writer) error {
 		fmt.Fprintf(out, "  ✓ Model:    %s\n", model)
 	}
 
-	reportSetupReadiness(ctx, cmd, db, out, sp.key, model)
+	reportSetupReadiness(ctx, cmd, db, out, provider, model)
 	return nil
 }
 
@@ -262,6 +268,13 @@ func reportSetupReadiness(ctx context.Context, cmd *cobra.Command, db libdb.DBMa
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "  Fix the above (or run `contenox-runtime doctor`), then you're set.")
 	fmt.Fprintln(out, "")
+}
+
+func registerSetupConnection(ctx context.Context, db libdb.DBManager, providerType, apiKey, baseURL string) (string, error) {
+	if providerType == "modeld" {
+		return autosetup.EnsureLocalConnection(ctx, db)
+	}
+	return providerType, registerSetupBackend(ctx, db, providerType, apiKey, baseURL)
 }
 
 func registerSetupBackend(ctx context.Context, db libdb.DBManager, providerType, apiKey, baseURL string) error {

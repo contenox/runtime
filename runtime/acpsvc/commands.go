@@ -36,6 +36,11 @@ func allACPCommands() []libacp.AvailableCommand {
 		{Name: "doctor", Description: "Check provider/model/backend readiness (read-only — no test prompt is sent)."},
 		{Name: "clear", Description: "Clear this session's conversation history."},
 		{Name: "compact", Description: "Summarize older history into a single message to reclaim context.", Input: &libacp.AvailableCommandInput{Hint: "[keep]"}},
+		{Name: "local", Description: "Install local inference, pull models and manage device memory limits.", Input: &libacp.AvailableCommandInput{Hint: "prepare <llama|openvino> | models | pull <model> | devices | ceiling <connection> <pool> <percent>"}},
+		{Name: "roles", Description: "Show model assignments and their verification status."},
+		{Name: "providers", Description: "List saved provider connections and their discovery status."},
+		{Name: "role", Description: "Assign and verify a model for an inference role.", Input: &libacp.AvailableCommandInput{Hint: "<role> <connection> <model> | <role> auto | <role> on|off"}},
+		{Name: "completion", Description: "Declare how a provider model completes code.", Input: &libacp.AvailableCommandInput{Hint: "<connection> <model> instruct|prompt|fim <format> [context]"}},
 		{Name: "model", Description: "Show the current model, or set it: /model <name>.", Input: &libacp.AvailableCommandInput{Hint: "[model-name]"}},
 		{Name: "provider", Description: "Show the current provider, or set it: /provider <name>.", Input: &libacp.AvailableCommandInput{Hint: "[provider-name]"}},
 		{Name: "max-tokens", Description: "Show or set the default response token cap: /max-tokens <count>.", Input: &libacp.AvailableCommandInput{Hint: "[count]"}},
@@ -58,6 +63,9 @@ func (t *Transport) acpCommandsFor(workspaceID string) []libacp.AvailableCommand
 	capable := t.hasMissionCapability()
 	out := make([]libacp.AvailableCommand, 0, len(all))
 	for _, c := range all {
+		if t.deps.OpenInference == nil && (c.Name == "local" || c.Name == "roles" || c.Name == "role" || c.Name == "providers" || c.Name == "completion") {
+			continue
+		}
 		if eventCommands[c.Name] && t.deps.Events == nil {
 			continue
 		}
@@ -70,6 +78,9 @@ func (t *Transport) acpCommandsFor(workspaceID string) []libacp.AvailableCommand
 			}
 		}
 		out = append(out, c)
+	}
+	if t.deps.OpenInference != nil {
+		t.setInferenceCompletions(out)
 	}
 	return out
 }
@@ -123,6 +134,17 @@ func (t *Transport) dispatchCommand(ctx context.Context, sid libacp.SessionID, s
 		event, err = t.deps.Events.Append(ctx, root, workspaceevents.Input{Type: workspaceevents.TypeEventFired, Source: workspaceevents.SourceHuman, Subject: topic, Data: json.RawMessage(payload)})
 		if err == nil {
 			out = fmt.Sprintf("Published %s (event %d).", event.Subject, event.NID)
+		}
+	case "local", "roles", "role", "providers", "completion":
+		commandCtx, stop := context.WithCancel(withChatProgress(ctx, t, sid))
+		registration := t.registerPromptCancel(sid, stop)
+		defer func() {
+			t.unregisterPromptCancel(sid, registration)
+			stop()
+		}()
+		out, err = t.dispatchInferenceCommand(commandCtx, name, strings.Fields(args))
+		if err != nil && commandCtx.Err() != nil {
+			return libacp.PromptResponse{StopReason: libacp.StopReasonCancelled}, nil
 		}
 	case "help":
 		out = t.handleHelp()

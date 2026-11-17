@@ -268,6 +268,10 @@ compiles them into .generated/.
 
 After init, register a backend, make sure the runtime can see a model, then set your defaults:
 
+  # Native Modeld worker (with a packaged worker installed):
+  contenox-runtime modeld status
+  contenox-runtime auto --dry-run
+
   # Local Ollama daemon:
   ollama pull qwen3:8b
   contenox-runtime backend add ollama --type ollama

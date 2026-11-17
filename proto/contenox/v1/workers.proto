@@ -1,0 +1,397 @@
+syntax = "proto3";
+
+package contenox.v1;
+
+import "contenox/v1/contract.proto";
+
+option go_package = "github.com/contenox/runtime/internal/protocol/v1;protocolv1";
+
+// Every member below whose engine counterpart carries a snake_case JSON tag is
+// declared with that same spelling as its json_name, and a member of an engine
+// type that carries no tags keeps the Go field name it reaches the wire as. The
+// payload's spelling is a declared fact a surface reads, not an accident of the
+// marshaller: the worker payload was written in these names before the wire was
+// declared, and every reader of it names them, so a declaration that rendered
+// them differently would answer a payload nobody asked for.
+
+// WorkerRequest is the request of _contenox/workers/status and
+// _contenox/workers/restart: which execution host to read or restart. An absent
+// target selects this installation.
+message WorkerRequest {
+  WorkerHost host = 1;
+}
+
+// WorkerConfigureRequest is the request of _contenox/workers/configure: the
+// reviewed launch options for one role, followed by the host to read.
+message WorkerConfigureRequest {
+  string role = 1;
+  WorkerOptions options = 2;
+  WorkerHost host = 3;
+}
+
+// WorkerStopRequest is the request of _contenox/workers/stop: the worker to stop.
+message WorkerStopRequest {
+  string instance = 1;
+  WorkerHost host = 2;
+}
+
+// WorkerAdmissionRequest is the request of _contenox/workers/admission: the
+// reviewed shared-scheduling bounds, followed by the host to read. The bounds
+// are the request's own fields because that is the shape the surface that
+// reviews them writes; a bound left out is absent, not a replacement.
+message WorkerAdmissionRequest {
+  reserved 1;
+  reserved "policy";
+  WorkerHost host = 2;
+  int32 queue_capacity = 3 [json_name = "queue_capacity"];
+  int32 global_limit = 4 [json_name = "global_limit"];
+  int32 foreground_burst = 5 [json_name = "foreground_burst"];
+  string max_queue_wait = 6 [json_name = "max_queue_wait"];
+}
+
+// WorkerHost selects this installation or one saved modeld connection.
+message WorkerHost {
+  // target is "local" or "connection"; empty means this installation.
+  string target = 1;
+  // connection_id names the saved connection a "connection" target reads.
+  string connection_id = 2;
+}
+
+// WorkerSnapshot is the status of this installation's local execution: its
+// saved configuration, reviewed admission bounds, per-role launch options, and
+// the workers the owner currently holds.
+//
+// owner_state and the two error members report an unavailable owner as a state
+// rather than as a failed read: a machine with no local execution still has
+// settings to review, which is what the configuration surfaces read.
+message WorkerSnapshot {
+  WorkerResources resources = 1;
+  ServiceContract contract = 2;
+  WorkerAdmissionPolicy admission = 3;
+  // options carries one entry per role this installation has reviewed.
+  map<string, WorkerOptions> options = 4;
+  // option_errors carries why a role's saved options could not be read, keyed
+  // by role; a role whose options read cleanly is absent.
+  map<string, string> option_errors = 5 [json_name = "option_errors"];
+  repeated WorkerStatus workers = 6;
+  string owner_state = 7 [json_name = "owner_state"];
+  string owner_error = 8 [json_name = "owner_error"];
+  string admission_error = 9 [json_name = "admission_error"];
+}
+
+// WorkerAdmissionPolicy is the editable shared-scheduling bound. max_queue_wait
+// is a duration in Go's own string form, so a surface renders what the engine
+// parses rather than a number whose unit it would have to guess.
+message WorkerAdmissionPolicy {
+  int32 queue_capacity = 1 [json_name = "queue_capacity"];
+  int32 global_limit = 2 [json_name = "global_limit"];
+  int32 foreground_burst = 3 [json_name = "foreground_burst"];
+  string max_queue_wait = 4 [json_name = "max_queue_wait"];
+}
+
+// WorkerOptions configures one role's managed local process. Every member is a
+// reviewed choice: a zero or empty one selects the backend's own policy rather
+// than a guessed default.
+message WorkerOptions {
+  // scheduling_mode is "protected", "serialized" or empty.
+  string scheduling_mode = 1 [json_name = "scheduling_mode"];
+  int32 context = 2;
+  int32 threads = 3;
+  int32 batch = 4;
+  // kv_cache_type is "f16", "q8_0", "q4_0" or empty.
+  string kv_cache_type = 5 [json_name = "kv_cache_type"];
+  // residency is "protected", "on-demand" or empty.
+  string residency = 6;
+  WorkerExecutionTarget target = 7;
+  // backend is "llama", "openvino" or empty.
+  string backend = 8;
+  string memory = 9;
+  string reserve = 10;
+  string cold_memory = 11 [json_name = "cold_memory"];
+  string idle_ttl = 12 [json_name = "idle_ttl"];
+  string headroom = 13;
+  string compute_reserve = 14 [json_name = "compute_reserve"];
+  string min_hot_context = 15 [json_name = "min_hot_context"];
+}
+
+// WorkerExecutionTarget selects physical placement independently of the model
+// and backend. mode is "automatic", "cpu" or "accelerator"; an accelerator
+// target names the physical device it binds to.
+message WorkerExecutionTarget {
+  string mode = 1;
+  string device_id = 2 [json_name = "device_id"];
+}
+
+// WorkerStatus reports one managed process without probing unrelated workers.
+message WorkerStatus {
+  int32 references = 1;
+  repeated string devices = 2;
+  WorkerSpec spec = 3;
+  string endpoint = 4;
+  string instance = 5;
+  string state = 6;
+  string error = 7;
+  int32 queued_foreground = 8 [json_name = "queued_foreground"];
+  int32 queued_background = 9 [json_name = "queued_background"];
+}
+
+// WorkerSpec selects a role's native process and allocation policy.
+//
+// config mirrors the engine's own launch configuration as it reaches the wire.
+// Its members are spelled as the engine declares them, which is PascalCase
+// rather than lower_snake_case, because the type carries explicit tags naming
+// each member and those names are what two shipped views read; each field
+// therefore carries the json_name it mirrors, and the engine has a test holding
+// those names so a rename cannot land silently.
+message WorkerSpec {
+  string configuration_digest = 1;
+  string digest = 2;
+  WorkerLaunchConfig config = 3;
+  string role = 4;
+  string model = 5;
+  string backend = 6;
+  string memory = 7;
+  string reserve = 8;
+  string cold_memory = 9;
+  string idle_ttl = 10;
+  string headroom = 11;
+  string compute_reserve = 12;
+  string min_hot_context = 13;
+}
+
+// WorkerLaunchConfig is one managed launch's explicit hardware and runtime
+// configuration.
+message WorkerLaunchConfig {
+  string operation = 1 [json_name = "Operation"];
+  WorkerPermit admission_permit = 2 [json_name = "AdmissionPermit"];
+  WorkerExecutionTarget target = 3 [json_name = "Target"];
+  WorkerExecution execution = 4 [json_name = "Execution"];
+  string session_namespace = 5 [json_name = "SessionNamespace"];
+  string embedding_pooling = 6 [json_name = "EmbeddingPooling"];
+  int32 num_ctx = 7 [json_name = "NumCtx"];
+  int32 hot_context_tokens = 8 [json_name = "HotContextTokens"];
+  int32 planner_effective_context = 9 [json_name = "PlannerEffectiveContext"];
+  int32 num_batch = 10 [json_name = "NumBatch"];
+  int32 num_threads = 11 [json_name = "NumThreads"];
+  int32 num_gpu_layers = 12 [json_name = "NumGpuLayers"];
+  repeated float tensor_split = 13 [json_name = "TensorSplit"];
+  bool flash_attn = 14 [json_name = "FlashAttn"];
+  string kv_cache_type = 15 [json_name = "KVCacheType"];
+  string prompt_format = 16 [json_name = "PromptFormat"];
+  string prompt_template_digest = 17 [json_name = "PromptTemplateDigest"];
+  bool disable_bos = 18 [json_name = "DisableBOS"];
+  string reasoning_format = 19 [json_name = "ReasoningFormat"];
+}
+
+// WorkerPermit binds a managed child operation to its owner's accepted request.
+message WorkerPermit {
+  uint64 id = 1 [json_name = "ID"];
+  string worker_id = 2 [json_name = "WorkerID"];
+  string owner_epoch = 3 [json_name = "OwnerEpoch"];
+}
+
+// WorkerExecution is the reviewed allocation a launch carries.
+message WorkerExecution {
+  int32 context = 1;
+  int32 threads = 2;
+  int32 batch = 3;
+  string kv_cache_type = 4;
+  string client_id = 5 [json_name = "client_id"];
+  WorkerCompletionProtection completion = 6;
+  WorkerExecutionTarget target = 7;
+  string role = 8;
+  string priority = 9;
+  string requester_id = 10 [json_name = "requester_id"];
+  bool supersede = 11;
+  string memory = 12;
+  string reserve = 13;
+  string cold_memory = 14;
+  string idle_ttl = 15;
+  string headroom = 16;
+  string compute_reserve = 17;
+  string min_hot_context = 18;
+}
+
+// WorkerCompletionProtection carries the explicit residency policy for one
+// execution host. state is the policy's own token; reservations are the pools
+// it holds.
+message WorkerCompletionProtection {
+  string state = 1 [json_name = "State"];
+  repeated WorkerProtection reservations = 2 [json_name = "Reservations"];
+}
+
+// WorkerProtection reserves a reviewed completion route before its worker is
+// resident.
+message WorkerProtection {
+  string client_id = 1 [json_name = "ClientID"];
+  string identity = 2 [json_name = "Identity"];
+  repeated WorkerPoolAllocation pools = 3 [json_name = "Pools"];
+}
+
+// WorkerResources reports resident allocations, configured completion
+// reservations and the device ceilings bounding each pool, as pool id to a
+// share of the pool's total bytes; a pool without a ceiling is absent.
+message WorkerResources {
+  repeated WorkerAllocation allocations = 1 [json_name = "Allocations"];
+  repeated WorkerProtection protections = 2 [json_name = "Protections"];
+  map<string, double> ceilings = 3 [json_name = "Ceilings"];
+}
+
+// WorkerAllocation is one resident worker's resource claim.
+message WorkerAllocation {
+  bool can_yield = 1 [json_name = "CanYield"];
+  string worker_id = 2 [json_name = "WorkerID"];
+  string owner_epoch = 3 [json_name = "OwnerEpoch"];
+  string identity = 4 [json_name = "Identity"];
+  repeated WorkerPoolAllocation pools = 5 [json_name = "Pools"];
+  int32 threads = 6 [json_name = "Threads"];
+  int32 thread_limit = 7 [json_name = "ThreadLimit"];
+}
+
+// WorkerPoolAllocation is one pool's claim: what it holds, what it may hold,
+// what is left, and the pool's physical size a device ceiling is a share of.
+message WorkerPoolAllocation {
+  string pool_id = 1 [json_name = "PoolID"];
+  int64 bytes = 2 [json_name = "Bytes"];
+  int64 limit_bytes = 3 [json_name = "LimitBytes"];
+  int64 available_bytes = 4 [json_name = "AvailableBytes"];
+  int64 total_bytes = 5 [json_name = "TotalBytes"];
+}
+
+// WorkerInventory is what one execution host reports about its native
+// availability, independently of any installed or resident model.
+message WorkerInventory {
+  int32 host_threads = 1 [json_name = "host_threads"];
+  repeated WorkerBackend backends = 2;
+  repeated WorkerMemoryPool pools = 3;
+}
+
+// WorkerBackend reports one native backend's availability and devices.
+message WorkerBackend {
+  WorkerScheduling scheduling = 1;
+  string backend = 2;
+  string state = 3;
+  string error = 4;
+  string runtime_digest = 5 [json_name = "runtime_digest"];
+  repeated string operations = 6;
+  repeated WorkerDevice devices = 7;
+}
+
+// WorkerScheduling reports the native boundaries available to the owner
+// scheduler. Every member is advisory: a backend that cannot yield says so.
+message WorkerScheduling {
+  bool single_active_request = 1 [json_name = "single_active_request"];
+  bool cooperative_yield = 2 [json_name = "cooperative_yield"];
+  bool thread_control = 3 [json_name = "thread_control"];
+  repeated string yield_operations = 4 [json_name = "yield_operations"];
+  repeated string limitations = 5;
+}
+
+// WorkerDevice is one accelerator or execution device.
+//
+// memory_free_known and memory_total_known distinguish absent plugin telemetry
+// from a real zero, so a surface never renders an unreported device as a full
+// one.
+message WorkerDevice {
+  string state = 1;
+  string error = 2;
+  string identity_state = 3 [json_name = "identity_state"];
+  string pool_id = 4 [json_name = "pool_id"];
+  repeated string operations = 5;
+  string id = 6;
+  bool shared_memory = 7 [json_name = "shared_memory"];
+  int32 index = 8;
+  string name = 9;
+  string description = 10;
+  string type = 11;
+  int64 memory_free = 12 [json_name = "memory_free"];
+  int64 memory_total = 13 [json_name = "memory_total"];
+  bool memory_free_known = 14 [json_name = "memory_free_known"];
+  bool memory_total_known = 15 [json_name = "memory_total_known"];
+}
+
+// WorkerMemoryPool identifies a physical allocation pool; devices sharing host
+// memory reference the same pool.
+message WorkerMemoryPool {
+  string id = 1;
+  string kind = 2;
+  int64 total_bytes = 3 [json_name = "total_bytes"];
+  int64 available_bytes = 4 [json_name = "available_bytes"];
+  string state = 5;
+  string error = 6;
+}
+
+// WorkerInspection reports one existing worker's residency and capacity through
+// its owner, without exposing a child connection. capacity_error carries why
+// the capacity reading is absent when it is.
+message WorkerInspection {
+  WorkerDaemonStatus status = 1;
+  WorkerModelInfo capacity = 2;
+  string capacity_error = 3 [json_name = "capacity_error"];
+}
+
+// WorkerDaemonStatus reports the owner-local model slot state. It is about
+// resident compute state, not the offline installed-model library.
+message WorkerDaemonStatus {
+  repeated WorkerStatus workers = 1;
+  string owner_instance_id = 2 [json_name = "owner_instance_id"];
+  string backend = 3;
+  string state = 4;
+  WorkerActiveModel active = 5;
+  string busy_operation = 6 [json_name = "busy_operation"];
+  string last_error = 7 [json_name = "last_error"];
+}
+
+// WorkerActiveModel is the model a slot currently holds.
+message WorkerActiveModel {
+  string model_name = 1 [json_name = "model_name"];
+  string type = 2;
+  string digest = 3;
+  string path = 4;
+  WorkerLaunchConfig config = 5;
+  repeated WorkerAdapter adapters = 6;
+  uint64 generation = 7;
+}
+
+// WorkerAdapter is one LoRA adapter applied to a model variant.
+message WorkerAdapter {
+  string name = 1;
+  string path = 2;
+  string digest = 3;
+  float scale = 4;
+}
+
+// WorkerModelInfo is a model's capabilities as the owner read them, and the
+// capacity decision it made from them.
+message WorkerModelInfo {
+  WorkerNativeAllocation allocation = 1;
+  bool supports_embedding = 2 [json_name = "supports_embedding"];
+  int32 model_max_context = 3 [json_name = "model_max_context"];
+  int32 effective_context = 4 [json_name = "effective_context"];
+  int32 memory_context_tokens = 5 [json_name = "memory_context_tokens"];
+  int32 hot_context_tokens = 6 [json_name = "hot_context_tokens"];
+  int32 planner_effective_context = 7 [json_name = "planner_effective_context"];
+  int64 kv_bytes_per_token = 8 [json_name = "kv_bytes_per_token"];
+  int64 free_bytes = 9 [json_name = "free_bytes"];
+  int64 weights_bytes = 10 [json_name = "weights_bytes"];
+  int64 overhead_bytes = 11 [json_name = "overhead_bytes"];
+  int64 reserved_bytes = 12 [json_name = "reserved_bytes"];
+  int64 user_limit_bytes = 13 [json_name = "user_limit_bytes"];
+  int64 min_free_bytes = 14 [json_name = "min_free_bytes"];
+  int64 host_cold_budget_bytes = 15 [json_name = "host_cold_budget_bytes"];
+  int64 usable_bytes = 16 [json_name = "usable_bytes"];
+  int64 required_bytes = 17 [json_name = "required_bytes"];
+  bool clamped = 18;
+  string reason = 19;
+  string device_kind = 20 [json_name = "device_kind"];
+  string device_id = 21 [json_name = "device_id"];
+  int64 device_total_bytes = 22 [json_name = "device_total_bytes"];
+  bool shared_with_display = 23 [json_name = "shared_with_display"];
+}
+
+// WorkerNativeAllocation is the allocation a managed load claimed.
+message WorkerNativeAllocation {
+  repeated WorkerDevice devices = 1;
+  WorkerLaunchConfig config = 2;
+  WorkerAllocation resources = 3;
+}
