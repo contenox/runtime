@@ -7,10 +7,12 @@ import (
 
 // NodeModel is one model as observed on a node's models directory.
 type NodeModel struct {
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Digest    string `json:"digest,omitempty"`
-	SizeBytes int64  `json:"size_bytes,omitempty"`
+	MediaError string `json:"media_error,omitempty"`
+	Pipeline   string `json:"pipeline,omitempty"`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Digest     string `json:"digest,omitempty"`
+	SizeBytes  int64  `json:"size_bytes,omitempty"`
 	// ContextLength is the model's trained context ceiling, read from file
 	// metadata only (GGUF header / OpenVINO config.json) — no device query, no
 	// capacity planner. 0 means unknown (header parse failed or was skipped).

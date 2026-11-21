@@ -121,6 +121,21 @@ func (s *Service) Embed(ctx context.Context, req transport.EmbedRequest) (transp
 	return s.next.Embed(ctx, req)
 }
 
+func (s *Service) RenderMedia(ctx context.Context, req transport.MediaRequest) (transport.MediaResult, error) {
+	renderer, ok := s.next.(transport.MediaRenderer)
+	if !ok {
+		return transport.MediaResult{}, transport.ErrUnsupportedFeature
+	}
+	hold, err := s.acquireForOpen(ctx, req.OpenSessionRequest)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	if hold != nil {
+		defer hold.release()
+	}
+	return renderer.RenderMedia(ctx, req)
+}
+
 func (s *Service) acquireForOpen(ctx context.Context, req transport.OpenSessionRequest) (*hold, error) {
 	if s.next == nil {
 		return nil, errors.New("devicelease: nil transport service")

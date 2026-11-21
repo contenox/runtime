@@ -37,3 +37,13 @@ func TestUnit_DecodeMCPImageResult_SurvivesTheBusRoundTrip(t *testing.T) {
 	_, ok = DecodeMCPImageResult("plain text")
 	require.False(t, ok)
 }
+
+func TestUnit_DecodeMCPMediaResult_AudioOnly(t *testing.T) {
+	var reply map[string]any
+	require.NoError(t, json.Unmarshal([]byte(`{"kind":"contenox.image_result","audio":[{"mime_type":"audio/wav","data":"AQID"}]}`), &reply))
+	result, ok := DecodeMCPImageResult(reply)
+	require.True(t, ok)
+	require.Empty(t, result.Images)
+	require.Len(t, result.Audio, 1)
+	require.Equal(t, []byte{1, 2, 3}, result.Audio[0].Data)
+}

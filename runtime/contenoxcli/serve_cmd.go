@@ -312,6 +312,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	eventTriggers := eventlog.NewTriggerHolder()
 	eventLog := eventlog.NewService(db, nil, tracker, eventlog.WithTrigger(eventTriggers))
 	workspaceEvents := workspaceevents.New(workspaceID, eventLog, bus, workspaceFactory, tracker)
+	var engine *enginesvc.Engine
 	localTools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
@@ -319,6 +320,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		"local_fs": localtools.NewLocalFSToolsWith(
 			"", db, nil, "local_fs",
 			acpsvc.NewServeCwdResolver(db, workspaceFactory),
+			workspaceMediaRenderer(db, func() *enginesvc.Engine { return engine }),
 		),
 		localtools.GitToolsName: localtools.NewGitToolsWith(
 			"", localtools.GitToolsName,
@@ -386,8 +388,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 	defer stopHITLApprovalSweeper()
 
 	sessionRouter := acpsvc.NewSessionRouter()
+	askApproval := func(ctx context.Context, req hitlservice.ApprovalRequest) (bool, error) {
+		if allowed, err := sessionRouter.AskApproval(ctx, req); !errors.Is(err, acpsvc.ErrNoBoundSession) {
+			return allowed, err
+		}
+		return hitlSvc.RequestApproval(ctx, req, taskEventSink)
+	}
 
-	engine, err := enginesvc.Build(ctx, db, enginesvc.Config{
+	engine, err = enginesvc.Build(ctx, db, enginesvc.Config{
 		DefaultModel:       opts.EffectiveDefaultModel,
 		DefaultProvider:    opts.EffectiveDefaultProvider,
 		AltDefaultModel:    opts.EffectiveAltDefaultModel,
@@ -397,20 +405,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		BackendCycleBudget: serveBackendCycleBudget,
 		LocalTools:         localTools,
 		EnableHITL:         true,
-		AskApproval: func(ctx context.Context, req hitlservice.ApprovalRequest) (bool, error) {
-			if allowed, err := sessionRouter.AskApproval(ctx, req); !errors.Is(err, acpsvc.ErrNoBoundSession) {
-				return allowed, err
-			}
-			return hitlSvc.RequestApproval(ctx, req, taskEventSink)
-		},
-		HITLService:      hitlSvc,
-		Bus:              bus,
-		KVStore:          kvMgr,
-		Tracker:          tracker,
-		Tracing:          opts.EffectiveTracing,
-		TaskEventSink:    taskEventSink,
-		WorkspaceID:      workspaceID,
-		HITLPolicySource: hitlSource,
+		AskApproval:        askApproval,
+		HITLService:        hitlSvc,
+		Bus:                bus,
+		KVStore:            kvMgr,
+		Tracker:            tracker,
+		Tracing:            opts.EffectiveTracing,
+		TaskEventSink:      taskEventSink,
+		WorkspaceID:        workspaceID,
+		HITLPolicySource:   hitlSource,
 	})
 	if err != nil {
 		return fmt.Errorf("build engine (run `contenox-runtime setup` to configure a model): %w", err)
@@ -556,7 +559,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 	fleetRef.set(fleet)
 
 	operatorInbox := operatorinbox.New(db)
-	triggerDispatcher := newTriggerDispatcher(workspaceEvents, eventLog, workspaceFactory, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(operatorInbox, sessionRouter))
+	wf := newWorkflowService(db, workspaceID, engine, tracker, opts.EffectiveDefaultProvider, opts.EffectiveDefaultModel,
+		localtools.NewHITLWrapper(nil, askApproval, hitlSvc, tracker, taskEventSink).AuthorizeRead)
+	eventTools.Workflows = wf
+	triggerDispatcher := newTriggerDispatcher(workspaceEvents, eventLog, workspaceFactory, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(wf, operatorInbox, sessionRouter))
 	eventTriggers.Set(triggerDispatcher)
 	triggerDispatcher.Start(ctx)
 	defer triggerDispatcher.Stop()
@@ -658,6 +664,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		WorkspaceRootMutators: workspaceReloader.mutators(bus),
 		WorkspaceEvents:       workspaceEvents,
 		WorkspaceTriggers: &workspacetriggersapi.Deps{
+			Workflows:   wf,
 			WorkspaceID: workspaceID,
 			Events:      workspaceEvents,
 			Store:       workspacetriggers.Store{DB: db},

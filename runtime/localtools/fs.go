@@ -53,6 +53,7 @@ type LocalFSTools struct {
 	cwdResolver func(context.Context) string
 	dialect     SQLDialect
 	fileIOIsOS  bool
+	renderMedia MediaRenderer
 }
 
 type FSOption func(*LocalFSTools)
@@ -120,6 +121,8 @@ func (h *LocalFSTools) execDispatch(ctx context.Context, startTime time.Time, in
 	}
 
 	switch toolName {
+	case "generate_image", "generate_video":
+		return h.generateMedia(ctx, args, toolName == "generate_video")
 	case "read_file":
 		if err := rejectUnknownArgs("local_fs.read_file", args, "path", "start_line", "end_line", "force"); err != nil {
 			return nil, taskengine.DataTypeAny, err
@@ -146,7 +149,7 @@ func (h *LocalFSTools) execDispatch(ctx context.Context, startTime time.Time, in
 		}
 		return h.grep(ctx, args)
 	case "find_files":
-		if err := rejectUnknownArgs("local_fs.find_files", args, "pattern", "path"); err != nil {
+		if err := rejectUnknownArgs("local_fs.find_files", args, "pattern", "path", "include_ignored_images"); err != nil {
 			return nil, taskengine.DataTypeAny, err
 		}
 		return h.findFiles(ctx, args)
@@ -1276,6 +1279,10 @@ func (h *LocalFSTools) findFiles(ctx context.Context, args map[string]any) (any,
 
 	patternHasSlash := strings.ContainsRune(pattern, '/')
 	filter := h.entryFilterFor(ctx, absRoot)
+	includeImages, _ := argBool(args, "include_ignored_images")
+	if includeImages {
+		filter.ignore = nil
+	}
 	maxResults := h.maxFindResultsFromPolicy(ctx)
 	maxDepth := h.maxFindDepthFromPolicy(ctx)
 	baseRoot, baseErr := h.absAllowedDir(ctx)
@@ -1321,6 +1328,13 @@ func (h *LocalFSTools) findFiles(ctx context.Context, args map[string]any) (any,
 			return nil
 		}
 
+		if includeImages {
+			switch strings.ToLower(filepath.Ext(d.Name())) {
+			case ".png", ".jpg", ".jpeg", ".gif", ".webp":
+			default:
+				return nil
+			}
+		}
 		var matched bool
 		if patternHasSlash {
 			matched, _ = filepath.Match(pattern, rel)

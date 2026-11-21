@@ -2,10 +2,12 @@ package modelregistry
 
 import (
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
 	"github.com/contenox/runtime/internal/schemafile"
+	"github.com/contenox/runtime/internal/transport"
 	"github.com/contenox/runtime/runtime/modelcontract"
 )
 
@@ -68,8 +70,21 @@ func ValidateDescriptor(name string, descriptor ModelDescriptor) error {
 		return fmt.Errorf("model %s declares unsupported backend %q", name, descriptor.Backend)
 	}
 	if descriptor.Completion.Mode != "" {
+		if descriptor.Pipeline != "" {
+			return fmt.Errorf("model %s declares completion on a diffusion pipeline", name)
+		}
 		if err := validateCompletionProfile(name, descriptor.Completion); err != nil {
 			return err
+		}
+	}
+	if descriptor.Pipeline != "" {
+		revision, err := hex.DecodeString(descriptor.Revision)
+		if err != nil || len(revision) != 20 || descriptor.BackendType() != "openvino" || transport.MediaRoleForPipeline(descriptor.Pipeline) == "" {
+			return fmt.Errorf("model %s requires a pinned, supported OpenVINO diffusion pipeline", name)
+		}
+		if descriptor.SupportsRetrieval() || descriptor.NextEdit.Format != "" || descriptor.Vision ||
+			descriptor.ToolProtocol != "" || (descriptor.AgenticTier != "" && descriptor.AgenticTier != AgenticTierNone) {
+			return fmt.Errorf("model %s mixes a diffusion pipeline with language model capabilities", name)
 		}
 	}
 	if descriptor.NextEdit.Format != "" {

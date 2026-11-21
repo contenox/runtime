@@ -18,7 +18,7 @@ import (
 // RoleRevision identifies persisted assignment and execution-setting changes for a role.
 func (s *Service) RoleRevision(ctx context.Context, role string) (string, error) {
 	switch role {
-	case RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding:
+	case RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding, RoleImage, RoleVideo:
 		return verificationRevision(ctx, runtimetypes.New(s.db.WithoutTransaction()), role)
 	default:
 		return "", fmt.Errorf("unknown inference role %q", role)

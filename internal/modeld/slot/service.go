@@ -442,6 +442,21 @@ func (s *Service) Embed(ctx context.Context, req transport.EmbedRequest) (transp
 	if err := ctxErr(ctx); err != nil {
 		return transport.EmbedResult{}, err
 	}
+	if err := s.beginOneShot(ctx, "embed"); err != nil {
+		return transport.EmbedResult{}, err
+	}
+	res, err := s.backend.Embed(ctx, req)
+	if _, ok := s.backend.(interface{ ReleaseEmbeddings() error }); ok {
+		s.mu.Lock()
+		s.embeddingResident = true
+		s.mu.Unlock()
+	}
+	s.markReadyOrError(err)
+	return res, err
+}
+
+// beginOneShot requires the operation lock and can evict an idle implicit session.
+func (s *Service) beginOneShot(ctx context.Context, operation string) error {
 	s.mu.Lock()
 	if s.active != nil {
 		// An idle implicit session is only resident because the idle reaper (not
@@ -451,30 +466,61 @@ func (s *Service) Embed(ctx context.Context, req transport.EmbedRequest) (transp
 		// busy, exactly as before.
 		if s.active.refs > 0 || s.active.explicit {
 			s.mu.Unlock()
-			return transport.EmbedResult{}, transport.ErrModelBusy
+			return transport.ErrModelBusy
 		}
 		old := s.active
 		s.active = nil
 		s.generation++
 		s.state = transport.SlotUnloading
-		s.busyOp = "embed"
+		s.busyOp = operation
 		s.lastErr = ""
 		s.mu.Unlock()
 		s.captureSnapshot(ctx, old)
 		if err := old.sess.Close(); err != nil {
-			return transport.EmbedResult{}, s.finishCloseError(err)
+			return s.finishCloseError(err)
 		}
 		s.mu.Lock()
 	}
 	s.state = transport.SlotBusy
-	s.busyOp = "embed"
+	s.busyOp = operation
 	s.mu.Unlock()
-	res, err := s.backend.Embed(ctx, req)
-	if _, ok := s.backend.(interface{ ReleaseEmbeddings() error }); ok {
-		s.mu.Lock()
-		s.embeddingResident = true
-		s.mu.Unlock()
+	return nil
+}
+
+func (s *Service) RenderMedia(ctx context.Context, req transport.MediaRequest) (transport.MediaResult, error) {
+	if err := s.checkFence(req.OwnerInstanceID); err != nil {
+		return transport.MediaResult{}, err
 	}
+	if err := req.Settings.Validate(); err != nil {
+		return transport.MediaResult{}, err
+	}
+	renderer, ok := s.backend.(transport.MediaRenderer)
+	if !ok {
+		return transport.MediaResult{}, transport.ErrUnsupportedFeature
+	}
+	unlock, err := s.lockOperation(ctx)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	defer unlock()
+	// Pin the artifact at the worker for both named and explicit-path requests.
+	// Standalone modeld receives verification requests without a supervisor digest.
+	path, err := s.resolvePath(req.Path, req.ModelName, req.Type, "")
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	digest, err := modelstore.ArtifactDigest(path, req.Type)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	if req.Digest != "" && req.Digest != digest {
+		return transport.MediaResult{}, fmt.Errorf("%w: model %s want=%s got=%s", modelstore.ErrDigestMismatch, req.ModelName, req.Digest, digest)
+	}
+	req.Path, req.Digest = path, digest
+	if err := s.beginOneShot(ctx, "render-media"); err != nil {
+		return transport.MediaResult{}, err
+	}
+	res, err := renderer.RenderMedia(ctx, req)
 	s.markReadyOrError(err)
 	return res, err
 }
@@ -892,6 +938,26 @@ func (s *Service) resolveModelPath(req transport.OpenSessionRequest) (transport.
 		return req, err
 	}
 	req.Path = path
+	if req.Type == "llama" {
+		bundled, err := modelstore.BundledLoRA(path)
+		if err != nil {
+			return req, err
+		}
+		if bundled != nil {
+			bundled.Digest, err = modelstore.FileDigest(bundled.Path)
+			if err != nil {
+				return req, err
+			}
+			// Inspection of an active variant can already carry its resolved adapter.
+			adapters := []transport.AdapterSpec{*bundled}
+			for _, ad := range req.Adapters {
+				if ad.Path != bundled.Path {
+					adapters = append(adapters, ad)
+				}
+			}
+			req.Adapters = adapters
+		}
+	}
 	return req, nil
 }
 

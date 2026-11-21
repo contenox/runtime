@@ -2,8 +2,14 @@ package localtools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/contenox/runtime/internal/transport"
+	"github.com/contenox/runtime/libdbexec"
+	"github.com/contenox/runtime/runtime/clikv"
+	"github.com/contenox/runtime/runtime/mediageneration"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -21,6 +27,12 @@ func (d fsToolDoc) pick(verbose bool) string {
 }
 
 var fsToolDocs = map[string]fsToolDoc{
+	"generate_image": {
+		terse: "Generate a PNG from a scene description using the configured local image model. The result's file field gives the workspace-relative path. Pass it to read_image to inspect the image.",
+	},
+	"generate_video": {
+		terse: "Generate a silent MP4 from a scene description using the configured local video model. The result's file field gives the workspace-relative path.",
+	},
 	"read_file": {
 		terse: "Read a text file. Omit start_line/end_line for the whole file; supply them to page through a large one. Refuses binaries. Oversized results are truncated to a head with a notice naming the exact resume line. A full read is required before write_file on an existing file.",
 		verbose: "Read a text file. With no start_line/end_line, reads the whole file and returns the raw text. " +
@@ -99,15 +111,19 @@ var fsToolDocs = map[string]fsToolDoc{
 }
 
 func (h *LocalFSTools) Supports(ctx context.Context) ([]string, error) {
-	return []string{
-		h.name,
-		"read_file", "write_file", "list_dir", "grep", "find_files",
-		"sed", "count_stats", "read_file_range", "stat_file", "read_image",
-	}, nil
+	tools, err := h.GetToolsForToolsByName(ctx, h.name)
+	if err != nil {
+		return nil, err
+	}
+	names := []string{h.name}
+	for _, tool := range tools {
+		names = append(names, tool.Function.Name)
+	}
+	return names, nil
 }
 
 func (h *LocalFSTools) GetSchemasForSupportedTools(ctx context.Context) (map[string]*openapi3.T, error) {
-	return map[string]*openapi3.T{}, nil
+	return taskengine.DeclarationSchemas(ctx, h.name, h)
 }
 
 func fsTool(name, desc string, props map[string]any, required ...string) taskengine.Tool {
@@ -168,8 +184,9 @@ func (h *LocalFSTools) GetToolsForToolsByName(ctx context.Context, name string) 
 		}, "path", "pattern"),
 
 		fsTool("find_files", doc("find_files"), map[string]any{
-			"pattern": fsProp("string", "Glob matched against the basename (e.g. \"*.go\"), or against the relative path when it contains a slash"),
-			"path":    fsProp("string", "Directory to search from, relative to the project root (default: project root)"),
+			"include_ignored_images": fsProp("boolean", "Find only PNG, JPEG, GIF and WebP images, including gitignored screenshots in this folder. Pass a returned path to read_image."),
+			"pattern":                fsProp("string", "Glob matched against the basename (e.g. \"*.go\"), or against the relative path when it contains a slash"),
+			"path":                   fsProp("string", "Directory to search from, relative to the project root (default: project root)"),
 		}, "pattern"),
 
 		fsTool("sed", doc("sed"), map[string]any{
@@ -195,6 +212,42 @@ func (h *LocalFSTools) GetToolsForToolsByName(ctx context.Context, name string) 
 		fsTool("stat_file", doc("stat_file"), map[string]any{
 			"path": fsProp("string", "Path to the file or directory"),
 		}, "path"),
+	}
+	if h.fileIOIsOS && h.renderMedia != nil && h.db != nil {
+		store := runtimetypes.New(h.db.WithoutTransaction())
+		for _, tool := range []struct{ name, role string }{{"generate_image", transport.ImageRole}, {"generate_video", transport.VideoRole}} {
+			var state string
+			if err := store.GetKV(ctx, clikv.Prefix+clikv.EnabledRoleKey(tool.role), &state); err != nil && !errors.Is(err, libdbexec.ErrNotFound) {
+				return nil, err
+			}
+			if state != "enabled" {
+				continue
+			}
+			name := tool.name
+			props := map[string]any{"prompt": fsProp("string", "Describe the scene to generate."),
+				"path": fsProp("string", "Optional new workspace file. Defaults to a unique file under Media."),
+				"seed": map[string]any{"type": "integer", "minimum": 0, "maximum": 4294967295, "description": "Optional seed for reproducible generation."}}
+			for _, axis := range []string{"width", "height"} {
+				props[axis] = map[string]any{
+					"type": "integer", "minimum": transport.MinMediaDimension, "maximum": transport.MaxMediaDimension,
+					"multipleOf": transport.MediaDimensionStep, "default": mediageneration.DefaultDimension,
+					"description": "Output " + axis + " in pixels.",
+				}
+			}
+			if name == "generate_video" {
+				props["fps"] = map[string]any{
+					"type": "integer", "minimum": 1, "maximum": transport.MaxMediaFPS,
+					"default": mediageneration.DefaultVideoFPS, "description": "Output frames per second.",
+				}
+				props["seconds"] = map[string]any{
+					"type": "number", "minimum": 1.0 / transport.MaxMediaFPS, "default": mediageneration.DefaultVideoSeconds,
+					"description": fmt.Sprintf("Clip duration in seconds. Duration × fps must be a whole number of frames. "+
+						"The model generates groups of eight frames plus one endpoint. Width × height × generated frames must fit %d pixels "+
+						"and the selected device's available memory.", transport.MaxMediaPixels),
+				}
+			}
+			allTools = append(allTools, fsTool(name, doc(name), props, "prompt"))
+		}
 	}
 
 	if name == h.name {

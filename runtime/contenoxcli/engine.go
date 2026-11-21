@@ -42,11 +42,13 @@ func BuildEngine(ctx context.Context, db libdbexec.DBManager, opts chatOpts) (*E
 		return nil, err
 	}
 
+	var engine *enginesvc.Engine
 	tools := map[string]taskengine.ToolsRepo{
 		"echo":     localtools.NewEchoTools(),
 		"print":    localtools.NewPrint(tracker),
 		"webtools": localtools.NewWebCaller(tracker),
-		"local_fs": localtools.NewLocalFSTools(opts.EffectiveLocalExecAllowedDir, db),
+		"local_fs": localtools.NewLocalFSToolsWith(opts.EffectiveLocalExecAllowedDir, db, nil, localtools.LocalFSToolsName, nil,
+			workspaceMediaRenderer(db, func() *enginesvc.Engine { return engine })),
 		localtools.GitToolsName: localtools.NewGitToolsWith(
 			opts.EffectiveLocalExecAllowedDir, localtools.GitToolsName, nil,
 			agentGitIdentity(db),

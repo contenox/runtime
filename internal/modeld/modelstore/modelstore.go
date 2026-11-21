@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/contenox/runtime/internal/archiveutil"
+	"github.com/contenox/runtime/internal/modeld/diffusion"
 	"github.com/contenox/runtime/internal/modeld/llama"
 	"github.com/contenox/runtime/internal/transport"
 )
@@ -111,7 +112,23 @@ func Resolve(dir, name, backendType, wantDigest string) (path string, err error)
 				return "", statErr
 			}
 		}
-		return "", fmt.Errorf("%w: %s (openvino)", ErrModelNotFound, name)
+		pipeline, err := diffusion.Pipeline(modelDir)
+		if err != nil {
+			return "", err
+		}
+		if pipeline == "" {
+			return "", fmt.Errorf("%w: %s (openvino)", ErrModelNotFound, name)
+		}
+		if wantDigest != "" {
+			got, err := ArtifactDigest(modelDir, backendType)
+			if err != nil {
+				return "", err
+			}
+			if got != wantDigest {
+				return "", fmt.Errorf("%w: model %s want=%s got=%s", ErrDigestMismatch, name, wantDigest, got)
+			}
+		}
+		return modelDir, nil
 
 	default:
 		return "", fmt.Errorf("%w: %q", ErrUnsupportedType, backendType)
@@ -134,6 +151,11 @@ func ArtifactDigest(path, backend string) (string, error) {
 		return DirectoryDigest(path)
 	case "llama":
 		dir := filepath.Dir(path)
+		if adapter, err := BundledLoRA(path); err != nil {
+			return "", err
+		} else if adapter != nil {
+			return DirectoryDigest(dir)
+		}
 		if _, err := os.Lstat(filepath.Join(dir, llama.MMProjFilename)); err == nil {
 			return DirectoryDigest(dir)
 		} else if !os.IsNotExist(err) {

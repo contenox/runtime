@@ -143,7 +143,7 @@ func ProposedWorkerOptions(ctx context.Context, role string) (WorkerOptions, boo
 // Options reads each role's configured launch options without starting workers.
 func (m *Workers) Options(ctx context.Context) (map[string]WorkerOptions, error) {
 	out := make(map[string]WorkerOptions)
-	for _, role := range []string{"primary", "alternative", "autocomplete", "next-edit", "embedding"} {
+	for _, role := range []string{"primary", "alternative", "autocomplete", "next-edit", "embedding", transport.ImageRole, transport.VideoRole} {
 		options, err := m.roleOptions(ctx, role)
 		if err != nil {
 			return nil, err
@@ -154,5 +154,9 @@ func (m *Workers) Options(ctx context.Context) (map[string]WorkerOptions, error)
 }
 
 func validWorkerRole(role string) bool {
-	return role == "primary" || role == "alternative" || role == "autocomplete" || role == "next-edit" || role == "embedding" || role == "inspection"
+	switch role {
+	case "primary", "alternative", "autocomplete", "next-edit", "embedding", "inspection", transport.ImageRole, transport.VideoRole:
+		return true
+	}
+	return false
 }

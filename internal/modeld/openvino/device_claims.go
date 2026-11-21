@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"sync"
 
 	"github.com/contenox/runtime/internal/modeld/capacity"
+	"github.com/contenox/runtime/internal/modeld/diffusion"
 	"github.com/contenox/runtime/internal/modeld/internal/sessionkit"
 	"github.com/contenox/runtime/internal/modeld/openvino/ovsession"
 	"github.com/contenox/runtime/internal/remedy"
@@ -14,7 +16,9 @@ import (
 
 type claimedService struct {
 	*Service
-	claimant transport.DeviceClaimant
+	claimant  transport.DeviceClaimant
+	mediaMu   sync.Mutex
+	mediaPeak map[string]int64
 }
 
 // WithDeviceClaims binds text, vision and embedding allocation to the shared worker owner.
@@ -47,14 +51,24 @@ func (s *claimedService) Describe(ctx context.Context, req transport.OpenSession
 	genai.Device = effectiveDevice(genai.Device)
 	var info transport.ModelInfo
 	var cfg transport.Config
-	if req.Config.Operation == "embedding" {
+	weights := dirSize(req.Path)
+	if req.Config.Operation == "embedding" || req.Config.Operation == "render-media" {
 		snapshot, err := capacity.Snapshot(s.memorySource(genai.Device))
 		if err != nil {
 			return transport.ModelInfo{}, err
 		}
-		weights := dirSize(req.Path)
+		if req.Config.Operation == "render-media" {
+			pipeline, err := diffusion.Pipeline(req.Path)
+			if err != nil {
+				return transport.ModelInfo{}, err
+			}
+			weights, err = mediaWeights(req.Path, pipeline)
+			if err != nil {
+				return transport.ModelInfo{}, err
+			}
+		}
 		info = transport.ModelInfo{DeviceKind: snapshot.Kind, DeviceID: snapshot.DeviceID, WeightsBytes: weights, RequiredBytes: weights}
-		info.SupportsEmbedding = ovsession.EmbedAvailable()
+		info.SupportsEmbedding = req.Config.Operation == "embedding" && ovsession.EmbedAvailable()
 		cfg = req.Config
 	} else {
 		info, err = s.describeConfigured(req, genai)
@@ -67,7 +81,7 @@ func (s *claimedService) Describe(ctx context.Context, req transport.OpenSession
 		}
 	}
 	cfg.Target = resolvedTarget(genai.Device, info.DeviceID)
-	allocation, err := s.allocation(cfg, info, dirSize(req.Path))
+	allocation, err := s.allocation(cfg, info, weights)
 	if err != nil {
 		return transport.ModelInfo{}, err
 	}
@@ -80,8 +94,21 @@ func (s *claimedService) claim(ctx context.Context, cfg transport.Config, info *
 	if err != nil {
 		return err
 	}
+	if cfg.Operation == "render-media" {
+		s.mediaMu.Lock()
+		defer s.mediaMu.Unlock()
+		for i, pool := range allocation.Resources.Pools {
+			allocation.Resources.Pools[i].Bytes = max(pool.Bytes, s.mediaPeak[pool.PoolID])
+		}
+	}
 	if err := s.claimant.ClaimDevices(ctx, allocation); err != nil {
 		return err
+	}
+	if cfg.Operation == "render-media" {
+		s.mediaPeak = make(map[string]int64, len(allocation.Resources.Pools))
+		for _, pool := range allocation.Resources.Pools {
+			s.mediaPeak[pool.PoolID] = pool.Bytes
+		}
 	}
 	info.Allocation = &allocation
 	return nil

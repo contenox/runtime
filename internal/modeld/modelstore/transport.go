@@ -30,7 +30,7 @@ func (a *NodeAdmin) ListModels(ctx context.Context) ([]transport.NodeModel, erro
 	}
 	out := make([]transport.NodeModel, len(models))
 	for i, model := range models {
-		out[i] = transport.NodeModel{Name: model.Name, Type: model.Type, Digest: model.Digest, SizeBytes: model.SizeBytes, ContextLength: model.ContextLength}
+		out[i] = transport.NodeModel{Name: model.Name, Type: model.Type, Digest: model.Digest, SizeBytes: model.SizeBytes, ContextLength: model.ContextLength, Pipeline: model.Pipeline, MediaError: model.MediaError}
 	}
 	return out, nil
 }

@@ -82,7 +82,7 @@ func TestIntegration_IndependentCloudSetup_IgnoresBrokenLocalSettingsAndOtherCon
 	service := newService(state)
 	configuration, err := service.Configuration(ctx)
 	require.NoError(t, err)
-	require.Len(t, configuration.Roles, 5)
+	require.Len(t, configuration.Roles, len(inferencesetup.RoleIDs()))
 	nextEdit, err := service.VerifiedRole(ctx, inferencesetup.RoleNextEdit)
 	require.Error(t, err)
 	require.False(t, nextEdit.Enabled)

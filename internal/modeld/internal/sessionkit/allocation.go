@@ -31,7 +31,7 @@ func Allocation(cfg transport.Config, info transport.ModelInfo, weights int64, d
 	result := transport.NativeAllocation{Devices: devices, Config: cfg, Resources: admission.Allocation{Threads: threads, ThreadLimit: runtime.NumCPU()}}
 	pools := map[string]admission.PoolAllocation{}
 	cold := min(max(info.HostColdBudgetBytes, 0), int64(max(cfg.PlannerEffectiveContext-cfg.NumCtx, 0))*max(info.KVBytesPerToken, 0))
-	hostBytes := cold + capacity.NativeHostOverheadBytes
+	hostBytes := cold + capacity.NativeHostOverheadBytes + info.HostStagingBytes
 	if len(devices) == 0 {
 		hostBytes += info.RequiredBytes
 	} else {

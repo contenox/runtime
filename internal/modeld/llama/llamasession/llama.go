@@ -279,6 +279,7 @@ func applyAdapters(model *llamacppshim.Model, lctx *llamacppshim.Context, adapte
 		return nil, nil
 	}
 	loaded := make([]*llamacppshim.Adapter, 0, len(adapters))
+	scales := make([]float32, 0, len(adapters))
 	for _, spec := range adapters {
 		ad, err := model.LoadAdapter(spec.Path)
 		if err != nil {
@@ -289,12 +290,12 @@ func applyAdapters(model *llamacppshim.Model, lctx *llamacppshim.Context, adapte
 		if scale == 0 {
 			scale = 1.0
 		}
-		if err := lctx.SetAdapter(ad, scale); err != nil {
-			ad.Free()
-			freeAdapters(loaded)
-			return nil, fmt.Errorf("llamasession: apply lora adapter %q: %w", spec.Name, err)
-		}
 		loaded = append(loaded, ad)
+		scales = append(scales, scale)
+	}
+	if err := lctx.SetAdapters(loaded, scales); err != nil {
+		freeAdapters(loaded)
+		return nil, err
 	}
 	return loaded, nil
 }

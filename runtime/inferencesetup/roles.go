@@ -23,6 +23,7 @@ import (
 	"github.com/contenox/runtime/runtime/clikv"
 	"github.com/contenox/runtime/runtime/internal/models/modelauth"
 	"github.com/contenox/runtime/runtime/llmrepo"
+	"github.com/contenox/runtime/runtime/mediageneration"
 	"github.com/contenox/runtime/runtime/modelcapability"
 	"github.com/contenox/runtime/runtime/modelcontract"
 	"github.com/contenox/runtime/runtime/modelregistry"
@@ -40,11 +41,13 @@ const (
 	RoleAutocomplete = "autocomplete"
 	RoleNextEdit     = "next-edit"
 	RoleEmbedding    = "embedding"
+	RoleImage        = transport.ImageRole
+	RoleVideo        = transport.VideoRole
 )
 
 // RoleIDs is every inference role an assignment may name.
 func RoleIDs() []string {
-	return []string{RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding}
+	return []string{RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding, RoleImage, RoleVideo}
 }
 
 var ErrSetupIncomplete = errors.New("inference setup is incomplete")
@@ -60,6 +63,8 @@ type optionalRole struct {
 var optionalRoles = []optionalRole{
 	{id: RoleNextEdit, enabledByDefault: false},
 	{id: RoleEmbedding, enabledByDefault: false},
+	{id: RoleImage, enabledByDefault: false},
+	{id: RoleVideo, enabledByDefault: false},
 }
 
 // OptionalRoles lists the roles an operator may turn off. Every other role is required.
@@ -80,7 +85,7 @@ func optionalRoleSpec(role string) (optionalRole, bool) {
 	return optionalRole{}, false
 }
 
-func enabledKey(role string) string { return "inference.enabled." + role }
+func enabledKey(role string) string { return clikv.EnabledRoleKey(role) }
 
 func readRoleEnabled(ctx context.Context, store runtimetypes.Store, role string) (bool, error) {
 	spec, optional := optionalRoleSpec(role)
@@ -251,6 +256,7 @@ func (s *Service) ModelFactory() ModelFactory {
 
 var roleSpecs = []struct{ id, name string }{
 	{RoleChat, "Chat"}, {RoleAutocomplete, "Autocomplete"}, {RoleNextEdit, "Next Edit"}, {RoleRecovery, "Recovery"}, {RoleEmbedding, "Workspace Search"},
+	{RoleImage, "Image generation"}, {RoleVideo, "Video generation"},
 }
 
 // Roles returns the effective role assignments and their verification state.
@@ -260,7 +266,7 @@ func (s *Service) Roles(ctx context.Context) ([]RoleStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	roles := make([]RoleStatus, 0, 5)
+	roles := make([]RoleStatus, 0, len(roleSpecs))
 	for _, spec := range roleSpecs {
 		assignment, readErr := s.readAssignment(ctx, store, spec.id)
 		if readErr != nil {
@@ -376,16 +382,12 @@ func (s *Service) Ready(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	ready := map[string]bool{}
 	for _, role := range roles {
-		ready[role.Role] = role.State == "available"
-	}
-	for _, role := range roles {
-		if _, optional := optionalRoleSpec(role.Role); optional && !role.Enabled {
-			ready[role.Role] = true
+		if role.Enabled && role.State != "available" {
+			return false, nil
 		}
 	}
-	return ready[RoleChat] && ready[RoleRecovery] && ready[RoleAutocomplete] && ready[RoleNextEdit] && ready[RoleEmbedding], nil
+	return true, nil
 }
 
 // VerifiedRole returns a role only when its current provider, model, and configuration fingerprint match successful verification evidence.
@@ -483,7 +485,7 @@ func (s *Service) assignReviewed(ctx context.Context, assignments []Assignment, 
 		if err := assignment.Inputs.validate(assignment.Role); err != nil {
 			return nil, err
 		}
-		if assignment.Role != RoleChat && assignment.Role != RoleRecovery && assignment.Role != RoleAutocomplete && assignment.Role != RoleNextEdit && assignment.Role != RoleEmbedding {
+		if !slices.Contains(RoleIDs(), assignment.Role) {
 			return nil, fmt.Errorf("role %q cannot be assigned explicitly", assignment.Role)
 		}
 		if seen[assignment.Role] {
@@ -757,7 +759,7 @@ func (s *Service) SetRoleEnabled(ctx context.Context, role string, enabled bool)
 
 // InvalidateProvider removes verification evidence for every role using a provider.
 func (s *Service) InvalidateProvider(ctx context.Context, provider string) error {
-	return s.invalidateRoles(ctx, provider, "", []string{RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding})
+	return s.invalidateRoles(ctx, provider, "", RoleIDs())
 }
 
 // invalidateRoles removes verification evidence for each listed role using a
@@ -955,11 +957,15 @@ func (s *Service) verify(ctx context.Context, assignment Assignment) (*Verificat
 		return nil, err
 	}
 	ctx, native := modeldconn.CaptureExecution(ctx)
-	models, closeModels, err := s.models.Models(ctx)
-	if err != nil {
-		return nil, err
+	var models llmrepo.ModelRepo
+	if assignment.Role != RoleImage && assignment.Role != RoleVideo {
+		var closeModels func()
+		models, closeModels, err = s.models.Models(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer closeModels()
 	}
-	defer closeModels()
 	verification := &Verification{
 		Inputs: assignment.Inputs.normalized(),
 		Role:   assignment.Role, Provider: assignment.Provider, Model: assignment.Model,
@@ -967,6 +973,14 @@ func (s *Service) verify(ctx context.Context, assignment Assignment) (*Verificat
 	}
 	verification.Fingerprint = fingerprint
 	switch assignment.Role {
+	case RoleImage, RoleVideo:
+		options := mediageneration.Options{Model: assignment.Model, Video: assignment.Role == RoleVideo, Prompt: "A red ceramic cup on a white table in daylight", Seed: 42}
+		if options.Video {
+			options.Seconds = new(1.0)
+		}
+		if _, err := s.renderNative(ctx, assignment, options, true); err != nil {
+			return nil, fmt.Errorf("%s verification failed: %w", assignment.Role, err)
+		}
 	case RoleEmbedding:
 		dimension, err := VerifyRetrieval(ctx, models, assignment)
 		if err != nil {
@@ -1063,6 +1077,10 @@ func (s *Service) requireCapability(ctx context.Context, assignment Assignment) 
 				continue
 			}
 			switch assignment.Role {
+			case RoleImage, RoleVideo:
+				if backend.Backend.BaseURL != "local" || (backend.Backend.Type != "modeld" && backend.Backend.Type != "local") || candidate.MediaRole != assignment.Role {
+					return fmt.Errorf("select an installed local model with %s support", assignment.Role)
+				}
 			case RoleEmbedding:
 				if !candidate.CanEmbed {
 					return errors.New("selected model does not advertise embedding capability")
@@ -1150,6 +1168,8 @@ func roleKeys(role string) [2]string {
 		return [2]string{"default-next-edit-provider", "default-next-edit-model"}
 	case RoleEmbedding:
 		return [2]string{"default-embedding-provider", "default-embedding-model"}
+	case RoleImage, RoleVideo:
+		return [2]string{"default-" + role + "-provider", "default-" + role + "-model"}
 	default:
 		return [2]string{"invalid-provider", "invalid-model"}
 	}
@@ -1287,6 +1307,9 @@ func (s *Service) fingerprint(ctx context.Context, store runtimetypes.Store, ass
 			}
 			if name == assignment.Model {
 				foundModel = true
+				if assignment.Role == RoleImage || assignment.Role == RoleVideo {
+					parts = append(parts, "native-media-role="+candidate.MediaRole)
+				}
 				if candidate.NextEditFormat != "" {
 					nextEditFormat = candidate.NextEditFormat
 				}

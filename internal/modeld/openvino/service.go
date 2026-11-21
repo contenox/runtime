@@ -42,30 +42,36 @@ var buildGenAIVersion string
 // side-effect free, so `modeld version` can report it without loading native libs.
 func BuildGenAIVersion() string { return buildGenAIVersion }
 
+const tokenizersPathEnv = "OPENVINO_TOKENIZERS_PATH_GENAI"
+
 // tokenizersLibName is the extension file the bundle/venv provides.
 func tokenizersLibName() string {
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		return "openvino_tokenizers.dll"
+	case "darwin":
+		return "libopenvino_tokenizers.dylib"
+	default:
+		return "libopenvino_tokenizers.so"
 	}
-	return "libopenvino_tokenizers.so"
 }
 
 // init points OpenVINO GenAI at the tokenizers extension without requiring the
 // caller to set OPENVINO_TOKENIZERS_PATH_GENAI. It prefers a bundle next to the
 // binary and falls back to the build-time venv path for local development.
 func init() {
-	if os.Getenv("OPENVINO_TOKENIZERS_PATH_GENAI") != "" {
+	if os.Getenv(tokenizersPathEnv) != "" {
 		return
 	}
 	if exe, err := os.Executable(); err == nil {
 		cand := filepath.Join(filepath.Dir(exe), "modeld-libs", tokenizersLibName())
 		if _, err := os.Stat(cand); err == nil {
-			_ = os.Setenv("OPENVINO_TOKENIZERS_PATH_GENAI", cand)
+			_ = os.Setenv(tokenizersPathEnv, cand)
 			return
 		}
 	}
 	if buildTokenizersPath != "" {
-		_ = os.Setenv("OPENVINO_TOKENIZERS_PATH_GENAI", buildTokenizersPath)
+		_ = os.Setenv(tokenizersPathEnv, buildTokenizersPath)
 	}
 }
 

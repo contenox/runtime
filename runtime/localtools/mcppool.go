@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,9 +17,11 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/internal/winproc"
 	"github.com/contenox/runtime/runtime/localtools/mcpoauth"
+	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 type MCPTransport string
@@ -48,9 +51,10 @@ var (
 type MCPAuthType string
 
 const (
-	MCPAuthNone   MCPAuthType = ""
-	MCPAuthBearer MCPAuthType = "bearer"
-	MCPAuthOAuth  MCPAuthType = "oauth"
+	MCPAuthNone              MCPAuthType = ""
+	MCPAuthBearer            MCPAuthType = "bearer"
+	MCPAuthOAuth             MCPAuthType = "oauth"
+	MCPAuthClientCredentials MCPAuthType = "client_credentials"
 )
 
 type MCPAuthConfig struct {
@@ -80,6 +84,7 @@ type MCPOAuthConfig struct {
 	ClientID string
 
 	ClientSecret string
+	TokenURL     string
 
 	Scopes []string
 
@@ -273,49 +278,34 @@ func (p *MCPSessionPool) buildTransport() (mcp.Transport, error) {
 		winproc.Hide(cmd)
 		return &mcp.CommandTransport{Command: cmd}, nil
 
-	case MCPTransportSSE:
-		if p.cfg.URL == "" {
-			return nil, fmt.Errorf("sse transport requires a url")
+	case MCPTransportSSE, MCPTransportHTTP:
+		endpoint, err := url.Parse(p.cfg.URL)
+		if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+			return nil, errors.New("remote MCP transport requires an HTTP or HTTPS URL")
 		}
 		var rt http.RoundTripper = http.DefaultTransport
 		if len(p.cfg.Headers) > 0 {
 			rt = &headerRoundTripper{base: rt, headers: p.cfg.Headers}
 		}
 		if p.cfg.Auth != nil && p.cfg.Auth.Type == MCPAuthOAuth {
-			oauthRT, err := p.buildOAuthRoundTripper(rt)
+			rt, err = p.buildOAuthRoundTripper(rt)
 			if err != nil {
 				return nil, err
 			}
-			rt = oauthRT
+		} else if p.cfg.Auth != nil && p.cfg.Auth.Type == MCPAuthClientCredentials {
+			rt, err = serviceAccountTransport(p.cfg.OAuth, rt)
+			if err != nil {
+				return nil, err
+			}
 		} else if token := p.cfg.Auth.ResolveToken(); token != "" {
 			rt = &bearerRoundTripper{base: rt, token: token}
 		}
 		rt = &sessionRoundTripper{base: rt, getSessionID: getSessionID, setSessionID: setSessionID}
-		t := &mcp.SSEClientTransport{Endpoint: p.cfg.URL}
-		t.HTTPClient = &http.Client{Transport: rt}
-		return t, nil
-
-	case MCPTransportHTTP:
-		if p.cfg.URL == "" {
-			return nil, fmt.Errorf("http transport requires a url")
+		client := &http.Client{Transport: &mcpOriginTransport{base: rt, endpoint: endpoint}}
+		if p.cfg.Transport == MCPTransportSSE {
+			return &mcp.SSEClientTransport{Endpoint: p.cfg.URL, HTTPClient: client}, nil
 		}
-		var rt http.RoundTripper = http.DefaultTransport
-		if len(p.cfg.Headers) > 0 {
-			rt = &headerRoundTripper{base: rt, headers: p.cfg.Headers}
-		}
-		if p.cfg.Auth != nil && p.cfg.Auth.Type == MCPAuthOAuth {
-			oauthRT, err := p.buildOAuthRoundTripper(rt)
-			if err != nil {
-				return nil, err
-			}
-			rt = oauthRT
-		} else if token := p.cfg.Auth.ResolveToken(); token != "" {
-			rt = &bearerRoundTripper{base: rt, token: token}
-		}
-		rt = &sessionRoundTripper{base: rt, getSessionID: getSessionID, setSessionID: setSessionID}
-		t := &mcp.StreamableClientTransport{Endpoint: p.cfg.URL}
-		t.HTTPClient = &http.Client{Transport: rt}
-		return t, nil
+		return &mcp.StreamableClientTransport{Endpoint: p.cfg.URL, HTTPClient: client}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown MCP transport: %q", p.cfg.Transport)
@@ -364,6 +354,35 @@ func (p *MCPSessionPool) Close() error {
 		return err
 	}
 	return nil
+}
+
+// MCP credentials and session IDs belong to the configured server. Check the
+// destination before header injection, including redirects and SSE message URLs.
+type mcpOriginTransport struct {
+	base     http.RoundTripper
+	endpoint *url.URL
+}
+
+func (t *mcpOriginTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.User != nil || !strings.EqualFold(r.URL.Scheme, t.endpoint.Scheme) || !strings.EqualFold(r.URL.Host, t.endpoint.Host) {
+		return nil, errors.New("MCP request points outside the configured origin")
+	}
+	return t.base.RoundTrip(r)
+}
+
+func serviceAccountTransport(settings *MCPOAuthConfig, base http.RoundTripper) (http.RoundTripper, error) {
+	if settings == nil || settings.ClientID == "" || settings.ClientSecret == "" {
+		return nil, errors.New("set an OAuth client ID and its client-secret environment variable")
+	}
+	u, err := url.Parse(settings.TokenURL)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
+		return nil, errors.New("set the HTTPS token endpoint registered for this service account")
+	}
+	// A redirect must never carry client credentials away from the named issuer.
+	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
+	config := clientcredentials.Config{ClientID: settings.ClientID, ClientSecret: settings.ClientSecret, TokenURL: u.String(), Scopes: settings.Scopes}
+	return &oauth2.Transport{Source: config.TokenSource(ctx), Base: base}, nil
 }
 
 type bearerRoundTripper struct {
@@ -484,14 +503,25 @@ func (p *MCPSessionPool) callTool(ctx context.Context, toolName string, args map
 			errors.New(toolErr),
 		)
 	}
-	if images := mcpCollectImages(result.Content); len(images) > 0 {
+	var audio []taskengine.AudioPart
+	total := 0
+	for _, block := range result.Content {
+		if clip, ok := block.(*mcp.AudioContent); ok {
+			total += len(clip.Data)
+			if total > modelrepo.MaxInlineAudioBytes || !modelrepo.SupportedAudioMimeTypes[clip.MIMEType] || len(clip.Data) == 0 {
+				return nil, fmt.Errorf("unsupported or oversized MCP audio (%s, %d bytes)", clip.MIMEType, total)
+			}
+			audio = append(audio, taskengine.AudioPart{Data: clip.Data, MimeType: clip.MIMEType})
+		}
+	}
+	if images := mcpCollectImages(result.Content); len(images) > 0 || len(audio) > 0 {
 		text := mcpCollectText(result.Content)
 		if result.StructuredContent != nil {
 			if b, err := json.Marshal(result.StructuredContent); err == nil {
 				text = strings.TrimSpace(text + "\n" + string(b))
 			}
 		}
-		return &MCPImageResult{Kind: MCPImageResultKind, Text: text, Images: images}, nil
+		return &MCPImageResult{Kind: MCPImageResultKind, Text: text, Images: images, Audio: audio}, nil
 	}
 	if result.StructuredContent != nil {
 		return result.StructuredContent, nil
@@ -507,9 +537,10 @@ type MCPImage struct {
 }
 
 type MCPImageResult struct {
-	Kind   string     `json:"kind"`
-	Text   string     `json:"text"`
-	Images []MCPImage `json:"images"`
+	Kind   string                 `json:"kind"`
+	Text   string                 `json:"text"`
+	Images []MCPImage             `json:"images"`
+	Audio  []taskengine.AudioPart `json:"audio,omitempty"`
 }
 
 func mcpCollectImages(contents []mcp.Content) []MCPImage {
@@ -538,14 +569,14 @@ func DecodeMCPImageResult(result any) (*taskengine.ToolImageResult, bool) {
 		return nil, false
 	}
 	var decoded MCPImageResult
-	if err := json.Unmarshal(raw, &decoded); err != nil || len(decoded.Images) == 0 {
+	if err := json.Unmarshal(raw, &decoded); err != nil || (len(decoded.Images) == 0 && len(decoded.Audio) == 0) {
 		return nil, false
 	}
 	return decoded.toolResult(), true
 }
 
 func (r *MCPImageResult) toolResult() *taskengine.ToolImageResult {
-	out := &taskengine.ToolImageResult{Text: r.Text}
+	out := &taskengine.ToolImageResult{Text: r.Text, Audio: r.Audio}
 	for _, img := range r.Images {
 		out.Images = append(out.Images, taskengine.ImagePart{Data: img.Data, MimeType: img.MimeType})
 	}

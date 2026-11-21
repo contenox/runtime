@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/contenox/runtime/internal/modeld/modelstore"
+	"github.com/contenox/runtime/internal/transport"
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/runtime/autosetup"
 	"github.com/contenox/runtime/runtime/inferencesetup"
@@ -20,6 +21,7 @@ import (
 	"github.com/contenox/runtime/runtime/modelregistry"
 	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 	"github.com/contenox/runtime/runtime/modelworkers"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
 type handler struct {
@@ -40,7 +42,9 @@ func AddRoutes(ctx context.Context, mux *http.ServeMux, db libdbexec.DBManager, 
 	h := &handler{ctx: modeldconn.WithDataRoot(ctx, root), root: root, db: db, setup: setup, prepare: prepare, acquisition: acquisition, store: modelstore.NewAdmin(modelstore.Dir(root, ""))}
 	mux.HandleFunc("GET /local-ai/models", h.models)
 	mux.HandleFunc("DELETE /local-ai/models/{name}", h.remove)
+	mux.HandleFunc("POST /local-ai/imports/{name}", h.importFiles)
 	mux.HandleFunc("GET /local-ai/hardware", h.hardware)
+	mux.HandleFunc("GET /local-ai/media-devices", h.mediaDevices)
 	mux.HandleFunc("GET /local-ai/status", h.status)
 	mux.HandleFunc("POST /local-ai/workers/unload", h.unload)
 	mux.HandleFunc("GET /local-ai/operations/current", h.progress)
@@ -60,15 +64,22 @@ func fail(w http.ResponseWriter, code int, err error) {
 }
 
 type model struct {
+	LoRA            bool   `json:"lora,omitempty"`
+	MediaError      string `json:"mediaError,omitempty"`
+	sourceURL       string
 	primaryRevision string
-	Name            string `json:"name"`
-	Label           string `json:"label"`
-	Engine          string `json:"engine"`
-	Bytes           int64  `json:"bytes"`
-	Installed       bool   `json:"installed"`
-	Chat            bool   `json:"chat"`
-	Assigned        bool   `json:"assigned"`
-	Primary         bool   `json:"primary"`
+	mediaRevision   string
+	MediaEnabled    bool                      `json:"mediaEnabled,omitempty"`
+	MediaDevice     transport.ExecutionTarget `json:"mediaDevice,omitzero"`
+	Name            string                    `json:"name"`
+	Label           string                    `json:"label"`
+	Engine          string                    `json:"engine"`
+	Pipeline        string                    `json:"pipeline,omitempty"`
+	Bytes           int64                     `json:"bytes"`
+	Installed       bool                      `json:"installed"`
+	Chat            bool                      `json:"chat"`
+	Assigned        bool                      `json:"assigned"`
+	Primary         bool                      `json:"primary"`
 }
 
 func (h *handler) library(ctx context.Context) ([]model, error) {
@@ -95,18 +106,22 @@ func (h *handler) library(ctx context.Context) ([]model, error) {
 	}
 	items := map[string]model{}
 	for _, entry := range entries {
-		items[entry.Name] = model{Name: entry.Name, Label: entry.DisplayLabel, Bytes: entry.SizeBytes + entry.MMProjSizeBytes, Engine: entry.BackendType(), Chat: !entry.Curated || slices.Contains(inferencesetup.RolesServed(entry), inferencesetup.RoleChat)}
+		items[entry.Name] = model{sourceURL: entry.SourceURL, Name: entry.Name, Label: entry.DisplayLabel, Bytes: entry.SizeBytes + entry.MMProjSizeBytes, Engine: entry.BackendType(), Pipeline: entry.Pipeline, Chat: entry.Pipeline == "" && (!entry.Curated || slices.Contains(inferencesetup.RolesServed(entry), inferencesetup.RoleChat))}
 	}
 	for _, file := range installed {
 		item, known := items[file.Name]
+		item.MediaError = file.MediaError
+		item.LoRA = file.LoRA
 		if !known {
-			item.Chat = true
+			item.Chat = file.Pipeline == ""
 		} // An imported model can be tested before it is selected.
-		item.Name, item.Bytes, item.Engine, item.Installed = file.Name, file.SizeBytes, file.Type, true
+		item.Name, item.Bytes, item.Engine, item.Installed, item.Pipeline = file.Name, file.SizeBytes, file.Type, true, file.Pipeline
 		items[file.Name] = item
 	}
 	var primaryRevision string
+	mediaRevisions := make(map[string]string)
 	for _, role := range config.Roles {
+		mediaRevisions[role.Role] = role.Revision
 		if role.Role == inferencesetup.RoleChat {
 			primaryRevision = role.Revision
 		}
@@ -115,12 +130,20 @@ func (h *handler) library(ctx context.Context) ([]model, error) {
 			if role.Role == "primary" {
 				item.Primary = true
 			}
+			if role.Role == transport.MediaRoleForPipeline(item.Pipeline) {
+				item.MediaEnabled = role.Enabled && role.State == "available"
+				opts, err := modelworkers.ReadAssignedOptions(ctx, runtimetypes.New(h.db.WithoutTransaction()), role.Role)
+				if err != nil {
+					return nil, err
+				}
+				item.MediaDevice = opts.Target.Normalize()
+			}
 			items[item.Name] = item
 		}
 	}
 	for _, observed := range config.Models {
 		item, ok := items[observed.Name]
-		if ok && observed.Chat && selectors[observed.Provider] {
+		if ok && item.Pipeline == "" && observed.Chat && selectors[observed.Provider] {
 			item.Chat = true
 			items[item.Name] = item
 		}
@@ -128,6 +151,7 @@ func (h *handler) library(ctx context.Context) ([]model, error) {
 	models := make([]model, 0, len(items))
 	for _, m := range items {
 		m.primaryRevision = primaryRevision
+		m.mediaRevision = mediaRevisions[transport.MediaRoleForPipeline(m.Pipeline)]
 		if m.Label == "" {
 			m.Label = m.Name
 		}

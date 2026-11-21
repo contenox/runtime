@@ -27,6 +27,8 @@ var axisTools = map[string][]toolRef{
 		{localtools.LocalFSToolsName, "write_file"},
 		{localtools.LocalFSToolsName, "edit_file"},
 		{localtools.LocalFSToolsName, "sed"},
+		{localtools.LocalFSToolsName, "generate_image"},
+		{localtools.LocalFSToolsName, "generate_video"},
 	},
 	AxisShell:           {{localtools.LocalExecToolsName, localtools.LocalExecToolsName}},
 	AxisEventsFire:      {{"events", "event_fire"}},

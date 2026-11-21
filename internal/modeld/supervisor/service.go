@@ -201,6 +201,10 @@ func (s *Service) acquire(ctx context.Context, req transport.OpenSessionRequest)
 	req.Config.AdmissionPermit = admission.Permit{}
 	if execution.Role == "embedding" {
 		req.Config.Operation = "embedding"
+	} else if execution.Role == transport.ImageRole || execution.Role == transport.VideoRole {
+		if req.Config.Operation != "render-media" {
+			return modeldconn.ModeldTarget{}, nil, req, errors.New("the media worker role requires a media render request")
+		}
 	} else if (execution.Role != "inspection" || req.Config.Operation == "") && (execution.Role != "autocomplete" || req.Config.Operation != "autocomplete") && (execution.Role != "next-edit" || req.Config.Operation != "next-edit") {
 		req.Config.Operation = "chat"
 	}
@@ -306,6 +310,33 @@ func (s *Service) Embed(ctx context.Context, request transport.EmbedRequest) (tr
 		if stopErr := s.retire(target); stopErr != nil {
 			return result, errors.Join(err, stopErr)
 		}
+	}
+	return result, errors.Join(err, release())
+}
+
+func (s *Service) RenderMedia(ctx context.Context, request transport.MediaRequest) (transport.MediaResult, error) {
+	if request.Config.Execution == nil || request.Config.Execution.Role != request.Settings.Role() {
+		return transport.MediaResult{}, errors.New("media request does not match the selected inference role")
+	}
+	request.Config.Operation = "render-media"
+	requested := reviewedConfig(request.Config)
+	target, release, resolved, err := s.acquire(ctx, request.OpenSessionRequest)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	request.OpenSessionRequest = resolved
+	request.Path = "" // The worker resolves against its own retained model store.
+	result, err := modeldconn.RenderMediaTarget(ctx, target, request)
+	if result.Execution != nil {
+		result.Execution.Requested = requested
+		result.Execution.OwnerEpoch, result.Execution.WorkerIdentity = s.epoch, target.Instance
+		if target.Allocation != nil && result.Execution.Capacity.Allocation != nil {
+			result.Execution.Capacity.Allocation.Resources.Identity = target.Allocation.Resources.Identity
+		}
+		result.Execution = transport.CopyExecutionReport(*result.Execution)
+	}
+	if err != nil {
+		err = errors.Join(err, s.retire(target))
 	}
 	return result, errors.Join(err, release())
 }

@@ -32,8 +32,12 @@ var blessedPreseedHashes = map[string][]string{
 		"97a08eb37ab1bd7913603cc4e0d5e2433c127894575615abf87ccc8a3119fa79",
 	},
 	"agents/acp/agent.md": {
+		"eb77797c3c51985ecd9cd64499cfcff4aac45885d25241c7bfabb16182a108ac",
 		"dbc70bcf07a6f1cd6601d83968d6d5fb4856169abe8628b76eef71d2f9555064",
 		"764ab97f5a803a248708782f9470547fee884c5a12a8af7acb11a025a6c09725",
+		"bbc7bc03a9104270383962f1196c2e448b95a3a7a9c9623052732077f71f07db",
+		"2ca9427b8afcc6619cc6cb9e2d4649ad57712fa30deefb6b17648c8533382283",
+		"bec6501cbfab6457a97dcb826c99cd88e49fbbfd23bd68d9069e8ee929b1b9ce",
 	},
 	"agents/acp/coding/agent.md": {
 		"fb72684a8e938269686b9d604a794f6d19dc4a7f35a6e970381748a11217a923",
@@ -65,6 +69,8 @@ var blessedPreseedHashes = map[string][]string{
 		"6836b13a3d87a1b25d76ffb91dc9e34dc2248ef934886c221bafe9477c009f07",
 		"674833696674f0b5d5dfee4ec7f1a34c32307f9e92842acedda389262e1f6032",
 		"177849ab3e46ee763fdaa54cf633752bea702d069f5fa55deb920579732ca24f",
+		"be3baf2f028a07a0a777014f1b7ca9841b81269010cd13b1e77819eb9c128d2e",
+		"12627113a853c56884032ef71ba917bf11c0807474ee92b37a43e113bd751b5f",
 	},
 	"agents/acp/general/recovery.md": {
 		"8c158c27cca4ffa4fb42825fa1bc7f8622a8f65af8a2446824fdf4fdaf785328",
@@ -106,7 +112,11 @@ var blessedPreseedHashes = map[string][]string{
 		"ca63cd5276800c1bdbfcd1613d9fa4d115d0b31c190e12b6be6fe9886c6d0150",
 	},
 	"agents/contenox/agent.md": {
+		"41162f7608f4b4ba8b5ac1fabfda37c4f6b40b7b661ba0623034cc80cb1de49a",
 		"073b4d0bf412ec6fe4d021c6a2be80c83df460c61c762fbdfe608a5136c44600",
+		"bcb29c177818d2d336b8d0c8f550a4438a2c4fd83dc755d7a8c72a3e48168809",
+		"032a9f9ee6445ccf83943b52b936dad7fde2ded78bba42ba0817c1e136a6499b",
+		"e817e19fb54c411e39814ca43dc36189a4c7462c5c2dbeb193c636f346c2d21f",
 	},
 	"agents/contenox/coding/agent.md": {
 		"c4246e52e89c8196e7917bec81c6438a5dbfea60ddca3b54be22ab1684877b0f",
@@ -123,6 +133,8 @@ var blessedPreseedHashes = map[string][]string{
 	"agents/contenox/general/agent.md": {
 		"781c6647c6ad7df267cb4fff9c3ec67f9f93591a5d8458caf4c52fcbe854be76",
 		"b0d59066d702133f07c3b6f518104d9bb12e744ff7cf14f818d1c8207b82ad23",
+		"6cf8b87d22b5310fe54bc3c5e46c58f8aad6c997a3a4f6bbad1d3d47495336d1",
+		"8c38a505bc60caae726ed377c905ec768169af4e986be6e040f2450619672109",
 	},
 	"agents/contenox/general/recovery.md": {
 		"28535f6981083e4f6235ac29b3bda192cff01079eb5cdc966e36c524ba5673ca",

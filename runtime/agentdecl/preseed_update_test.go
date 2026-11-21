@@ -177,6 +177,51 @@ func TestUnit_Preseed_KeepsAnEditedShippedCopy(t *testing.T) {
 	require.Equal(t, mine, onDisk)
 }
 
+func TestUnit_Preseed_RetiresOnlyUnmodifiedDesktopAgents(t *testing.T) {
+	dir := t.TempDir()
+	state := map[string]preseedRecord{}
+	shipped := []byte("previously shipped agent")
+	cases := []struct {
+		name     string
+		record   preseedRecord
+		content  []byte
+		hasChild bool
+		removed  bool
+	}{
+		{"acp/devices", preseedRecord{SHA256: hashBytes(shipped)}, shipped, false, true},
+		{"contenox/web", preseedRecord{SHA256: hashBytes(shipped)}, shipped, false, true},
+		{"acp/web", preseedRecord{SHA256: hashBytes(shipped)}, []byte("custom agent"), false, false},
+		{"acp/recording", preseedRecord{Operator: true}, shipped, false, false},
+		{"contenox/recording", preseedRecord{SHA256: hashBytes(shipped)}, shipped, true, false},
+		{"contenox/devices", preseedRecord{}, shipped, false, false},
+	}
+	for _, tc := range cases {
+		rel := NativeSourceDir + "/" + tc.name + "/" + AgentFilename
+		dest := filepath.Join(dir, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(dest), 0o755))
+		require.NoError(t, os.WriteFile(dest, tc.content, 0o644))
+		if tc.hasChild {
+			require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(dest), RecoveryFilename), []byte("custom recovery"), 0o644))
+		}
+		if tc.record != (preseedRecord{}) {
+			state[rel] = tc.record
+		}
+	}
+	writePreseedStateAt(t, dir, state)
+	_, err := Preseed(t.Context(), rootOf(t, dir))
+	require.NoError(t, err)
+	for _, tc := range cases {
+		dest := filepath.Join(dir, NativeSourceDir, filepath.FromSlash(tc.name), AgentFilename)
+		if tc.removed {
+			require.NoFileExists(t, dest)
+		} else {
+			b, err := os.ReadFile(dest)
+			require.NoError(t, err)
+			require.Equal(t, tc.content, b)
+		}
+	}
+}
+
 func TestUnit_Preseed_ReportsAnOperatorsFileOnce(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

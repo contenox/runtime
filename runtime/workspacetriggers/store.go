@@ -19,14 +19,16 @@ import (
 const ListenerOwner = "workspace-trigger"
 
 type listenerTarget struct {
-	OnDone         string `json:"onDone,omitempty"`
-	Target         string `json:"target,omitempty"`
-	SessionID      string `json:"sessionId,omitempty"`
-	SessionMode    string `json:"sessionMode,omitempty"`
-	Root           string `json:"root"`
-	AgentName      string `json:"agentName"`
-	HITLPolicyName string `json:"hitlPolicyName"`
-	Prompt         string `json:"prompt"`
+	Workflow         string `json:"workflow,omitempty"`
+	WorkflowRevision string `json:"workflowRevision,omitempty"`
+	OnDone           string `json:"onDone,omitempty"`
+	Target           string `json:"target,omitempty"`
+	SessionID        string `json:"sessionId,omitempty"`
+	SessionMode      string `json:"sessionMode,omitempty"`
+	Root             string `json:"root"`
+	AgentName        string `json:"agentName"`
+	HITLPolicyName   string `json:"hitlPolicyName"`
+	Prompt           string `json:"prompt"`
 }
 
 type listenerMeta struct {
@@ -57,7 +59,7 @@ func (s Store) listeners(scope string) (*libevents.ListenerStore, error) {
 }
 
 func toListener(t Trigger) (*libevents.Listener, error) {
-	target, err := json.Marshal(listenerTarget{OnDone: t.OnDone, Target: t.Target, SessionID: t.SessionID, SessionMode: t.SessionMode, Root: t.Root, AgentName: t.AgentName, HITLPolicyName: t.HITLPolicyName, Prompt: t.Prompt})
+	target, err := json.Marshal(listenerTarget{Workflow: t.Workflow, WorkflowRevision: t.WorkflowRevision, OnDone: t.OnDone, Target: t.Target, SessionID: t.SessionID, SessionMode: t.SessionMode, Root: t.Root, AgentName: t.AgentName, HITLPolicyName: t.HITLPolicyName, Prompt: t.Prompt})
 	if err != nil {
 		return nil, fmt.Errorf("workspacetriggers: encode target: %w", err)
 	}
@@ -92,7 +94,7 @@ func fromListener(l *libevents.Listener) (Trigger, error) {
 		return Trigger{}, fmt.Errorf("workspacetriggers: trigger %s metadata: %w", l.ID, err)
 	}
 	return Trigger{
-		CreatedBy: meta.CreatedBy, OnDone: target.OnDone, ID: l.ID, Target: target.Target, SessionID: target.SessionID, SessionMode: target.SessionMode,
+		Workflow: target.Workflow, WorkflowRevision: target.WorkflowRevision, CreatedBy: meta.CreatedBy, OnDone: target.OnDone, ID: l.ID, Target: target.Target, SessionID: target.SessionID, SessionMode: target.SessionMode,
 		Root:     target.Root,
 		Name:     meta.Name,
 		Events:   append([]string(nil), l.Types...),

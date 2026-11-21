@@ -979,16 +979,27 @@ func (a *Adapter) Free() {
 // SetAdapter applies a loaded LoRA adapter to this context at the given scale.
 // This mutates the context only; the base model weights are unchanged.
 func (c *Context) SetAdapter(a *Adapter, scale float32) error {
+	return c.SetAdapters([]*Adapter{a}, []float32{scale})
+}
+
+// SetAdapters replaces the context's complete adapter set in one llama.cpp call.
+func (c *Context) SetAdapters(adapters []*Adapter, scales []float32) error {
 	if c == nil || c.ptr == nil {
 		return errors.New("llamacppshim: context is closed")
 	}
-	if a == nil || a.ptr == nil {
-		return errors.New("llamacppshim: adapter is closed")
+	if len(adapters) != len(scales) {
+		return errors.New("llamacppshim: each LoRA adapter needs a scale")
 	}
-	adapter := a.ptr
-	cscale := C.float(scale)
-	if rc := C.llama_set_adapters_lora(c.ptr, &adapter, C.size_t(1), &cscale); rc != 0 {
-		return fmt.Errorf("llamacppshim: set LoRA adapter failed (rc=%d)", int(rc))
+	native := make([]*C.struct_llama_adapter_lora, len(adapters))
+	strengths := make([]C.float, len(scales))
+	for i, adapter := range adapters {
+		if adapter == nil || adapter.ptr == nil || adapter.model != c.model {
+			return fmt.Errorf("llamacppshim: adapter %d is closed or belongs to another model", i)
+		}
+		native[i], strengths[i] = adapter.ptr, C.float(scales[i])
+	}
+	if rc := C.llama_set_adapters_lora(c.ptr, unsafe.SliceData(native), C.size_t(len(native)), unsafe.SliceData(strengths)); rc != 0 {
+		return fmt.Errorf("llamacppshim: set LoRA adapters failed (rc=%d)", int(rc))
 	}
 	return nil
 }

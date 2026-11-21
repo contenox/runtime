@@ -213,7 +213,7 @@ func TestIntegration_Roles_RequireCapabilityVerificationBeforeReadiness(t *testi
 	require.ErrorIs(t, err, inferencesetup.ErrRoleDisabled)
 	require.ErrorIs(t, err, inferencesetup.ErrSetupIncomplete)
 	require.ErrorContains(t, service.SetRoleEnabled(ctx, inferencesetup.RoleChat, false), "required")
-	require.Equal(t, []string{inferencesetup.RoleNextEdit, inferencesetup.RoleEmbedding}, inferencesetup.OptionalRoles())
+	require.Equal(t, []string{inferencesetup.RoleNextEdit, inferencesetup.RoleEmbedding, inferencesetup.RoleImage, inferencesetup.RoleVideo}, inferencesetup.OptionalRoles())
 	embedding, err := service.Assign(ctx, inferencesetup.Assignment{Role: inferencesetup.RoleEmbedding, Provider: "openai", Model: "text-embedding-3-small"}, inferencesetup.SourceUser)
 	require.NoError(t, err)
 	require.Equal(t, 3, embedding.Dimension)

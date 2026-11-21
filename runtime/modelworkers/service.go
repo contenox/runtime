@@ -120,7 +120,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (*Snapshot, error) {
 
 func (s *Service) configuration(ctx context.Context, store runtimetypes.Store) (*Snapshot, error) {
 	result := &Snapshot{Contract: Contract, Options: map[string]modeldconn.WorkerOptions{}, OptionErrors: map[string]string{}, Workers: []modeldconn.WorkerStatus{}, OwnerState: "unavailable"}
-	for _, role := range []string{"primary", "alternative", "autocomplete", "next-edit", "embedding"} {
+	for _, role := range []string{"primary", "alternative", "autocomplete", "next-edit", "embedding", transport.ImageRole, transport.VideoRole} {
 		options, err := ReadOptions(ctx, store, role)
 		if err != nil {
 			result.OptionErrors[role] = err.Error()

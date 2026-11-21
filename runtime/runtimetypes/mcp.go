@@ -43,6 +43,7 @@ type MCPServer struct {
 	AuthToken             string            `json:"authToken,omitempty"`
 	AuthEnvKey            string            `json:"authEnvKey,omitempty" example:"MCP_FS_TOKEN"`
 	OAuthClientID         string            `json:"oauthClientId,omitempty"`
+	OAuthTokenURL         string            `json:"oauthTokenUrl,omitempty"`
 	OAuthClientSecretEnv  string            `json:"oauthClientSecretEnv,omitempty"`
 	ConnectTimeoutSeconds int               `json:"connectTimeoutSeconds" example:"30"`
 	Headers               map[string]string `json:"headers,omitempty"`
@@ -93,12 +94,12 @@ func (s *store) CreateMCPServer(ctx context.Context, srv *MCPServer) error {
 
 	_, err = s.Exec.ExecContext(ctx, `
 		INSERT INTO mcp_servers
-		(id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+		(id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at, oauth_token_url)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
 		srv.ID, srv.Name, srv.Transport, srv.Command, string(argsJSON),
 		srv.URL, srv.AuthType, srv.AuthToken, srv.AuthEnvKey,
 		srv.OAuthClientID, srv.OAuthClientSecretEnv,
-		timeout, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.CreatedAt, srv.UpdatedAt,
+		timeout, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.CreatedAt, srv.UpdatedAt, srv.OAuthTokenURL,
 	)
 	return err
 }
@@ -129,8 +130,8 @@ func (s *store) UpsertMCPServerByName(ctx context.Context, srv *MCPServer) error
 
 	_, err = s.Exec.ExecContext(ctx, `
 		INSERT INTO mcp_servers
-		(id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		(id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at, oauth_token_url)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		ON CONFLICT(name) DO UPDATE SET
 			transport               = excluded.transport,
 			command                 = excluded.command,
@@ -141,6 +142,7 @@ func (s *store) UpsertMCPServerByName(ctx context.Context, srv *MCPServer) error
 			auth_env_key            = excluded.auth_env_key,
 			oauth_client_id         = excluded.oauth_client_id,
 			oauth_client_secret_env = excluded.oauth_client_secret_env,
+			oauth_token_url = excluded.oauth_token_url,
 			connect_timeout_seconds = excluded.connect_timeout_seconds,
 			headers_json            = excluded.headers_json,
 			inject_params_json      = excluded.inject_params_json,
@@ -150,20 +152,20 @@ func (s *store) UpsertMCPServerByName(ctx context.Context, srv *MCPServer) error
 		srv.ID, srv.Name, srv.Transport, srv.Command, string(argsJSON),
 		srv.URL, srv.AuthType, srv.AuthToken, srv.AuthEnvKey,
 		srv.OAuthClientID, srv.OAuthClientSecretEnv,
-		timeout, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.CreatedAt, srv.UpdatedAt,
+		timeout, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.CreatedAt, srv.UpdatedAt, srv.OAuthTokenURL,
 	)
 	return err
 }
 
 func (s *store) GetMCPServer(ctx context.Context, id string) (*MCPServer, error) {
 	return s.scanMCPServer(ctx, `
-		SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at
+		SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at, oauth_token_url
 		FROM mcp_servers WHERE id = $1`, id)
 }
 
 func (s *store) GetMCPServerByName(ctx context.Context, name string) (*MCPServer, error) {
 	return s.scanMCPServer(ctx, `
-		SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at
+		SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at, oauth_token_url
 		FROM mcp_servers WHERE name = $1`, name)
 }
 
@@ -174,7 +176,7 @@ func (s *store) scanMCPServer(ctx context.Context, query string, arg any) (*MCPS
 		&srv.ID, &srv.Name, &srv.Transport, &srv.Command, &argsJSON,
 		&srv.URL, &srv.AuthType, &srv.AuthToken, &srv.AuthEnvKey,
 		&srv.OAuthClientID, &srv.OAuthClientSecretEnv,
-		&srv.ConnectTimeoutSeconds, &headersJSON, &injectJSON, &envJSON, &srv.Workspace, &srv.CreatedAt, &srv.UpdatedAt,
+		&srv.ConnectTimeoutSeconds, &headersJSON, &injectJSON, &envJSON, &srv.Workspace, &srv.CreatedAt, &srv.UpdatedAt, &srv.OAuthTokenURL,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -216,12 +218,12 @@ func (s *store) UpdateMCPServer(ctx context.Context, srv *MCPServer) error {
 		SET name=$2, transport=$3, command=$4, args_json=$5, url=$6,
 		    auth_type=$7, auth_token=$8, auth_env_key=$9,
 		    oauth_client_id=$10, oauth_client_secret_env=$11,
-		    connect_timeout_seconds=$12, headers_json=$13, inject_params_json=$14, env_json=$15, workspace=$16, updated_at=$17
+		    connect_timeout_seconds=$12, headers_json=$13, inject_params_json=$14, env_json=$15, workspace=$16, updated_at=$17, oauth_token_url=$18
 		WHERE id=$1`,
 		srv.ID, srv.Name, srv.Transport, srv.Command, string(argsJSON),
 		srv.URL, srv.AuthType, srv.AuthToken, srv.AuthEnvKey,
 		srv.OAuthClientID, srv.OAuthClientSecretEnv,
-		srv.ConnectTimeoutSeconds, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.UpdatedAt,
+		srv.ConnectTimeoutSeconds, string(headersJSON), string(injectJSON), string(envJSON), srv.Workspace, srv.UpdatedAt, srv.OAuthTokenURL,
 	)
 	if err != nil {
 		return err
@@ -242,7 +244,7 @@ func (s *store) ListMCPServers(ctx context.Context, createdAtCursor *time.Time, 
 		return nil, ErrLimitParamExceeded
 	}
 
-	const columns = `SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at
+	const columns = `SELECT id, name, transport, command, args_json, url, auth_type, auth_token, auth_env_key, oauth_client_id, oauth_client_secret_env, connect_timeout_seconds, headers_json, inject_params_json, env_json, workspace, created_at, updated_at, oauth_token_url
 		FROM mcp_servers`
 	const order = ` ORDER BY created_at DESC, id DESC`
 	cond, args := keysetBefore("created_at", "id", createdAtCursor, afterID, 1)
@@ -262,7 +264,7 @@ func (s *store) ListMCPServers(ctx context.Context, createdAtCursor *time.Time, 
 			&srv.ID, &srv.Name, &srv.Transport, &srv.Command, &argsJSON,
 			&srv.URL, &srv.AuthType, &srv.AuthToken, &srv.AuthEnvKey,
 			&srv.OAuthClientID, &srv.OAuthClientSecretEnv,
-			&srv.ConnectTimeoutSeconds, &headersJSON, &injectJSON, &envJSON, &srv.Workspace, &srv.CreatedAt, &srv.UpdatedAt,
+			&srv.ConnectTimeoutSeconds, &headersJSON, &injectJSON, &envJSON, &srv.Workspace, &srv.CreatedAt, &srv.UpdatedAt, &srv.OAuthTokenURL,
 		); err != nil {
 			return nil, fmt.Errorf("mcp: scan row: %w", err)
 		}

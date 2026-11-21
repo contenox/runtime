@@ -138,10 +138,58 @@ func Preseed(ctx context.Context, contenoxDir Root) (PreseedResult, error) {
 		}
 		next[f.rel] = preseedRecord{SHA256: shipped}
 	}
+	if err := retireDesktopAgents(ctx, contenoxDir.FS, state); err != nil {
+		return result, fmt.Errorf("agentdecl: retire desktop agents: %w", err)
+	}
 	if err := writePreseedState(ctx, contenoxDir.FS, state, next); err != nil {
 		return result, err
 	}
 	return result, nil
+}
+
+func retireDesktopAgents(ctx context.Context, fsys vfs.Files, state map[string]preseedRecord) error {
+	parents := map[string]bool{".": true, NativeSourceDir: true}
+	retired := map[string]string{}
+	for _, family := range []string{"acp", "contenox"} {
+		parent := path.Join(NativeSourceDir, family)
+		for _, name := range []string{"devices", "recording", "web"} {
+			dir := path.Join(parent, name)
+			record := state[path.Join(dir, AgentFilename)]
+			if !record.Operator && record.SHA256 != "" {
+				parents[parent] = true
+				retired[dir] = record.SHA256
+			}
+		}
+	}
+	if len(retired) == 0 {
+		return nil
+	}
+	return fsys.WalkDir(ctx, ".", func(dir string, entry fs.DirEntry, err error) error {
+		if err != nil || !entry.IsDir() || parents[dir] {
+			return err
+		}
+		hash, ok := retired[dir]
+		if !ok {
+			return fs.SkipDir
+		}
+		entries, err := fsys.ReadDir(ctx, dir)
+		if err != nil {
+			return err
+		}
+		if len(entries) == 1 && entries[0].Name() == AgentFilename && entries[0].Type().IsRegular() {
+			rel := path.Join(dir, AgentFilename)
+			data, err := fsys.ReadFile(ctx, rel)
+			if err != nil {
+				return err
+			}
+			if hashBytes(data) == hash {
+				if err := fsys.Remove(ctx, rel); err != nil && !errors.Is(err, fs.ErrNotExist) {
+					return err
+				}
+			}
+		}
+		return fs.SkipDir
+	})
 }
 
 func preseedFiles() ([]preseedFile, error) {

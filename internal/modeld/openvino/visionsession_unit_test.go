@@ -45,7 +45,7 @@ func (f *fakeVLMBackend) Stream(_ context.Context, prompt string, images []ovses
 	f.lastPrompt = prompt
 	f.lastImages = images
 	ch := make(chan ovsession.StreamChunk, 1)
-	ch <- ovsession.StreamChunk{Text: "ok"}
+	ch <- ovsession.StreamChunk{Text: "ok", Metrics: &ovsession.PipelineMetrics{FinishReason: "stop"}}
 	close(ch)
 	return ch, nil
 }
@@ -189,7 +189,12 @@ func TestUnit_OpenVINOVisionSessionContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode: %v", err)
 	}
-	for range ch {
+	var finish string
+	for chunk := range ch {
+		finish = chunk.FinishReason
+	}
+	if finish != "stop" {
+		t.Fatalf("vision decode finish reason = %q, want stop", finish)
 	}
 	if !strings.Contains(backend.lastPrompt, "<ov_genai_image_0>") {
 		t.Fatalf("decode prompt should carry the universal image tag, got %q", backend.lastPrompt)

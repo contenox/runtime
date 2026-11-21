@@ -15,6 +15,8 @@ var realTools = map[string]bool{
 	"read_file":       true,
 	"read_file_range": true,
 	"read_image":      true,
+	"generate_image":  true,
+	"generate_video":  true,
 	"write_file":      true,
 	"edit_file":       true,
 

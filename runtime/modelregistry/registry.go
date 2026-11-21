@@ -17,6 +17,8 @@ var ErrNotFound = errors.New("model not found in registry")
 
 // ModelDescriptor describes a downloadable model and its backend requirements.
 type ModelDescriptor struct {
+	// Pipeline is the exported OpenVINO GenAI diffusion pipeline class in model_index.json.
+	Pipeline string `json:"pipeline,omitempty"`
 	// Completion declares the code-completion execution contract and its curated evidence.
 	Completion CompletionProfile `json:"completion,omitempty"`
 	// NextEdit declares the edit-prediction contract and its curation evidence.

@@ -427,6 +427,28 @@ func (s *Server) embed(ctx context.Context, in *embedReq) (*embedResp, error) {
 	return &res, nil
 }
 
+func (s *Server) renderMedia(ctx context.Context, req *transport.MediaRequest) (*transport.MediaResult, error) {
+	if err := checkFence(ctx, s.instanceID); err != nil {
+		return nil, encodeError(err)
+	}
+	if err := req.Settings.Validate(); err != nil {
+		return nil, encodeError(err)
+	}
+	if req.Path != "" || req.ModelName == "" || len(req.Adapters) != 0 {
+		return nil, encodeError(errors.New("select an installed media model by name"))
+	}
+	renderer, ok := s.svc.(transport.MediaRenderer)
+	if !ok {
+		return nil, encodeError(transport.ErrUnsupportedFeature)
+	}
+	req.Config = s.sessionConfig(ctx, req.Config)
+	result, err := renderer.RenderMedia(ctx, *req)
+	if err != nil {
+		return nil, encodeError(err)
+	}
+	return &result, nil
+}
+
 func (s *Server) ensurePrefix(ctx context.Context, in *ensurePrefixReq) (*transport.PrefixStatus, error) {
 	if err := checkFence(ctx, s.instanceID); err != nil {
 		return nil, encodeError(err)

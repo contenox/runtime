@@ -503,7 +503,15 @@ func runACPProfile(cmd *cobra.Command, profile acpProfile) error {
 		sessionRouter = acpsvc.NewSessionRouter()
 		nativeTurns = nativeturn.New(nativeturn.Config{})
 		watcher := newWorkspaceWatcher(workspaceEvents, roots, workspaceLeaseDir(dbPath), workspaceID, "acp", tracker)
-		dispatcher := newTriggerDispatcher(workspaceEvents, eventLog, roots, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(operatorinbox.New(db), sessionRouter))
+		// In unattended mode approvals proceed automatically; explicit read denials still apply.
+		workflowAsk := askApproval
+		if workflowAsk == nil {
+			workflowAsk = func(context.Context, hitlservice.ApprovalRequest) (bool, error) { return true, nil }
+		}
+		wf := newWorkflowService(db, workspaceID, engine, tracker, defaultProvider, defaultModel,
+			localtools.NewHITLWrapper(nil, workflowAsk, acpHITL, tracker).AuthorizeRead)
+		eventTools.Workflows = wf
+		dispatcher := newTriggerDispatcher(workspaceEvents, eventLog, roots, db, workspaceID, fleet, missions, tracker, deliverWorkspaceEvent(wf, operatorinbox.New(db), sessionRouter))
 		watcher.Start(ctx)
 		dispatcher.Start(ctx)
 		stopFleetTeardown = func() { _ = nativeTurns.Close(); dispatcher.Stop(); watcher.Stop(); stop() }

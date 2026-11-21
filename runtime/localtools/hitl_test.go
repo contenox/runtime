@@ -5,12 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/contenox/runtime/internal/transport"
 	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/localtools"
+	"github.com/contenox/runtime/runtime/mediageneration"
 	"github.com/contenox/runtime/runtime/taskengine"
 	"github.com/getkin/kin-openapi/openapi3"
 	git "github.com/go-git/go-git/v5"
@@ -521,4 +524,32 @@ func TestUnit_HITLWrapper_GatesEveryFileAGitToolWouldPrint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, asked)
 	assert.Contains(t, fmt.Sprint(res), "SECRET=two")
+}
+
+func TestMediaWritesUseTheApprovedDestination(t *testing.T) {
+	for _, method := range []string{"generate_image", "generate_video"} {
+		dir := t.TempDir()
+		var approved string
+		inner := localtools.NewLocalFSToolsWith(dir, nil, nil, localtools.LocalFSToolsName, nil, localtools.WithMediaRenderer(func(context.Context, mediageneration.Options) (transport.MediaResult, error) {
+			return transport.MediaResult{Data: []byte("render")}, nil
+		}))
+		w := localtools.NewHITLWrapper(inner, func(_ context.Context, req hitlservice.ApprovalRequest) (bool, error) {
+			approved = req.Args["path"].(string)
+			return true, nil
+		}, approvePolicy(), nil)
+		call := &taskengine.ToolsCall{Name: "local_fs", ToolName: method, Args: map[string]string{"prompt": "paint"}}
+		asset, _, err := w.Exec(t.Context(), time.Now(), nil, false, call)
+		require.NoError(t, err)
+		require.True(t, strings.HasPrefix(approved, "Media/"))
+		require.Equal(t, approved, asset.(map[string]any)["file"])
+		require.FileExists(t, filepath.Join(dir, approved))
+		call.Args["path"] = "restricted/output" + filepath.Ext(approved)
+		w = localtools.NewHITLWrapper(inner, func(_ context.Context, req hitlservice.ApprovalRequest) (bool, error) {
+			require.Equal(t, call.Args["path"], req.Args["path"])
+			return false, nil
+		}, approvePolicy(), nil)
+		_, _, err = w.Exec(t.Context(), time.Now(), nil, false, call)
+		require.Error(t, err)
+		require.NoFileExists(t, filepath.Join(dir, call.Args["path"]))
+	}
 }

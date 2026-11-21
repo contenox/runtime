@@ -56,7 +56,7 @@ func TestIntegration_RegistryDownloadUsesModeldAndPreservesConfiguredDefaults(t 
 		_ = transportgrpc.Serve(ctx, listener, &registryOwner{transport.NewMemoryService(), admin}, lease.InstanceID(), "shared")
 	}()
 
-	model := strings.Repeat("w", 8192)
+	model := "GGUF" + strings.Repeat("w", 8188)
 	var transfers atomic.Int32
 	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/weights" {

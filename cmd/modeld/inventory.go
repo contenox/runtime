@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/contenox/runtime/internal/modeld/capacity"
+	"github.com/contenox/runtime/internal/modeld/openvino/ovsession"
 	"github.com/contenox/runtime/internal/modeld/slot"
 	"github.com/contenox/runtime/internal/remedy"
 	"github.com/contenox/runtime/internal/transport"
@@ -68,6 +69,9 @@ func nativeInventory(ctx context.Context) (transport.Inventory, error) {
 			backend.State = "unavailable"
 		}
 		backend.Operations = []string{"chat", "autocomplete", "next-edit", "embedding", "vision"}
+		if name == "openvino" && ovsession.GenAIAvailable {
+			backend.Operations = append(backend.Operations, transport.ImageRole, transport.VideoRole)
+		}
 		backend.Scheduling = transport.SchedulingCapabilities{SingleActiveRequest: true, YieldOperations: []string{}, Limitations: []string{"A worker runs one request at a time. Roles sharing that worker execute serially."}}
 		if name == "llama" {
 			backend.Scheduling.CooperativeYield, backend.Scheduling.ThreadControl = true, true

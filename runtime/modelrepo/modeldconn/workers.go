@@ -684,7 +684,13 @@ func (m *Workers) launchProcess(ctx context.Context, spec WorkerSpec, root strin
 				}
 			}
 			if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-				processStopErr = err
+				// On Windows TerminateProcess can report access denied while an
+				// exited process is still being reaped. Wait confirms termination.
+				select {
+				case <-done:
+				case <-time.After(2 * time.Second):
+					processStopErr = err
+				}
 				return
 			}
 			<-done

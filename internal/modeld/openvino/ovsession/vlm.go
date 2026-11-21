@@ -395,6 +395,8 @@ func (s *VLMSession) Stream(ctx context.Context, prompt string, images []VLMImag
 			case 1:
 				if err := ctx.Err(); err != nil {
 					sendTerminalStreamError(ctx, ch, err)
+				} else {
+					_ = sessionkit.Send(ctx, ch, StreamChunk{Metrics: &PipelineMetrics{FinishReason: "stop"}})
 				}
 				return
 			case 3:

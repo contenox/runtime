@@ -100,8 +100,8 @@ checksum and transport/backend report, and updates the managed installation
 pointer. Compatibility is based on transport protocol and backend capability;
 the worker need not have the same version string as the CLI. Supply the HTTP origin containing your release index with `--base-url`.
 
-The platform matrix in `.github/workflows/release.yml` remains the supported CLI
-matrix. `task modeld:check` compiles worker control paths for that same matrix
+The `release-assets` target in the Makefile lists the supported CLI platforms.
+`task modeld:check` compiles worker control paths for that same matrix
 without native engines. This is a compile check, not evidence that native
 libraries load or inference works on those machines. Native package smoke and
 backend tests must run on the corresponding platform with its actual SDKs and

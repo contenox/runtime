@@ -47,6 +47,10 @@ func (p *catalogProvider) ListModels(ctx context.Context) ([]modelrepo.ObservedM
 	}
 	out := make([]modelrepo.ObservedModel, 0, len(models))
 	for _, m := range models {
+		if m.Pipeline != "" {
+			out = append(out, observedMedia(m, inventory))
+			continue
+		}
 		config := transport.Config{Execution: &transport.Execution{Role: "inspection", Priority: "background"}}
 		descriptor, resolveErr := modelregistry.NewCurated().Resolve(ctx, m.Name)
 		if resolveErr != nil && !errors.Is(resolveErr, modelregistry.ErrNotFound) {
@@ -123,6 +127,10 @@ func (p *catalogProvider) localModels(ctx context.Context) ([]modelrepo.Observed
 	}
 	out := make([]modelrepo.ObservedModel, 0, len(models))
 	for _, m := range models {
+		if m.Pipeline != "" {
+			out = append(out, observedMedia(m, inventory))
+			continue
+		}
 		backend := transport.BackendInventory{Backend: m.Type, State: "unavailable", Error: "This backend is not installed; " + remedy.PrepareLocal + "."}
 		for _, candidate := range inventory.Backends {
 			if candidate.Backend == m.Type {
@@ -168,6 +176,19 @@ func (p *catalogProvider) localModels(ctx context.Context) ([]modelrepo.Observed
 	}
 	return out, nil
 }
+func observedMedia(model transport.NodeModel, inventory transport.Inventory) modelrepo.ObservedModel {
+	role := transport.MediaRoleForPipeline(model.Pipeline)
+	meta := map[string]string{"type": model.Type}
+	if model.MediaError != "" {
+		meta["backend_error"] = model.MediaError
+	} else if slices.ContainsFunc(inventory.Backends, func(backend transport.BackendInventory) bool {
+		return backend.Backend == model.Type && backend.State == "available" && slices.Contains(backend.Operations, role)
+	}) {
+		meta["media_role"] = role
+	}
+	return modelrepo.ObservedModel{Name: model.Name, Size: model.SizeBytes, Digest: model.Digest, Meta: meta}
+}
+
 func (p *catalogProvider) ProviderFor(model modelrepo.ObservedModel) modelrepo.Provider {
 	provider := newModeldProvider(model.Name, []string{p.spec.BaseURL}, model.CapabilityConfig, p.tracker)
 	provider.artifact = modeldconn.ModelRef{Name: model.Name, Type: model.Meta["type"], Digest: model.Digest}

@@ -406,6 +406,9 @@ func mcpServerToConfig(srv *runtimetypes.MCPServer, store runtimetypes.Store) lo
 			ClientSecret: srv.ResolveOAuthClientSecret(),
 		}
 	}
+	if cfg.Auth != nil && cfg.Auth.Type == localtools.MCPAuthClientCredentials {
+		cfg.OAuth = &localtools.MCPOAuthConfig{ClientID: srv.OAuthClientID, ClientSecret: srv.ResolveOAuthClientSecret(), TokenURL: srv.OAuthTokenURL}
+	}
 	return cfg
 }
 

@@ -405,6 +405,7 @@ type ImagePart struct {
 type ToolImageResult struct {
 	Text   string
 	Images []ImagePart
+	Audio  []AudioPart
 }
 
 type AudioPart struct {

@@ -38,6 +38,7 @@ import (
 	"github.com/contenox/runtime/runtime/internal/localaiapi"
 	"github.com/contenox/runtime/runtime/internal/localfileapi"
 	"github.com/contenox/runtime/runtime/internal/mcpserverapi"
+	"github.com/contenox/runtime/runtime/internal/mediaapi"
 	"github.com/contenox/runtime/runtime/internal/missionapi"
 	"github.com/contenox/runtime/runtime/internal/missionchangesapi"
 	"github.com/contenox/runtime/runtime/internal/modelregistryapi"
@@ -237,6 +238,7 @@ func registerProductRoutes(ctx context.Context, mux *http.ServeMux, config *Conf
 		localfileapi.AddWorkspaceFindRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps))
 		accessapi.AddRoutes(mux, deps.WorkspaceRoots, workspaceHITLFactory(deps))
 		if deps.WorkspaceEvents != nil {
+			mediaapi.AddRoutes(mux, deps.WorkspaceEvents, modeldconn.DataRootFromContext(ctx), setup)
 			workspaceeventsapi.AddRoutes(mux, deps.WorkspaceEvents)
 			workspacegithub.New(store, deps.WorkspaceID, deps.WorkspaceEvents).AddRoutes(mux)
 		}

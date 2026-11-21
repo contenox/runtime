@@ -88,6 +88,8 @@ missions.fire = "allow"
 		{tools: "local_fs", tool: "write_file", action: hitlservice.ActionApprove},
 		{tools: "local_fs", tool: "edit_file", action: hitlservice.ActionApprove},
 		{tools: "local_fs", tool: "sed", action: hitlservice.ActionApprove},
+		{tools: "local_fs", tool: "generate_image", action: hitlservice.ActionApprove},
+		{tools: "local_fs", tool: "generate_video", action: hitlservice.ActionApprove},
 		{tools: "local_shell", tool: "local_shell", action: hitlservice.ActionApprove},
 	}, shapes(transpile(t, cfg, "axes")))
 
@@ -129,6 +131,8 @@ tool = "git_status"
 		{tools: "local_fs", tool: "write_file", action: hitlservice.ActionDeny, op: hitlservice.OpGlob, value: "**/.git/**"},
 		{tools: "local_fs", tool: "edit_file", action: hitlservice.ActionDeny, op: hitlservice.OpGlob, value: "**/.git/**"},
 		{tools: "local_fs", tool: "sed", action: hitlservice.ActionDeny, op: hitlservice.OpGlob, value: "**/.git/**"},
+		{tools: "local_fs", tool: "generate_image", action: hitlservice.ActionDeny, op: hitlservice.OpGlob, value: "**/.git/**"},
+		{tools: "local_fs", tool: "generate_video", action: hitlservice.ActionDeny, op: hitlservice.OpGlob, value: "**/.git/**"},
 		{tools: "local_fs", tool: "read_file", action: hitlservice.ActionApprove, op: hitlservice.OpGlob, value: "**/.env"},
 		{tools: "local_fs", tool: "read_file_range", action: hitlservice.ActionApprove, op: hitlservice.OpGlob, value: "**/.env"},
 		{tools: "local_fs", tool: "read_image", action: hitlservice.ActionApprove, op: hitlservice.OpGlob, value: "**/.env"},
@@ -150,6 +154,8 @@ tool = "git_status"
 		{tools: "local_fs", tool: "write_file", action: hitlservice.ActionAllow},
 		{tools: "local_fs", tool: "edit_file", action: hitlservice.ActionAllow},
 		{tools: "local_fs", tool: "sed", action: hitlservice.ActionAllow},
+		{tools: "local_fs", tool: "generate_image", action: hitlservice.ActionAllow},
+		{tools: "local_fs", tool: "generate_video", action: hitlservice.ActionAllow},
 		{tools: "local_shell", tool: "local_shell", action: hitlservice.ActionDeny, op: hitlservice.OpCommandBlacklist, value: "mkfs"},
 		{tools: "local_shell", tool: "local_shell", action: hitlservice.ActionApprove, op: hitlservice.OpNoCommandSubstitution},
 		{tools: "local_shell", tool: "local_shell", action: hitlservice.ActionAllow, op: hitlservice.OpCommandPrefixAllowlist, value: "ls"},

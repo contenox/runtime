@@ -4,6 +4,10 @@ package llamacppshim
 
 import "errors"
 
+func ValidateAdapterPair(base, adapter string) error {
+	return errors.New("validating LoRA adapters requires the packaged llama.cpp backend")
+}
+
 // Available reports whether the direct llama.cpp shim was compiled in.
 const Available = false
 

@@ -910,6 +910,10 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 			executedAny = true
 
 			var resultImages []ImagePart
+			var resultAudio []AudioPart
+			if media, ok := result.(*ToolImageResult); ok && media != nil {
+				resultAudio = media.Audio
+			}
 			if text, kept, ok := toolImageResultForModel(result); ok {
 				result = text
 				resultType = DataTypeString
@@ -941,6 +945,7 @@ func (exe *SimpleExec) TaskExec(taskCtx context.Context, startingTime time.Time,
 				Role:            "tool",
 				Content:         content,
 				Images:          resultImages,
+				Audio:           resultAudio,
 				ToolCallID:      toolCall.ID,
 				ToolResultError: toolExecErr != nil,
 				Timestamp:       time.Now().UTC(),
@@ -1573,6 +1578,15 @@ func isRecoverableToolSurfaceError(err error) bool {
 
 func providerMessagesFromEngine(prelude, messages []Message) []libmodelprovider.Message {
 	out := make([]libmodelprovider.Message, 0, len(prelude)+len(messages))
+	// Audio input uses a user content block on several providers. Preserve the
+	// contiguous tool replies before presenting audio from that batch.
+	var toolAudio []libmodelprovider.AudioPart
+	flushAudio := func() {
+		if len(toolAudio) > 0 {
+			out = append(out, libmodelprovider.Message{Role: "user", Content: "Audio returned by the preceding tool calls.", Audio: toolAudio})
+			toolAudio = nil
+		}
+	}
 	for _, m := range prelude {
 		out = append(out, libmodelprovider.Message{
 			Role:    m.Role,
@@ -1580,6 +1594,9 @@ func providerMessagesFromEngine(prelude, messages []Message) []libmodelprovider.
 		})
 	}
 	for _, m := range messages {
+		if m.Role != "tool" {
+			flushAudio()
+		}
 		var toolCalls []libmodelprovider.ToolCall
 		if len(m.CallTools) > 0 {
 			toolCalls = make([]libmodelprovider.ToolCall, len(m.CallTools))
@@ -1614,7 +1631,12 @@ func providerMessagesFromEngine(prelude, messages []Message) []libmodelprovider.
 			ToolCalls:    toolCalls,
 			ToolCallID:   m.ToolCallID,
 		})
+		if m.Role == "tool" && len(audio) > 0 {
+			toolAudio = append(toolAudio, audio...)
+			out[len(out)-1].Audio = nil
+		}
 	}
+	flushAudio()
 	return out
 }
 
@@ -1931,6 +1953,9 @@ func toolImageResultWithoutModel(result any) (string, bool) {
 		return "", false
 	}
 	if len(img.Images) == 0 {
+		if len(img.Audio) > 0 {
+			return strings.TrimSpace(img.Text + "\n(audio returned by tool)"), true
+		}
 		return img.Text, true
 	}
 	return strings.TrimSpace(fmt.Sprintf("%s\n(%d image(s) were not attached: a tools task has no model to show them to)", img.Text, len(img.Images))), true

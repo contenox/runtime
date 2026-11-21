@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.19
 	github.com/aws/aws-sdk-go-v2/service/bedrock v1.65.0
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.53.1
+	github.com/dop251/goja v0.0.0-20260723142020-b4aef50fa347
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/modelcontextprotocol/go-sdk v1.4.0
@@ -37,12 +38,16 @@ require (
 	mvdan.cc/sh/v3 v3.14.1
 )
 
-require golang.org/x/text v0.41.0 // indirect
+require (
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	golang.org/x/text v0.41.0 // indirect
+)
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.3.0 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.25 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect

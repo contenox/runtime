@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/contenox/runtime/runtime/workflows"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 type CheckFunc func(ctx context.Context, t workspacetriggers.Trigger) error
 
 type Deps struct {
+	Workflows   *workflows.Service
 	WorkspaceID string
 	Events      workspaceevents.Service
 	Store       workspacetriggers.Store
@@ -55,6 +57,9 @@ type firingsResponse struct {
 
 func AddRoutes(mux *http.ServeMux, deps Deps) {
 	h := &handler{deps: deps}
+	if deps.Workflows != nil {
+		h.workflowRoutes(mux)
+	}
 	mux.HandleFunc("GET /workspace/schedules/interval", h.validateInterval)
 	for _, route := range []string{"GET /workspace/schedules", "POST /workspace/schedules", "PUT /workspace/schedules/{id}", "DELETE /workspace/schedules/{id}"} {
 		mux.HandleFunc(route, h.schedules)
@@ -221,6 +226,7 @@ func (h *handler) update(w http.ResponseWriter, r *http.Request) {
 		_ = apiframework.Error(w, r, mapError(err), apiframework.UpdateOperation)
 		return
 	}
+	t.Root = current.Root
 	t.Enabled = current.Enabled
 	if in.Enabled != nil {
 		t.Enabled = *in.Enabled

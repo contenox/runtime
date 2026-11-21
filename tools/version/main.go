@@ -116,8 +116,7 @@ func bumpVersion(bumpType string) error {
 	tx.markSuccessful()
 
 	fmt.Printf("\n✅ Version %s committed successfully!\n", newVersion)
-	fmt.Printf("   Push main with: git push\n")
-	fmt.Printf("   Then run the Release workflow; it creates the tag.\n")
+	fmt.Println("   Prepare and qualify the source drop before tagging it for release.")
 	return nil
 }
 
@@ -180,7 +179,7 @@ func calculateNewVersion(currentVersion, bumpType string) (string, error) {
 
 	parts := strings.Split(tag, ".")
 	if len(parts) != 3 {
-		return "", fmt.Errorf("cannot bump non-stable version %q; use the release workflow", currentVersion)
+		return "", fmt.Errorf("cannot bump non-stable version %q; set the intended version in %s", currentVersion, getVersionFile())
 	}
 
 	major, err := strconv.Atoi(parts[0])

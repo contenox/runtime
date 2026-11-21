@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/internal/archiveutil"
+	"github.com/contenox/runtime/internal/modeld/diffusion"
 	"github.com/contenox/runtime/internal/modeld/llama"
 	"github.com/contenox/runtime/internal/modeld/openvino"
 	"github.com/contenox/runtime/internal/modeld/openvino/ovsession"
@@ -131,7 +132,8 @@ func EnsureModelAvailable(ctx context.Context, reg modelregistry.Registry, model
 	}
 	defer os.RemoveAll(destDir)
 	modelBackend := desc.BackendType()
-	if modelBackend == "openvino" {
+	switch modelBackend {
+	case "openvino":
 		if desc.Repo == "" {
 			return fmt.Errorf("openvino model %q has no source repo in registry", modelName)
 		}
@@ -144,7 +146,7 @@ func EnsureModelAvailable(ctx context.Context, reg modelregistry.Registry, model
 		if err := stageTokenizerCompanion(ctx, destDir, *desc); err != nil {
 			return fmt.Errorf("acquire model %q tokenizer companion: %w", modelName, err)
 		}
-	} else if modelBackend == "llama" {
+	case "llama":
 		if desc.SourceURL == "" || (desc.Vision && desc.MMProjURL == "") {
 			return fmt.Errorf("model %q is missing a required model or vision-projector source; repair its registry entry", modelName)
 		}
@@ -154,6 +156,13 @@ func EnsureModelAvailable(ctx context.Context, reg modelregistry.Registry, model
 		}
 		if err := downloadFile(ctx, desc.SourceURL, destFile, out, opts.Progress); err != nil {
 			return fmt.Errorf("auto-pull model %q: %w", modelName, err)
+		}
+
+		// A custom endpoint may return a login page with HTTP 200.
+		if desc.ID != "" {
+			if err := checkGGUFFile(destFile); err != nil {
+				return fmt.Errorf("download model %q: %w", modelName, err)
+			}
 		}
 
 		if desc.Vision && desc.MMProjURL != "" {
@@ -168,7 +177,7 @@ func EnsureModelAvailable(ctx context.Context, reg modelregistry.Registry, model
 				return fmt.Errorf("auto-pull model %q: chat template: %w", modelName, err)
 			}
 		}
-	} else {
+	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedType, modelBackend)
 	}
 	if desc.ToolProtocol != "" || desc.ReasoningProtocol != "" {
@@ -183,6 +192,19 @@ func EnsureModelAvailable(ctx context.Context, reg modelregistry.Registry, model
 	}
 	if err := receiveStaged(ctx, modelName, modelBackend, destDir, opts.Receive); err != nil {
 		return err
+	}
+	return nil
+}
+
+func checkGGUFFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	var header [8]byte
+	if _, err := io.ReadFull(file, header[:]); err != nil || string(header[:4]) != "GGUF" {
+		return errors.New("downloaded file has no GGUF header")
 	}
 	return nil
 }
@@ -213,6 +235,16 @@ func requiredAssets(modelsDir string, desc modelregistry.ModelDescriptor) error 
 			required = append(required, llama.ChatTemplateFilename)
 		}
 	case "openvino":
+		if desc.Pipeline != "" {
+			pipeline, err := diffusion.Pipeline(dir)
+			if err != nil {
+				return err
+			}
+			if pipeline != desc.Pipeline {
+				return fmt.Errorf("%w: %s requires pipeline %s", ErrModelNotFound, desc.Name, desc.Pipeline)
+			}
+			return diffusion.CheckCompatibility(dir, pipeline)
+		}
 		kind, format, companionRequired := literalSourceOperation(desc)
 		if companionRequired {
 			if desc.TokenizerCompanionID == "" {

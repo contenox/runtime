@@ -122,5 +122,5 @@ func (s *Service) RegisterModel(ctx context.Context, request RegisterModelReques
 	if err := s.state.ReconcileDeclarations(ctx, backend.ID); err != nil {
 		return err
 	}
-	return s.invalidateRoles(ctx, runtimestate.ConnectionSelector(backend.ID), request.Model, []string{RoleChat, RoleRecovery, RoleAutocomplete, RoleNextEdit, RoleEmbedding})
+	return s.invalidateRoles(ctx, runtimestate.ConnectionSelector(backend.ID), request.Model, RoleIDs())
 }

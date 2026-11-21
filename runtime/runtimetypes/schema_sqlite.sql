@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
     auth_env_key            TEXT,
     oauth_client_id         TEXT NOT NULL DEFAULT '',
     oauth_client_secret_env TEXT NOT NULL DEFAULT '',
+    oauth_token_url TEXT NOT NULL DEFAULT '',
     connect_timeout_seconds INTEGER NOT NULL DEFAULT 30,
     headers_json            TEXT NOT NULL DEFAULT '{}',
     inject_params_json      TEXT NOT NULL DEFAULT '{}',
@@ -411,6 +412,7 @@ ALTER TABLE mcp_servers ADD COLUMN headers_json            TEXT NOT NULL DEFAULT
 ALTER TABLE mcp_servers ADD COLUMN inject_params_json      TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE mcp_servers ADD COLUMN oauth_client_id         TEXT NOT NULL DEFAULT '';
 ALTER TABLE mcp_servers ADD COLUMN oauth_client_secret_env TEXT NOT NULL DEFAULT '';
+ALTER TABLE mcp_servers ADD COLUMN oauth_token_url TEXT NOT NULL DEFAULT '';
 
 -- plan-review feature removed: drop orphaned tables on upgraded databases.
 DROP TABLE IF EXISTS plan_steps;

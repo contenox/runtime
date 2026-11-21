@@ -12,6 +12,12 @@ import (
 const huggingFaceOrigin = "https://huggingface.co"
 
 type downloadTokenKey struct{}
+type downloadOriginKey struct{}
+
+// WithDownloadOrigin binds the desktop token to the explicitly selected repository origin.
+func WithDownloadOrigin(ctx context.Context, origin string) context.Context {
+	return context.WithValue(ctx, downloadOriginKey{}, origin)
+}
 
 // WithDownloadToken supplies a read token for one Hugging Face download.
 func WithDownloadToken(ctx context.Context, token string) context.Context {
@@ -32,6 +38,10 @@ func modelDownload(ctx context.Context, source string) (*http.Response, error) {
 	if endpoint == "" {
 		endpoint = huggingFaceOrigin
 	}
+	origin, explicit := ctx.Value(downloadOriginKey{}).(string)
+	if explicit {
+		endpoint = origin
+	}
 	base, err := url.Parse(endpoint)
 	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
 		return nil, fmt.Errorf("HF_ENDPOINT must be an HTTP or HTTPS base URL without credentials, query, or fragment")
@@ -42,7 +52,7 @@ func modelDownload(ctx context.Context, source string) (*http.Response, error) {
 	}
 	isHF := target.Scheme == "https" && target.Host == "huggingface.co"
 	repoPath := target.Path
-	if isHF {
+	if isHF && !explicit {
 		target.Scheme = base.Scheme
 		target.Host = base.Host
 		target.Path = strings.TrimRight(base.Path, "/") + target.Path
@@ -57,7 +67,7 @@ func modelDownload(ctx context.Context, source string) (*http.Response, error) {
 		token := strings.TrimSpace(os.Getenv("HF_TOKEN"))
 		if supplied, ok := ctx.Value(downloadTokenKey{}).(string); ok {
 			token = ""
-			if isHF && base.Scheme == "https" && base.Host == "huggingface.co" {
+			if base.Scheme == "https" && (explicit || (isHF && base.Host == "huggingface.co")) {
 				token = supplied
 			}
 		}
@@ -90,6 +100,9 @@ func modelDownload(ctx context.Context, source string) (*http.Response, error) {
 			repoPath = strings.TrimPrefix(strings.TrimPrefix(repoPath, "/"), "api/models/")
 			parts := strings.Split(repoPath, "/")
 			page := huggingFaceOrigin
+			if explicit {
+				page = base.Scheme + "://" + base.Host
+			}
 			if len(parts) >= 2 {
 				page += "/" + url.PathEscape(parts[0]) + "/" + url.PathEscape(parts[1])
 			}

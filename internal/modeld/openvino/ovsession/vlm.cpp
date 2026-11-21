@@ -508,10 +508,9 @@ int cx_vlm_stream_next(cx_vlm_stream *stream,
     int rc = stream->rc;
     std::string message = stream->error;
     lock.unlock();
-    if (rc != 0) {
-        write_buf(err, err_len, message);
-    }
-    return rc == 0 ? 1 : rc;
+    if (rc == 0) return 1; // next() reports a completed stream separately from a text delta.
+    write_buf(err, err_len, message);
+    return rc == 3 ? 3 : 2;
 }
 
 int cx_vlm_generate_stream(cx_vlm_session *s,

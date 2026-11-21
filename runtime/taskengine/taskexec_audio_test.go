@@ -49,3 +49,19 @@ func TestUnit_ProviderMessagesFromEngine_TextOnlyStaysAudioFree(t *testing.T) {
 	require.Nil(t, got[0].Audio)
 	require.False(t, libmodelprovider.MessagesHaveAudio(got))
 }
+
+func TestUnit_ProviderMessagesFromEngine_AudioFollowsParallelToolReplies(t *testing.T) {
+	clip := AudioPart{Data: []byte("RIFF"), MimeType: "audio/wav"}
+	got := providerMessagesFromEngine(nil, []Message{
+		{Role: "tool", ToolCallID: "audio", Audio: []AudioPart{clip}},
+		{Role: "tool", ToolCallID: "text", Content: "ok"},
+		{Role: "assistant", Content: "heard"},
+	})
+	require.Len(t, got, 4)
+	require.Equal(t, "audio", got[0].ToolCallID)
+	require.Empty(t, got[0].Audio)
+	require.Equal(t, "text", got[1].ToolCallID)
+	require.Equal(t, "user", got[2].Role)
+	require.Equal(t, clip.Data, got[2].Audio[0].Data)
+	require.Equal(t, "assistant", got[3].Role)
+}

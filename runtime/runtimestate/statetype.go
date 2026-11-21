@@ -36,6 +36,7 @@ type ModelPullStatus struct {
 	AdvertisedCapabilities []string                       `json:"advertisedCapabilities"`
 	AdapterCapabilities    []string                       `json:"adapterCapabilities"`
 	NativeBackend          string                         `json:"nativeBackend,omitempty"`
+	MediaRole              string                         `json:"mediaRole,omitempty"`
 	CompletionMode         string                         `json:"completionMode,omitempty"`
 	Name                   string                         `json:"name" example:"Llama 2 7B"`
 	Model                  string                         `json:"model" example:"llama2:7b"`

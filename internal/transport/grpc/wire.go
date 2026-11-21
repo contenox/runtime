@@ -28,6 +28,7 @@ type computeServer interface {
 	openSession(context.Context, *openSessionReq) (*openSessionResp, error)
 	describe(context.Context, *openSessionReq) (*describeResp, error)
 	embed(context.Context, *embedReq) (*embedResp, error)
+	renderMedia(context.Context, *transport.MediaRequest) (*transport.MediaResult, error)
 	ensurePrefix(context.Context, *ensurePrefixReq) (*transport.PrefixStatus, error)
 	prefillSuffix(context.Context, *prefillSuffixReq) (*transport.SuffixStatus, error)
 	explainContext(context.Context, *explainReq) (*transport.ContextReport, error)
@@ -335,6 +336,13 @@ var serviceDesc = grpclib.ServiceDesc{
 				return nil, err
 			}
 			return s.embed(ctx, in)
+		})},
+		{MethodName: "RenderMedia", Handler: unaryHandler("RenderMedia", func(s *Server, ctx context.Context, dec func(any) error) (any, error) {
+			in := new(transport.MediaRequest)
+			if err := dec(in); err != nil {
+				return nil, err
+			}
+			return s.renderMedia(ctx, in)
 		})},
 		{MethodName: "EnsurePrefix", Handler: unaryHandler("EnsurePrefix", func(s *Server, ctx context.Context, dec func(any) error) (any, error) {
 			in := new(ensurePrefixReq)

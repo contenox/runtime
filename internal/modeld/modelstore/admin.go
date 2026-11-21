@@ -13,7 +13,9 @@ import (
 	"sync"
 
 	"github.com/contenox/runtime/internal/archiveutil"
+	"github.com/contenox/runtime/internal/modeld/diffusion"
 	"github.com/contenox/runtime/internal/modeld/llama"
+	"github.com/contenox/runtime/internal/modeld/llama/llamacppshim"
 	"github.com/contenox/runtime/internal/modeld/openvino"
 	"github.com/contenox/runtime/internal/transport"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -21,10 +23,13 @@ import (
 
 // NodeModel is one model as observed on a node's models directory.
 type NodeModel struct {
-	Name      string
-	Type      string // "llama" | "openvino"
-	Digest    string // file SHA256 for single-file llama; tree SHA256 for bundles
-	SizeBytes int64
+	LoRA       bool
+	MediaError string
+	Pipeline   string
+	Name       string
+	Type       string // "llama" | "openvino"
+	Digest     string // file SHA256 for single-file llama; tree SHA256 for bundles
+	SizeBytes  int64
 	// ContextLength is the model's trained context ceiling, from a header-only
 	// metadata parse (no device query, no capacity planner) — 0 if that parse
 	// failed or was skipped; see ListModels.
@@ -183,8 +188,14 @@ func (a *Admin) listModels(withDigest bool) ([]NodeModel, error) {
 		name := e.Name()
 		if path, err := Resolve(a.dir, name, "llama", ""); err == nil {
 			m := NodeModel{Name: name, Type: "llama"}
+			if adapter, err := BundledLoRA(path); err == nil && adapter != nil {
+				m.LoRA = true
+				if info, err := os.Stat(adapter.Path); err == nil {
+					m.SizeBytes += info.Size()
+				}
+			}
 			if info, statErr := os.Stat(path); statErr == nil {
-				m.SizeBytes = info.Size()
+				m.SizeBytes += info.Size()
 			}
 			if mmproj := ResolveMMProj(path); mmproj != "" {
 				if info, statErr := os.Stat(mmproj); statErr == nil {
@@ -212,7 +223,14 @@ func (a *Admin) listModels(withDigest bool) ([]NodeModel, error) {
 			if err != nil {
 				return nil, err
 			}
-			m := NodeModel{Name: name, Type: "openvino", SizeBytes: size}
+			pipeline, err := diffusion.Pipeline(dir)
+			if err != nil {
+				return nil, err
+			}
+			m := NodeModel{Name: name, Type: "openvino", SizeBytes: size, Pipeline: pipeline}
+			if err := diffusion.CheckCompatibility(dir, pipeline); err != nil {
+				m.MediaError = err.Error()
+			}
 			if withDigest {
 				digest, err := ArtifactDigest(dir, "openvino")
 				if err != nil {
@@ -339,9 +357,29 @@ func (a *Admin) ReceiveModel(ctx context.Context, manifest PushManifest, r io.Re
 		return PushResult{}, fmt.Errorf("%w: model %s want=%s got=%s", ErrDigestMismatch, manifest.Name, manifest.Digest, got)
 	}
 
-	_, err = Resolve(a.dir, filepath.Base(staging), manifest.Type, "")
+	base, err := Resolve(a.dir, filepath.Base(staging), manifest.Type, "")
 	if err != nil {
 		return PushResult{}, fmt.Errorf("modelstore: staged artifact is incomplete: %w", err)
+	}
+	switch manifest.Type {
+	case "llama":
+		adapter, err := BundledLoRA(base)
+		if err != nil {
+			return PushResult{}, err
+		}
+		if adapter != nil {
+			if err := llamacppshim.ValidateAdapterPair(base, adapter.Path); err != nil {
+				return PushResult{}, err
+			}
+		}
+	case "openvino":
+		pipeline, err := diffusion.Pipeline(base)
+		if err != nil {
+			return PushResult{}, err
+		}
+		if err := diffusion.CheckCompatibility(base, pipeline); err != nil {
+			return PushResult{}, err
+		}
 	}
 	digest, err := DirectoryDigest(staging)
 	if err != nil {

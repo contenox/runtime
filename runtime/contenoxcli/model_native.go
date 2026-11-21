@@ -55,6 +55,9 @@ func runModelRegistryList(cmd *cobra.Command, _ []string) error {
 
 func runModelPull(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+	if root, _ := cmd.Flags().GetString("data-root"); root != "" {
+		ctx = modeldconn.WithDataRoot(ctx, root)
+	}
 	db, _, err := openConfigDB(cmd)
 	if err != nil {
 		return err
@@ -116,6 +119,7 @@ func promptModeldModel(ctx context.Context, out io.Writer, scanner *bufio.Scanne
 }
 
 func init() {
+	modelPullCmd.Flags().String("data-root", "", "Use the model store of the local owner at this data root.")
 	modelCmd.AddCommand(modelPullCmd, modelRegistryListCmd, newNativeShowCmd(), newNativePSCmd(), newNativeStopCmd())
 	modelListCmd.Flags().Bool("local", false, "List installed native models without contacting a worker.")
 	for _, cmd := range []*cobra.Command{

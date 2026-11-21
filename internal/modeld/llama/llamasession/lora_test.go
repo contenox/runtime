@@ -4,7 +4,7 @@ package llamasession
 
 import (
 	"context"
-	"os"
+	"flag"
 	"strings"
 	"testing"
 	"time"
@@ -12,14 +12,13 @@ import (
 	"github.com/contenox/runtime/internal/modeld/llama"
 )
 
+var loraModel = flag.String("lora-model", "", "base GGUF for the native LoRA qualification")
+var loraAdapter = flag.String("lora-adapter", "", "matching GGUF LoRA adapter")
+
 func TestSystem_LlamaSessionLoRA_AdapterChangesContinuation(t *testing.T) {
-	modelPath := os.Getenv("CONTENOX_LLAMA_LORA_GGUF")
-	if modelPath == "" {
-		t.Skip("set CONTENOX_LLAMA_LORA_GGUF to a base GGUF model with a matching adapter")
-	}
-	adapterPath := os.Getenv("CONTENOX_LLAMA_LORA_ADAPTER")
-	if adapterPath == "" {
-		t.Skip("set CONTENOX_LLAMA_LORA_ADAPTER to a GGUF LoRA adapter for the model")
+	modelPath, adapterPath := *loraModel, *loraAdapter
+	if modelPath == "" || adapterPath == "" {
+		t.Skip("supply -lora-model and -lora-adapter")
 	}
 
 	cfg := llama.Config{NumCtx: 128, NumBatch: 32, NumThreads: 2, DisableBOS: true}
@@ -63,7 +62,7 @@ func TestSystem_LlamaSessionLoRA_AdapterChangesContinuation(t *testing.T) {
 	t.Logf("lora=%q", loraOut)
 	t.Logf("adapter changed continuation: %v", changed)
 
-	if os.Getenv("CONTENOX_LLAMA_LORA_EXPECT_DIFF") == "1" && !changed {
+	if !changed {
 		t.Fatal("expected the LoRA adapter to change the continuation")
 	}
 }

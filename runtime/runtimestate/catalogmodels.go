@@ -16,6 +16,9 @@ func observedModelFromPullStatus(model ModelPullStatus) modelrepo.ObservedModel 
 	}
 
 	meta := map[string]string{}
+	if model.MediaRole != "" {
+		meta["media_role"] = model.MediaRole
+	}
 	if model.NativeBackend != "" {
 		meta["type"] = model.NativeBackend
 	}
@@ -81,6 +84,7 @@ func pullStatusFromObservedModel(model modelrepo.ObservedModel) ModelPullStatus 
 	return ModelPullStatus{
 		AdvertisedCapabilities: observedCapabilities(model.CapabilityConfig),
 		NativeBackend:          model.Meta["type"],
+		MediaRole:              model.Meta["media_role"],
 		CompletionMode:         model.CompletionMode,
 		FIMFormat:              model.FIMFormat, CanAutocomplete: model.CanAutocomplete,
 		NextEditFormat: model.NextEditFormat, CanNextEdit: model.CanNextEdit,

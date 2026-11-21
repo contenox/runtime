@@ -2,6 +2,8 @@ package contenoxcli
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	libdb "github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
@@ -9,9 +11,11 @@ import (
 	"github.com/contenox/runtime/runtime/agentregistryservice"
 	"github.com/contenox/runtime/runtime/eventlog"
 	"github.com/contenox/runtime/runtime/fleetservice"
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/internal/workspacetriggersapi"
 	"github.com/contenox/runtime/runtime/missionservice"
 	"github.com/contenox/runtime/runtime/operatorinbox"
+	"github.com/contenox/runtime/runtime/workflows"
 	"github.com/contenox/runtime/runtime/workspaceevents"
 	"github.com/contenox/runtime/runtime/workspacetriggers"
 )
@@ -53,6 +57,19 @@ type policyChecker interface {
 
 func triggerCheck(agents agentregistryservice.Service, policies policyChecker) workspacetriggersapi.CheckFunc {
 	return func(ctx context.Context, t workspacetriggers.Trigger) error {
+		if t.Target == "workflow" {
+			d, err := workflows.Load(t.Root, t.Workflow)
+			if err != nil {
+				return err
+			}
+			if d.Revision != t.WorkflowRevision {
+				return fmt.Errorf("select the current workflow revision")
+			}
+			if policies != nil && t.HITLPolicyName != "" {
+				return policies.ValidatePolicy(ctx, t.HITLPolicyName)
+			}
+			return nil
+		}
 		if t.Target == "notify" {
 			return nil
 		}
@@ -84,8 +101,24 @@ func newTriggerDispatcher(events workspaceevents.Service, log eventlog.Service, 
 	})
 }
 
-func deliverWorkspaceEvent(operatorInbox operatorinbox.Service, sessionRouter *acpsvc.SessionRouter) func(context.Context, workspacetriggers.Run, string) error {
+func deliverWorkspaceEvent(wf *workflows.Service, operatorInbox operatorinbox.Service, sessionRouter *acpsvc.SessionRouter) func(context.Context, workspacetriggers.Run, string) error {
 	return func(ctx context.Context, run workspacetriggers.Run, id string) error {
+		if run.Trigger.Target == "workflow" {
+			input, _ := json.Marshal(map[string]any{"event": run.Event, "paths": run.Paths})
+			var nid int64
+			origin := run.Event
+			if evt := run.TopicEvent; evt != nil {
+				nid = evt.NID
+				input = evt.Data
+				origin = evt.Subject
+			}
+			ctx = hitlservice.WithPolicyName(ctx, run.Trigger.HITLPolicyName)
+			r, err := wf.Run(ctx, run.Root, workflows.Invocation{Name: run.Trigger.Workflow, Revision: run.Trigger.WorkflowRevision, ID: id, Origin: origin, Payload: input, EventNID: nid})
+			if err == nil && r.Status == "failed" {
+				err = fmt.Errorf("%s", r.Error)
+			}
+			return err
+		}
 		if run.Trigger.Target == "notify" {
 			return operatorInbox.Add(ctx, &operatorinbox.Item{ID: id, Reason: operatorinbox.ReasonWorkspaceEvent, Intent: run.Intent(), Report: missionservice.Report{ID: id, Kind: missionservice.ReportKindFinding, Summary: run.Trigger.Name, Detail: run.Intent()}})
 		}

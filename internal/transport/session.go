@@ -84,6 +84,7 @@ type ModelInfo struct {
 	FreeBytes               int64             `json:"free_bytes,omitempty"`
 	WeightsBytes            int64             `json:"weights_bytes,omitempty"`
 	OverheadBytes           int64             `json:"overhead_bytes,omitempty"`
+	HostStagingBytes        int64             `json:"host_staging_bytes,omitempty"`
 	ReservedBytes           int64             `json:"reserved_bytes,omitempty"`
 	UserLimitBytes          int64             `json:"user_limit_bytes,omitempty"`
 	MinFreeBytes            int64             `json:"min_free_bytes,omitempty"`

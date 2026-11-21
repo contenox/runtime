@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/runtime/eventlog"
+	"github.com/contenox/runtime/runtime/hitlservice"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/workflows"
 	"github.com/contenox/runtime/runtime/workspaceevents"
 	"github.com/contenox/runtime/runtime/workspacetriggers"
 	"github.com/getkin/kin-openapi/openapi3"
@@ -25,6 +27,7 @@ func WithOperator(ctx context.Context, session string) context.Context {
 }
 
 type Provider struct {
+	Workflows   *workflows.Service
 	History     workspacetriggers.History
 	Events      workspaceevents.Service
 	Check       func(context.Context, workspacetriggers.Trigger) error
@@ -34,8 +37,8 @@ type Provider struct {
 }
 
 func (*Provider) Supports(context.Context) ([]string, error) { return []string{"events"}, nil }
-func (*Provider) GetSchemasForSupportedTools(context.Context) (map[string]*openapi3.T, error) {
-	return map[string]*openapi3.T{}, nil
+func (p *Provider) GetSchemasForSupportedTools(ctx context.Context) (map[string]*openapi3.T, error) {
+	return taskengine.DeclarationSchemas(ctx, "events", p)
 }
 
 func tool(name, description string, props map[string]any, required ...string) taskengine.Tool {
@@ -52,20 +55,21 @@ func (*Provider) GetToolsForToolsByName(_ context.Context, name string) ([]taske
 	field := map[string]string{"type": "string"}
 	triggerProps := map[string]any{
 		"name": field, "agentName": field, "hitlPolicyName": field,
-		"prompt": map[string]string{"type": "string", "description": "Instructions the agent must execute when it wakes. Include the requested actions, filenames and any completion topic. For example: Read REVIEW.md and use event_fire to publish review.received with the verdict."},
-		"target": field, "sessionMode": field, "onDone": field,
+		"prompt":   map[string]string{"type": "string", "description": "Instructions the agent must execute when it wakes. Include the requested actions, filenames and any completion topic. For example: Read REVIEW.md and use event_fire to publish review.received with the verdict."},
+		"workflow": field, "workflowRevision": field, "target": field, "sessionMode": field, "onDone": field,
 		"pathGlob":   map[string]string{"type": "string", "description": "Project-relative filename or glob. For a change to REVIEW.md use REVIEW.md here."},
 		"debounceMs": map[string]any{"type": "integer", "minimum": 250, "maximum": 600000},
 	}
 	topicProps := maps.Clone(triggerProps)
 	topicProps["topicGlob"] = map[string]string{"type": "string", "description": "Name or pattern of an explicitly published topic, for example review.requested. For filesystem changes use pathGlob."}
 	return []taskengine.Tool{
+		tool("workflow_run", "Run a project JavaScript file from workflows/<name>.js with a JSON event. Returns a proposal for human review in Workflows.", map[string]any{"name": field, "payload": map[string]string{"type": "object"}}, "name"),
 		tool("schedule_create", "Publish a topic once at an RFC3339 time, at a repeating interval, or with a five-field cron expression. A matching subscription wakes the agent.", map[string]any{"topic": field, "at": field, "every": field, "cron": field, "timezone": field, "payload": map[string]string{"type": "object"}}, "topic"),
 		tool("schedule_list", "List schedules with their topics, next fire times and enabled state.", map[string]any{"cursor": field}),
 		tool("schedule_update", "Pause or resume a schedule.", map[string]any{"id": field, "enabled": map[string]string{"type": "boolean"}}, "id", "enabled"),
 		tool("schedule_delete", "Delete a workspace schedule.", map[string]any{"id": field}, "id"),
 		tool("watch_create", "Subscribe to a file appearing or changing. For example, wake this conversation when REVIEW.md is written with pathGlob REVIEW.md, target session, sessionMode continue and hitlPolicyName default.", triggerProps, "name", "pathGlob", "prompt"),
-		tool("subscription_create", "Wake an agent when a named topic is published. Choose exactly one topicGlob or pathGlob. Use watch_create for file changes. Choose target mission (agentName), session (this conversation, sessionMode continue or new), or notify (inbox). A mission or session requires hitlPolicyName. onDone optionally publishes a topic when a mission lands.", topicProps, "name", "prompt"),
+		tool("subscription_create", "Wake an agent when a named topic is published. Choose exactly one topicGlob or pathGlob. Use watch_create for file changes. Choose target mission (agentName), session (this conversation, sessionMode continue or new), notify (inbox), or workflow (workflow name and workflowRevision). A mission or session requires hitlPolicyName. onDone optionally publishes a topic when a mission lands.", topicProps, "name", "prompt"),
 		tool("subscription_delete", "Remove a subscription in this project by its ID.", map[string]any{"id": field}, "id"),
 		tool("event_fire", "Publish a named event to this project. Matching subscriptions may start work.", map[string]any{"topic": map[string]string{"type": "string"}, "payload": map[string]string{"type": "object"}}, "topic"),
 		tool("event_get", "Read a workspace event and its full payload by event number.", map[string]any{"nid": map[string]any{"type": "integer", "minimum": 1}}, "nid"),
@@ -175,6 +179,27 @@ func (p *Provider) Exec(ctx context.Context, _ time.Time, input any, _ bool, cal
 		}
 		row, err := (workspaceevents.Schedules{DB: p.Store.DB}).Create(ctx, workspaceevents.Scope(p.WorkspaceID, root), schedule, time.Now())
 		return row, taskengine.DataTypeAny, err
+	case "workflow_run":
+		if p.Workflows == nil {
+			return nil, taskengine.DataTypeAny, fmt.Errorf("workflow service unavailable")
+		}
+		d, e := workflows.Load(root, arg("name"))
+		if e != nil {
+			return nil, taskengine.DataTypeAny, e
+		}
+		payload := json.RawMessage(call.Args["payload"])
+		if len(payload) == 0 {
+			payload = json.RawMessage("{}")
+		}
+		if value, ok := args["payload"]; ok {
+			payload, e = json.Marshal(value)
+		}
+		if e != nil {
+			return nil, taskengine.DataTypeAny, e
+		}
+		r, e := p.Workflows.Run(ctx, root, workflows.Invocation{Name: d.Name, Revision: d.Revision, Origin: creator, Payload: payload})
+		r.Changes = nil
+		return r, taskengine.DataTypeAny, e
 	case "watch_create", "subscription_create":
 		if call.ToolName == "watch_create" && (arg("topicGlob") != "" || arg("pathGlob") == "") {
 			return nil, taskengine.DataTypeAny, fmt.Errorf("watch_create requires a pathGlob")
@@ -187,8 +212,14 @@ func (p *Provider) Exec(ctx context.Context, _ time.Time, input any, _ bool, cal
 			}
 			tr.DebounceMs = ms
 		}
+		tr.Workflow = arg("workflow")
+		tr.WorkflowRevision = arg("workflowRevision")
 		tr.OnDone = arg("onDone")
 		tr.Target = arg("target")
+		if tr.Target == "workflow" {
+			// A deferred workflow inherits the caller's policy (empty selects the project default).
+			tr.HITLPolicyName = hitlservice.PolicyNameFromContext(ctx)
+		}
 		if tr.Target == "session" {
 			tr.SessionID, _ = ctx.Value(runtimetypes.SessionIDContextKey).(string)
 			tr.SessionMode = arg("sessionMode")

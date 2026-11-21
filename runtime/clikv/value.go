@@ -9,6 +9,9 @@ import (
 
 const Prefix = "cli."
 
+// EnabledRoleKey stores an optional inference role's on/off selection.
+func EnabledRoleKey(role string) string { return "inference.enabled." + role }
+
 func SetString(ctx context.Context, store runtimetypes.Store, key, value string) error {
 	v := strings.TrimSpace(value)
 	data, err := json.Marshal(v)

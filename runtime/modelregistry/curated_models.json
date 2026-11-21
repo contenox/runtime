@@ -1,5 +1,34 @@
 {
   "models": {
+    "stable-diffusion-v1-5-fp16-ov": {
+      "name": "stable-diffusion-v1-5-fp16-ov",
+      "displayLabel": "Stable Diffusion 1.5 · Image generation",
+      "family": "stable-diffusion",
+      "recommendedVramGb": 8,
+      "backend": "openvino",
+      "pipeline": "StableDiffusionPipeline",
+      "repo": "OpenVINO/stable-diffusion-v1-5-fp16-ov",
+      "revision": "73814e567b3d7dd889d08bce31997ab30332f896",
+      "sourceUrl": "https://huggingface.co/OpenVINO/stable-diffusion-v1-5-fp16-ov",
+      "sizeBytes": 3354879592,
+      "curated": true,
+      "useCase": "image-generation"
+    },
+    "ltx-video-int8-ov": {
+      "name": "ltx-video-int8-ov",
+      "displayLabel": "LTX-Video 2B INT8 · Video generation",
+      "family": "ltx-video",
+      "recommendedVramGb": 8,
+      "backend": "openvino",
+      "pipeline": "LTXPipeline",
+      "repo": "rahmanbazarov/LTX-Video-int8-ov",
+      "revision": "1676af3ca0e8d16ef6218a5495f4d299d1e589dd",
+      "sourceUrl": "https://huggingface.co/rahmanbazarov/LTX-Video-int8-ov",
+      "license": "LTX-Video Open Weights License",
+      "sizeBytes": 7125843455,
+      "curated": true,
+      "useCase": "video-generation"
+    },
     "codestral-22b": {
       "name": "codestral-22b",
       "sourceUrl": "https://huggingface.co/bartowski/Codestral-22B-v0.1-GGUF/resolve/main/Codestral-22B-v0.1-Q4_K_M.gguf",

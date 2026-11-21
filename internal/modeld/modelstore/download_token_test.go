@@ -13,6 +13,41 @@ type downloadRoundTrip func(*http.Request) (*http.Response, error)
 
 func (f downloadRoundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
+func TestCustomRepositoryUsesOnlyItsExplicitCredential(t *testing.T) {
+	t.Setenv("HF_TOKEN", "machine-token")
+	original := http.DefaultClient
+	t.Cleanup(func() { http.DefaultClient = original })
+	var requests int
+	http.DefaultClient = &http.Client{Transport: downloadRoundTrip(func(r *http.Request) (*http.Response, error) {
+		requests++
+		res := &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("GGUF")), Request: r}
+		switch r.URL.Host {
+		case "hub.example":
+			if r.Header.Get("Authorization") != "Bearer scoped" {
+				t.Fatal("credential absent on selected repository")
+			}
+			res.StatusCode = 302
+			res.Header.Set("Location", "https://cdn.hub.example/file")
+		case "cdn.hub.example":
+			if r.Header.Get("Authorization") != "" {
+				t.Fatal("credential reached CDN")
+			}
+		default:
+			t.Fatal("unexpected download origin")
+		}
+		return res, nil
+	})}
+	ctx := WithDownloadOrigin(WithDownloadToken(context.Background(), "scoped"), "https://hub.example")
+	resp, err := modelDownload(ctx, "https://hub.example/team/model/resolve/main/model.gguf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if requests != 2 {
+		t.Fatal("missing redirected download")
+	}
+}
+
 func TestDownloadTokenIsRequestScopedAndStrippedOnRedirect(t *testing.T) {
 	t.Setenv("HF_ENDPOINT", "")
 	t.Setenv("HF_TOKEN", "cli-token")

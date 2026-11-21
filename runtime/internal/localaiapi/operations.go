@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 
 	"github.com/contenox/runtime/internal/modeld/admission"
@@ -25,15 +26,17 @@ import (
 )
 
 type operation struct {
-	ID        string `json:"id"`
-	Model     string `json:"model"`
-	Action    string `json:"action"`
-	Phase     string `json:"phase"`
-	Current   int64  `json:"current"`
-	Total     int64  `json:"total"`
-	Error     string `json:"error,omitempty"`
-	Failure   string `json:"failure,omitempty"`
-	AccessURL string `json:"accessUrl,omitempty"`
+	Target      transport.ExecutionTarget `json:"target,omitzero"`
+	ID          string                    `json:"id"`
+	Model       string                    `json:"model"`
+	Action      string                    `json:"action"`
+	Phase       string                    `json:"phase"`
+	Current     int64                     `json:"current"`
+	Total       int64                     `json:"total"`
+	Error       string                    `json:"error,omitempty"`
+	Failure     string                    `json:"failure,omitempty"`
+	TokenOrigin string                    `json:"tokenOrigin,omitempty"`
+	AccessURL   string                    `json:"accessUrl,omitempty"`
 }
 
 func (h *handler) progress(w http.ResponseWriter, r *http.Request) {
@@ -55,12 +58,15 @@ func (h *handler) stop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) start(w http.ResponseWriter, r *http.Request) {
-	var req struct{ Model, Action, Token string }
+	var req struct {
+		Model, Action, Token, TokenOrigin string
+		Target                            transport.ExecutionTarget
+	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&req); err != nil {
 		fail(w, 400, err)
 		return
 	}
-	if req.Action != "use" && req.Action != "download" {
+	if req.Action != "use" && req.Action != "download" && req.Action != "use-media" {
 		fail(w, 400, errors.New("Unknown model action."))
 		return
 	}
@@ -81,21 +87,47 @@ func (h *handler) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := models[idx]
+	if req.Action == "use-media" {
+		if m.MediaError != "" {
+			fail(w, 422, errors.New(m.MediaError))
+			return
+		}
+		if !m.Installed || transport.MediaRoleForPipeline(m.Pipeline) == "" {
+			fail(w, 400, errors.New("choose an installed image or video generation model"))
+			return
+		}
+		if err := req.Target.Validate(); err != nil {
+			fail(w, 400, err)
+			return
+		}
+	}
 	if req.Action == "use" && !m.Chat {
 		fail(w, 400, errors.New("Choose a chat model."))
 		return
 	}
 	ctx, cancel := context.WithCancel(h.ctx)
-	if req.Token != "" {
+	if req.TokenOrigin != "" {
+		source, err := url.Parse(m.sourceURL)
+		if err != nil || source.Scheme != "https" || source.User != nil || req.TokenOrigin != source.Scheme+"://"+source.Host {
+			cancel()
+			fail(w, 400, errors.New("The token origin must match the HTTPS model source."))
+			return
+		}
+		ctx = modelstore.WithDownloadOrigin(ctx, req.TokenOrigin)
+	}
+	if req.Token != "" || req.TokenOrigin != "" {
 		ctx = modelstore.WithDownloadToken(ctx, req.Token)
 	}
 	h.cancel = cancel
-	h.current = operation{ID: uuid.NewString(), Model: m.Name, Action: req.Action, Phase: "prepare"}
-	go h.run(ctx, cancel, m, req.Action)
+	h.current = operation{ID: uuid.NewString(), Model: m.Name, Action: req.Action, Phase: "prepare", TokenOrigin: req.TokenOrigin}
+	if req.Action == "use-media" {
+		h.current.Target = req.Target.Normalize()
+	}
+	go h.run(ctx, cancel, m, req.Action, req.Target)
 	reply(w, 202, h.current)
 }
 
-func (h *handler) run(ctx context.Context, cancel context.CancelFunc, m model, action string) {
+func (h *handler) run(ctx context.Context, cancel context.CancelFunc, m model, action string, target transport.ExecutionTarget) {
 	update := func(phase string, current, total int64) error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
@@ -128,15 +160,21 @@ func (h *handler) run(ctx context.Context, cancel context.CancelFunc, m model, a
 		} else if provider.DiscoveryError != "" {
 			return fmt.Errorf("Local model discovery: %s", provider.DiscoveryError)
 		}
-		if action == "use" {
+		if action == "use" || action == "use-media" {
 			if err := update("verify", 0, 0); err != nil {
 				return err
+			}
+			if action == "use-media" {
+				return h.useForMedia(ctx, m, provider.ID, target)
 			}
 			return h.useForChat(ctx, m, provider.ID)
 		}
 		return nil
 	}
-	err := execute()
+	h.finish(ctx, cancel, execute())
+}
+
+func (h *handler) finish(ctx context.Context, cancel context.CancelFunc, err error) operation {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	defer cancel()
@@ -161,6 +199,7 @@ func (h *handler) run(ctx context.Context, cancel context.CancelFunc, m model, a
 			h.current.AccessURL = denied.Page
 		}
 	}
+	return h.current
 }
 
 func (h *handler) useForChat(ctx context.Context, m model, connectionID string) error {

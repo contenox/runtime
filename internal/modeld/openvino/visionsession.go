@@ -371,7 +371,7 @@ func (s *visionSession) Decode(ctx context.Context, cfg transport.DecodeConfig) 
 		defer close(out)
 		for chunk := range src {
 			select {
-			case out <- transport.StreamChunk{Text: chunk.Text, Thinking: chunk.Thinking, Error: chunk.Error}:
+			case out <- NativeStreamChunk(chunk):
 			case <-ctx.Done():
 				sessionkit.TrySend(out, transport.StreamChunk{Error: ctx.Err()})
 				return

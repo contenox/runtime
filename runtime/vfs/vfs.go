@@ -124,3 +124,44 @@ func resolveLeaf(absPath string) (string, error) {
 		probe = parent
 	}
 }
+
+// OpenFileParent pins the directories of a workspace-relative file without following symlinks.
+// The caller owns the returned parent and uses the leaf for subsequent rooted file operations.
+func OpenFileParent(root *os.Root, name string, create bool) (*os.Root, string, error) {
+	if !filepath.IsLocal(name) || name == "." || name != filepath.Clean(name) {
+		return nil, "", fmt.Errorf("invalid workspace file path %q", name)
+	}
+	parent, err := root.OpenRoot(".")
+	if err != nil {
+		return nil, "", err
+	}
+	parts := strings.Split(filepath.ToSlash(name), "/")
+	for _, part := range parts[:len(parts)-1] {
+		st, err := parent.Lstat(part)
+		if create && errors.Is(err, os.ErrNotExist) {
+			err = parent.Mkdir(part, 0755)
+			if err == nil || errors.Is(err, os.ErrExist) {
+				st, err = parent.Lstat(part)
+			}
+		}
+		if err != nil || !st.IsDir() {
+			parent.Close()
+			if err != nil {
+				return nil, "", err
+			}
+			return nil, "", fmt.Errorf("%s is not a directory", part)
+		}
+		next, err := parent.OpenRoot(part)
+		parent.Close()
+		if err != nil {
+			return nil, "", err
+		}
+		actual, err := next.Stat(".")
+		if err != nil || !os.SameFile(st, actual) {
+			next.Close()
+			return nil, "", fmt.Errorf("directory %s changed while opening it", part)
+		}
+		parent = next
+	}
+	return parent, parts[len(parts)-1], nil
+}

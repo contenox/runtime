@@ -221,6 +221,14 @@ func (c *Client) Embed(ctx context.Context, req transport.EmbedRequest) (transpo
 	return *out, nil
 }
 
+// RenderMedia requests frames from the fenced model owner.
+func (c *Client) RenderMedia(ctx context.Context, request transport.MediaRequest) (transport.MediaResult, error) {
+	request.OwnerInstanceID = c.owner
+	var result transport.MediaResult
+	err := c.invoke(ctx, "RenderMedia", &request, &result)
+	return result, err
+}
+
 // ListModels enumerates every model on the node's models directory.
 func (c *Client) ListModels(ctx context.Context) ([]transport.NodeModel, error) {
 	out := new(listModelsResp)

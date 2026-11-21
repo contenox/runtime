@@ -3,17 +3,37 @@ package contenoxcli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 
+	"github.com/contenox/runtime/internal/transport"
 	"github.com/contenox/runtime/libbus"
 	"github.com/contenox/runtime/libdbexec"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentservice"
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/inferencesetup"
+	"github.com/contenox/runtime/runtime/localtools"
+	"github.com/contenox/runtime/runtime/mediageneration"
+	"github.com/contenox/runtime/runtime/modelrepo/modeldconn"
 	"github.com/contenox/runtime/runtime/runtimestate"
 	"github.com/contenox/runtime/runtime/taskengine"
 )
+
+// The filesystem tools are constructed before the engine that owns discovery and worker settings.
+func workspaceMediaRenderer(db libdbexec.DBManager, active func() *enginesvc.Engine) localtools.FSOption {
+	return localtools.WithMediaRenderer(func(ctx context.Context, options mediageneration.Options) (transport.MediaResult, error) {
+		engine := active()
+		if engine == nil {
+			return transport.MediaResult{}, errors.New("the inference engine is starting")
+		}
+		setup, err := inferencesetup.New(db, engine.State, engine.Bus, inferencesetup.RuntimeModelFactory{DB: db, State: engine.State, Bus: engine.Bus})
+		if err != nil {
+			return transport.MediaResult{}, err
+		}
+		return setup.RenderMedia(modeldconn.WithWorkers(ctx, engine.Workers), options)
+	})
+}
 
 func completionChain() (*taskengine.TaskChainDefinition, error) {
 	var chain taskengine.TaskChainDefinition

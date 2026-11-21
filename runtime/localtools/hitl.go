@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"strconv"
 	"strings"
@@ -97,21 +98,43 @@ func (h *HITLWrapper) Exec(
 	debug bool,
 	tools *taskengine.ToolsCall,
 ) (any, taskengine.DataType, error) {
+	args, ok := input.(map[string]any)
+	if !ok {
+		args = make(map[string]any, len(tools.Args))
+		for key, value := range tools.Args {
+			args[key] = value
+		}
+	}
+	if tools.Name == LocalFSToolsName && (tools.ToolName == "generate_image" || tools.ToolName == "generate_video") {
+		path, err := mediaPath(args, tools.ToolName == "generate_video")
+		if err != nil {
+			return nil, taskengine.DataTypeAny, err
+		}
+		effective := make(map[string]any, len(args)+1)
+		maps.Copy(effective, args)
+		effective["path"] = path
+		args, input = effective, effective
+	}
+	if err := h.authorize(ctx, tools, args, debug); err != nil {
+		return "", taskengine.DataTypeAny, err
+	}
+	return h.inner.Exec(ctx, startTime, input, debug, tools)
+}
+
+// AuthorizeRead applies the same policy and approval prompt to a workflow document snapshot.
+func (h *HITLWrapper) AuthorizeRead(ctx context.Context, path string) error {
+	return h.authorize(ctx, &taskengine.ToolsCall{Name: LocalFSToolsName, ToolName: "read_file"}, map[string]any{"path": path}, false)
+}
+
+func (h *HITLWrapper) authorize(ctx context.Context, tools *taskengine.ToolsCall, args map[string]any, debug bool) error {
 	toolName := tools.ToolName
 	if toolName == "" {
 		toolName = tools.Name
 	}
-	reportErr, reportChange, end := h.tracker.Start(ctx, "hitl", "exec", "tool_name", toolName, "args", input)
+	reportErr, reportChange, end := h.tracker.Start(ctx, "hitl", "exec", "tool_name", toolName, "args", args)
 	defer end()
-
 	if debug {
-		reportChange("input", input)
-	}
-
-	args, ok := input.(map[string]any)
-	if !ok {
-		reportErr(fmt.Errorf("hitl: non-map input %T; When-conditions will not be evaluated", input))
-		args = make(map[string]any)
+		reportChange("input", args)
 	}
 
 	result, err := h.policy.Evaluate(ctx, tools.Name, toolName, args)
@@ -122,7 +145,7 @@ func (h *HITLWrapper) Exec(
 			Reason: "policy_error",
 		}, false)
 		reportChange("denied", "policy_error")
-		return "", taskengine.DataTypeAny, errors.New("the permission policy could not be evaluated, so the operation was denied. This is a configuration problem, not your mistake: report the error and do not retry")
+		return errors.New("the permission policy could not be evaluated, so the operation was denied. This is a configuration problem, not your mistake: report the error and do not retry")
 	}
 
 	// A tool that prints several files at once (git_diff, git_show, git_blame)
@@ -132,7 +155,7 @@ func (h *HITLWrapper) Exec(
 	switch result.Action {
 	case hitlservice.ActionAllow:
 		h.publishDecision(ctx, tools.Name, toolName, args, result, false)
-		return h.inner.Exec(ctx, startTime, input, debug, tools)
+		return nil
 
 	case hitlservice.ActionDeny:
 		h.publishDecision(ctx, tools.Name, toolName, args, result, false)
@@ -141,7 +164,7 @@ func (h *HITLWrapper) Exec(
 		if (result.Reason == "read_path_denied" || result.Reason == "policy_error") && result.Detail != "" {
 			message += " " + result.Detail + "."
 		}
-		return "", taskengine.DataTypeAny, errors.New(message)
+		return errors.New(message)
 
 	case hitlservice.ActionApprove:
 		oldContent, newContent, diffErr := h.buildDiff(ctx, tools, toolName, args)
@@ -191,27 +214,27 @@ func (h *HITLWrapper) Exec(
 				}
 				if onTimeout == hitlservice.ActionAllow {
 					reportChange("approved", "timeout_allow")
-					return h.inner.Exec(ctx, startTime, input, debug, tools)
+					return nil
 				}
 				reportErr(fmt.Errorf("hitl: approval timed out: %w", err))
 				reportChange("denied", "timeout")
-				return "", taskengine.DataTypeAny, fmt.Errorf("approval timed out after %ds and the operation was automatically denied (policy %s, on_timeout=%s); ask the user before retrying",
+				return fmt.Errorf("approval timed out after %ds and the operation was automatically denied (policy %s, on_timeout=%s); ask the user before retrying",
 					result.TimeoutS, policyLabel(result), onTimeout)
 			}
 			err = fmt.Errorf("hitl: approval error: %w", err)
 			reportErr(err)
-			return nil, taskengine.DataTypeAny, err
+			return err
 		}
 		if !approved {
 			reportChange("denied", "user")
-			return "", taskengine.DataTypeAny, errors.New(denyMessageUser)
+			return errors.New(denyMessageUser)
 		}
 		reportChange("approved", "user")
-		return h.inner.Exec(ctx, startTime, input, debug, tools)
+		return nil
 
 	default:
 		h.publishDecision(ctx, tools.Name, toolName, args, result, false)
-		return h.inner.Exec(ctx, startTime, input, debug, tools)
+		return nil
 	}
 }
 

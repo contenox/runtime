@@ -146,6 +146,17 @@ type EvaluationResult struct {
 }
 
 func evaluate(ctx context.Context, p *Policy, toolsName, toolName string, args map[string]any) EvaluationResult {
+	result := evaluateCall(ctx, p, toolsName, toolName, args)
+	if toolsName == "local_fs" && (toolName == "generate_image" || toolName == "generate_video") && result.Action != ActionDeny {
+		write := evaluateCall(ctx, p, toolsName, "write_file", args)
+		if write.Action == ActionDeny || write.Action == ActionApprove && result.Action == ActionAllow {
+			return write
+		}
+	}
+	return result
+}
+
+func evaluateCall(ctx context.Context, p *Policy, toolsName, toolName string, args map[string]any) EvaluationResult {
 	// Structural reading needs to know which shell will run the line. Callers
 	// that know (the tool layer) set it; when nobody did, POSIX is the honest
 	// default on the hosts whose shell is sh. Windows keeps the conservative

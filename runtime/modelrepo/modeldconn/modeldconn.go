@@ -503,6 +503,42 @@ func EmbedTarget(ctx context.Context, target ModeldTarget, ref ModelRef, cfg tra
 	})
 }
 
+// RenderMediaTarget runs a bounded diffusion request on the model owner or its admitted worker.
+func RenderMediaTarget(ctx context.Context, target ModeldTarget, request transport.MediaRequest) (transport.MediaResult, error) {
+	if err := request.Settings.Validate(); err != nil {
+		return transport.MediaResult{}, err
+	}
+	ctx = WithWorkerRole(ctx, request.Settings.Role())
+	if target.Endpoint == "" {
+		status, err := readyDaemon(ctx)
+		if err != nil {
+			return transport.MediaResult{}, err
+		}
+		target.Endpoint = status.Endpoint
+	}
+	client, err := executionEndpoint(ctx, target)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	if target.Execution != nil {
+		request.Config.Execution = target.Execution
+	}
+	if client.Backend == "shared" && request.Config.Execution == nil {
+		request.Config.Execution, err = requestExecution(ctx, request.Settings.Role(), request.Type)
+		if err != nil {
+			return transport.MediaResult{}, err
+		}
+	}
+	if err := protectExecution(ctx, target.Endpoint, &request.Config); err != nil {
+		return transport.MediaResult{}, err
+	}
+	result, err := client.RenderMedia(ctx, request)
+	if err == nil {
+		err = RecordExecution(ctx, ModelRef{Name: request.ModelName, Type: request.Type, Digest: request.Digest}, result.Execution)
+	}
+	return result, err
+}
+
 // ListModelsTarget lists models on the target.
 func ListModelsTarget(ctx context.Context, target ModeldTarget) ([]transport.NodeModel, error) {
 	if target.Endpoint == "" {

@@ -42,6 +42,10 @@ func DiscoverAuthServer(ctx context.Context, mcpServerURL string) (*ServerMetada
 	}
 	baseOrigin := u.Scheme + "://" + u.Host
 
+	// Remote MCP hosts can delegate sign-in to a different issuer.
+	if resource := protectedResource(ctx, u); resource != nil && len(resource.AuthorizationServers) > 0 {
+		return issuerMetadata(ctx, resource.AuthorizationServers[0])
+	}
 	wellKnown := baseOrigin + "/.well-known/oauth-authorization-server"
 	meta, err := fetchJSON[ServerMetadata](ctx, wellKnown)
 	if err == nil {

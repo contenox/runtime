@@ -38,7 +38,7 @@ func (s *Service) validateScheduling(ctx context.Context, store runtimetypes.Sto
 		return nil
 	}
 	roles := map[string]schedulingRole{}
-	for _, name := range []string{RoleAutocomplete, RoleNextEdit, RoleChat, RoleRecovery, RoleEmbedding} {
+	for _, name := range RoleIDs() {
 		enabled, err := readRoleEnabled(ctx, store, name)
 		if err != nil {
 			return err
@@ -82,7 +82,7 @@ func (s *Service) validateScheduling(ctx context.Context, store runtimetypes.Sto
 	if !configured {
 		return nil
 	}
-	for _, name := range []string{RoleNextEdit, RoleChat, RoleRecovery, RoleEmbedding} {
+	for _, name := range []string{RoleNextEdit, RoleChat, RoleRecovery, RoleEmbedding, RoleImage, RoleVideo} {
 		role, configured := roles[name]
 		sharedHost := false
 		for endpoint := range role.endpoints {

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -15,6 +16,27 @@ import (
 	"github.com/contenox/runtime/internal/transport"
 	"github.com/contenox/runtime/runtime/modelregistry"
 )
+
+func TestRegisteredModelRejectsHTMLDownload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("<html>Please sign in</html>"))
+	}))
+	defer server.Close()
+	root := t.TempDir()
+	reg := &mockRegistry{models: map[string]*modelregistry.ModelDescriptor{
+		"private-model": {ID: "user-entry", Name: "private-model", SourceURL: server.URL},
+	}}
+	err := modelstore.EnsureModelAvailable(t.Context(), reg, "private-model", modelstore.AutoPullOptions{
+		DataRoot: root,
+		Receive:  modelstore.NewNodeAdmin(filepath.Join(root, "models")).ReceiveModel,
+	})
+	if err == nil || !strings.Contains(err.Error(), "GGUF header") {
+		t.Fatalf("expected an invalid GGUF download, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "models", "private-model")); !os.IsNotExist(err) {
+		t.Fatalf("invalid model reached the inventory: %v", err)
+	}
+}
 
 type mockRegistry struct {
 	models map[string]*modelregistry.ModelDescriptor

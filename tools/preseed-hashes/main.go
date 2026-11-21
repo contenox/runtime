@@ -196,7 +196,7 @@ func gitHashes(root, gitPath string) ([]string, error) {
 	commits := strings.Fields(string(out))
 	hashes := make([]string, 0, len(commits))
 	for _, commit := range commits {
-		show := exec.Command("git", "-C", root, "show", commit+":"+gitPath)
+		show := exec.Command("git", "-C", root, "show", commit+":./"+gitPath)
 		blob, err := show.Output()
 		if err != nil {
 			return nil, fmt.Errorf("git show %s:%s: %w", commit, gitPath, err)

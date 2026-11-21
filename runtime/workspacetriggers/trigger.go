@@ -37,24 +37,26 @@ func AllowedEvents() []string {
 }
 
 type Trigger struct {
-	CreatedBy      string    `json:"createdBy,omitempty"`
-	OnDone         string    `json:"onDone,omitempty"`
-	Target         string    `json:"target,omitempty"`
-	SessionID      string    `json:"sessionId,omitempty"`
-	SessionMode    string    `json:"sessionMode,omitempty"`
-	ID             string    `json:"id"`
-	Root           string    `json:"root"`
-	Name           string    `json:"name"`
-	Events         []string  `json:"events"`
-	TopicGlob      string    `json:"topicGlob,omitempty"`
-	PathGlob       string    `json:"pathGlob"`
-	DebounceMs     int       `json:"debounceMs"`
-	AgentName      string    `json:"agentName"`
-	HITLPolicyName string    `json:"hitlPolicyName"`
-	Prompt         string    `json:"prompt"`
-	Enabled        bool      `json:"enabled"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	Workflow         string    `json:"workflow,omitempty"`
+	WorkflowRevision string    `json:"workflowRevision,omitempty"`
+	CreatedBy        string    `json:"createdBy,omitempty"`
+	OnDone           string    `json:"onDone,omitempty"`
+	Target           string    `json:"target,omitempty"`
+	SessionID        string    `json:"sessionId,omitempty"`
+	SessionMode      string    `json:"sessionMode,omitempty"`
+	ID               string    `json:"id"`
+	Root             string    `json:"root"`
+	Name             string    `json:"name"`
+	Events           []string  `json:"events"`
+	TopicGlob        string    `json:"topicGlob,omitempty"`
+	PathGlob         string    `json:"pathGlob"`
+	DebounceMs       int       `json:"debounceMs"`
+	AgentName        string    `json:"agentName"`
+	HITLPolicyName   string    `json:"hitlPolicyName"`
+	Prompt           string    `json:"prompt"`
+	Enabled          bool      `json:"enabled"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 type Firing struct {
@@ -82,15 +84,17 @@ func (t *Trigger) Normalize() error {
 		return fmt.Errorf("%w: name is required", ErrInvalidTrigger)
 	case len(t.Name) > MaxNameLength:
 		return fmt.Errorf("%w: name exceeds %d characters", ErrInvalidTrigger, MaxNameLength)
-	case t.Target != "" && t.Target != "mission" && t.Target != "session" && t.Target != "notify":
-		return fmt.Errorf("%w: choose mission, session or notify", ErrInvalidTrigger)
+	case t.Target != "" && t.Target != "mission" && t.Target != "session" && t.Target != "notify" && t.Target != "workflow":
+		return fmt.Errorf("%w: choose mission, session, notify or workflow", ErrInvalidTrigger)
+	case t.Target == "workflow" && (t.Workflow == "" || len(t.WorkflowRevision) != 64):
+		return fmt.Errorf("%w: choose a saved workflow revision", ErrInvalidTrigger)
 	case t.Target == "session" && (t.SessionID == "" || (t.SessionMode != "continue" && t.SessionMode != "new")):
 		return fmt.Errorf("%w: choose a live session and its new or continue mode", ErrInvalidTrigger)
 	case (t.Target == "" || t.Target == "mission") && t.AgentName == "":
 		return fmt.Errorf("%w: agentName is required: a trigger starts a mission with a named agent", ErrInvalidTrigger)
-	case t.Target != "notify" && t.HITLPolicyName == "":
+	case t.Target != "workflow" && t.Target != "notify" && t.HITLPolicyName == "":
 		return fmt.Errorf("%w: hitlPolicyName is required: a triggered mission must name its envelope", ErrInvalidTrigger)
-	case t.Prompt == "":
+	case t.Prompt == "" && t.Target != "workflow":
 		return fmt.Errorf("%w: prompt is required: it is what the mission is asked to do", ErrInvalidTrigger)
 	case strings.ContainsAny(t.Prompt, "\r\n"):
 		return fmt.Errorf("%w: prompt must be a single line, like a mission intent", ErrInvalidTrigger)

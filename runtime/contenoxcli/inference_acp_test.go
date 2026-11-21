@@ -14,6 +14,7 @@ import (
 	"github.com/contenox/runtime/libbus"
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/acpsvc"
+	"github.com/contenox/runtime/runtime/inferencesetup"
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ func TestIntegration_InferenceACPSetupOnly(t *testing.T) {
 	require.NoError(t, err)
 	var snapshot protocolv1.InferenceResult
 	require.NoError(t, protojson.Unmarshal(status, &snapshot))
-	require.Len(t, snapshot.Roles, 5)
+	require.Len(t, snapshot.Roles, len(inferencesetup.RoleIDs()))
 	require.NotEmpty(t, snapshot.ConfigurationContract.Operations)
 	var local *protocolv1.InferenceProviderCapability
 	for _, capability := range snapshot.ProviderTypes {

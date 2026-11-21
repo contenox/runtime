@@ -219,6 +219,21 @@ func (s *managedSlot) Describe(ctx context.Context, request transport.OpenSessio
 	return s.Service.Describe(ctx, request)
 }
 
+func (s *managedSlot) RenderMedia(ctx context.Context, request transport.MediaRequest) (transport.MediaResult, error) {
+	gate, err := newComputeGate(s.lifetime, s.client, request.Config.AdmissionPermit)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	defer gate.close()
+	request.Config.AdmissionPermit = admission.Permit{}
+	operation, finish, err := gate.operation(ctx)
+	if err != nil {
+		return transport.MediaResult{}, err
+	}
+	defer finish()
+	return s.Service.RenderMedia(operation, request)
+}
+
 type computeSession struct {
 	transport.Session
 	gate *computeGate

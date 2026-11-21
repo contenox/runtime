@@ -432,7 +432,7 @@ func (w *rootWorker) refuse(ctx context.Context, firings runtimetypes.EventFirin
 }
 
 func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiringStore, b *burst) (bool, error) {
-	if b.trigger.Target == "session" {
+	if b.trigger.Target == "session" || b.trigger.Target == "workflow" {
 		select {
 		case w.sessionSlots <- struct{}{}:
 		default:
@@ -441,11 +441,11 @@ func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiri
 	}
 	requestID := RequestID(b.trigger.ID, b.lastNID)
 	begin := firings.BeginEventFiring
-	if b.trigger.Target == "session" {
+	if b.trigger.Target == "session" || b.trigger.Target == "workflow" {
 		begin = firings.BeginEventFiringOnce
 	}
 	claimed, err := begin(ctx, b.trigger.ID, b.lastNID, requestID)
-	if b.trigger.Target == "session" && (err != nil || !claimed) {
+	if (b.trigger.Target == "session" || b.trigger.Target == "workflow") && (err != nil || !claimed) {
 		<-w.sessionSlots
 	}
 	if err != nil {
@@ -455,9 +455,9 @@ func (w *rootWorker) deliver(ctx context.Context, firings runtimetypes.EventFiri
 		return w.handled(ctx, firings, b.trigger.ID, b.lastNID)
 	}
 	runCtx := runtimetypes.WithEventHop(context.WithValue(ctx, libtracker.ContextKeyRequestID, requestID), b.hop+1)
-	if b.trigger.Target == "session" {
+	if b.trigger.Target == "session" || b.trigger.Target == "workflow" {
 		if err := w.record(runCtx, workspaceevents.TypeTriggerStarted, requestID, map[string]any{
-			"trigger": b.trigger.ID, "triggerName": b.trigger.Name, "nid": b.lastNID, "target": "session", "hop": b.hop + 1,
+			"trigger": b.trigger.ID, "triggerName": b.trigger.Name, "nid": b.lastNID, "target": b.trigger.Target, "hop": b.hop + 1,
 		}); err != nil {
 			<-w.sessionSlots
 			return false, err
@@ -500,7 +500,7 @@ func (w *rootWorker) handled(ctx context.Context, firings runtimetypes.EventFiri
 		return true, nil
 	}
 	rec, err := w.d.history.started(ctx, w.scope, f)
-	return rec.MissionID != "" || rec.Target == "session", err
+	return rec.MissionID != "" || rec.Target == "session" || rec.Target == "workflow", err
 }
 
 func findFiring(ctx context.Context, firings runtimetypes.EventFiringStore, triggerID string, nid int64) (runtimetypes.EventFiring, bool, error) {
@@ -541,8 +541,8 @@ func (w *rootWorker) settle(ctx context.Context, firings runtimetypes.EventFirin
 		if missionID == "" {
 			if f.Stranded(w.d.cfg.Now()) {
 				rule, err := w.d.cfg.Store.Get(ctx, w.scope, f.TriggerName)
-				if err == nil && rule.Target == "session" {
-					if err := firings.FinishEventFiring(ctx, f.TriggerName, f.NID, "parked", "Session delivery was interrupted. Inspect the session before replaying."); err != nil {
+				if err == nil && (rule.Target == "session" || rule.Target == "workflow") {
+					if err := firings.FinishEventFiring(ctx, f.TriggerName, f.NID, "parked", "Delivery was interrupted. Inspect the target before replaying."); err != nil {
 						failures = append(failures, err)
 					}
 				}
