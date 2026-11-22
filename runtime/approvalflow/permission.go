@@ -125,6 +125,17 @@ func ToolKindFor(toolsName, toolName string) libacp.ToolKind {
 	}
 
 	switch toolsName {
+	case "browser":
+		switch base {
+		case "navigate":
+			return libacp.ToolKindFetch
+		case "snapshot", "screenshot", "tab_audio":
+			return libacp.ToolKindRead
+		case "click":
+			return libacp.ToolKindExecute
+		case "type_text":
+			return libacp.ToolKindEdit
+		}
 	case "local_shell":
 		return libacp.ToolKindExecute
 	case "local_fs":

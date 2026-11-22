@@ -41,6 +41,20 @@ func newTestManager(ctx context.Context, t *testing.T, bus *libbus.InMem) *mcpwo
 	return mgr
 }
 
+func TestDesktopBrowserChangedRegistration(t *testing.T) {
+	ctx := t.Context()
+	bus := libbus.NewInMem()
+	mgr := newTestManager(ctx, t, bus)
+	require.NoError(t, mgr.StartWorker(ctx, fakeMCPServer(t, "browser")))
+	defer mgr.StopWorker(ctx, "browser")
+	raw, err := json.Marshal(mcpworker.MCPToolRequest{DesktopBrowser: "previous installation", Tool: "snapshot"})
+	require.NoError(t, err)
+	reply, err := bus.Request(ctx, mcpworker.SubjectExecute("browser"), raw)
+	require.NoError(t, err)
+	_, err = mcpworker.DecodeToolReply(reply)
+	require.ErrorContains(t, err, "Browser registration changed")
+}
+
 func fakeMCPServer(t *testing.T, name string) *runtimetypes.MCPServer {
 	t.Helper()
 	unavailable := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

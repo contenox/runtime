@@ -245,6 +245,9 @@ shell = "deny"
 
 [envelopes.read_only.tools]
 "@client-mcp.*" = "approve"
+"@desktop-browser.*" = "deny"
+"@desktop-browser.snapshot" = "allow"
+"@desktop-browser.screenshot" = "allow"
 # Git reads are workspace reads, so they inherit this posture's reading half.
 # Git writes change the index, the worktree or the branch, which a posture that
 # promises to change nothing refuses rather than offers for approval.
@@ -397,6 +400,7 @@ deny_paths = [
 # Changing the worktree is the same step up this posture already makes for file
 # writes: ask, then do it. The reads keep the allow they inherit from read_only.
 [envelopes.ask_always.tools]
+"@desktop-browser.*" = "approve"
 "native-git.git_add" = "approve"
 "native-git.git_commit" = "approve"
 "native-git.git_checkout_branch" = "approve"
@@ -608,6 +612,9 @@ on_exhausted = "finish_stuck"
 
 [envelopes.strict.tools]
 "@client-mcp.*" = "deny"
+"@desktop-browser.*" = "deny"
+"@desktop-browser.snapshot" = "deny"
+"@desktop-browser.screenshot" = "deny"
 
 # The envelope for a driver you did not write. It differs from strict on one
 # word: deny, not ask. There is no approval prompt worth showing for a session
@@ -652,6 +659,8 @@ on_exhausted = "finish_stuck"
 
 [envelopes.acpx.tools]
 "@client-mcp.*" = "deny"
+"@desktop-browser.snapshot" = "deny"
+"@desktop-browser.screenshot" = "deny"
 
 # The oracle adjudication chain, and the only pure allowlist in the set: one
 # toolset granted, everything else denied. Denied rather than approved because

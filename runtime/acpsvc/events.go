@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/contenox/runtime/libacp"
+	"github.com/contenox/runtime/runtime/approvalflow"
 	"github.com/contenox/runtime/runtime/taskengine"
 )
 
@@ -322,6 +323,11 @@ func summarizeToolCallArgs(toolName string, args map[string]any) string {
 }
 
 func toolKindFor(toolName string) libacp.ToolKind {
+	for _, prefix := range []string{"browser.", "browser_"} {
+		if tool, ok := strings.CutPrefix(toolName, prefix); ok {
+			return approvalflow.ToolKindFor("browser", tool)
+		}
+	}
 	if toolName == "" {
 		return libacp.ToolKindOther
 	}

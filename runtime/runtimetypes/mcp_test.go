@@ -2,8 +2,10 @@ package runtimetypes_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +15,30 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDesktopBrowserLauncher(t *testing.T) {
+	dir := t.TempDir()
+	paths := []string{filepath.Join(dir, "Contenox"), filepath.Join(dir, "browser-mcp.cjs"), filepath.Join(dir, "endpoint.json")}
+	raw, err := json.Marshal(paths)
+	require.NoError(t, err)
+	launcher := runtimetypes.ParseDesktopBrowserLauncher(string(raw))
+	server := runtimetypes.MCPServer{Name: "browser", Transport: "stdio", Command: paths[0],
+		Args: []string{paths[1], paths[2], uuid.NewString()}, Env: map[string]string{"ELECTRON_RUN_AS_NODE": "1"}}
+	require.True(t, launcher.Matches(&server))
+	require.False(t, runtimetypes.ParseDesktopBrowserLauncher("").Matches(&server))
+	for _, change := range []func(*runtimetypes.MCPServer){
+		func(s *runtimetypes.MCPServer) { s.Command = "other" },
+		func(s *runtimetypes.MCPServer) { s.Args = []string{paths[1], paths[2], "invalid"} },
+		func(s *runtimetypes.MCPServer) { s.Args = []string{"other", paths[2], server.Args[2]} },
+		func(s *runtimetypes.MCPServer) { s.Args = []string{paths[1], "other", server.Args[2]} },
+		func(s *runtimetypes.MCPServer) { s.Env = map[string]string{"EXTRA": "1", "ELECTRON_RUN_AS_NODE": "1"} },
+		func(s *runtimetypes.MCPServer) { s.InjectParams = map[string]string{"x": "1"} },
+	} {
+		other := server
+		change(&other)
+		require.False(t, launcher.Matches(&other))
+	}
+}
 
 func newSSE(name string) *runtimetypes.MCPServer {
 	return &runtimetypes.MCPServer{

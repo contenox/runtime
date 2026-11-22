@@ -190,6 +190,9 @@ func evaluateCall(ctx context.Context, p *Policy, toolsName, toolName string, ar
 func ruleMatches(ctx context.Context, r Rule, toolsName, toolName string, args map[string]any, trusted *TrustedBinaries) (bool, string) {
 	toolsOK := r.Tools == "" || r.Tools == "*" || r.Tools == toolsName ||
 		(r.Tools == ClientMCPToolsSelector && runtimetypes.IsACPManagedMCPServerName(toolsName))
+	if r.Tools == runtimetypes.DesktopBrowserSelector {
+		toolsOK = toolsName == "browser" && runtimetypes.DesktopBrowserFromContext(ctx) != nil
+	}
 	toolOK := r.Tool == "" || r.Tool == "*" || r.Tool == toolName
 	if !toolsOK || !toolOK {
 		return false, ""

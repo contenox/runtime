@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 )
 
 const EnvelopeSection = "envelopes"
@@ -606,7 +607,7 @@ func ToolPatternRef(pattern string) (tools, tool string, err error) {
 			pattern, "*", "<toolset>", "<toolset>.<tool>")
 	}
 	for index, part := range parts {
-		if index == 0 && part == hitlservice.ClientMCPToolsSelector {
+		if index == 0 && (part == hitlservice.ClientMCPToolsSelector || part == runtimetypes.DesktopBrowserSelector) {
 			continue
 		}
 		if part == "*" || toolPatternName.MatchString(part) {
@@ -623,6 +624,10 @@ func ToolPatternRef(pattern string) (tools, tool string, err error) {
 
 func toolPatternSpecificity(tools, tool string) int {
 	n := 0
+	// An operator's named, toolset-wide or global rule precedes desktop defaults.
+	if tools == runtimetypes.DesktopBrowserSelector {
+		n = 3
+	}
 	if tools == "*" {
 		n++
 	}

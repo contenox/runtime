@@ -10,6 +10,7 @@ import (
 	"github.com/contenox/runtime/libtracker"
 	"github.com/contenox/runtime/runtime/agentdecl"
 	"github.com/contenox/runtime/runtime/hitlservice"
+	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -109,6 +110,46 @@ func TestUnit_Envelopes_ReadOnlyChangesNothing(t *testing.T) {
 	assert.Equal(t, hitlservice.ActionAllow, evaluate(t, svc, "local_fs", "read_file", map[string]any{"path": "main.go"}))
 	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, svc, "local_fs", "write_file", map[string]any{"path": "main.go", "content": "x"}))
 	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, svc, "local_shell", "local_shell", map[string]any{"command": "ls"}))
+}
+
+func TestUnit_Envelopes_DesktopBrowser(t *testing.T) {
+	cfg := mustConfig(t)
+	ctx := runtimetypes.WithDesktopBrowser(t.Context(), &runtimetypes.MCPServer{Name: "browser"})
+	for _, tc := range []struct {
+		profile        string
+		read, interact hitlservice.Action
+	}{
+		{"read_only", hitlservice.ActionAllow, hitlservice.ActionDeny},
+		{"ask_always", hitlservice.ActionAllow, hitlservice.ActionApprove},
+		{"auto_edit", hitlservice.ActionAllow, hitlservice.ActionApprove},
+		{"default", hitlservice.ActionAllow, hitlservice.ActionApprove},
+		{"acp", hitlservice.ActionAllow, hitlservice.ActionApprove},
+		{"dev", hitlservice.ActionAllow, hitlservice.ActionApprove},
+		{"strict", hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"acpx", hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"oracle", hitlservice.ActionDeny, hitlservice.ActionDeny},
+	} {
+		t.Run(tc.profile, func(t *testing.T) {
+			svc := envelopeEvaluator(t, cfg, tc.profile)
+			for tool, want := range map[string]hitlservice.Action{
+				"snapshot": tc.read, "screenshot": tc.read, "navigate": tc.interact,
+				"click": tc.interact, "type_text": tc.interact, "tab_audio": tc.interact,
+			} {
+				result, err := svc.Evaluate(ctx, "browser", tool, nil)
+				require.NoError(t, err)
+				assert.Equal(t, want, result.Action, tool)
+			}
+		})
+	}
+	svc := envelopeEvaluator(t, cfg, "default")
+	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "browser", "snapshot", nil))
+	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "playwright", "screenshot", nil))
+	for _, pattern := range []string{"browser.screenshot", "browser.*", "*"} {
+		cfg.Envelopes["custom"] = map[string]any{"extends": "default", "tools": map[string]any{pattern: "deny"}}
+		result, err := envelopeEvaluator(t, cfg, "custom").Evaluate(ctx, "browser", "screenshot", nil)
+		require.NoError(t, err)
+		assert.Equal(t, hitlservice.ActionDeny, result.Action, pattern)
+	}
 }
 
 func TestUnit_Envelopes_DefaultShellTiers(t *testing.T) {

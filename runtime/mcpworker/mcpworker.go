@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -27,9 +28,10 @@ const (
 )
 
 type MCPToolRequest struct {
-	SessionID string         `json:"session_id,omitempty"`
-	Tool      string         `json:"tool"`
-	Args      map[string]any `json:"args"`
+	DesktopBrowser string         `json:"desktop_browser,omitempty"`
+	SessionID      string         `json:"session_id,omitempty"`
+	Tool           string         `json:"tool"`
+	Args           map[string]any `json:"args"`
 }
 
 type MCPToolReply struct {
@@ -228,12 +230,19 @@ func (m *Manager) StartWorker(ctx context.Context, srv *runtimetypes.MCPServer) 
 		}
 	}()
 
+	var desktopBrowser string
+	if srv.Name == "browser" && runtimetypes.ParseDesktopBrowserLauncher(os.Getenv("CONTENOX_DESKTOP_BROWSER")).Matches(srv) {
+		desktopBrowser = srv.DesktopBrowserKey()
+	}
 	if _, err := m.messenger.Serve(workerCtx, SubjectExecute(srv.Name), func(ctx context.Context, data []byte) ([]byte, error) {
 		var req MCPToolRequest
 		if err := json.Unmarshal(data, &req); err != nil {
 			return errorReply(fmt.Errorf("mcpworker: decode request: %w", err))
 		}
 
+		if req.DesktopBrowser != "" && req.DesktopBrowser != desktopBrowser {
+			return errorReply(errors.New("Browser registration changed; request a new tool call"))
+		}
 		pool := m.getOrCreatePool(ctx, w, req.SessionID)
 		result, err := pool.CallTool(ctx, req.Tool, req.Args)
 		if err != nil {

@@ -91,7 +91,14 @@ func (p *PersistentRepo) Exec(
 		reportErr(err)
 		return nil, taskengine.DataTypeAny, err
 	}
-	if mcpSrv, err := store.GetMCPServerByName(ctx, args.Name); err == nil {
+	mcpSrv, lookupErr := store.GetMCPServerByName(ctx, args.Name)
+	if approved := runtimetypes.DesktopBrowserFromContext(ctx); approved != nil && approved.Name == args.Name {
+		// An approval may have waited while the installation or workspace changed.
+		if lookupErr != nil || mcpSrv.ID != approved.ID || !mcpSrv.UpdatedAt.Equal(approved.UpdatedAt) {
+			return nil, taskengine.DataTypeAny, errors.New("Browser registration changed; request a new tool call")
+		}
+	}
+	if lookupErr == nil {
 		out, dt, execErr := p.execMCPTools(ctx, mcpSrv, args, input)
 		if execErr != nil {
 			reportErr(execErr)
@@ -153,11 +160,15 @@ func (p *PersistentRepo) execMCPTools(
 		}
 	}
 
-	reqPayload, err := json.Marshal(mcpworker.MCPToolRequest{
+	req := mcpworker.MCPToolRequest{
 		SessionID: sessionID,
 		Tool:      toolName,
 		Args:      toolArgs,
-	})
+	}
+	if approved := runtimetypes.DesktopBrowserFromContext(ctx); approved != nil && approved.Name == srv.Name {
+		req.DesktopBrowser = approved.DesktopBrowserKey()
+	}
+	reqPayload, err := json.Marshal(req)
 	if err != nil {
 		return nil, taskengine.DataTypeAny, fmt.Errorf("mcp tools %q: encode request: %w", srv.Name, err)
 	}

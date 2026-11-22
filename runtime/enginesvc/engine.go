@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	libbus "github.com/contenox/runtime/libbus"
@@ -317,11 +318,16 @@ func buildTools(engineCtx context.Context, cfg Config, db libdbexec.DBManager, t
 			}
 			return provider.ReadPaths(ctx, call, args)
 		})
-		toolsRepo = hitlExemptProviders(
+		gated := hitlExemptProviders(
 			wrapper,
 			raw,
 			missiontools.ToolsProviderName,
 		)
+		if _, local := cfg.LocalTools["browser"]; !local {
+			gated.browserLauncher = runtimetypes.ParseDesktopBrowserLauncher(os.Getenv("CONTENOX_DESKTOP_BROWSER"))
+			gated.browserRegistration = store.GetMCPServerByName
+		}
+		toolsRepo = gated
 	}
 
 	toolsRepo = toolguidance.WrapFromEnv(toolsRepo)
@@ -331,11 +337,13 @@ func buildTools(engineCtx context.Context, cfg Config, db libdbexec.DBManager, t
 
 type hitlExemptRepo struct {
 	taskengine.ToolsRepo
-	raw    taskengine.ToolsRepo
-	exempt map[string]bool
+	raw                 taskengine.ToolsRepo
+	exempt              map[string]bool
+	browserLauncher     *runtimetypes.DesktopBrowserLauncher
+	browserRegistration func(context.Context, string) (*runtimetypes.MCPServer, error)
 }
 
-func hitlExemptProviders(gated, raw taskengine.ToolsRepo, providers ...string) taskengine.ToolsRepo {
+func hitlExemptProviders(gated, raw taskengine.ToolsRepo, providers ...string) *hitlExemptRepo {
 	exempt := make(map[string]bool, len(providers))
 	for _, p := range providers {
 		exempt[p] = true
@@ -346,6 +354,15 @@ func hitlExemptProviders(gated, raw taskengine.ToolsRepo, providers ...string) t
 func (h *hitlExemptRepo) Exec(ctx context.Context, startingTime time.Time, input any, debug bool, args *taskengine.ToolsCall) (any, taskengine.DataType, error) {
 	if args != nil && h.exempt[args.Name] {
 		return h.raw.Exec(ctx, startingTime, input, debug, args)
+	}
+	if args != nil && args.Name == "browser" && h.browserLauncher != nil {
+		server, err := h.browserRegistration(ctx, args.Name)
+		if err != nil && !errors.Is(err, libdbexec.ErrNotFound) {
+			return nil, taskengine.DataTypeAny, fmt.Errorf("check Browser registration: %w", err)
+		}
+		if err == nil && h.browserLauncher.Matches(server) {
+			ctx = runtimetypes.WithDesktopBrowser(ctx, server)
+		}
 	}
 	return h.ToolsRepo.Exec(ctx, startingTime, input, debug, args)
 }
