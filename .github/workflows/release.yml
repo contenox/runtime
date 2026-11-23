@@ -243,6 +243,22 @@ jobs:
         with:
           subject-path: "release-assets/*"
 
+      - name: Stage the Windows Modeld worker and installer index
+        working-directory: release-assets
+        env:
+          MODELD_ARCHIVE_URL: https://github.com/contenox/runtime/releases/download/v1.0.0-rc.12/modeld-v1.0.0-rc.12-windows-amd64.zip
+          MODELD_SHA256: 6d42e759db75f1f7d7e7641bd4e8a234f782cb8009fd735a10dd6bebb0bdf4bd
+        run: |
+          set -euo pipefail
+          archive=${MODELD_ARCHIVE_URL##*/}
+          for suffix in '' .sha256 .build.json; do
+            curl --fail --location --retry 3 --output "$archive$suffix" "$MODELD_ARCHIVE_URL$suffix"
+          done
+          printf '%s  %s\n' "$MODELD_SHA256" "$archive" | sha256sum -c -
+          python3 ../scripts/modeld-publish.py --check-only "$archive" |
+            jq --arg archive "$archive" '{schema: 1, builds: [. | .archive = $archive | .sha256 = ($archive + ".sha256")]}' > index.json
+          sha256sum "$archive" "$archive.sha256" "$archive.build.json" index.json > "$RUNNER_TEMP/modeld-checksums"
+
       - name: Create or update draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -280,6 +296,7 @@ jobs:
           gh release download "$VERSION" --dir verify --clobber
           cd verify
           sha256sum -c SHA256SUMS
+          sha256sum -c "$RUNNER_TEMP/modeld-checksums"
 
       - name: Publish
         env:
