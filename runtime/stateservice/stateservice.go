@@ -82,10 +82,10 @@ func (s *service) Get(ctx context.Context) ([]statetype.BackendRuntimeState, err
 }
 
 func (s *service) SetupStatus(ctx context.Context) (setupcheck.Result, error) {
-	states, err := s.Get(ctx)
-	if err != nil {
+	if err := s.state.RecheckIfStale(ctx); err != nil {
 		return setupcheck.Result{}, err
 	}
+	states := setupcheck.StatesFromMap(s.state.Get(ctx))
 	in, err := setupcheck.GatherInput(ctx, s.db, states, s.workspaceID)
 	if err != nil {
 		return setupcheck.Result{}, err

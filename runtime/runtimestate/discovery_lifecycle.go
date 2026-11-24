@@ -13,6 +13,7 @@ import (
 type discoveryLifecycle struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
+	budget    time.Duration
 	mu        sync.Mutex
 	running   bool
 	stopped   bool
@@ -22,17 +23,30 @@ type discoveryLifecycle struct {
 }
 
 func (s *State) StartDiscovery(ctx context.Context) (stop func(), err error) {
+	return s.StartDiscoveryWithBudget(ctx, 0)
+}
+
+// StartDiscoveryWithBudget bounds each background catalog cycle independently of
+// the lifetime of the serving process. Stopping discovery cancels and joins its workers.
+func (s *State) StartDiscoveryWithBudget(ctx context.Context, budget time.Duration) (stop func(), err error) {
 	if s.discovery != nil {
 		return nil, errors.New("backend discovery already started")
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	d := &discoveryLifecycle{ctx: ctx, cancel: cancel, pending: map[string]bool{}}
+	d := &discoveryLifecycle{ctx: ctx, cancel: cancel, budget: budget, pending: map[string]bool{}}
 	s.discovery = d
 	if err := d.refresh(ctx, s); err != nil {
 		d.stop()
 		return nil, err
 	}
 	return d.stop, nil
+}
+
+func (d *discoveryLifecycle) cycleContext() (context.Context, context.CancelFunc) {
+	if d.budget > 0 {
+		return context.WithTimeout(d.ctx, d.budget)
+	}
+	return context.WithCancel(d.ctx)
 }
 
 func (s *State) discoveryTracker() libtracker.ActivityTracker {
@@ -61,7 +75,9 @@ func (d *discoveryLifecycle) refresh(ctx context.Context, s *State) error {
 	go func() {
 		defer d.workers.Done()
 		reportErr, _, end := s.discoveryTracker().Start(d.ctx, "sync", "backend_cycle")
-		if err := s.RunBackendCycle(d.ctx); err != nil {
+		cycleCtx, cancel := d.cycleContext()
+		defer cancel()
+		if err := s.RunBackendCycle(cycleCtx); err != nil {
 			reportErr(err)
 		}
 		end()
@@ -95,7 +111,9 @@ func (d *discoveryLifecycle) refreshProviders(s *State, ids []string) error {
 	go func() {
 		defer d.workers.Done()
 		reportErr, _, end := s.discoveryTracker().Start(d.ctx, "sync", "provider_cycle", "providers", scheduled)
-		if err := s.RefreshProviderModels(d.ctx, scheduled...); err != nil {
+		cycleCtx, cancel := d.cycleContext()
+		defer cancel()
+		if err := s.RefreshProviderModels(cycleCtx, scheduled...); err != nil {
 			reportErr(err)
 		}
 		end()
@@ -140,9 +158,10 @@ func (s *State) ScheduleProviderRefresh(ctx context.Context, providers ...string
 
 func (s *State) RecheckIfStale(ctx context.Context) error {
 	if s.discovery != nil {
-		if err := s.discovery.wait(ctx); err != nil {
+		if err := s.discovery.refresh(ctx, s); err != nil {
 			return err
 		}
+		return s.discovery.wait(ctx)
 	}
 	if !s.claimReconcile(time.Now()) {
 		return nil

@@ -13,6 +13,7 @@ import (
 	"github.com/contenox/runtime/runtime/enginesvc"
 	"github.com/contenox/runtime/runtime/internal/setupcheck"
 	"github.com/contenox/runtime/runtime/runtimetypes"
+	"github.com/stretchr/testify/require"
 )
 
 func hasIssueCode(issues []setupcheck.Issue, code string) bool {
@@ -140,6 +141,24 @@ func TestSystem_Build_BackendCycleBudget_boundsAnUnresponsiveProvider(t *testing
 	}); err != nil {
 		t.Fatalf("create backend: %v", err)
 	}
+
+	t.Run("deferred discovery leaves local reads available", func(t *testing.T) {
+		buildCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		eng, err := enginesvc.Build(buildCtx, db, enginesvc.Config{DeferDiscovery: true})
+		require.NoError(t, err)
+		defer eng.Stop()
+		require.NotContains(t, eng.State.Get(ctx), "unresponsive")
+
+		stop, err := eng.State.StartDiscoveryWithBudget(buildCtx, time.Second)
+		require.NoError(t, err)
+		defer stop()
+		require.NoError(t, eng.State.ReconcileIfStale(buildCtx))
+		probeCtx, stopWaiting := context.WithTimeout(buildCtx, 50*time.Millisecond)
+		defer stopWaiting()
+		_, err = eng.SetupStatus(probeCtx)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	})
 
 	start := time.Now()
 	eng, err := enginesvc.Build(ctx, db, enginesvc.Config{

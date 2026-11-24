@@ -74,9 +74,7 @@ const (
 	remoteBindAddr   = "0.0.0.0"
 )
 
-// serveBackendCycleBudget bounds startup discovery so a provider that answers slowly or not
-// at all cannot keep the listener from binding; the state records the timeout and the next
-// refresh probes again.
+// serveBackendCycleBudget bounds background probes, including the first catalog refresh.
 const serveBackendCycleBudget = 15 * time.Second
 
 // catalogRefreshInterval is how often a serving runtime re-probes its providers. A provider
@@ -402,7 +400,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		AltDefaultProvider: opts.EffectiveAltDefaultProvider,
 		ContextLength:      opts.EffectiveContext,
 		NoDeleteModels:     opts.EffectiveNoDeleteModels,
-		BackendCycleBudget: serveBackendCycleBudget,
+		DeferDiscovery:     true,
 		LocalTools:         localTools,
 		EnableHITL:         true,
 		AskApproval:        askApproval,
@@ -422,6 +420,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("build engine: runtime state is not configured")
 	}
 	defer engine.Stop()
+	stopDiscovery, err := engine.State.StartDiscoveryWithBudget(ctx, serveBackendCycleBudget)
+	if err != nil {
+		return fmt.Errorf("start provider discovery: %w", err)
+	}
+	defer stopDiscovery()
 	workspaceWatcher := newWorkspaceWatcher(workspaceEvents, workspaceFactory, workspaceLeaseDir(dbPath), workspaceID, nodeID, tracker)
 	workspaceWatcher.Start(ctx)
 	defer workspaceWatcher.Stop()

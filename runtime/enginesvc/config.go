@@ -49,9 +49,9 @@ type Config struct {
 
 	SkipBackendCycle bool
 
-	// BackendCycleBudget bounds the first backend cycle, so a serving process binds even
-	// when a registered provider answers slowly or not at all. Zero leaves the cycle
-	// unbounded; a caller that answers with the state it just built needs it unbounded.
+	// DeferDiscovery leaves discovery and the first readiness check to the caller.
+	DeferDiscovery bool
+	// BackendCycleBudget bounds synchronous startup discovery. Zero leaves it unbounded.
 	BackendCycleBudget time.Duration
 
 	WorkspaceID      string

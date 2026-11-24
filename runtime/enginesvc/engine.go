@@ -66,6 +66,7 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 	if state == nil {
 		stateOpts := []runtimestate.Option{
 			runtimestate.WithKVStore(kvMgr),
+			runtimestate.WithTracker(cfg.Tracker),
 			runtimestate.WithAutoDiscoverModels(),
 		}
 		if cfg.NoDeleteModels {
@@ -122,7 +123,7 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 		}
 	}
 
-	if !cfg.SkipBackendCycle {
+	if !cfg.DeferDiscovery && !cfg.SkipBackendCycle {
 		cycleCtx := ctx
 		cancelCycle := func() {}
 		if cfg.BackendCycleBudget > 0 {
@@ -159,11 +160,13 @@ func Build(ctx context.Context, db libdbexec.DBManager, cfg Config) (*Engine, er
 		}
 		return setupcheck.OverlayEffectiveDefaults(r, cfg.ReadinessDefaultModel, cfg.ReadinessDefaultProvider), nil
 	}
-	res, err := setupStatus(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("setup status failed: %w", err)
+	if !cfg.DeferDiscovery {
+		res, err := setupStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("setup status failed: %w", err)
+		}
+		engine.SetupCheck = res
 	}
-	engine.SetupCheck = res
 	engine.SetupStatus = setupStatus
 
 	tokenizer := ollamatokenizer.NewEstimateTokenizer()
