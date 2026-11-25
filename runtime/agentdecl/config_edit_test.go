@@ -205,7 +205,7 @@ func TestUnit_ConfigEdit_ReplacingAGroupSpreadOverSeveralPlacesMergesThem(t *tes
 
 func TestUnit_ConfigEdit_AnEditNeverChangesMoreThanItsTargetOnTheShippedFile(t *testing.T) {
 	raw := shippedText(t)
-	for _, name := range []string{"read_only", "ask_always", "auto_edit", "default", "strict", "acp", "dev", "acpx", "oracle"} {
+	for _, name := range []string{"read_only", "browser_research", "ask_always", "auto_edit", "default", "strict", "acp", "dev", "acpx", "oracle"} {
 		out, removed, err := agentdecl.DeleteLayerItem(raw, "envelopes", name)
 		require.NoErrorf(t, err, "delete %s", name)
 		require.True(t, removed)
