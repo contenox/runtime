@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/contenox/runtime/libacp"
@@ -14,6 +15,7 @@ import (
 	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/turninput"
 )
 
 type nativeTurnViewer struct {
@@ -132,24 +134,65 @@ func (tr *nativeEventTranslator) publish(ctx context.Context, sid libacp.Session
 	}
 }
 
-func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, images []taskengine.ImagePart, audio []taskengine.AudioPart, droppedWhy droppedReasons, droppedContentKinds []string) (libacp.PromptResponse, error) {
+func (t *Transport) handleSteer(ctx context.Context, params json.RawMessage) (json.RawMessage, *libacp.Error) {
+	var p struct {
+		libacp.PromptRequest
+		Text string `json:"text"` // Earlier clients sent a single text field.
+	}
+	if json.Unmarshal(params, &p) != nil || p.SessionID == "" {
+		return nil, libacp.InvalidParams("sessionId and prompt are required")
+	}
+	if p.Prompt == nil && strings.TrimSpace(p.Text) != "" {
+		p.Prompt = []libacp.ContentBlock{libacp.NewTextContent(p.Text)}
+	}
+	sess, ok := t.sessionFor(p.SessionID)
+	if !ok {
+		return nil, libacp.InvalidParams("unknown session")
+	}
+	if _, native := sess.driver.(*nativeDriver); !native || t.deps.NativeTurns == nil {
+		return nil, libacp.InvalidParams("steering requires a native chat")
+	}
+	content, rpcErr := t.prepareUserInput(ctx, p.PromptRequest, sess)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var notice *libacp.SessionUpdate
+	if update, dropped := droppedContentNotice(content.dropped, content.reasons); dropped {
+		notice = &update
+	}
+	queued, err := t.deps.NativeTurns.Enqueue(p.SessionID, content.Message, notice)
+	if err != nil {
+		return nil, libacp.InvalidParams(err.Error())
+	}
+	receipt := map[string]any{"queued": queued}
+	if queued && notice != nil {
+		receipt["_meta"] = notice.Meta
+	}
+	return mustJSON(receipt), nil
+}
+
+func (d *nativeDriver) promptViaRegistry(ctx context.Context, sid libacp.SessionID, sess *sessionEntry, content nativeUserInput) (libacp.PromptResponse, error) {
 	t := d.t
 	policy, _ := ctx.Value(eventTurnPolicy{}).(string)
 
-	viewer := newNativeTurnViewer(t, req.SessionID)
-	turnFn := func(turnCtx context.Context, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
-		if policy != "" {
+	viewer := newNativeTurnViewer(t, sid)
+	var turn *nativeturn.Turn
+	var err error
+	if policy != "" {
+		turn, _, err = t.deps.NativeTurns.StartIfIdle(sid, func(turnCtx context.Context, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
 			turnCtx = context.WithValue(turnCtx, eventTurnPolicy{}, policy)
 			turnCtx = runtimetypes.WithEventHop(turnCtx, runtimetypes.EventHopFromContext(ctx))
-		}
-		return d.runNativeTurn(turnCtx, req, sess, input, images, audio, droppedWhy, droppedContentKinds, emit)
+			return d.runNativeTurn(turnCtx, sid, sess, content, nil, emit)
+		}, viewer)
+	} else {
+		turn, _, err = t.deps.NativeTurns.StartInteractive(sid, func(turnCtx context.Context, emit func(context.Context, libacp.SessionNotification), first *turninput.Message, pending turninput.Pending) nativeturn.Result {
+			input := content
+			if first != nil {
+				input = nativeUserInput{Message: *first}
+			}
+			return d.runNativeTurn(turnCtx, sid, sess, input, pending, emit)
+		}, viewer)
 	}
-
-	start := t.deps.NativeTurns.Start
-	if policy != "" {
-		start = t.deps.NativeTurns.StartIfIdle
-	}
-	turn, _, err := start(req.SessionID, turnFn, viewer)
 	if err != nil {
 		if policy != "" {
 			return libacp.PromptResponse{}, err
@@ -161,7 +204,7 @@ func (d *nativeDriver) promptViaRegistry(ctx context.Context, req libacp.PromptR
 	case <-turn.Done():
 		turn.Detach(viewer.ID())
 		resp, err := nativeResultToResponse(turn.Result())
-		return withDroppedContentMeta(resp, droppedContentKinds, droppedWhy), err
+		return withDroppedContentMeta(resp, content.dropped, content.reasons), err
 	case <-ctx.Done():
 		turn.Detach(viewer.ID())
 		if policy != "" {
@@ -181,18 +224,18 @@ func nativeResultToResponse(res nativeturn.Result) (libacp.PromptResponse, error
 	return libacp.PromptResponse{StopReason: res.StopReason}, nil
 }
 
-func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptRequest, sess *sessionEntry, input string, images []taskengine.ImagePart, audio []taskengine.AudioPart, droppedWhy droppedReasons, droppedContentKinds []string, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
+func (d *nativeDriver) runNativeTurn(turnCtx context.Context, sid libacp.SessionID, sess *sessionEntry, input nativeUserInput, pending turninput.Pending, emit func(context.Context, libacp.SessionNotification)) nativeturn.Result {
 	t := d.t
 
 	turnCtx = libtracker.WithNewRequestID(turnCtx)
 	reqID, _ := turnCtx.Value(libtracker.ContextKeyRequestID).(string)
 
 	reportErr, reportChange, end := t.tracker().Start(turnCtx, "prompt", "acp_session",
-		"session_id", string(req.SessionID), "prompt_blocks", len(req.Prompt))
+		"session_id", string(sid), "prompt_blocks", input.BlockCount)
 	defer end()
 
 	// Journaled ahead of anything the turn produces.
-	announceDroppedContent(turnCtx, req.SessionID, droppedContentKinds, droppedWhy, emit)
+	announceDroppedContent(turnCtx, sid, input.dropped, input.reasons, emit)
 
 	policyName := t.resolveSessionHITLPolicy(sess)
 	if eventPolicy, ok := turnCtx.Value(eventTurnPolicy{}).(string); ok {
@@ -216,7 +259,7 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 		sub, err := bus.Stream(turnCtx, taskengine.TaskEventRequestSubject(reqID), rawCh)
 		if err != nil {
 			subErr, _, subEnd := t.tracker().Start(turnCtx, "subscribe", "acp_event_stream",
-				"session_id", string(req.SessionID), "request_id", reqID)
+				"session_id", string(sid), "request_id", reqID)
 			subErr(err)
 			subEnd()
 		} else {
@@ -224,7 +267,7 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 			go func() {
 				defer close(translateDone)
 				for payload := range rawCh {
-					translator.publish(turnCtx, req.SessionID, payload)
+					translator.publish(turnCtx, sid, payload)
 				}
 			}()
 			drainEvents = func() {
@@ -257,17 +300,17 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 		}
 	}
 
-	contextLen := t.sessionContextLength(turnCtx, sess)
-
 	resp, err := d.agent.Prompt(turnCtx, agentservice.PromptRequest{
 		SessionID:      sess.InternalSessionID,
-		Input:          input,
-		Images:         images,
-		Audio:          audio,
+		InputMessageID: input.ID,
+		PendingInput:   pending,
+		Input:          input.Text,
+		Images:         input.Images,
+		Audio:          input.Audio,
 		Chain:          t.deps.ChainRegistry.Default(),
 		TemplateVars:   templateVars,
 		ToolsAllowlist: toolsAllowlist,
-		ContextLength:  contextLen,
+		ContextLength:  t.sessionContextLength(turnCtx, sess),
 	})
 
 	if drainEvents != nil {
@@ -277,10 +320,10 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 	if err != nil {
 		cancelled := errors.Is(err, context.Canceled) || errors.Is(turnCtx.Err(), context.Canceled)
 		if cancelled {
-			reportChange(string(req.SessionID), map[string]any{
+			reportChange(string(sid), map[string]any{
 				"stop_reason":           string(libacp.StopReasonCancelled),
 				"request_id":            reqID,
-				"dropped_content_kinds": droppedContentKinds,
+				"dropped_content_kinds": input.dropped,
 			})
 			return nativeturn.Result{StopReason: libacp.StopReasonCancelled}
 		}
@@ -296,12 +339,12 @@ func (d *nativeDriver) runNativeTurn(turnCtx context.Context, req libacp.PromptR
 		stopReason = libacp.StopReasonCancelled
 	}
 
-	d.emitSessionInfo(turnCtx, req.SessionID, sess, emit)
+	d.emitSessionInfo(turnCtx, sid, sess, emit)
 
-	reportChange(string(req.SessionID), map[string]any{
+	reportChange(string(sid), map[string]any{
 		"stop_reason":           string(stopReason),
 		"request_id":            reqID,
-		"dropped_content_kinds": droppedContentKinds,
+		"dropped_content_kinds": input.dropped,
 	})
 	return nativeturn.Result{StopReason: stopReason}
 }

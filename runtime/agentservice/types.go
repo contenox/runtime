@@ -6,11 +6,14 @@ import (
 	"strings"
 
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/turninput"
 )
 
 type PromptRequest struct {
-	SessionID string
-	Input     string
+	SessionID      string
+	Input          string
+	InputMessageID string
+	PendingInput   turninput.Pending
 	// Images and Audio are attachments riding this turn's user message.
 	Images         []taskengine.ImagePart
 	Audio          []taskengine.AudioPart

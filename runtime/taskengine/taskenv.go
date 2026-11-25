@@ -485,6 +485,10 @@ func (env SimpleEnv) ExecEnv(ctx context.Context, chain *TaskChainDefinition, in
 				stepEvent.OutputType = ""
 				publishTaskEventBestEffort(taskCtx, env.tracker, env.eventSink, stepEvent)
 				reportErrAttempt(taskErr)
+				// A failed model call may have already consumed live user input.
+				if currentTask.Handler == HandleChatCompletion && outputType == DataTypeChatHistory {
+					taskInput, taskInputType = output, outputType
+				}
 				continue
 			}
 			publishTaskEventBestEffort(taskCtx, env.tracker, env.eventSink, stepEvent)

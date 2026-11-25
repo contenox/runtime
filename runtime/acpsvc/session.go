@@ -3,7 +3,6 @@ package acpsvc
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -23,8 +22,10 @@ import (
 	"github.com/contenox/runtime/runtime/chatservice"
 	"github.com/contenox/runtime/runtime/connectorservice"
 	"github.com/contenox/runtime/runtime/missionservice"
+	"github.com/contenox/runtime/runtime/nativeturn"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/turninput"
 	"github.com/contenox/runtime/runtime/vfs"
 )
 
@@ -187,6 +188,9 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 		messageID := fmt.Sprintf("replay-%d", i)
 		switch m.Role {
 		case "user":
+			if strings.HasPrefix(m.ID, "steer-") {
+				messageID = m.ID
+			}
 			if m.Content == "" && len(m.Images) == 0 && len(m.Audio) == 0 {
 				continue
 			}
@@ -198,17 +202,8 @@ func (t *Transport) replayMessages(ctx context.Context, sessionID libacp.Session
 					Update:    update,
 				})
 			}
-			for _, img := range m.Images {
-				t.sendUpdate(ctx, libacp.SessionNotification{
-					SessionID: sessionID,
-					Update:    userAttachmentChunk(messageID, libacp.NewImageContent(base64.StdEncoding.EncodeToString(img.Data), img.MimeType)),
-				})
-			}
-			for _, clip := range m.Audio {
-				t.sendUpdate(ctx, libacp.SessionNotification{
-					SessionID: sessionID,
-					Update:    userAttachmentChunk(messageID, libacp.NewAudioContent(base64.StdEncoding.EncodeToString(clip.Data), clip.MimeType)),
-				})
+			for chunk := range nativeturn.AttachmentChunks(turninput.Message{ID: messageID, Images: m.Images, Audio: m.Audio}) {
+				t.sendUpdate(ctx, libacp.SessionNotification{SessionID: sessionID, Update: chunk})
 			}
 			users++
 		case "assistant":
@@ -1228,8 +1223,4 @@ func parseDBTimeString(s string) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
-}
-
-func userAttachmentChunk(messageID string, content libacp.ContentBlock) libacp.SessionUpdate {
-	return libacp.SessionUpdate{SessionUpdate: libacp.SessionUpdateUserMessageChunk, Content: &content, MessageID: messageID}
 }

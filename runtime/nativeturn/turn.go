@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/contenox/runtime/libacp"
+	"github.com/contenox/runtime/runtime/turninput"
 )
 
 const (
@@ -51,19 +52,25 @@ type turnSession struct {
 	viewers       map[string]Viewer
 	order         []string
 	finished      bool
+	interactive   InteractiveFunc
+	pending       []turninput.Message
 	graceTimer    *time.Timer
 	graceDeadline time.Time
 }
 
 func (ts *turnSession) emit(ctx context.Context, n libacp.SessionNotification) {
 	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.emitLocked(ctx, n)
+}
+
+func (ts *turnSession) emitLocked(ctx context.Context, n libacp.SessionNotification) {
 	ts.seq++
 	ev := Event{Seq: ts.seq, Update: n}
 	ts.journal.append(ev)
 	for _, id := range ts.order {
 		_ = ts.viewers[id].Deliver(ctx, ev)
 	}
-	ts.mu.Unlock()
 }
 
 func (ts *turnSession) attach(ctx context.Context, v Viewer) error {
@@ -120,14 +127,29 @@ func (ts *turnSession) detach(viewerID string) {
 }
 
 func (ts *turnSession) run(fn TurnFunc) {
-	ts.markFinished(fn(ts.turnCtx, ts.emit))
-}
-
-func (ts *turnSession) markFinished(res Result) {
-	ts.mu.Lock()
-	if ts.finished {
+	var res Result
+	var first *turninput.Message
+	for {
+		if ts.interactive != nil {
+			res = ts.interactive(ts.turnCtx, ts.emit, first, ts.nextInput)
+		} else {
+			res = fn(ts.turnCtx, ts.emit)
+		}
+		ts.mu.Lock()
+		if len(ts.pending) == 0 {
+			break
+		}
+		next := ts.pending[0]
+		// A failed, cancelled or non-conversational chain must not restart indefinitely.
+		if ts.turnCtx.Err() != nil || res.Err != nil || res.StopReason != libacp.StopReasonEndTurn || (first != nil && next.ID == first.ID) {
+			for _, input := range ts.pending {
+				ts.notifyInputLocked(input, "undelivered")
+			}
+			ts.pending = nil
+			break
+		}
+		first = &next
 		ts.mu.Unlock()
-		return
 	}
 	ts.finished = true
 	ts.result = res

@@ -13,6 +13,7 @@ import (
 	"github.com/contenox/runtime/runtime/missiontools"
 	"github.com/contenox/runtime/runtime/runtimetypes"
 	"github.com/contenox/runtime/runtime/taskengine"
+	"github.com/contenox/runtime/runtime/turninput"
 )
 
 func (t *Transport) Prompt(ctx context.Context, req libacp.PromptRequest) (libacp.PromptResponse, error) {
@@ -75,38 +76,13 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 		return libacp.PromptResponse{}, err
 	}
 
-	// Extracted before FlattenContent, whose text projection would drop them.
-	images, nonImageBlocks := extractImageParts(req.Prompt)
-	audio, textBlocks := extractAudioParts(nonImageBlocks)
-	input, droppedContentKinds := libacp.FlattenContent(textBlocks)
-
-	droppedWhy := droppedReasons{}
-	if len(images) > 0 {
-		if reason := t.sessionImageRefusal(ctx, sess); reason != "" {
-			droppedWhy[string(libacp.ContentKindImage)] = reason
-			images = nil
-			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindImage))
-		}
+	content, contentErr := t.prepareUserInput(ctx, req, sess)
+	if contentErr != nil {
+		reportErr(contentErr)
+		return libacp.PromptResponse{}, contentErr
 	}
-	if len(audio) > 0 {
-		if reason := t.sessionAudioRefusal(ctx, sess); reason != "" {
-			droppedWhy[string(libacp.ContentKindAudio)] = reason
-			audio = nil
-			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindAudio))
-		}
-	}
-
-	if input == "" && len(images) == 0 && len(audio) == 0 {
-		if len(droppedWhy) > 0 {
-			announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
-			err := libacp.NewError(libacp.ErrInvalidParams, strings.TrimSpace(droppedWhy[string(libacp.ContentKindImage)]+" "+droppedWhy[string(libacp.ContentKindAudio)]))
-			reportErr(err)
-			return libacp.PromptResponse{}, err
-		}
-		err := libacp.NewError(libacp.ErrInvalidParams, "empty prompt")
-		reportErr(err)
-		return libacp.PromptResponse{}, err
-	}
+	input, images, audio := content.Text, content.Images, content.Audio
+	droppedContentKinds, droppedWhy := content.dropped, content.reasons
 
 	t.setProvisionalTitle(ctx, req.SessionID, sess, input)
 
@@ -145,7 +121,8 @@ func (d *nativeDriver) Prompt(ctx context.Context, req libacp.PromptRequest, ses
 	sess.setLastPrompt(input)
 
 	if t.deps.NativeTurns != nil {
-		return d.promptViaRegistry(ctx, req, sess, input, images, audio, droppedWhy, droppedContentKinds)
+		content.Text = input
+		return d.promptViaRegistry(ctx, req.SessionID, sess, content)
 	}
 
 	announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
@@ -276,4 +253,50 @@ func mapStopReason(r agentservice.StopReason) libacp.StopReason {
 		return libacp.StopReasonCancelled
 	}
 	return libacp.StopReasonEndTurn
+}
+
+type nativeUserInput struct {
+	turninput.Message
+	dropped []string
+	reasons droppedReasons
+}
+
+// Both prompt admission paths decode ACP content and consult the selected model here.
+func (t *Transport) prepareUserInput(ctx context.Context, req libacp.PromptRequest, sess *sessionEntry) (nativeUserInput, *libacp.Error) {
+	images, nonImageBlocks := extractImageParts(req.Prompt)
+	audio, textBlocks := extractAudioParts(nonImageBlocks)
+	input, droppedContentKinds := libacp.FlattenContent(textBlocks)
+
+	droppedWhy := droppedReasons{}
+	if len(images) > 0 {
+		if reason := t.sessionImageRefusal(ctx, sess); reason != "" {
+			droppedWhy[string(libacp.ContentKindImage)] = reason
+			images = nil
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindImage))
+		}
+	}
+	if len(audio) > 0 {
+		if reason := t.sessionAudioRefusal(ctx, sess); reason != "" {
+			droppedWhy[string(libacp.ContentKindAudio)] = reason
+			audio = nil
+			droppedContentKinds = appendDroppedKind(droppedContentKinds, string(libacp.ContentKindAudio))
+		}
+	}
+
+	if input == "" && len(images) == 0 && len(audio) == 0 {
+		if len(droppedWhy) > 0 {
+			announceDroppedContent(ctx, req.SessionID, droppedContentKinds, droppedWhy, t.sendUpdate)
+			err := libacp.NewError(libacp.ErrInvalidParams, strings.TrimSpace(droppedWhy[string(libacp.ContentKindImage)]+" "+droppedWhy[string(libacp.ContentKindAudio)]))
+			return nativeUserInput{}, err
+		}
+		if len(droppedContentKinds) > 0 {
+			return nativeUserInput{}, libacp.InvalidParams("No usable prompt content in the supplied blocks: " + strings.Join(droppedContentKinds, ", "))
+		}
+		return nativeUserInput{}, libacp.InvalidParams("empty prompt")
+	}
+
+	return nativeUserInput{
+		Message: turninput.Message{Text: input, Images: images, Audio: audio, BlockCount: len(req.Prompt)},
+		dropped: droppedContentKinds, reasons: droppedWhy,
+	}, nil
 }

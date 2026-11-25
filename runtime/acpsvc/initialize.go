@@ -74,6 +74,9 @@ func (t *Transport) Initialize(ctx context.Context, req libacp.InitializeRequest
 	meta := map[string]any{
 		AvailableCommandsMetaKey: t.acpCommands(),
 	}
+	if t.deps.NativeTurns != nil {
+		meta["contenox.sessionSteering"] = true
+	}
 	if t.deps.Engine != nil {
 		if opts := t.workspaceConfigOptions(ctx); len(opts) > 0 {
 			meta[WorkspaceConfigOptionsMetaKey] = opts

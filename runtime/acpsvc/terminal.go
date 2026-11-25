@@ -40,6 +40,8 @@ type terminalRunResult struct {
 
 func (t *Transport) handleExtRequest(ctx context.Context, method string, params json.RawMessage) (json.RawMessage, *libacp.Error) {
 	switch method {
+	case "_contenox/session/steer":
+		return t.handleSteer(ctx, params)
 	case extMethodAutocomplete:
 		return t.handleAutocomplete(ctx, params)
 	case extMethodNextEdit:

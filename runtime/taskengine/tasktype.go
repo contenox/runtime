@@ -9,6 +9,7 @@ import (
 
 	"github.com/contenox/runtime/runtime/modelrepo"
 	"github.com/contenox/runtime/runtime/taskengine/llmretry"
+	"github.com/contenox/runtime/runtime/turninput"
 	"gopkg.in/yaml.v3"
 )
 
@@ -397,10 +398,7 @@ type MessageAuthor struct {
 	Name string `json:"name,omitempty"`
 }
 
-type ImagePart struct {
-	Data     []byte `json:"data"`
-	MimeType string `json:"mime_type" example:"image/png"`
-}
+type ImagePart = turninput.ImagePart
 
 type ToolImageResult struct {
 	Text   string
@@ -408,10 +406,7 @@ type ToolImageResult struct {
 	Audio  []AudioPart
 }
 
-type AudioPart struct {
-	Data     []byte `json:"data"`
-	MimeType string `json:"mime_type" example:"audio/wav"`
-}
+type AudioPart = turninput.AudioPart
 
 type Tool struct {
 	Type     string       `json:"type"`

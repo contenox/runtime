@@ -1108,6 +1108,7 @@ func (exe *SimpleExec) executeLLM(
 	defer end()
 
 	input.Messages = repairToolCallPairing(input.Messages)
+	batch, delivered := prepareSteering(ctx, &input)
 
 	tools := []libmodelprovider.Tool{}
 	hiddenTools := map[string]struct{}{}
@@ -1319,6 +1320,16 @@ func (exe *SimpleExec) executeLLM(
 		},
 	}
 
+	if delivered != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, DataTypeAny, "", meta, err
+		}
+		// Context shifting must retain the queued user message for it to count as delivered.
+		if !containsSteering(input.Messages, batch) {
+			return nil, DataTypeAny, "", meta, fmt.Errorf("queued user message did not fit the model context")
+		}
+		delivered()
+	}
 	streamed, resp, meta, err := exe.streamWithRetry(ctx, reportChange, llmCall, req, messagesC, chatArgs)
 	if !streamed && err != nil && streamSetupCanFallback(err) {
 		resp, meta, err = exe.chatWithRetry(ctx, reportChange, llmCall, req, messagesC, chatArgs)
@@ -1351,6 +1362,9 @@ func (exe *SimpleExec) executeLLM(
 		}
 	}
 	if err != nil {
+		if delivered != nil {
+			return input, DataTypeChatHistory, "", meta, fmt.Errorf("chat failed: %w", err)
+		}
 		return nil, DataTypeAny, "", meta, fmt.Errorf("chat failed: %w", err)
 	}
 
@@ -1391,6 +1405,9 @@ func (exe *SimpleExec) executeLLM(
 		if err != nil {
 			err = fmt.Errorf("tokenizer failed: %w", err)
 			reportErr(err)
+			if delivered != nil {
+				return input, DataTypeChatHistory, "", meta, err
+			}
 			return nil, DataTypeAny, "", meta, err
 		}
 	}

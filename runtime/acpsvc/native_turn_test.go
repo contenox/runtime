@@ -126,6 +126,100 @@ type promptOutcome struct {
 	err  error
 }
 
+type followupAgent struct {
+	*blockingAgent
+	prompts []agentservice.PromptRequest
+}
+
+func TestSteeringReportsRefusedAttachments(t *testing.T) {
+	ctx := context.Background()
+	a := &followupAgent{blockingAgent: newBlockingAgent()}
+	tr, sid, reg := transportWithRegistry(a)
+	defer reg.Close()
+	tr.statesFn = twoConnectionStates // Both configured models accept text only.
+	done := make(chan error, 1)
+	go func() {
+		_, err := tr.Prompt(ctx, promptReq(sid))
+		done <- err
+	}()
+	<-a.started
+	steer := func(blocks ...libacp.ContentBlock) (json.RawMessage, *libacp.Error) {
+		return tr.handleSteer(ctx, mustJSON(libacp.PromptRequest{SessionID: sid, Prompt: blocks}))
+	}
+	clip := libacp.NewAudioContent("d2F2", "audio/wav")
+	_, rpcErr := steer(clip)
+	require.NotNil(t, rpcErr)
+	require.Contains(t, rpcErr.Message, "audio")
+	raw, rpcErr := steer(libacp.NewTextContent("Use the transcript"), clip)
+	require.Nil(t, rpcErr)
+	var receipt struct {
+		Queued bool                            `json:"queued"`
+		Meta   map[string]droppedContentReport `json:"_meta"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &receipt))
+	require.True(t, receipt.Queued)
+	require.Equal(t, []string{"audio"}, receipt.Meta[droppedContentMetaKey].Kinds)
+	close(a.release)
+	require.NoError(t, <-done)
+	require.Len(t, a.prompts, 2)
+	require.Equal(t, "Use the transcript", a.prompts[1].Input)
+	require.Empty(t, a.prompts[1].Audio)
+}
+
+func (a *followupAgent) Prompt(ctx context.Context, req agentservice.PromptRequest) (*agentservice.PromptResponse, error) {
+	a.prompts = append(a.prompts, req)
+	if len(a.prompts) == 1 {
+		return a.blockingAgent.Prompt(ctx, req)
+	}
+	_, delivered := req.PendingInput()
+	delivered()
+	return &agentservice.PromptResponse{StopReason: agentservice.StopEndTurn}, nil
+}
+
+func TestSteerAtEndOfTurn(t *testing.T) {
+	for _, cancel := range []bool{false, true} {
+		t.Run(map[bool]string{true: "cancel", false: "follow-up"}[cancel], func(t *testing.T) {
+			a := &followupAgent{blockingAgent: newBlockingAgent()}
+			tr, sid, reg := transportWithRegistry(a)
+			defer reg.Close()
+			out := make(chan error, 1)
+			go func() {
+				_, err := tr.Prompt(context.Background(), promptReq(sid))
+				out <- err
+			}()
+			<-a.started
+			params := mustJSON(libacp.PromptRequest{SessionID: sid, Prompt: []libacp.ContentBlock{
+				libacp.NewTextContent("Focus on Windows"),
+				libacp.NewResourceLink("release.log", "release.log"),
+				libacp.NewImageContent("cG5n", "image/png"),
+				libacp.NewAudioContent("d2F2", "audio/wav"),
+			}})
+			raw, rpcErr := tr.handleExtRequest(context.Background(), "_contenox/session/steer", params)
+			require.Nil(t, rpcErr)
+			require.JSONEq(t, `{"queued":true}`, string(raw))
+			if cancel {
+				reg.Cancel(sid)
+			} else {
+				close(a.release)
+			}
+			require.NoError(t, <-out)
+			if cancel {
+				require.Len(t, a.prompts, 1)
+			} else {
+				require.Len(t, a.prompts, 2)
+				require.Equal(t, a.prompts[0].SessionID, a.prompts[1].SessionID)
+				require.Equal(t, "Focus on Windows\nrelease.log: release.log", a.prompts[1].Input)
+				require.Equal(t, []taskengine.ImagePart{{Data: []byte("png"), MimeType: "image/png"}}, a.prompts[1].Images)
+				require.Equal(t, []taskengine.AudioPart{{Data: []byte("wav"), MimeType: "audio/wav"}}, a.prompts[1].Audio)
+				require.NotEmpty(t, a.prompts[1].InputMessageID)
+			}
+			raw, rpcErr = tr.handleSteer(context.Background(), params)
+			require.Nil(t, rpcErr)
+			require.JSONEq(t, `{"queued":false}`, string(raw))
+		})
+	}
+}
+
 func TestSurvival_PromptSurvivesConnectionDrop(t *testing.T) {
 	agent := newBlockingAgent()
 	tr, sid, reg := transportWithRegistry(agent)

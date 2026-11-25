@@ -70,12 +70,18 @@ func (t *Turn) Detach(viewerID string) { t.ts.detach(viewerID) }
 func (t *Turn) Cancel() { t.ts.teardown() }
 
 func (r *Registry) Start(sid libacp.SessionID, fn TurnFunc, viewer Viewer) (*Turn, bool, error) {
-	return r.start(sid, fn, viewer, false)
+	return r.start(sid, fn, nil, viewer, false)
 }
 func (r *Registry) StartIfIdle(sid libacp.SessionID, fn TurnFunc, viewer Viewer) (*Turn, bool, error) {
-	return r.start(sid, fn, viewer, true)
+	return r.start(sid, fn, nil, viewer, true)
 }
-func (r *Registry) start(sid libacp.SessionID, fn TurnFunc, viewer Viewer, onlyIfIdle bool) (*Turn, bool, error) {
+
+// StartInteractive gives the active conversation exclusive ownership of queued user input.
+func (r *Registry) StartInteractive(sid libacp.SessionID, fn InteractiveFunc, viewer Viewer) (*Turn, bool, error) {
+	return r.start(sid, nil, fn, viewer, false)
+}
+
+func (r *Registry) start(sid libacp.SessionID, fn TurnFunc, interactive InteractiveFunc, viewer Viewer, onlyIfIdle bool) (*Turn, bool, error) {
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
@@ -92,6 +98,7 @@ func (r *Registry) start(sid libacp.SessionID, fn TurnFunc, viewer Viewer, onlyI
 		return &Turn{ts: ts}, false, nil
 	}
 	ts := r.newTurnSession(sid)
+	ts.interactive = interactive
 	r.sessions[sid] = ts
 	r.mu.Unlock()
 

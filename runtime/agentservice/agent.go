@@ -146,6 +146,9 @@ func (a *agent) Prompt(ctx context.Context, req PromptRequest) (*PromptResponse,
 		return nil, err
 	}
 	chain := req.Chain
+	if req.PendingInput != nil {
+		ctx = taskengine.WithSteering(ctx, chain.ID, req.PendingInput)
+	}
 
 	templateVars := req.TemplateVars
 	if templateVars == nil {
@@ -318,7 +321,11 @@ func (a *agent) buildChatInput(ctx context.Context, req PromptRequest) (any, tas
 
 	inputContent := ComposeUserInput(req.Input, req.Context)
 
-	userMsg := taskengine.Message{ID: uuid.NewString(), Role: "user", Content: inputContent, Images: req.Images, Audio: req.Audio, Timestamp: time.Now().UTC()}
+	id := req.InputMessageID
+	if id == "" {
+		id = uuid.NewString()
+	}
+	userMsg := taskengine.Message{ID: id, Role: "user", Content: inputContent, Images: req.Images, Audio: req.Audio, Timestamp: time.Now().UTC()}
 	chatInput := taskengine.ChatHistory{
 		Messages: append(history, userMsg),
 	}
