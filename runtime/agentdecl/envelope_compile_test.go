@@ -116,24 +116,25 @@ func TestUnit_Envelopes_DesktopBrowser(t *testing.T) {
 	cfg := mustConfig(t)
 	ctx := runtimetypes.WithDesktopBrowser(t.Context(), &runtimetypes.MCPServer{Name: "browser"})
 	for _, tc := range []struct {
-		profile        string
-		read, interact hitlservice.Action
+		profile               string
+		read, interact, audio hitlservice.Action
 	}{
-		{"read_only", hitlservice.ActionAllow, hitlservice.ActionDeny},
-		{"ask_always", hitlservice.ActionAllow, hitlservice.ActionApprove},
-		{"auto_edit", hitlservice.ActionAllow, hitlservice.ActionApprove},
-		{"default", hitlservice.ActionAllow, hitlservice.ActionApprove},
-		{"acp", hitlservice.ActionAllow, hitlservice.ActionApprove},
-		{"dev", hitlservice.ActionAllow, hitlservice.ActionApprove},
-		{"strict", hitlservice.ActionDeny, hitlservice.ActionDeny},
-		{"acpx", hitlservice.ActionDeny, hitlservice.ActionDeny},
-		{"oracle", hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"read_only", hitlservice.ActionAllow, hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"browser_research", hitlservice.ActionAllow, hitlservice.ActionAllow, hitlservice.ActionDeny},
+		{"ask_always", hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"auto_edit", hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"default", hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"acp", hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"dev", hitlservice.ActionAllow, hitlservice.ActionApprove, hitlservice.ActionApprove},
+		{"strict", hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"acpx", hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
+		{"oracle", hitlservice.ActionDeny, hitlservice.ActionDeny, hitlservice.ActionDeny},
 	} {
 		t.Run(tc.profile, func(t *testing.T) {
 			svc := envelopeEvaluator(t, cfg, tc.profile)
 			for tool, want := range map[string]hitlservice.Action{
 				"snapshot": tc.read, "screenshot": tc.read, "navigate": tc.interact,
-				"click": tc.interact, "type_text": tc.interact, "tab_audio": tc.interact,
+				"click": tc.interact, "type_text": tc.interact, "tab_audio": tc.audio,
 			} {
 				result, err := svc.Evaluate(ctx, "browser", tool, nil)
 				require.NoError(t, err)
@@ -141,6 +142,10 @@ func TestUnit_Envelopes_DesktopBrowser(t *testing.T) {
 			}
 		})
 	}
+	research := envelopeEvaluator(t, cfg, "browser_research")
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, research, "browser", "navigate", nil))
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, research, "webtools", "web_get", nil))
+	assert.Equal(t, hitlservice.ActionDeny, evaluate(t, research, "local_fs", "write_file", map[string]any{"path": "note.txt"}))
 	svc := envelopeEvaluator(t, cfg, "default")
 	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "browser", "snapshot", nil))
 	assert.Equal(t, hitlservice.ActionApprove, evaluate(t, svc, "playwright", "screenshot", nil))

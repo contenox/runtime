@@ -349,6 +349,18 @@ when_key = "path"
 when_op = "glob"
 when_value = "**/{id_rsa,id_dsa,id_ecdsa,id_ed25519}*"
 
+[envelopes.browser_research]
+extends = "read_only"
+description = "Research websites in the desktop Browser. Allow navigation, clicks and typing while keeping the workspace read-only."
+default_action = "deny"
+
+[envelopes.browser_research.tools]
+"@desktop-browser.navigate" = "allow"
+"@desktop-browser.click" = "allow"
+"@desktop-browser.type_text" = "allow"
+"@client-mcp.*" = "deny"
+"webtools.*" = "deny"
+
 # Edits ask. This is where the write wall lives, so that everything extending it
 # inherits the same answer to "which files are not project files": the ones that
 # run something. A shell rc, a systemd unit, a LaunchAgent, a git hook directory

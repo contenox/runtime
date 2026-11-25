@@ -25,6 +25,7 @@ var blessedPreseedHashes = map[string][]string{
 		"b5f0dcf215d1b57144c7704ed1f977d764912e6a3d9b727751086a6cb881b78b",
 		"6b161ca6fff059f62ebfdd04cb1c2ce729198b263a073f3f8744a1e399aef36e",
 		"bd6bcb65a1276dfcf6fb2d39663fbc3cdfb39a848d3b849c6cf236aec5a2963f",
+		"c27dd3cabe318dffe6e39a48aec511aa14823739c5c52de16835e6d968c79083",
 	},
 	"agents/README.md": {
 		"8a5b92e9acf242f8adc01e9a1f271e01653943aa404a93ae6121ee945772692e",

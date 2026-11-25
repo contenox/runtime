@@ -33,7 +33,7 @@ func TestDesktopBrowserSelectedProfileGatesDispatch(t *testing.T) {
 	t.Setenv("CONTENOX_DESKTOP_BROWSER", string(encoded))
 	cfg, err := agentdecl.Shipped()
 	require.NoError(t, err)
-	for _, name := range []string{"default", "strict"} {
+	for _, name := range []string{"default", "strict", "browser_research"} {
 		policy, err := agentdecl.RenderEnvelopePolicy(cfg, name, "")
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, agentdecl.EnvelopePolicyFile(name)), policy, 0600))
@@ -82,6 +82,11 @@ func TestDesktopBrowserSelectedProfileGatesDispatch(t *testing.T) {
 	require.NoError(t, call("default", "snapshot"))
 	require.Len(t, calls, 1)
 	require.Equal(t, server.DesktopBrowserKey(), (<-calls).DesktopBrowser)
+	for _, tool := range []string{"navigate", "snapshot", "screenshot", "click", "type_text"} {
+		require.NoError(t, call("browser_research", tool))
+		require.Equal(t, server.DesktopBrowserKey(), (<-calls).DesktopBrowser)
+	}
+	require.Error(t, call("browser_research", "tab_audio"))
 	require.Error(t, call("default", "tab_audio"))
 	require.Error(t, call("strict", "screenshot"))
 	require.ErrorContains(t, call("default", "navigate"), "Browser registration changed")
